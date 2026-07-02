@@ -34,9 +34,9 @@ flutter build ios --release    # iOS
 
 ## Ключевые ссылки
 
-- [[../../wiki/entities/hiddify-app]] — описание upstream
-- [[../../wiki/entities/hiddify-app-settings-deepwiki-2026-07]] — карта кодовой базы
-- [[../../wiki/entities/vpn-under-china-reality-kiwi-habr-1053250-2026-06]] — UX-флоу через bridge page + deeplink
+- [[../~/LLM-Wiki/entities/hiddify-app]] — описание upstream
+- [[../~/LLM-Wiki/entities/hiddify-app-settings-deepwiki-2026-07]] — карта кодовой базы
+- [[../~/LLM-Wiki/entities/vpn-under-china-reality-kiwi-habr-1053250-2026-06]] — UX-флоу через bridge page + deeplink
 
 ## Когда нанимать разработчика
 
