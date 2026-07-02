@@ -1,25 +1,36 @@
-# Teremok Connect — мобильный клиент
+# Teremok Connect — мобильный клиент (Flutter + Sing-box)
 
-> **Статус**: в разработке. План — форк [Hiddify-App](https://github.com/hiddify/hiddify-app) (Flutter) с кастомным UI/брендингом и интеграцией с нашим backend.
+> ✅ **СТАТУС 2026-07-02 (rev 3):**
+> Решение по мобильному клиенту **финализировано**.
+> Пишем сами на Flutter (UI) + Sing-box (VPN-ядро, GPLv3 без NC).
+> Никаких форков Hiddify-App — лицензия GPLv3+NC запрещает коммерцию без permission.
+> Issue [#2271](https://github.com/hiddify/hiddify-app/issues/2271) в upstream закрыт как `not_planned`.
+>
+> Подробности и обоснование: [`../../wiki/concepts/mobile-fork-strategy`](../../wiki/concepts/mobile-fork-strategy.md).
 
-## Цель форка
+## Что это
 
-1. Переименовать под **Teremok Connect**
-2. Подключить к нашему backend (`api.teremok-connect.ru`)
-3. Заменить UI-тексты и брендинг
-4. Добавить авторизацию по телефону (Flash Call → поле для 4 цифр)
-5. Интегрировать с Telegram-ботом для саппорта
+VPN-клиент для подписчиков Teremok Connect. Кросс-платформенный (iOS, Android, macOS, Windows, Linux). Один Flutter codebase, sing-box ядро под капотом.
+
+## Стек
+
+- **UI:** Flutter 3.x + Dart, Riverpod 2
+- **VPN ядро:** sing-box (Go) через FFI binding
+- **HTTP:** dio → наш FastAPI backend (`/vpn/config`, `/auth/flash-call/*`)
+- **Хранилище:** flutter_secure_storage (Keychain / EncryptedSharedPreferences)
+- **Навигация:** go_router
 
 ## Roadmap
 
-- [ ] Форк Hiddify-App → `teremok-connect/mobile`
-- [ ] Кастомизация брендинга (иконка, splash, цвета)
-- [ ] Подключение к нашему backend
-- [ ] Авторизация Flash Call (UI + логика)
-- [ ] In-app support (открытие Telegram-бота)
-- [ ] Push-уведомления (FCM) для обновлений конфигов
-- [ ] Deep links (`teremok://import-config?url=...`)
-- [ ] Подписочная модель (In-App Purchases + WebView fallback на ЮKassa)
+- [ ] Перенести существующий прототип пользователя из Cursor в `mobile/`
+- [ ] Настроить `pubspec.yaml` (flutter + dio + riverpod + secure_storage)
+- [ ] Подключить sing-box через FFI bridge
+- [ ] Экран авторизации Flash Call (как в backend Phase 2)
+- [ ] Главный экран: статус подключения + кнопка Вкл/Выкл
+- [ ] Экран настроек (серверы, протоколы, theme)
+- [ ] UI Paywall (ЮKassa через WebView)
+- [ ] Локализация ru-RU + en-US
+- [ ] CI: GitHub Actions (Android/Windows/Linux) + Codemagic (iOS/macOS)
 
 ## Разработка
 
@@ -29,25 +40,26 @@ flutter pub get
 flutter run                    # на эмуляторе/устройстве
 flutter test                   # тесты
 flutter build apk --release    # Android
-flutter build ios --release    # iOS
+flutter build ios --release    # iOS (нужен Mac или Codemagic)
 ```
-
-## Ключевые ссылки
-
-- [[../../wiki/entities/hiddify-app]] — описание upstream
-- [[../../wiki/entities/hiddify-app-settings-deepwiki-2026-07]] — карта кодовой базы
-- [[../../wiki/entities/vpn-under-china-reality-kiwi-habr-1053250-2026-06]] — UX-флоу через bridge page + deeplink
 
 ## Когда нанимать разработчика
 
-Форк + кастомизация UI = **2–4 недели** для вайбкодера с Cursor + Claude 4.5.
+Если MVP на Flutter готов, но нужны:
+- Углубленные фичи (kill-switch, split-tunneling, custom DNS)
+- Оптимизация производительности
+- Сложные платформенные интеграции
 
-Если времени нет — найми Flutter-разработчика на 1–2 месяца:
-- Стоимость: 80–150 тыс. ₽/мес
-- Искать: Telegram-чаты Flutter-комьюнити, hh.ru, Хабр Фриланс
+Тогда ищем Flutter-разработчика на 1-2 месяца (80-150 тыс. ₽/мес по плану `vibecoder-roadmap`).
 
 ## Чего НЕ делать
 
-- ❌ Не пиши с нуля свой VPN-клиент (потеря 6+ месяцев)
-- ❌ Не используй React Native (медленнее Flutter для нашего кейса)
-- ❌ Не забывай про iOS — нужен разработчик для App Store review
+- ❌ Не использовать код Hiddify-App (GPLv3+NC, лицензия запрещает коммерцию)
+- ❌ Не использовать React Native (медленнее для VPN-задач)
+- ❌ Не публиковать в App Store / Google Play пока не проверим всё через TestFlight / internal testing
+
+## Связи
+
+→ [`../../wiki/concepts/mobile-fork-strategy`](../../wiki/concepts/mobile-fork-strategy.md) — детальная стратегия
+→ [`../../wiki/entities/sing-box`](../../wiki/entities/sing-box.md) — VPN ядро
+→ [`../../wiki/entities/flutter`](../../wiki/entities/flutter.md) — UI фреймворк
