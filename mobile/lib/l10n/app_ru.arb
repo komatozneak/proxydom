@@ -1,0 +1,11 @@
+{
+  "@@locale": "ru",
+  "appTitle": "Teremok Connect",
+  "loginTitle": "Вход",
+  "loginPlaceholderHint": "Поле для телефона будет в шаге 6",
+  "loginTestButton": "Войти (тестовая кнопка)",
+  "homeTitle": "Главная",
+  "homeVpnHint": "VPN UI — в шагах 9+",
+  "logoutTooltip": "Выйти",
+  "switchLanguage": "RU"
+}

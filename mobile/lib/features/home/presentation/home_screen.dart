@@ -1,41 +1,61 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../app.dart';
 import '../../../../core/router.dart';
+import '../../../../l10n/app_localizations.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final l = AppL10n.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Главная'),
+        title: Text(l.homeTitle),
         actions: [
+          TextButton(
+            onPressed: () {
+              final next = AppLocale.current.languageCode == 'ru'
+                  ? const Locale('en')
+                  : const Locale('ru');
+              AppLocale.set(next);
+              (context as Element).findAncestorWidgetOfExactType<MaterialApp>();
+              Navigator.of(context).pop();
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const Scaffold(
+                    body: Center(child: CircularProgressIndicator()),
+                  ),
+                ),
+              );
+              Navigator.of(context).pop();
+            },
+            child: Text(
+              AppLocale.current.languageCode.toUpperCase(),
+              style: const TextStyle(color: Colors.white),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
+            tooltip: l.logoutTooltip,
             onPressed: () {
               AppRouter.setAuthenticated(false);
               context.go('/login');
             },
-            tooltip: 'Выйти',
           ),
         ],
       ),
-      body: const Center(
+      body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.shield_outlined, size: 96, color: Colors.teal),
-            SizedBox(height: 24),
+            const Icon(Icons.shield_outlined, size: 96, color: Colors.teal),
+            const SizedBox(height: 24),
             Text(
-              'Home Screen',
-              style: TextStyle(fontSize: 28),
-            ),
-            SizedBox(height: 8),
-            Text(
-              '(VPN UI — в шагах 9+)',
-              style: TextStyle(fontSize: 14, color: Colors.grey),
+              l.homeVpnHint,
+              style: const TextStyle(fontSize: 14, color: Colors.grey),
             ),
           ],
         ),

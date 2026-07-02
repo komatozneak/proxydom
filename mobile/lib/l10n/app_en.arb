@@ -1,0 +1,23 @@
+{
+  "@@locale": "en",
+  "appTitle": "Teremok Connect",
+  "@appTitle": {
+    "description": "Title shown in app bar and OS task switcher"
+  },
+  "loginTitle": "Sign in",
+  "@loginTitle": {},
+  "loginPlaceholderHint": "Phone number field comes in step 6",
+  "@loginPlaceholderHint": {},
+  "loginTestButton": "Sign in (test button)",
+  "@loginTestButton": {},
+  "homeTitle": "Home",
+  "@homeTitle": {},
+  "homeVpnHint": "VPN UI — comes in step 9+",
+  "@homeVpnHint": {},
+  "logoutTooltip": "Sign out",
+  "@logoutTooltip": {},
+  "switchLanguage": "EN",
+  "@switchLanguage": {
+    "description": "Short label of language toggle button (shows next-language code)"
+  }
+}
