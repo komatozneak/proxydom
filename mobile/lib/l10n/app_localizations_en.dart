@@ -56,5 +56,16 @@ class AppL10nEn extends AppL10n {
   }
 
   @override
+  String get verifyResend => 'Resend call';
+
+  @override
+  String verifyResendIn(int seconds) {
+    return 'Resend in ${seconds}s';
+  }
+
+  @override
+  String get verifyWrongCode => 'Wrong code, try again';
+
+  @override
   String get switchLanguage => 'EN';
 }

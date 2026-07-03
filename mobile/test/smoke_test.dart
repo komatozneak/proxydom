@@ -8,6 +8,7 @@ import 'package:teremok_connect/core/config.dart';
 import 'package:teremok_connect/core/jwt_interceptor.dart';
 import 'package:teremok_connect/core/router.dart';
 import 'package:teremok_connect/core/token_storage.dart';
+import 'package:teremok_connect/l10n/app_localizations.dart';
 
 class _FakeTokenStorage implements TokenStore {
   _FakeTokenStorage({this.access = 'old-access', this.refresh = 'old-refresh'});
@@ -73,6 +74,32 @@ void main() {
     expect(find.text('Номер телефона'), findsOneWidget);
     expect(find.text('+7 999 123 4567'), findsOneWidget);
     expect(find.text('Позвонить'), findsOneWidget);
+  });
+
+  testWidgets('Verify screen renders 4 fields and resend button', (tester) async {
+    AppLocale.set(const Locale('ru'));
+    AppRouter.setAuthenticated(false);
+    AppRouter.setPendingPhone('+79991234567');
+
+    final widget = MaterialApp.router(
+      routerConfig: AppRouter.config,
+      localizationsDelegates: AppL10n.localizationsDelegates,
+      supportedLocales: AppL10n.supportedLocales,
+      locale: AppLocale.current,
+    );
+    await tester.pumpWidget(widget);
+    await tester.pump();
+
+    AppRouter.config.go('/verify?phone=${Uri.encodeComponent('+79991234567')}');
+    // Один кадр чтобы роутер переключился, но НЕ pumpAndSettle —
+    // он не завершится из-за активного cooldown-таймера.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('Введите код'), findsOneWidget);
+    expect(find.text('Перезвонить через 30с'), findsOneWidget);
+    expect(find.text('Force submit "0000"'), findsOneWidget);
+    expect(find.byType(TextField), findsNWidgets(5));
   });
 
   test('AppConfig.baseUrl is set to Android emulator default', () {

@@ -25,6 +25,10 @@
   "verifyTitle": "Enter code",
   "verifySentTo": "We called {phone}",
   "@verifySentTo": {"placeholders": {"phone": {"type": "String"}}},
+  "verifyResend": "Resend call",
+  "verifyResendIn": "Resend in {seconds}s",
+  "@verifyResendIn": {"placeholders": {"seconds": {"type": "int"}}},
+  "verifyWrongCode": "Wrong code, try again",
   "switchLanguage": "EN",
   "@switchLanguage": {
     "description": "Short label of language toggle button (shows next-language code)"

@@ -187,6 +187,24 @@ abstract class AppL10n {
   /// **'We called {phone}'**
   String verifySentTo(String phone);
 
+  /// No description provided for @verifyResend.
+  ///
+  /// In en, this message translates to:
+  /// **'Resend call'**
+  String get verifyResend;
+
+  /// No description provided for @verifyResendIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Resend in {seconds}s'**
+  String verifyResendIn(int seconds);
+
+  /// No description provided for @verifyWrongCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrong code, try again'**
+  String get verifyWrongCode;
+
   /// Short label of language toggle button (shows next-language code)
   ///
   /// In en, this message translates to:

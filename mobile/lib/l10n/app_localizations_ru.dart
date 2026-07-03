@@ -56,5 +56,16 @@ class AppL10nRu extends AppL10n {
   }
 
   @override
+  String get verifyResend => 'Перезвонить';
+
+  @override
+  String verifyResendIn(int seconds) {
+    return 'Перезвонить через $secondsс';
+  }
+
+  @override
+  String get verifyWrongCode => 'Неверный код, попробуйте снова';
+
+  @override
   String get switchLanguage => 'RU';
 }
