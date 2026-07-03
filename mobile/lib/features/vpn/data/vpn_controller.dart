@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 
 import 'vpn_config.dart';
+import 'vpn_service_config.dart';
 
 /// Контроллер VPN-сессии — мост между Flutter UI и Android VpnService.
 ///
@@ -19,30 +20,30 @@ class VpnController {
 
   /// Подключиться к VPN с переданным конфигом.
   ///
-  /// На Android-стороне это вызовет ACTION_START в TeremokVpnService.
-  /// Возвращает true если команда успешно отправлена (НЕ значит что VPN
-  /// поднялся — реальное состояние придёт через [statusStream]).
+  /// Преобразует [VpnConfig] в [VpnServiceConfig] (с дефолтами для dev)
+  /// и передаёт как JSON-строку в нативный код через MethodChannel.
   Future<bool> start(VpnConfig config) async {
     try {
-      final primaryOutbound = config.singBoxConfig.primaryOutbound;
-      if (primaryOutbound == null) {
-        throw PlatformException(
-          code: 'NO_OUTBOUND',
-          message: 'sing-box config has no outbounds',
-        );
+      final outbound = config.singBoxConfig.primaryOutbound;
+      if (outbound == null) {
+        throw VpnControllerException('sing-box config has no outbounds');
       }
 
-      final result = await _methodChannel.invokeMethod<bool>('start', {
-        'username': config.username,
-        'protocol': primaryOutbound.type,
-        'server': primaryOutbound.server,
-        'serverPort': primaryOutbound.serverPort,
-        'uuid': primaryOutbound.uuid,
-        'flow': primaryOutbound.flow,
-      });
+      // Парсим в VpnServiceConfig (MTU/address/routes/DNS из inbound,
+      // server/uuid/tls из outbound) и сериализуем в JSON-строку.
+      final serviceConfig = VpnServiceConfig.fromVpnConfig(config);
+      final paramsJson = serviceConfig.toJsonString();
+
+      // Отправляем в нативный код одним аргументом paramsJson.
+      final result = await _methodChannel.invokeMethod<bool>(
+        'start',
+        {'paramsJson': paramsJson},
+      );
       return result ?? false;
     } on PlatformException catch (e) {
-      throw VpnControllerException('start failed: ${e.code} ${e.message}');
+      throw VpnControllerException(
+        'start failed: ${e.code} ${e.message}',
+      );
     }
   }
 

@@ -9,6 +9,8 @@ import android.util.Log
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
+import org.json.JSONArray
+import org.json.JSONObject
 
 /**
  * Android VpnService — скелет для будущей sing-box интеграции (Шаги 14-15).
@@ -33,6 +35,7 @@ class TeremokVpnService : VpnService() {
         const val ACTION_STOP = "com.teremok.connect.STOP_VPN"
         const val EXTRA_USERNAME = "username"
         const val EXTRA_PROTOCOL = "protocol"
+        const val EXTRA_PARAMS_JSON = "paramsJson"
 
         /** Получить системный Intent для запроса VPN-разрешения, или null если уже есть. */
         fun prepareVpn(context: android.content.Context): Intent? {
@@ -64,8 +67,12 @@ class TeremokVpnService : VpnService() {
             ACTION_START -> {
                 val username = intent.getStringExtra(EXTRA_USERNAME) ?: "anonymous"
                 val protocol = intent.getStringExtra(EXTRA_PROTOCOL) ?: "unknown"
+                val paramsJson = intent.getStringExtra(EXTRA_PARAMS_JSON) ?: "{}"
                 Log.i(TAG, "onStartCommand: ACTION_START (user=$username, proto=$protocol)")
-                startVpn(username, protocol)
+                val params = runCatching { jsonToMap(JSONObject(paramsJson)) }
+                    .onFailure { Log.w(TAG, "failed to parse paramsJson, using defaults", it) }
+                    .getOrDefault(emptyMap())
+                startVpn(username, protocol, params)
             }
             ACTION_STOP -> {
                 Log.i(TAG, "onStartCommand: ACTION_STOP")
@@ -79,13 +86,16 @@ class TeremokVpnService : VpnService() {
     }
 
     /**
-     * Создаёт TUN-интерфейс через Builder.establish().
-     * Пока не подключаем ни к чему — только проверяем что permission OK
-     * и система выдаёт нам fd.
+     * Создаёт TUN-интерфейс через Builder.establish() на основе распарсенных
+     * параметров из sing-box config (см. [VpnServiceConfig.toJsonString] в Dart).
      *
-     * В Шаге 14+ сюда добавится tun2socks через sing-box.
+     * Пока не подключаем к sing-box — это будет в Шаге 14+.
      */
-    private fun startVpn(username: String, protocol: String) {
+    private fun startVpn(
+        username: String,
+        protocol: String,
+        params: Map<String, Any?>,
+    ) {
         if (isRunning) {
             Log.w(TAG, "startVpn: уже запущен, пропускаем")
             return
@@ -95,20 +105,62 @@ class TeremokVpnService : VpnService() {
             currentStatus = "preparing"
             VpnStatusBroadcaster.emit(currentStatus)
 
+            val sessionName = (params["sessionName"] as? String)
+                ?: "Teremok VPN ($username)"
+            val mtu = (params["mtu"] as? Number)?.toInt() ?: 1500
+            val address = (params["address"] as? String) ?: "10.255.255.1"
+            val addressPrefix = (params["addressPrefix"] as? Number)?.toInt() ?: 30
+            @Suppress("UNCHECKED_CAST")
+            val routes = (params["routes"] as? List<String>) ?: listOf("0.0.0.0/0")
+            @Suppress("UNCHECKED_CAST")
+            val dnsServers = (params["dnsServers"] as? List<String>)
+                ?: listOf("1.1.1.1", "8.8.8.8")
+            val outboundServer = (params["outboundServer"] as? String) ?: "unknown"
+            val outboundServerPort = (params["outboundServerPort"] as? Number)?.toInt() ?: 443
+            val outboundUuid = (params["outboundUuid"] as? String) ?: ""
+            val outboundFlow = params["outboundFlow"] as? String
+            val tlsFingerprint = params["outboundTlsFingerprint"] as? String
+            val tlsSni = params["outboundTlsSni"] as? String
+            val tlsPublicKey = params["outboundTlsPublicKey"] as? String
+            val tlsShortId = params["outboundTlsShortId"] as? String
+
+            Log.i(TAG, "startVpn: $sessionName (mtu=$mtu)")
+            Log.i(TAG, "  tunnel: $address/$addressPrefix, routes=$routes, dns=$dnsServers")
+            Log.i(
+                TAG,
+                "  outbound: $outboundServer:$outboundServerPort flow=$outboundFlow",
+            )
+            Log.i(
+                TAG,
+                "  tls: sni=$tlsSni fp=$tlsFingerprint pk=$tlsPublicKey sid=$tlsShortId",
+            )
+
             val builder = Builder()
-                .setSession("Teremok VPN ($username)")
-                .setMtu(1500)
-                // Минимальный адрес TUN (RFC 5737 documentation prefix).
-                // В Шаге 15 мы будем парсить это из sing_box_config.inbounds.
-                .addAddress("10.255.255.1", 30)
-                .addRoute("0.0.0.0", 0) // весь IPv4 трафик
-                .addDnsServer("1.1.1.1")
-                .addDnsServer("8.8.8.8")
+                .setSession(sessionName)
+                .setMtu(mtu)
+                .addAddress(address, addressPrefix)
+
+            for (route in routes) {
+                val parts = route.split("/")
+                if (parts.size == 2) {
+                    try {
+                        builder.addRoute(parts[0], parts[1].toInt())
+                        Log.i(TAG, "  added route: $route")
+                    } catch (e: Exception) {
+                        Log.w(TAG, "  invalid route '$route', skipping")
+                    }
+                } else {
+                    Log.w(TAG, "  invalid route '$route' (expected addr/prefix), skipping")
+                }
+            }
+
+            for (dns in dnsServers) {
+                builder.addDnsServer(dns)
+            }
 
             currentStatus = "connecting"
             VpnStatusBroadcaster.emit(currentStatus)
 
-            // В Шаге 15 заменим на tun2socks через sing-box.
             tunInterface = builder.establish()
 
             if (tunInterface == null) {
@@ -188,8 +240,21 @@ object VpnChannelRegistry {
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "start" -> {
-                        val username = call.argument<String>("username") ?: ""
-                        val protocol = call.argument<String>("protocol") ?: ""
+                        // paramsJson — JSON-строка с flat keys (см. VpnServiceConfig)
+                        val paramsJson = call.argument<String>("paramsJson") ?: "{}"
+                        // username и protocol — для удобства логирования (можно вытащить
+                        // и из JSON, но проще держать отдельно для теста)
+                        val username = call.argument<String>("username")
+                            ?: try {
+                                JSONObject(paramsJson).optString("sessionName", "anonymous")
+                                    .removePrefix("Teremok VPN (")
+                                    .removeSuffix(")")
+                            } catch (e: Exception) { "anonymous" }
+                        val protocol = call.argument<String>("protocol")
+                            ?: try {
+                                JSONObject(paramsJson).optString("outboundType", "unknown")
+                            } catch (e: Exception) { "unknown" }
+
                         val intent = Intent(
                             appContext,
                             TeremokVpnService::class.java,
@@ -197,6 +262,7 @@ object VpnChannelRegistry {
                             action = TeremokVpnService.ACTION_START
                             putExtra(TeremokVpnService.EXTRA_USERNAME, username)
                             putExtra(TeremokVpnService.EXTRA_PROTOCOL, protocol)
+                            putExtra(TeremokVpnService.EXTRA_PARAMS_JSON, paramsJson)
                         }
                         appContext.startService(intent)
                         result.success(true)
@@ -210,12 +276,6 @@ object VpnChannelRegistry {
                         }
                         appContext.startService(intent)
                         result.success(true)
-                    }
-                    "getStatus" -> {
-                        result.success(serviceProvider()?.currentStatus ?: "idle")
-                    }
-                    "requestPermission" -> {
-                        result.success(onPermissionRequest())
                     }
                     "getStatus" -> {
                         result.success(serviceProvider()?.currentStatus ?: "idle")
@@ -238,6 +298,36 @@ object VpnChannelRegistry {
                     VpnStatusBroadcaster.unregister()
                 }
             })
+    }
+}
+
+/**
+ * Конвертация org.json.JSONObject → Map<String, Any?> (рекурсивно для вложенных
+ * объектов и массивов). Используется для парсинга paramsJson в [TeremokVpnService].
+ */
+internal fun jsonToMap(json: JSONObject): Map<String, Any?> {
+    val map = mutableMapOf<String, Any?>()
+    for (key in json.keys()) {
+        val value = json.get(key)
+        map[key] = when (value) {
+            is JSONObject -> jsonToMap(value)
+            is JSONArray -> jsonArrayToList(value)
+            JSONObject.NULL -> null
+            else -> value
+        }
+    }
+    return map
+}
+
+internal fun jsonArrayToList(arr: JSONArray): List<Any?> {
+    return (0 until arr.length()).map { i ->
+        val value = arr.get(i)
+        when (value) {
+            is JSONObject -> jsonToMap(value)
+            is JSONArray -> jsonArrayToList(value)
+            JSONObject.NULL -> null
+            else -> value
+        }
     }
 }
 

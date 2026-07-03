@@ -14,6 +14,7 @@ import 'package:teremok_connect/features/auth/application/auth_provider.dart';
 import 'package:teremok_connect/features/auth/application/auth_state.dart';
 import 'package:teremok_connect/features/vpn/data/vpn_config.dart';
 import 'package:teremok_connect/features/vpn/data/vpn_controller.dart';
+import 'package:teremok_connect/features/vpn/data/vpn_service_config.dart';
 import 'package:teremok_connect/l10n/app_localizations.dart';
 
 class _FakeTokenStorage implements TokenStore {
@@ -266,12 +267,21 @@ void main() {
         expect(ok, true);
         expect(log.last.method, 'start');
         final args = log.last.arguments as Map;
-        expect(args['username'], 'test_user');
-        expect(args['protocol'], 'vless');
-        expect(args['server'], 'vpn-dev.example');
-        expect(args['serverPort'], 443);
-        expect(args['uuid'], '12345678-1234-1234-1234-123456789012');
-        expect(args['flow'], 'xtls-rprx-vision');
+        expect(args.containsKey('paramsJson'), true);
+        // Декодируем paramsJson чтобы убедиться что flat keys корректные
+        final paramsString = args['paramsJson'] as String;
+        final params = VpnServiceConfig.fromVpnConfig(config).toMap();
+        // sanity: обязательные поля
+        expect(params['sessionName'], 'Teremok VPN (test_user)');
+        expect(params['mtu'], 1500);
+        expect(params['address'], '10.255.255.1');
+        expect(params['addressPrefix'], 30);
+        expect(params['outboundServer'], 'vpn-dev.example');
+        expect(params['outboundServerPort'], 443);
+        expect(params['outboundFlow'], 'xtls-rprx-vision');
+        // paramsString содержит JSON-представление тех же данных
+        expect(paramsString.contains('vpn-dev.example'), true);
+        expect(paramsString.contains('12345678-1234-1234-1234-123456789012'), true);
       },
     );
 
@@ -295,6 +305,106 @@ void main() {
         );
       },
     );
+  });
+
+  group('VpnServiceConfig', () {
+    test('fromVpnConfig использует дефолты при пустых inbounds/outbounds', () {
+      final cfg = VpnConfig.fromJson({
+        'username': 'test_user',
+        'links': ['vless://...'],
+        'expire': 1785654092,
+        'sing_box_config': {
+          'log': {'level': 'info'},
+          'inbounds': const [],
+          'outbounds': const [],
+        },
+      });
+      final service = VpnServiceConfig.fromVpnConfig(cfg);
+      expect(service.mtu, 1500);
+      expect(service.address, '10.255.255.1');
+      expect(service.addressPrefix, 30);
+      expect(service.routes, ['0.0.0.0/0']);
+      expect(service.dnsServers, ['1.1.1.1', '8.8.8.8']);
+      expect(service.outboundServer, 'unknown');
+      expect(service.outboundServerPort, 443);
+      expect(service.sessionName, 'Teremok VPN (test_user)');
+    });
+
+    test('fromVpnConfig использует inbound и outbound из JSON', () {
+      final config = VpnConfig.fromJson({
+        'username': 'real_user',
+        'links': const <String>[],
+        'expire': 1785654092,
+        'sing_box_config': {
+          'log': {'level': 'info'},
+          'inbounds': [
+            {
+              'type': 'tun',
+              'inet4_address': '192.168.50.1/24',
+              'auto_route': true,
+              'strict_route': true,
+            },
+          ],
+          'outbounds': [
+            {
+              'type': 'vless',
+              'tag': 'proxy',
+              'server': 'real-server.example',
+              'server_port': 8443,
+              'uuid': 'real-uuid-1234',
+              'flow': 'xtls-rprx-vision',
+              'tls': {
+                'enabled': true,
+                'server_name': 'real-sni.example',
+                'utls': {'enabled': true, 'fingerprint': 'safari'},
+                'reality': {
+                  'enabled': true,
+                  'public_key': 'realpublickey123',
+                  'short_id': 'realshortid',
+                },
+              },
+            },
+          ],
+        },
+      });
+      final service = VpnServiceConfig.fromVpnConfig(config);
+      expect(service.address, '192.168.50.1');
+      expect(service.addressPrefix, 24);
+      expect(service.routes, containsAll(['0.0.0.0/0', '::/0']));
+      expect(service.outboundServer, 'real-server.example');
+      expect(service.outboundServerPort, 8443);
+      expect(service.outboundUuid, 'real-uuid-1234');
+      expect(service.outboundTlsFingerprint, 'safari');
+      expect(service.outboundTlsPublicKey, 'realpublickey123');
+      expect(service.outboundTlsShortId, 'realshortid');
+    });
+
+    test('toMap() возвращает flat keys (без вложенного outbound)', () {
+      final cfg = VpnConfig.fromJson({
+        'username': 'flat',
+        'links': const <String>[],
+        'expire': 1785654092,
+        'sing_box_config': {
+          'log': {'level': 'info'},
+          'inbounds': const [],
+          'outbounds': [
+            {
+              'type': 'vless',
+              'tag': 'proxy',
+              'server': 's',
+              'server_port': 443,
+              'uuid': 'u',
+            },
+          ],
+        },
+      });
+      final service = VpnServiceConfig.fromVpnConfig(cfg);
+      final map = service.toMap();
+      expect(map.containsKey('outbound'), false);
+      expect(map['outboundServer'], 's');
+      expect(map['outboundServerPort'], 443);
+      expect(map['outboundUuid'], 'u');
+    });
   });
 
   test('AppConfig.baseUrl is set to Android emulator default', () {
