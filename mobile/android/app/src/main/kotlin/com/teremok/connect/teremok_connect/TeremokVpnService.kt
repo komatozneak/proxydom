@@ -172,6 +172,33 @@ class TeremokVpnService : VpnService() {
             }
 
             isRunning = true
+
+            // Запускаем sing-box процесс (Шаг 14). Реальный tun2socks — Шаг 15.
+            val singBoxConfigJson = buildSingBoxJson(
+                params = params,
+                address = address,
+                addressPrefix = addressPrefix,
+                outboundServer = outboundServer,
+                outboundServerPort = outboundServerPort,
+                outboundUuid = outboundUuid,
+                outboundFlow = outboundFlow,
+                tlsFingerprint = tlsFingerprint,
+                tlsSni = tlsSni,
+                tlsPublicKey = tlsPublicKey,
+                tlsShortId = tlsShortId,
+            )
+            Log.i(TAG, "startVpn: sing-box config (${singBoxConfigJson.length} chars)")
+            val bridge = SingBoxBridge.instance
+            bridge.bind(this)
+            if (bridge.installBinary()) {
+                val started = bridge.start(singBoxConfigJson)
+                if (!started) {
+                    Log.w(TAG, "startVpn: sing-box не запустился, TUN остаётся")
+                }
+            } else {
+                Log.w(TAG, "startVpn: не удалось установить sing-box binary")
+            }
+
             currentStatus = "connected"
             VpnStatusBroadcaster.emit(currentStatus)
             Log.i(TAG, "startVpn: TUN interface established (protocol=$protocol)")
@@ -193,6 +220,7 @@ class TeremokVpnService : VpnService() {
         try {
             currentStatus = "disconnecting"
             VpnStatusBroadcaster.emit(currentStatus)
+            SingBoxBridge.instance.stop()
             tunInterface?.close()
             Log.i(TAG, "stopVpn: TUN interface closed")
         } catch (e: Exception) {
@@ -329,6 +357,82 @@ internal fun jsonArrayToList(arr: JSONArray): List<Any?> {
             else -> value
         }
     }
+}
+
+/**
+ * Собирает полный sing-box config JSON из flat params.
+ *
+ * Шаг 14: tun-интерфейс есть, но TUN fd НЕ передаётся в sing-box process —
+ * это будет в Шаге 15 (fd inheritance). Здесь sing-box стартует с
+ * placeholder tun-конфигом, чтобы проверить что CLI принимает JSON.
+ */
+internal fun buildSingBoxJson(
+    params: Map<String, Any?>,
+    address: String,
+    addressPrefix: Int,
+    outboundServer: String,
+    outboundServerPort: Int,
+    outboundUuid: String,
+    outboundFlow: String?,
+    tlsFingerprint: String?,
+    tlsSni: String?,
+    tlsPublicKey: String?,
+    tlsShortId: String?,
+): String {
+    val outbound = JSONObject().apply {
+        put("type", "vless")
+        put("tag", "proxy")
+        put("server", outboundServer)
+        put("server_port", outboundServerPort)
+        put("uuid", outboundUuid)
+        if (!outboundFlow.isNullOrEmpty()) put("flow", outboundFlow)
+        put(
+            "tls",
+            JSONObject().apply {
+                put("enabled", true)
+                if (!tlsSni.isNullOrEmpty()) put("server_name", tlsSni)
+                put(
+                    "utls",
+                    JSONObject().apply {
+                        put("enabled", true)
+                        if (!tlsFingerprint.isNullOrEmpty()) {
+                            put("fingerprint", tlsFingerprint)
+                        }
+                    },
+                )
+                put(
+                    "reality",
+                    JSONObject().apply {
+                        put("enabled", true)
+                        if (!tlsPublicKey.isNullOrEmpty()) put("public_key", tlsPublicKey)
+                        if (!tlsShortId.isNullOrEmpty()) put("short_id", tlsShortId)
+                    },
+                )
+            },
+        )
+    }
+
+    val root = JSONObject().apply {
+        put("log", JSONObject().apply { put("level", "info") })
+        put(
+            "inbounds",
+            JSONArray().apply {
+                put(
+                    JSONObject().apply {
+                        put("type", "tun")
+                        put("inet4_address", "$address/$addressPrefix")
+                        put("auto_route", true)
+                        put("strict_route", true)
+                    },
+                )
+            },
+        )
+        put(
+            "outbounds",
+            JSONArray().apply { put(outbound) },
+        )
+    }
+    return root.toString()
 }
 
 /**
