@@ -5,8 +5,10 @@ import 'core/theme.dart';
 import 'l10n/app_localizations.dart';
 
 /// Текущий язык приложения. Хранится пока в памяти.
-/// В более позднем шаге заменим на Riverpod + secure_storage.
+/// В Шаге 11 заменим на Riverpod + secure_storage.
 class AppLocale {
+  AppLocale._();
+
   static Locale _current = const Locale('ru');
 
   static Locale get current => _current;

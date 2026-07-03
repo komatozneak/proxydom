@@ -169,6 +169,60 @@ abstract class AppL10n {
   /// **'VPN UI — comes in step 9+'**
   String get homeVpnHint;
 
+  /// No description provided for @homeDisconnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnected'**
+  String get homeDisconnected;
+
+  /// No description provided for @homeConnecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting...'**
+  String get homeConnecting;
+
+  /// No description provided for @homeConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected'**
+  String get homeConnected;
+
+  /// No description provided for @homeError.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection failed'**
+  String get homeError;
+
+  /// No description provided for @homeConnect.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect'**
+  String get homeConnect;
+
+  /// No description provided for @homeDisconnect.
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnect'**
+  String get homeDisconnect;
+
+  /// No description provided for @homeRegion.
+  ///
+  /// In en, this message translates to:
+  /// **'Region'**
+  String get homeRegion;
+
+  /// No description provided for @homeSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get homeSettings;
+
+  /// No description provided for @homeAbout.
+  ///
+  /// In en, this message translates to:
+  /// **'About'**
+  String get homeAbout;
+
   /// No description provided for @logoutTooltip.
   ///
   /// In en, this message translates to:

@@ -2,24 +2,26 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/api_client.dart';
 import '../../../core/router.dart';
 import '../../../core/token_storage.dart';
 import '../../../l10n/app_localizations.dart';
+import '../application/auth_provider.dart';
 
-class VerifyScreen extends StatefulWidget {
+class VerifyScreen extends ConsumerStatefulWidget {
   const VerifyScreen({super.key, required this.phone});
 
   /// Телефон приходит из query parameter /verify?phone=...
   final String phone;
 
   @override
-  State<VerifyScreen> createState() => _VerifyScreenState();
+  ConsumerState<VerifyScreen> createState() => _VerifyScreenState();
 }
 
-class _VerifyScreenState extends State<VerifyScreen> {
+class _VerifyScreenState extends ConsumerState<VerifyScreen> {
   final List<TextEditingController> _controllers = List.generate(
     4,
     (i) => TextEditingController(),
@@ -137,10 +139,13 @@ class _VerifyScreenState extends State<VerifyScreen> {
             accessToken: access,
             refreshToken: refresh,
           );
-          AppRouter.setAuthenticated(true);
-          AppRouter.setPendingPhone(null);
+          AppRouter.pendingPhone = null;
           if (!mounted) return;
-          context.go('/home');
+          // Пишем в authProvider — GoRouter сам перенаправит на /home.
+          await ref.read(authProvider.notifier).authenticated(
+                accessToken: access,
+                refreshToken: refresh,
+              );
           return;
         }
       }

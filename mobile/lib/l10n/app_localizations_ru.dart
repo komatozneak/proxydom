@@ -45,6 +45,33 @@ class AppL10nRu extends AppL10n {
   String get homeVpnHint => 'VPN UI — в шагах 9+';
 
   @override
+  String get homeDisconnected => 'Отключено';
+
+  @override
+  String get homeConnecting => 'Подключение...';
+
+  @override
+  String get homeConnected => 'Подключено';
+
+  @override
+  String get homeError => 'Ошибка подключения';
+
+  @override
+  String get homeConnect => 'Подключиться';
+
+  @override
+  String get homeDisconnect => 'Отключить';
+
+  @override
+  String get homeRegion => 'Регион';
+
+  @override
+  String get homeSettings => 'Настройки';
+
+  @override
+  String get homeAbout => 'О приложении';
+
+  @override
   String get logoutTooltip => 'Выйти';
 
   @override

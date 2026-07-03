@@ -45,6 +45,33 @@ class AppL10nEn extends AppL10n {
   String get homeVpnHint => 'VPN UI — comes in step 9+';
 
   @override
+  String get homeDisconnected => 'Disconnected';
+
+  @override
+  String get homeConnecting => 'Connecting...';
+
+  @override
+  String get homeConnected => 'Connected';
+
+  @override
+  String get homeError => 'Connection failed';
+
+  @override
+  String get homeConnect => 'Connect';
+
+  @override
+  String get homeDisconnect => 'Disconnect';
+
+  @override
+  String get homeRegion => 'Region';
+
+  @override
+  String get homeSettings => 'Settings';
+
+  @override
+  String get homeAbout => 'About';
+
+  @override
   String get logoutTooltip => 'Sign out';
 
   @override
