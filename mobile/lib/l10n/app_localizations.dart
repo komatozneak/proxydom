@@ -223,6 +223,18 @@ abstract class AppL10n {
   /// **'About'**
   String get homeAbout;
 
+  /// No description provided for @homeConfigError.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to get config: {message}'**
+  String homeConfigError(String message);
+
+  /// No description provided for @homeFetchConfig.
+  ///
+  /// In en, this message translates to:
+  /// **'Fetch config'**
+  String get homeFetchConfig;
+
   /// No description provided for @logoutTooltip.
   ///
   /// In en, this message translates to:

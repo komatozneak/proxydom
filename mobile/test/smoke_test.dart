@@ -11,6 +11,7 @@ import 'package:teremok_connect/core/router.dart';
 import 'package:teremok_connect/core/token_storage.dart';
 import 'package:teremok_connect/features/auth/application/auth_provider.dart';
 import 'package:teremok_connect/features/auth/application/auth_state.dart';
+import 'package:teremok_connect/features/vpn/data/vpn_config.dart';
 import 'package:teremok_connect/l10n/app_localizations.dart';
 
 class _FakeTokenStorage implements TokenStore {
@@ -137,6 +138,65 @@ void main() {
     const a = AuthStateUnauthenticated();
     const b = AuthStateUnauthenticated();
     expect(identical(a, b), isTrue);
+  });
+
+  test('VpnConfig.fromJson парсит mock-ответ от backend', () {
+    final json = {
+      'username': 'test_user',
+      'links': ['vless://abc@server:443?type=tcp#test_user'],
+      'expire': 1785654092,
+      'sing_box_config': {
+        'log': {'level': 'info'},
+        'inbounds': [
+          {
+            'type': 'tun',
+            'inet4_address': '172.19.0.1/30',
+            'auto_route': true,
+            'strict_route': true,
+          },
+        ],
+        'outbounds': [
+          {
+            'type': 'vless',
+            'tag': 'proxy',
+            'server': 'vpn-dev.example',
+            'server_port': 443,
+            'uuid': '12345678-1234-1234-1234-123456789012',
+            'flow': 'xtls-rprx-vision',
+            'tls': {
+              'enabled': true,
+              'server_name': 'example.com',
+              'utls': {'enabled': true, 'fingerprint': 'chrome'},
+              'reality': {
+                'enabled': true,
+                'public_key': 'pk',
+                'short_id': 'abcd',
+              },
+            },
+          },
+        ],
+      },
+    };
+
+    final config = VpnConfig.fromJson(json);
+    expect(config.username, 'test_user');
+    expect(config.links, hasLength(1));
+    expect(config.singBoxConfig.primaryOutbound?.server, 'vpn-dev.example');
+    expect(config.singBoxConfig.primaryOutbound?.serverPort, 443);
+    expect(
+      config.singBoxConfig.primaryOutbound?.tls?.realityEnabled,
+      true,
+    );
+    expect(
+      config.singBoxConfig.primaryOutbound?.tls?.publicKey,
+      'pk',
+    );
+    expect(
+      config.singBoxConfig.primaryOutbound?.tls?.fingerprint,
+      'chrome',
+    );
+    expect(config.expire.year, greaterThan(2025));
+    expect(config.expire.isUtc, true);
   });
 
   test('AppConfig.baseUrl is set to Android emulator default', () {

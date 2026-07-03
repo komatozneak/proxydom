@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../app.dart';
-import '../../../../l10n/app_localizations.dart';
 import '../../auth/application/auth_provider.dart';
 import '../../auth/application/auth_state.dart';
 import '../application/vpn_provider.dart';
 import '../application/vpn_status.dart';
+import '../../../../app.dart';
+import '../../../../l10n/app_localizations.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -114,20 +114,22 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-class _StatusIndicator extends StatelessWidget {
+class _StatusIndicator extends ConsumerWidget {
   const _StatusIndicator({required this.status});
 
   final VpnStatus status;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final l = AppL10n.of(context);
+    final vpnConfig = ref.watch(vpnProvider.notifier).config;
 
     late final Color color;
     late final String label;
     late final Widget child;
     String? errorMessage;
+    String? serverInfo;
 
     switch (status) {
       case VpnDisconnected():
@@ -150,11 +152,16 @@ class _StatusIndicator extends StatelessWidget {
       case VpnConnected():
         final s = (status as VpnConnected).serverName;
         final p = (status as VpnConnected).protocol;
+        final host = vpnConfig?.singBoxConfig.primaryOutbound?.server;
+        final port = vpnConfig?.singBoxConfig.primaryOutbound?.serverPort;
         color = theme.colorScheme.primary;
         label = l.homeConnected;
         child = Icon(Icons.shield, size: 96, color: color);
         // suppress unused warning for destructured locals
         assert(s.isNotEmpty && p.isNotEmpty);
+        if (host != null && port != null) {
+          serverInfo = '$host:$port';
+        }
       case VpnError():
         final msg = (status as VpnError).message;
         color = theme.colorScheme.error;
@@ -187,6 +194,15 @@ class _StatusIndicator extends StatelessWidget {
             '${(status as VpnConnected).protocol}',
             style: theme.textTheme.bodyMedium,
           ),
+          if (serverInfo != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              'VPS: $serverInfo',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.outline,
+              ),
+            ),
+          ],
         ],
         if (status is VpnError) ...[
           const SizedBox(height: 4),
@@ -194,6 +210,27 @@ class _StatusIndicator extends StatelessWidget {
             errorMessage ?? '',
             style: theme.textTheme.bodySmall?.copyWith(color: color),
             textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: () async {
+              try {
+                await ref.read(vpnProvider.notifier).fetchConfig();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(l.homeFetchConfig)),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(l.homeConfigError(e.toString()))),
+                  );
+                }
+              }
+            },
+            icon: const Icon(Icons.cloud_download),
+            label: Text(l.homeFetchConfig),
           ),
         ],
       ],

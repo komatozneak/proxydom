@@ -72,6 +72,14 @@ class AppL10nEn extends AppL10n {
   String get homeAbout => 'About';
 
   @override
+  String homeConfigError(String message) {
+    return 'Failed to get config: $message';
+  }
+
+  @override
+  String get homeFetchConfig => 'Fetch config';
+
+  @override
   String get logoutTooltip => 'Sign out';
 
   @override

@@ -21,6 +21,8 @@
   "homeRegion": "Регион",
   "homeSettings": "Настройки",
   "homeAbout": "О приложении",
+  "homeConfigError": "Не удалось получить конфиг: {message}",
+  "homeFetchConfig": "Получить конфиг",
   "logoutTooltip": "Выйти",
   "verifyTitle": "Введите код",
   "verifySentTo": "Позвонили на {phone}",

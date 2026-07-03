@@ -72,6 +72,14 @@ class AppL10nRu extends AppL10n {
   String get homeAbout => 'О приложении';
 
   @override
+  String homeConfigError(String message) {
+    return 'Не удалось получить конфиг: $message';
+  }
+
+  @override
+  String get homeFetchConfig => 'Получить конфиг';
+
+  @override
   String get logoutTooltip => 'Выйти';
 
   @override
