@@ -166,7 +166,25 @@ class _StatusIndicator extends ConsumerWidget {
         final msg = (status as VpnError).message;
         color = theme.colorScheme.error;
         label = l.homeError;
-        child = Icon(Icons.error_outline, size: 96, color: color);
+        child = Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 64, color: Colors.red),
+            const SizedBox(height: 8),
+            Text(
+              msg,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Auto-retry in 5s...',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.outline,
+              ),
+            ),
+          ],
+        );
         errorMessage = msg;
     }
 

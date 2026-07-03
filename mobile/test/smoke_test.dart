@@ -8,6 +8,8 @@ import 'package:teremok_connect/app.dart';
 import 'package:teremok_connect/core/api_client.dart';
 import 'package:teremok_connect/core/config.dart';
 import 'package:teremok_connect/core/jwt_interceptor.dart';
+import 'package:teremok_connect/core/result.dart';
+import 'package:teremok_connect/core/retry_policy.dart';
 import 'package:teremok_connect/core/router.dart';
 import 'package:teremok_connect/core/token_storage.dart';
 import 'package:teremok_connect/features/auth/application/auth_provider.dart';
@@ -418,6 +420,98 @@ void main() {
 
   test('TokenStorage can be cleared safely on empty storage', () async {
     await TokenStorage.instance.clear();
+  });
+
+  group('RetryPolicy', () {
+    test('выполняется с первой попытки если нет ошибки', () async {
+      final policy = RetryPolicy(maxAttempts: 3);
+      var attempts = 0;
+      final result = await policy.execute(() async {
+        attempts++;
+        return 'ok';
+      });
+      expect(attempts, 1);
+      expect(result, 'ok');
+    });
+
+    test('retry на transient ошибках до maxAttempts', () async {
+      final policy = RetryPolicy(
+        maxAttempts: 3,
+        initialDelay: const Duration(milliseconds: 10),
+      );
+      var attempts = 0;
+      final result = await policy.execute(() async {
+        attempts++;
+        if (attempts < 3) throw Exception('transient');
+        return 'ok';
+      });
+      expect(attempts, 3);
+      expect(result, 'ok');
+    });
+
+    test('бросает последнюю ошибку после maxAttempts', () async {
+      final policy = RetryPolicy(
+        maxAttempts: 3,
+        initialDelay: const Duration(milliseconds: 10),
+      );
+      var attempts = 0;
+      await expectLater(
+        policy.execute(() async {
+          attempts++;
+          throw Exception('always fails');
+        }),
+        throwsException,
+      );
+      expect(attempts, 3);
+    });
+
+    test('shouldRetry=false → без retry', () async {
+      final policy = RetryPolicy(maxAttempts: 3);
+      var attempts = 0;
+      await expectLater(
+        policy.execute(
+          () async {
+            attempts++;
+            throw Exception('user error');
+          },
+          shouldRetry: (_) async => false,
+        ),
+        throwsException,
+      );
+      expect(attempts, 1);
+    });
+
+    test('backoff экспоненциальный', () {
+      final policy = RetryPolicy(
+        initialDelay: const Duration(milliseconds: 100),
+        backoffMultiplier: 2.0,
+        maxDelay: const Duration(seconds: 10),
+      );
+      expect(policy.delayFor(1), Duration.zero);
+      expect(policy.delayFor(2), const Duration(milliseconds: 200));
+      expect(policy.delayFor(3), const Duration(milliseconds: 400));
+    });
+
+    test('Result<T> when() раскрывает success и failure', () {
+      const success = Success<int>(42);
+      const failure = Failure<int>('error');
+
+      expect(success.isSuccess, true);
+      expect(failure.isFailure, true);
+      expect(success.valueOrNull, 42);
+      expect(failure.valueOrNull, null);
+
+      final sValue = success.when<int>(
+        success: (v) => v * 2,
+        failure: (_, __) => -1,
+      );
+      final fValue = failure.when<int>(
+        success: (v) => v * 2,
+        failure: (_, __) => -1,
+      );
+      expect(sValue, 84);
+      expect(fValue, -1);
+    });
   });
 
   group('JwtRefreshInterceptor', () {

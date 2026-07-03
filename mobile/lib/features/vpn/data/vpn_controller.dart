@@ -16,6 +16,12 @@ class VpnController {
   static const _methodChannel = MethodChannel('teremok/vpn');
   static const _eventChannel = EventChannel('teremok/vpn/status');
 
+  /// Таймаут на start (Шаг 16): 10 сек.
+  static const Duration startTimeout = Duration(seconds: 10);
+
+  /// Таймаут на stop (Шаг 16): 5 сек.
+  static const Duration stopTimeout = Duration(seconds: 5);
+
   Stream<VpnNativeStatus>? _statusStream;
 
   /// Подключиться к VPN с переданным конфигом.
@@ -29,29 +35,43 @@ class VpnController {
         throw VpnControllerException('sing-box config has no outbounds');
       }
 
-      // Парсим в VpnServiceConfig (MTU/address/routes/DNS из inbound,
-      // server/uuid/tls из outbound) и сериализуем в JSON-строку.
       final serviceConfig = VpnServiceConfig.fromVpnConfig(config);
       final paramsJson = serviceConfig.toJsonString();
 
-      // Отправляем в нативный код одним аргументом paramsJson.
-      final result = await _methodChannel.invokeMethod<bool>(
-        'start',
-        {'paramsJson': paramsJson},
-      );
+      final result = await _methodChannel
+          .invokeMethod<bool>('start', {'paramsJson': paramsJson})
+          .timeout(
+            startTimeout,
+            onTimeout: () {
+              throw VpnControllerException(
+                'start timeout after ${startTimeout.inSeconds}s',
+              );
+            },
+          );
       return result ?? false;
+    } on TimeoutException catch (e) {
+      throw VpnControllerException('start timeout: $e');
     } on PlatformException catch (e) {
-      throw VpnControllerException(
-        'start failed: ${e.code} ${e.message}',
-      );
+      throw VpnControllerException('start failed: ${e.code} ${e.message}');
     }
   }
 
   /// Отключиться от VPN.
   Future<bool> stop() async {
     try {
-      final result = await _methodChannel.invokeMethod<bool>('stop');
+      final result = await _methodChannel
+          .invokeMethod<bool>('stop')
+          .timeout(
+            stopTimeout,
+            onTimeout: () {
+              throw VpnControllerException(
+                'stop timeout after ${stopTimeout.inSeconds}s',
+              );
+            },
+          );
       return result ?? false;
+    } on TimeoutException catch (e) {
+      throw VpnControllerException('stop timeout: $e');
     } on PlatformException catch (e) {
       throw VpnControllerException('stop failed: ${e.code} ${e.message}');
     }
