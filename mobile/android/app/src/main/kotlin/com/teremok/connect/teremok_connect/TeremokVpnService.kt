@@ -45,6 +45,7 @@ class TeremokVpnService : VpnService() {
 
     private var tunInterface: ParcelFileDescriptor? = null
     private var isRunning = false
+    private var tunForwarder: TunForwarder? = null
 
     /**
      * Текущий статус сервиса для [VpnStatusBroadcaster].
@@ -173,6 +174,20 @@ class TeremokVpnService : VpnService() {
 
             isRunning = true
 
+            // === Шаг 15: запускаем TunForwarder (UNIX socket для forwarder) ===
+            // Реальный tun2socks (sing-box ↔ TUN через socketpair+SCM_RIGHTS) —
+            // Шаг 19 (libbox.aar JNI). Здесь поднимаем инфраструктуру.
+            val activeTun = tunInterface
+            if (activeTun != null) {
+                tunForwarder = TunForwarder(activeTun) {
+                    Log.i(TAG, "TunForwarder is ready (UNIX socket bound)")
+                }
+                tunForwarder?.start()
+                Log.i(TAG, "startVpn: TunForwarder started")
+            } else {
+                Log.w(TAG, "startVpn: tunInterface is null, forwarder не запущен")
+            }
+
             // Запускаем sing-box процесс (Шаг 14). Реальный tun2socks — Шаг 15.
             val singBoxConfigJson = buildSingBoxJson(
                 params = params,
@@ -220,7 +235,10 @@ class TeremokVpnService : VpnService() {
         try {
             currentStatus = "disconnecting"
             VpnStatusBroadcaster.emit(currentStatus)
+            // Сначала останавливаем sing-box, потом forwarder, потом закрываем TUN
             SingBoxBridge.instance.stop()
+            tunForwarder?.stop()
+            tunForwarder = null
             tunInterface?.close()
             Log.i(TAG, "stopVpn: TUN interface closed")
         } catch (e: Exception) {
