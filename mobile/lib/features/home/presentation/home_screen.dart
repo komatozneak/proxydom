@@ -3,16 +3,24 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/application/auth_provider.dart';
 import '../../auth/application/auth_state.dart';
+import '../../auth/application/logout_handler.dart';
 import '../application/vpn_provider.dart';
 import '../application/vpn_status.dart';
 import '../../../../app.dart';
 import '../../../../l10n/app_localizations.dart';
 
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  bool _logoutInProgress = false;
+
+  @override
+  Widget build(BuildContext context) {
     final l = AppL10n.of(context);
     final theme = Theme.of(context);
     final authState =
@@ -49,11 +57,15 @@ class HomeScreen extends ConsumerWidget {
           ),
           if (isAuthed)
             IconButton(
-              icon: const Icon(Icons.logout),
+              icon: _logoutInProgress
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.logout),
               tooltip: l.logoutTooltip,
-              onPressed: () {
-                ref.read(authProvider.notifier).unauthenticated();
-              },
+              onPressed: _logoutInProgress ? null : _onLogoutPressed,
             ),
         ],
       ),
@@ -111,6 +123,47 @@ class HomeScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _onLogoutPressed() async {
+    final l = AppL10n.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l.logoutConfirmTitle),
+        content: Text(l.logoutConfirmMessage),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(l.logoutTooltip),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _logoutInProgress = true);
+
+    final result = await ref.read(logoutHandlerProvider).logout();
+
+    if (!mounted) return;
+    setState(() => _logoutInProgress = false);
+
+    if (result is LogoutPartialFailure && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${l.logoutWarning}: ${result.message}'),
+          duration: const Duration(seconds: 5),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    }
+    // GoRouter сам перенаправит на /login через refreshListenable.
   }
 }
 

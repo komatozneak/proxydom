@@ -40,10 +40,13 @@ class AppRouter {
       final isAuthed = auth is AuthStateAuthenticated;
 
       if (!isAuthed && (goingToLogin || goingToVerify)) {
-        return null;
+        return null; // можно оставаться на login/verify
       }
       if (!isAuthed && !goingToLogin && !goingToVerify) {
-        return '/login';
+        return '/login'; // back-button protection: не пускаем на /home
+      }
+      if (isAuthed && goingToHome) {
+        return null; // уже на home
       }
       if (isAuthed && !goingToHome) {
         return '/home';

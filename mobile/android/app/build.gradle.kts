@@ -29,7 +29,7 @@ android {
         // Flutter default is 21, but VpnService needs 23.
         // NOTE: Flutter Gradle plugin auto-resets this to flutter.minSdkVersion
         // on every build — re-apply after each `flutter build apk` if reverted.
-        minSdk = 23
+        minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

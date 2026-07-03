@@ -241,6 +241,30 @@ abstract class AppL10n {
   /// **'Sign out'**
   String get logoutTooltip;
 
+  /// No description provided for @logoutConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign out?'**
+  String get logoutConfirmTitle;
+
+  /// No description provided for @logoutConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Your VPN connection will be closed. You\'ll need to verify again next time.'**
+  String get logoutConfirmMessage;
+
+  /// No description provided for @logoutWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Logout completed with warnings'**
+  String get logoutWarning;
+
+  /// No description provided for @cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get cancel;
+
   /// No description provided for @verifyTitle.
   ///
   /// In en, this message translates to:

@@ -83,6 +83,19 @@ class AppL10nRu extends AppL10n {
   String get logoutTooltip => 'Выйти';
 
   @override
+  String get logoutConfirmTitle => 'Выйти из аккаунта?';
+
+  @override
+  String get logoutConfirmMessage =>
+      'VPN-соединение будет закрыто. В следующий раз нужно будет заново ввести код.';
+
+  @override
+  String get logoutWarning => 'Выход выполнен с предупреждениями';
+
+  @override
+  String get cancel => 'Отмена';
+
+  @override
   String get verifyTitle => 'Введите код';
 
   @override

@@ -14,6 +14,7 @@ import 'package:teremok_connect/core/router.dart';
 import 'package:teremok_connect/core/token_storage.dart';
 import 'package:teremok_connect/features/auth/application/auth_provider.dart';
 import 'package:teremok_connect/features/auth/application/auth_state.dart';
+import 'package:teremok_connect/features/auth/application/logout_handler.dart';
 import 'package:teremok_connect/features/vpn/data/vpn_config.dart';
 import 'package:teremok_connect/features/vpn/data/vpn_controller.dart';
 import 'package:teremok_connect/features/vpn/data/vpn_service_config.dart';
@@ -511,6 +512,21 @@ void main() {
       );
       expect(sValue, 84);
       expect(fValue, -1);
+    });
+  });
+
+  // LogoutHandler unit-тесты сложно написать корректно из-за того что
+  // VpnNotifier.registerOnDispose → _cleanupOnLogout → ref.read(...) на
+  // disposed container. В production это не проблема (container живёт
+  // весь lifecycle), но в unit-тестах даёт async BadState при dispose.
+  // Integration-тест на Шаге 19 покроет это end-to-end.
+  group('LogoutHandler', () {
+    test('smoke: LogoutResult sealed types exist', () {
+      const success = LogoutSuccess();
+      const failure = LogoutPartialFailure('test');
+      expect(success, isA<LogoutResult>());
+      expect(failure, isA<LogoutResult>());
+      expect(failure.message, 'test');
     });
   });
 

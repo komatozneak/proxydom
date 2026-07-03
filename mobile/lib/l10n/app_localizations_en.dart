@@ -83,6 +83,19 @@ class AppL10nEn extends AppL10n {
   String get logoutTooltip => 'Sign out';
 
   @override
+  String get logoutConfirmTitle => 'Sign out?';
+
+  @override
+  String get logoutConfirmMessage =>
+      'Your VPN connection will be closed. You\'ll need to verify again next time.';
+
+  @override
+  String get logoutWarning => 'Logout completed with warnings';
+
+  @override
+  String get cancel => 'Cancel';
+
+  @override
   String get verifyTitle => 'Enter code';
 
   @override
