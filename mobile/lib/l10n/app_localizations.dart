@@ -121,6 +121,42 @@ abstract class AppL10n {
   /// **'Sign in (test button)'**
   String get loginTestButton;
 
+  /// No description provided for @loginPhoneLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone number'**
+  String get loginPhoneLabel;
+
+  /// No description provided for @loginPhoneHint.
+  ///
+  /// In en, this message translates to:
+  /// **'+7 999 123 4567'**
+  String get loginPhoneHint;
+
+  /// No description provided for @loginPhoneHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'We\'ll call you for verification'**
+  String get loginPhoneHelper;
+
+  /// No description provided for @loginPhoneError.
+  ///
+  /// In en, this message translates to:
+  /// **'Format: +7XXXXXXXXXX (must be 12 chars)'**
+  String get loginPhoneError;
+
+  /// No description provided for @loginCallButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Call me'**
+  String get loginCallButton;
+
+  /// No description provided for @loginCallingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Calling...'**
+  String get loginCallingTitle;
+
   /// No description provided for @homeTitle.
   ///
   /// In en, this message translates to:
@@ -138,6 +174,18 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Sign out'**
   String get logoutTooltip;
+
+  /// No description provided for @verifyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter code'**
+  String get verifyTitle;
+
+  /// No description provided for @verifySentTo.
+  ///
+  /// In en, this message translates to:
+  /// **'We called {phone}'**
+  String verifySentTo(String phone);
 
   /// Short label of language toggle button (shows next-language code)
   ///

@@ -21,6 +21,24 @@ class AppL10nRu extends AppL10n {
   String get loginTestButton => 'Войти (тестовая кнопка)';
 
   @override
+  String get loginPhoneLabel => 'Номер телефона';
+
+  @override
+  String get loginPhoneHint => '+7 999 123 4567';
+
+  @override
+  String get loginPhoneHelper => 'Позвоним для подтверждения';
+
+  @override
+  String get loginPhoneError => 'Формат: +7XXXXXXXXXX (12 символов)';
+
+  @override
+  String get loginCallButton => 'Позвонить';
+
+  @override
+  String get loginCallingTitle => 'Звоним...';
+
+  @override
   String get homeTitle => 'Главная';
 
   @override
@@ -28,6 +46,14 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get logoutTooltip => 'Выйти';
+
+  @override
+  String get verifyTitle => 'Введите код';
+
+  @override
+  String verifySentTo(String phone) {
+    return 'Позвонили на $phone';
+  }
 
   @override
   String get switchLanguage => 'RU';

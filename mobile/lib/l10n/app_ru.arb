@@ -4,8 +4,16 @@
   "loginTitle": "Вход",
   "loginPlaceholderHint": "Поле для телефона будет в шаге 6",
   "loginTestButton": "Войти (тестовая кнопка)",
+  "loginPhoneLabel": "Номер телефона",
+  "loginPhoneHint": "+7 999 123 4567",
+  "loginPhoneHelper": "Позвоним для подтверждения",
+  "loginPhoneError": "Формат: +7XXXXXXXXXX (12 символов)",
+  "loginCallButton": "Позвонить",
+  "loginCallingTitle": "Звоним...",
   "homeTitle": "Главная",
   "homeVpnHint": "VPN UI — в шагах 9+",
   "logoutTooltip": "Выйти",
+  "verifyTitle": "Введите код",
+  "verifySentTo": "Позвонили на {phone}",
   "switchLanguage": "RU"
 }

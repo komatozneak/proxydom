@@ -21,6 +21,24 @@ class AppL10nEn extends AppL10n {
   String get loginTestButton => 'Sign in (test button)';
 
   @override
+  String get loginPhoneLabel => 'Phone number';
+
+  @override
+  String get loginPhoneHint => '+7 999 123 4567';
+
+  @override
+  String get loginPhoneHelper => 'We\'ll call you for verification';
+
+  @override
+  String get loginPhoneError => 'Format: +7XXXXXXXXXX (must be 12 chars)';
+
+  @override
+  String get loginCallButton => 'Call me';
+
+  @override
+  String get loginCallingTitle => 'Calling...';
+
+  @override
   String get homeTitle => 'Home';
 
   @override
@@ -28,6 +46,14 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get logoutTooltip => 'Sign out';
+
+  @override
+  String get verifyTitle => 'Enter code';
+
+  @override
+  String verifySentTo(String phone) {
+    return 'We called $phone';
+  }
 
   @override
   String get switchLanguage => 'EN';

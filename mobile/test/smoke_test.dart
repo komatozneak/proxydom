@@ -48,8 +48,9 @@ void main() {
     await tester.pumpWidget(const TeremokApp());
     await tester.pumpAndSettle();
 
-    expect(find.text('Sign in'), findsOneWidget);
-    expect(find.text('Sign in (test button)'), findsOneWidget);
+    expect(find.text('Sign in'), findsWidgets);
+    expect(find.text('Phone number'), findsOneWidget);
+    expect(find.text('Call me'), findsOneWidget);
   });
 
   testWidgets('App boots and shows login screen (ru)', (tester) async {
@@ -58,20 +59,20 @@ void main() {
     await tester.pumpWidget(const TeremokApp());
     await tester.pumpAndSettle();
 
-    expect(find.text('Вход'), findsOneWidget);
-    expect(find.text('Войти (тестовая кнопка)'), findsOneWidget);
+    expect(find.text('Вход'), findsWidgets);
+    expect(find.text('Номер телефона'), findsOneWidget);
+    expect(find.text('Позвонить'), findsOneWidget);
   });
 
-  testWidgets('Tapping login goes to home', (tester) async {
+  testWidgets('Login screen renders phone field and button', (tester) async {
     AppLocale.set(const Locale('ru'));
     AppRouter.setAuthenticated(false);
     await tester.pumpWidget(const TeremokApp());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Войти (тестовая кнопка)'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Главная'), findsOneWidget);
+    expect(find.text('Номер телефона'), findsOneWidget);
+    expect(find.text('+7 999 123 4567'), findsOneWidget);
+    expect(find.text('Позвонить'), findsOneWidget);
   });
 
   test('AppConfig.baseUrl is set to Android emulator default', () {
