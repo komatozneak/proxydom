@@ -1,8 +1,18 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+val keystoreProperties = Properties().apply {
+    val f = rootProject.file("key.properties")
+    if (f.exists()) {
+        load(FileInputStream(f))
+    }
 }
 
 android {
@@ -20,26 +30,56 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.teremok.connect.teremok_connect"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
-        // minSdk 23 — Android 6.0 (Marshmallow). Required for
-        // android.net.VpnService.Builder.establish() (Шаг 11).
-        // Flutter default is 21, but VpnService needs 23.
-        // NOTE: Flutter Gradle plugin auto-resets this to flutter.minSdkVersion
-        // on every build — re-apply after each `flutter build apk` if reverted.
-        minSdk = flutter.minSdkVersion
+        // Жёстко фиксируем minSdk = 23 для VpnService.Builder.establish.
+        // Flutter plugin иногда откатывает на flutter.minSdkVersion — поэтому
+        // повторяем после каждого `flutter build apk`.
+        minSdk = 23
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("release") {
+            if (!keystoreProperties.isEmpty) {
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+                storeFile = file(keystoreProperties["storeFile"] as String)
+                storePassword = keystoreProperties["storePassword"] as String
+            }
+        }
+    }
+
     buildTypes {
-        release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+        getByName("release") {
+            // Если key.properties настроен — подписываем release keystore.
+            // Иначе fallback на debug (dev/CI only, НЕ для Play Store).
+            signingConfig = if (!keystoreProperties.isEmpty) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
+        }
+        getByName("debug") {
+            // debug уже настроен
+        }
+    }
+
+    // ABI splits — отдельные APK на архитектуру (Шаг 19).
+    // Уменьшает размер APK на 60-70% (вместо 175 MB sing-box binaries — только нужный ABI).
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86_64")
+            isUniversalApk = true
         }
     }
 }
