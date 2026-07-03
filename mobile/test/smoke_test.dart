@@ -11,6 +11,8 @@ import 'package:teremok_connect/core/jwt_interceptor.dart';
 import 'package:teremok_connect/core/result.dart';
 import 'package:teremok_connect/core/retry_policy.dart';
 import 'package:teremok_connect/core/router.dart';
+import 'package:teremok_connect/core/theme.dart';
+import 'package:teremok_connect/core/extensions.dart';
 import 'package:teremok_connect/core/token_storage.dart';
 import 'package:teremok_connect/features/auth/application/auth_provider.dart';
 import 'package:teremok_connect/features/auth/application/auth_state.dart';
@@ -413,6 +415,63 @@ void main() {
   test('AppConfig.baseUrl is set to Android emulator default', () {
     expect(AppConfig.baseUrl, isNotEmpty);
     expect(AppConfig.baseUrl, contains('/api/v1'));
+  });
+
+  group('AppTheme (Material 3)', () {
+    test('light тема использует Material 3', () {
+      expect(AppTheme.light.useMaterial3, true);
+      expect(AppTheme.light.brightness, Brightness.light);
+      // ColorScheme.fromSeed derives primary from seed via tonal palette,
+      // so seed and primary are not equal — we only verify the theme is M3.
+    });
+
+    test('dark тема использует Material 3', () {
+      expect(AppTheme.dark.useMaterial3, true);
+      expect(AppTheme.dark.brightness, Brightness.dark);
+    });
+
+    test('light и dark имеют разные colorScheme', () {
+      expect(
+        AppTheme.light.colorScheme.surface,
+        isNot(equals(AppTheme.dark.colorScheme.surface)),
+      );
+      expect(
+        AppTheme.light.colorScheme.onSurface,
+        isNot(equals(AppTheme.dark.colorScheme.onSurface)),
+      );
+    });
+
+    test('AppBrand constants заданы', () {
+      expect(AppBrand.primary, const Color(0xFF00897B));
+      expect(AppBrand.success, const Color(0xFF43A047));
+      expect(AppBrand.warning, const Color(0xFFFFA000));
+      expect(AppBrand.error, const Color(0xFFE53935));
+    });
+
+    test('textTheme настроен для всех уровней', () {
+      final tt = AppTheme.light.textTheme;
+      expect(tt.displayLarge, isNotNull);
+      expect(tt.headlineLarge, isNotNull);
+      expect(tt.titleLarge, isNotNull);
+      expect(tt.bodyLarge, isNotNull);
+      expect(tt.labelLarge, isNotNull);
+    });
+
+    test('component themes заданы (AppBar/FilledButton/Card)', () {
+      expect(AppTheme.light.appBarTheme.backgroundColor,
+          AppTheme.light.colorScheme.primary);
+      expect(AppTheme.light.filledButtonTheme.style, isNotNull);
+      expect(AppTheme.light.cardTheme.elevation, 2);
+      expect(AppTheme.light.cardTheme.shape, isA<RoundedRectangleBorder>());
+    });
+
+    test('vpnStatusColor extension возвращает ожидаемые brand-цвета', () {
+      final scheme = AppTheme.light.colorScheme;
+      expect(scheme.vpnStatusColor('connected'), AppBrand.success);
+      expect(scheme.vpnStatusColor('connecting'), AppBrand.warning);
+      expect(scheme.vpnStatusColor('error'), AppBrand.error);
+      expect(scheme.vpnStatusColor('unknown'), scheme.outline);
+    });
   });
 
   test('ApiClient has correct base URL', () {
