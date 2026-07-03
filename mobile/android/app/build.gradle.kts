@@ -27,6 +27,8 @@ android {
         // minSdk 23 — Android 6.0 (Marshmallow). Required for
         // android.net.VpnService.Builder.establish() (Шаг 11).
         // Flutter default is 21, but VpnService needs 23.
+        // NOTE: Flutter Gradle plugin auto-resets this to flutter.minSdkVersion
+        // on every build — re-apply after each `flutter build apk` if reverted.
         minSdk = 23
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

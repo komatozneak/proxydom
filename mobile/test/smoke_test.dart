@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http_mock_adapter/http_mock_adapter.dart';
@@ -12,6 +13,7 @@ import 'package:teremok_connect/core/token_storage.dart';
 import 'package:teremok_connect/features/auth/application/auth_provider.dart';
 import 'package:teremok_connect/features/auth/application/auth_state.dart';
 import 'package:teremok_connect/features/vpn/data/vpn_config.dart';
+import 'package:teremok_connect/features/vpn/data/vpn_controller.dart';
 import 'package:teremok_connect/l10n/app_localizations.dart';
 
 class _FakeTokenStorage implements TokenStore {
@@ -197,6 +199,102 @@ void main() {
     );
     expect(config.expire.year, greaterThan(2025));
     expect(config.expire.isUtc, true);
+  });
+
+  group('VpnController', () {
+    const channel = MethodChannel('teremok/vpn');
+    final List<MethodCall> log = <MethodCall>[];
+
+    setUp(() {
+      log.clear();
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        log.add(call);
+        if (call.method == 'getStatus') return 'idle';
+        if (call.method == 'requestPermission') return true;
+        return true;
+      });
+    });
+
+    tearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+    });
+
+    test('stop() вызывает MethodChannel stop', () async {
+      final result = await VpnController.instance.stop();
+      expect(result, true);
+      expect(log.last.method, 'stop');
+    });
+
+    test('getStatus() возвращает idle (мок)', () async {
+      final status = await VpnController.instance.getStatus();
+      expect(status, VpnNativeStatus.idle);
+      expect(log.last.method, 'getStatus');
+    });
+
+    test('requestPermission() вызывает MethodChannel и возвращает true', () async {
+      final granted = await VpnController.instance.requestPermission();
+      expect(granted, true);
+      expect(log.last.method, 'requestPermission');
+    });
+
+    test(
+      'start() вызывает MethodChannel с правильными аргументами',
+      () async {
+        final json = {
+          'username': 'test_user',
+          'links': const <String>[],
+          'expire': 1785654092,
+          'sing_box_config': {
+            'log': {'level': 'info'},
+            'inbounds': const [],
+            'outbounds': [
+              {
+                'type': 'vless',
+                'tag': 'proxy',
+                'server': 'vpn-dev.example',
+                'server_port': 443,
+                'uuid': '12345678-1234-1234-1234-123456789012',
+                'flow': 'xtls-rprx-vision',
+              },
+            ],
+          },
+        };
+        final config = VpnConfig.fromJson(json);
+        final ok = await VpnController.instance.start(config);
+        expect(ok, true);
+        expect(log.last.method, 'start');
+        final args = log.last.arguments as Map;
+        expect(args['username'], 'test_user');
+        expect(args['protocol'], 'vless');
+        expect(args['server'], 'vpn-dev.example');
+        expect(args['serverPort'], 443);
+        expect(args['uuid'], '12345678-1234-1234-1234-123456789012');
+        expect(args['flow'], 'xtls-rprx-vision');
+      },
+    );
+
+    test(
+      'start() без outbound бросает VpnControllerException',
+      () async {
+        final json = {
+          'username': 'empty',
+          'links': const <String>[],
+          'expire': 1785654092,
+          'sing_box_config': {
+            'log': {'level': 'info'},
+            'inbounds': const [],
+            'outbounds': const [],
+          },
+        };
+        final config = VpnConfig.fromJson(json);
+        expect(
+          () => VpnController.instance.start(config),
+          throwsA(isA<VpnControllerException>()),
+        );
+      },
+    );
   });
 
   test('AppConfig.baseUrl is set to Android emulator default', () {
