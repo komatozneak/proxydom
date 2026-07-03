@@ -4,4 +4,17 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+
+    <application>
+        <!-- ТОЛЬКО ДЛЯ DEBUG: ручной старт VpnService без Flutter UI -->
+        <activity
+            android:name=".DebugVpnActivity"
+            android:exported="true"
+            android:label="Teremok Debug VPN">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+    </application>
 </manifest>
