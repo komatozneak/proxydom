@@ -5,16 +5,18 @@
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
 
-    <application>
-        <!-- ТОЛЬКО ДЛЯ DEBUG: ручной старт VpnService без Flutter UI -->
+    <application
+        android:usesCleartextTraffic="true">
+        <!-- ТОЛЬКО ДЛЯ DEBUG: ручной старт VpnService без Flutter UI.
+             НЕ имеет LAUNCHER intent-filter, чтобы не перехватывать главный запуск
+             (Flutter run запускает MainActivity по умолчанию). Доступна через
+             `adb shell am start -n com.teremok.connect.teremok_connect/.DebugVpnActivity`.
+
+             usesCleartextTraffic="true" разрешает HTTP (не HTTPS) к localhost/10.0.2.2
+             для dev backend. В release этого не будет. -->
         <activity
             android:name=".DebugVpnActivity"
             android:exported="true"
-            android:label="Teremok Debug VPN">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN"/>
-                <category android:name="android.intent.category.LAUNCHER"/>
-            </intent-filter>
-        </activity>
+            android:label="Teremok Debug VPN"/>
     </application>
 </manifest>
