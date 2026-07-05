@@ -30,7 +30,7 @@ internal class LibboxPlatform(
 
     override fun openTun(options: TunOptions): Int {
         val fd = tunFdProvider()
-            ?: error("TUN fd not set — wire TunForwarder in Commit 4")
+            ?: error("TUN fd not set — call SingBoxBridge.setTunFd() first")
         return fd
     }
 

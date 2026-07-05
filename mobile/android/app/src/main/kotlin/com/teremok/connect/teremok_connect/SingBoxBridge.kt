@@ -123,6 +123,11 @@ class SingBoxBridge private constructor() {
             return false
         }
 
+        if (tunFd == null) {
+            Log.e(TAG, "start: TUN fd not set — call setTunFd() first")
+            return false
+        }
+
         return try {
             ensureSetup()
             Libbox.checkConfig(singBoxConfigJson)
