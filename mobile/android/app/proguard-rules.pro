@@ -10,10 +10,9 @@
 -keep class android.net.VpnService { *; }
 -keep class com.teremok.connect.teremok_connect.** { *; }
 
-# Sing-box native binary (Шаг 14) — НЕ трогаем через ProGuard,
-# т.к. binary вызывается через ProcessBuilder, а не через JNI classes.
-# Но keep-правило ниже не помешает на случай если кто-то добавит JNI wrapper.
--keep class sing.box.** { *; }
+# libbox JNI (sing-box v1.13.14 via gomobile) — CLI binaries removed in v0.2.0
+-keep class io.nekohasekai.libbox.** { *; }
+-keep class go.** { *; }
 
 # JSON serialization annotations (для будущих моделей)
 -keepclassmembers class * {

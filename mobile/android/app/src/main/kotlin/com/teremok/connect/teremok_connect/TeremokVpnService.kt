@@ -13,19 +13,12 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Android VpnService — скелет для будущей sing-box интеграции (Шаги 14-15).
+ * Android VpnService с libbox JNI (sing-box tun2socks).
  *
  * Lifecycle:
- * - onCreate: сервис создан, currentStatus = "idle"
- * - onStartCommand: вызывается через startService с intent.action = ACTION_START/STOP.
- *   Создаём TUN через Builder.establish() (пока без tun2socks).
- * - onRevoke: вызывается системой или при ручном отзыве из Settings.
- * - onDestroy: чистим ресурсы.
- *
- * На этом шаге VPN работает (системный диалог "Разрешить VPN" появляется),
- * но НЕ маршрутизирует трафик. Трафик пойдёт через sing-box в Шаге 15.
- *
- * Шаг 12: добавлен currentStatus + broadcaster для EventChannel.
+ * - establish TUN через Builder
+ * - TunForwarder → SingBoxBridge.setTunFd
+ * - SingBoxBridge.start(config) → libbox CommandServer
  */
 class TeremokVpnService : VpnService() {
 
@@ -174,25 +167,11 @@ class TeremokVpnService : VpnService() {
 
             isRunning = true
 
-            // === Шаг 15: запускаем TunForwarder (UNIX socket для forwarder) ===
-            // Реальный tun2socks (sing-box ↔ TUN через socketpair+SCM_RIGHTS) —
-            // Шаг 19 (libbox.aar JNI). Здесь поднимаем инфраструктуру.
-            val activeTun = tunInterface
-            if (activeTun != null) {
-                tunForwarder = TunForwarder(activeTun) {
-                    Log.i(TAG, "TunForwarder is ready (UNIX socket bound)")
-                }
-                tunForwarder?.start()
-                Log.i(TAG, "startVpn: TunForwarder started")
-            } else {
-                Log.w(TAG, "startVpn: tunInterface is null, forwarder не запущен")
-            }
-
-            // Запускаем sing-box процесс (Шаг 14). Реальный tun2socks — Шаг 15.
             val singBoxConfigJson = buildSingBoxJson(
                 params = params,
                 address = address,
                 addressPrefix = addressPrefix,
+                mtu = mtu,
                 outboundServer = outboundServer,
                 outboundServerPort = outboundServerPort,
                 outboundUuid = outboundUuid,
@@ -203,15 +182,38 @@ class TeremokVpnService : VpnService() {
                 tlsShortId = tlsShortId,
             )
             Log.i(TAG, "startVpn: sing-box config (${singBoxConfigJson.length} chars)")
+
             val bridge = SingBoxBridge.instance
             bridge.bind(this)
-            if (bridge.installBinary()) {
-                val started = bridge.start(singBoxConfigJson)
-                if (!started) {
-                    Log.w(TAG, "startVpn: sing-box не запустился, TUN остаётся")
+            if (!bridge.loadLibrary()) {
+                Log.e(TAG, "startVpn: libbox init failed")
+                currentStatus = "error"
+                VpnStatusBroadcaster.emit(currentStatus)
+                stopVpn()
+                return
+            }
+
+            val activeTun = tunInterface
+            if (activeTun != null) {
+                tunForwarder = TunForwarder(activeTun, bridge) {
+                    Log.i(TAG, "TunForwarder: TUN fd wired to libbox")
                 }
+                tunForwarder?.start()
             } else {
-                Log.w(TAG, "startVpn: не удалось установить sing-box binary")
+                Log.e(TAG, "startVpn: tunInterface is null")
+                currentStatus = "error"
+                VpnStatusBroadcaster.emit(currentStatus)
+                stopVpn()
+                return
+            }
+
+            val started = bridge.start(singBoxConfigJson)
+            if (!started) {
+                Log.e(TAG, "startVpn: libbox не запустился")
+                currentStatus = "error"
+                VpnStatusBroadcaster.emit(currentStatus)
+                stopVpn()
+                return
             }
 
             currentStatus = "connected"
@@ -378,16 +380,13 @@ internal fun jsonArrayToList(arr: JSONArray): List<Any?> {
 }
 
 /**
- * Собирает полный sing-box config JSON из flat params.
- *
- * Шаг 14: tun-интерфейс есть, но TUN fd НЕ передаётся в sing-box process —
- * это будет в Шаге 15 (fd inheritance). Здесь sing-box стартует с
- * placeholder tun-конфигом, чтобы проверить что CLI принимает JSON.
+ * Собирает sing-box config JSON для libbox [CommandServer].
  */
 internal fun buildSingBoxJson(
     params: Map<String, Any?>,
     address: String,
     addressPrefix: Int,
+    mtu: Int,
     outboundServer: String,
     outboundServerPort: Int,
     outboundUuid: String,
@@ -438,16 +437,32 @@ internal fun buildSingBoxJson(
                 put(
                     JSONObject().apply {
                         put("type", "tun")
-                        put("inet4_address", "$address/$addressPrefix")
-                        put("auto_route", true)
+                        put("tag", "tun-in")
+                        put("interface_name", "tun0")
+                        put("mtu", mtu)
+                        put(
+                            "address",
+                            JSONArray().apply { put("$address/$addressPrefix") },
+                        )
+                        put("auto_route", false)
                         put("strict_route", true)
+                        put("stack", "gvisor")
                     },
                 )
             },
         )
         put(
             "outbounds",
-            JSONArray().apply { put(outbound) },
+            JSONArray().apply {
+                put(JSONObject().apply { put("type", "direct"); put("tag", "direct") })
+                put(outbound)
+            },
+        )
+        put(
+            "route",
+            JSONObject().apply {
+                put("final", "proxy")
+            },
         )
     }
     return root.toString()

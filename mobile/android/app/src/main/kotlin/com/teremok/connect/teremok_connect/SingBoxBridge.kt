@@ -1,204 +1,195 @@
 package com.teremok.connect.teremok_connect
 
 import android.content.Context
-import android.os.Build
+import android.net.VpnService
 import android.util.Log
+import io.nekohasekai.libbox.CommandServer
+import io.nekohasekai.libbox.CommandServerHandler
+import io.nekohasekai.libbox.Libbox
+import io.nekohasekai.libbox.OverrideOptions
+import io.nekohasekai.libbox.SetupOptions
+import io.nekohasekai.libbox.SystemProxyStatus
 import java.io.File
-import java.io.InputStream
-import java.io.OutputStream
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Bridge к sing-box native binary через Process.
+ * Bridge к sing-box через libbox JNI ([libbox.aar]).
  *
- * На этом шаге (Шаг 14) sing-box CLI запускается как child process.
- * Конфиг передаётся через stdin, логи читаются через stdout.
- *
- * ⚠️ Это НЕ оптимальный вариант для продакшена:
- * - Настоящий tun2socks требует передачи TUN fd от VpnService → sing-box.
- *   Это делается через fd inheritance на Linux/Android, что сложно.
- * - В Шаге 15 добавим tun2socks через прямое чтение fd.
- * - В Шаге 19 (release) — заменим на JNI binding.
- *
- * Для Шага 14 достаточно проверить инфраструктуру:
- * - binary копируется из assets в filesDir (chmod +x)
- * - стартует и принимает JSON config через stdin
- * - логи пишутся в logcat
+ * Заменяет CLI child process (Шаг 14) на [CommandServer] + [PlatformInterface].
+ * TUN fd передаётся через [setTunFd] — Commit 4 (TunForwarder).
  */
 class SingBoxBridge private constructor() {
 
     companion object {
         private const val TAG = "SingBoxBridge"
-        private const val BINARY_DIR_NAME = "sing-box"
-        private const val BINARY_NAME = "sing-box"
+        private const val WORK_DIR = "sing-box"
+        private const val TEMP_DIR = "sing-box-temp"
+
+        init {
+            System.loadLibrary("box")
+            Libbox.touch()
+        }
 
         @JvmStatic
         val instance: SingBoxBridge by lazy { SingBoxBridge() }
     }
 
-    private var process: Process? = null
-    private var _appContext: Context? = null
+    private var appContext: Context? = null
+    private var vpnService: VpnService? = null
+    private var commandServer: CommandServer? = null
+    private var tunFd: Int? = null
+    private val isSetup = AtomicBoolean(false)
+    private val isRunning = AtomicBoolean(false)
 
-    /**
-     * Установить context (нужно вызвать до installBinary).
-     */
-    fun bind(context: Context) {
-        _appContext = context.applicationContext
+    private val platform = LibboxPlatform(
+        tunFdProvider = { tunFd },
+        protectSocket = { fd -> vpnService?.protect(fd) == true },
+    )
+
+    private val commandHandler = object : CommandServerHandler {
+        override fun getSystemProxyStatus(): SystemProxyStatus? = null
+
+        override fun serviceReload() {
+            Log.i(TAG, "serviceReload requested")
+        }
+
+        override fun serviceStop() {
+            Log.i(TAG, "serviceStop requested")
+            stop()
+        }
+
+        override fun setSystemProxyEnabled(isEnabled: Boolean) {
+            Log.i(TAG, "setSystemProxyEnabled: $isEnabled")
+        }
+
+        override fun writeDebugMessage(message: String?) {
+            if (!message.isNullOrBlank()) {
+                Log.i(TAG, "[libbox] $message")
+            }
+        }
     }
 
-    private val binariesDir: File
-        get() {
-            val ctx = _appContext
-                ?: error("SingBoxBridge.bind(context) must be called first")
-            return File(ctx.filesDir, BINARY_DIR_NAME).apply { mkdirs() }
+    /**
+     * Установить context. Если [context] — [VpnService], сохраняем для [VpnService.protect].
+     */
+    fun bind(context: Context) {
+        appContext = context.applicationContext
+        if (context is VpnService) {
+            vpnService = context
         }
+        ensureSetup()
+    }
 
     /**
-     * Копирует sing-box binary из assets в filesDir.
-     * APK assets read-only — нужен реальный файл на диске для chmod +x.
+     * Передать TUN file descriptor в libbox (Commit 4).
+     * Вызывать после [android.net.VpnService.Builder.establish].
      */
-    fun installBinary(): Boolean {
-        val ctx = _appContext
+    fun setTunFd(fd: Int) {
+        tunFd = fd
+        Log.i(TAG, "setTunFd: $fd")
+    }
+
+    /**
+     * Инициализирует libbox runtime.
+     */
+    fun loadLibrary(): Boolean {
+        val ctx = appContext
         if (ctx == null) {
-            Log.e(TAG, "installBinary: bind() не вызван")
+            Log.e(TAG, "loadLibrary: bind() не вызван")
             return false
         }
-
-        val assetName = pickAssetForAbi()
-        val target = File(binariesDir, BINARY_NAME)
-
-        if (target.exists() && target.canExecute()) {
-            Log.i(TAG, "installBinary: уже установлен (${target.absolutePath})")
-            return true
-        }
-
         return try {
-            ctx.assets.open(assetName).use { input: InputStream ->
-                target.outputStream().use { output ->
-                    input.copyTo(output)
-                }
-            }
-            target.setExecutable(true, false)
-            target.setReadable(true, false)
-            Log.i(
-                TAG,
-                "installBinary: copied $assetName → ${target.absolutePath} " +
-                    "(${target.length()} bytes, exec=${target.canExecute()})",
-            )
+            ensureSetup()
+            Log.i(TAG, "loadLibrary: libbox ${Libbox.version()} ready")
             true
         } catch (e: Exception) {
-            Log.e(TAG, "installBinary: failed", e)
+            Log.e(TAG, "loadLibrary: libbox setup failed", e)
             false
         }
     }
 
     /**
-     * Выбираем asset по Build.SUPPORTED_ABIS[0].
-     * Ожидаемые имена: sing-box-arm64 / sing-box-armv7 / sing-box-x86_64.
-     */
-    private fun pickAssetForAbi(): String {
-        val primaryAbi = if (Build.SUPPORTED_ABIS.isNotEmpty()) {
-            Build.SUPPORTED_ABIS[0]
-        } else {
-            "arm64-v8a"
-        }
-        val asset = when (primaryAbi) {
-            "arm64-v8a" -> "sing-box-arm64"
-            "armeabi-v7a" -> "sing-box-armv7"
-            "x86_64" -> "sing-box-x86_64"
-            "x86" -> "sing-box-x86_64" // legacy x86 fallback
-            else -> "sing-box-arm64" // safe default
-        }
-        Log.i(TAG, "pickAssetForAbi: $primaryAbi → $asset")
-        return asset
-    }
-
-    /**
-     * Запустить sing-box с переданным sing-box JSON config.
-     *
-     * ⚠️ На этом шаге (Шаг 14) binary стартует и принимает конфиг,
-     * но tun2socks НЕ работает (TUN fd не передаётся в process).
-     * Реальный tun2socks — Шаг 15.
+     * Запустить sing-box через [CommandServer.startOrReloadService].
      */
     fun start(singBoxConfigJson: String): Boolean {
-        if (process?.isAlive == true) {
-            Log.w(TAG, "start: уже запущен (PID=${safePid(process!!)})")
+        if (isRunning.get()) {
+            Log.w(TAG, "start: уже запущен")
             return false
         }
 
-        val binary = File(binariesDir, BINARY_NAME)
-        if (!binary.exists() || !binary.canExecute()) {
-            Log.e(TAG, "start: binary не найден или не executable: ${binary.absolutePath}")
+        val ctx = appContext
+        if (ctx == null) {
+            Log.e(TAG, "start: bind() не вызван")
+            return false
+        }
+
+        if (tunFd == null) {
+            Log.e(TAG, "start: TUN fd not set — call setTunFd() first")
             return false
         }
 
         return try {
-            val pb = ProcessBuilder(binary.absolutePath, "run")
-            pb.redirectErrorStream(true)
-            val p = pb.start()
-            process = p
+            ensureSetup()
+            Libbox.checkConfig(singBoxConfigJson)
 
-            // Отправляем конфиг в stdin
-            val stdin: OutputStream = p.outputStream
-            stdin.write(singBoxConfigJson.toByteArray())
-            stdin.write("\n".toByteArray())
-            stdin.flush()
-            stdin.close()
+            val server = Libbox.newCommandServer(commandHandler, platform)
+            server.start()
+            server.startOrReloadService(singBoxConfigJson, OverrideOptions())
+            commandServer = server
+            isRunning.set(true)
 
-            Log.i(TAG, "start: sing-box запущен, PID=${safePid(p)}")
-
-            // Запускаем reader для stdout (логи) — fire and forget
-            startLogReader(p.inputStream)
-
+            Log.i(TAG, "start: libbox CommandServer started (${Libbox.version()})")
             true
         } catch (e: Exception) {
             Log.e(TAG, "start: failed", e)
+            commandServer?.close()
+            commandServer = null
+            isRunning.set(false)
             false
         }
     }
 
     /**
-     * Остановить sing-box процесс.
+     * Остановить sing-box CommandServer.
      */
     fun stop() {
-        val p = process ?: return
+        val server = commandServer ?: return
         try {
-            Log.i(TAG, "stop: destroy() PID=${safePid(p)}")
-            p.destroy()
-            if (!p.waitFor(5, TimeUnit.SECONDS)) {
-                Log.w(TAG, "stop: не завершился за 5 сек, force kill")
-                p.destroyForcibly()
-            }
+            Log.i(TAG, "stop: closing CommandServer")
+            runCatching { server.closeService() }
+                .onFailure { Log.w(TAG, "closeService: ${it.message}") }
+            server.close()
         } catch (e: Exception) {
             Log.e(TAG, "stop: error", e)
-        }
-        process = null
-    }
-
-    private fun safePid(p: Process): Long {
-        // Process.pid() появился в API 26 (Android 8.0). MinSdk=23,
-        // поэтому используем reflection чтобы не падать на старых API.
-        return try {
-            val method = Process::class.java.getMethod("pid")
-            (method.invoke(p) as? Long) ?: -1L
-        } catch (e: NoSuchMethodException) {
-            -1L
-        } catch (e: Exception) {
-            -1L
+        } finally {
+            commandServer = null
+            isRunning.set(false)
+            tunFd = null
         }
     }
 
-    private fun startLogReader(stream: InputStream) {
-        Thread {
-            try {
-                stream.bufferedReader().useLines { lines ->
-                    lines.forEach { line ->
-                        Log.i(TAG, "[sing-box] $line")
-                    }
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "logReader: stream closed", e)
-            }
-        }.start()
+    private fun ensureSetup() {
+        if (isSetup.get()) return
+        val ctx = appContext ?: error("SingBoxBridge.bind(context) must be called first")
+
+        val basePath = ctx.filesDir.absolutePath
+        val workingPath = File(ctx.filesDir, WORK_DIR).apply { mkdirs() }.absolutePath
+        val tempPath = File(ctx.cacheDir, TEMP_DIR).apply { mkdirs() }.absolutePath
+
+        val options = SetupOptions().apply {
+            setBasePath(basePath)
+            setWorkingPath(workingPath)
+            setTempPath(tempPath)
+            setFixAndroidStack(true)
+            setLogMaxLines(3000)
+        }
+        Libbox.setup(options)
+
+        val stderrLog = File(workingPath, "stderr.log").absolutePath
+        runCatching { Libbox.redirectStderr(stderrLog) }
+            .onFailure { Log.w(TAG, "redirectStderr failed: ${it.message}") }
+
+        isSetup.set(true)
+        Log.i(TAG, "ensureSetup: libbox ${Libbox.version()} base=$basePath")
     }
 }
