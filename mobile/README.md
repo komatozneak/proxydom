@@ -1,16 +1,14 @@
 # Teremok Connect — мобильный клиент (Flutter + Sing-box)
 
-> ✅ **СТАТУС 2026-07-03 (rev 4 — MVP ЗАВЕРШЁН):**
+> ✅ **СТАТУС 2026-07-05 (v0.2.0 — libbox JNI):**
 >
-> **Все 20/20 шагов MVP завершены** (плюс шаг 5b — debug bypass).
-> Backend `108 passed, 5 skipped`. Mobile `30 passed, 2 known failures`.
-> Реальный VPN-трафик пока не маршрутизируется (нужен libbox.aar с JNI для Шага 19+).
-> Auth-flow работает end-to-end (Flash Call + JWT + Home).
+> **Реальный tun2socks через libbox.aar** (sing-box v1.13.14, JNI binding).
+> CLI fallback удалён. Auth-flow end-to-end (Flash Call + JWT + Home).
 >
-> Подробности по коммитам и шагам — [`mobile/cursor-tasks/`](./cursor-tasks/README.md).
+> Подробности — [`CHANGELOG.md`](./CHANGELOG.md), [`mobile/cursor-tasks/`](./cursor-tasks/README.md).
 
 > **Стек:** Flutter 3.24+ · Dart 3.5+ · Riverpod 2 · dio · go_router ·
-> flutter_secure_storage · sing-box CLI (v1.13.14) · Android VpnService (Kotlin).
+> flutter_secure_storage · **libbox.aar** (sing-box v1.13.14 JNI) · Android VpnService (Kotlin).
 >
 > Никаких форков Hiddify-App — лицензия GPLv3+NC запрещает коммерцию.
 > Issue [#2271](https://github.com/hiddify/hiddify-app/issues/2271) в upstream закрыт как `not_planned`.
@@ -31,15 +29,14 @@ VPN-клиент для подписчиков Teremok Connect. Кросс-пл�
 - ✅ **Riverpod authProvider** (Шаг 8) — sealed AuthState, AsyncNotifier
 - ✅ **Logout flow** (Шаг 17) — LogoutHandler с VPN cleanup, AlertDialog confirm
 
-### VPN Stack (инфраструктура готова, реальный tun2socks — Шаг 19+ release)
+### VPN Stack (libbox JNI — v0.2.0)
 - ✅ **VpnConfigRepository** (Шаг 10) — GET `/vpn/config` (с mock backend)
 - ✅ **VpnServiceConfig** (Шаг 13) — парсер sing-box JSON → flat params
 - ✅ **VpnController** (Шаг 12) — MethodChannel `teremok/vpn` + EventChannel `teremok/vpn/status`
-- ✅ **TeremokVpnService** (Шаг 11) — Android VpnService extends, Builder.establish()
-- ✅ **TunForwarder** (Шаг 15) — UNIX socket для forwarder
-- ✅ **SingBoxBridge** (Шаг 14) — CLI процесс с stdin JSON config
-- ⚠️ **Реальный tun2socks** — не работает (sing-box CLI не получает TUN fd автоматически).
-  Требует libbox.aar с JNI binding в production release.
+- ✅ **TeremokVpnService** (Шаг 11) — Android VpnService, Builder.establish()
+- ✅ **TunForwarder** — передаёт TUN fd в libbox
+- ✅ **SingBoxBridge** — libbox JNI (`CommandServer` + `PlatformInterface`)
+- ✅ **libbox.aar** v1.13.14 — pre-built, 4 ABI (arm64, armv7, x86, x86_64)
 
 ### UI (Material 3 + dark mode)
 - ✅ **Home screen** (Шаг 9) — круглый 240×240 индикатор, FilledButton Connect/Disconnect
