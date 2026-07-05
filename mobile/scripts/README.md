@@ -10,10 +10,10 @@ Upstream **не публикует** готовый AAR в GitHub Releases — �
 
 | Компонент | Версия |
 |---|---|
-| Go | 1.21+ |
+| Go | 1.24+ (sing-box v1.13.14 go.mod) |
 | JDK | OpenJDK 17 |
-| Android NDK | r28+ |
-| gomobile | latest (`go install golang.org/x/mobile/cmd/gomobile@latest && gomobile init`) |
+| Android NDK | 28.0.13004108 (pinned in upstream sdk.go) |
+| gomobile | sagernet fork v0.1.12 (`go install github.com/sagernet/gomobile/cmd/gomobile@v0.1.12`) |
 | Env vars | `ANDROID_HOME`, `JAVA_HOME` |
 
 Подробная инструкция: `wiki/operations/build-libbox-aar.md`
@@ -57,7 +57,8 @@ git commit -m "build(mobile): pre-built libbox.aar v1.13.14"
 ### Troubleshooting
 
 - **`package github.com/sagernet/sing-tun: not found`** — подмодули не инициализированы. Скрипт делает `git submodule update --init --recursive` автоматически; если упало — удалите `WORKDIR` и запустите снова.
-- **`gomobile: command not found`** — `go install golang.org/x/mobile/cmd/gomobile@latest && gomobile init`
+- **`flag provided but not defined: -libname`** — установлен google gomobile вместо sagernet fork. Используй `github.com/sagernet/gomobile/cmd/gomobile@v0.1.12`
+- **`gomobile: command not found`** — скрипт установит sagernet/gomobile автоматически, или вручную: `go install github.com/sagernet/gomobile/cmd/gomobile@v0.1.12 && go install github.com/sagernet/gomobile/cmd/gobind@v0.1.12 && gomobile init`
 - **`java version should be openjdk 17`** — upstream жёстко требует JDK 17 (см. `cmd/internal/build_libbox/main.go`)
 - **Нет `armeabi-v7a/libbox.so`** — известная проблема gomobile для 32-bit. Для MVP достаточно `arm64-v8a`; armv7 остаётся на CLI fallback до отдельной итерации.
 

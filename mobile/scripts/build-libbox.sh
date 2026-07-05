@@ -6,7 +6,8 @@
 # Документация: wiki/operations/build-libbox-aar.md
 # План эпика: wiki/queries/mobile-step-19-final-plan.md
 #
-# Требования: Go 1.21+, gomobile, Android NDK r28+, ANDROID_HOME, JAVA_HOME (OpenJDK 17).
+# Требования: Go 1.24+ (sing-box v1.13.14), sagernet/gomobile v0.1.12, NDK 28.0.13004108,
+# ANDROID_HOME, JAVA_HOME (OpenJDK 17).
 
 set -euo pipefail
 
@@ -19,6 +20,8 @@ SINGBOX_VERSION="${SINGBOX_VERSION:-1.13.14}"
 SINGBOX_REPO="${SINGBOX_REPO:-https://github.com/SagerNet/sing-box.git}"
 WORKDIR="${WORKDIR:-${TMPDIR:-/tmp}/sing-box-build-${SINGBOX_VERSION}}"
 SKIP_BUILD="${SKIP_BUILD:-0}"
+# Pinned to github.com/sagernet/gomobile in sing-box v1.13.14 go.mod (supports -libname flag).
+GOMOBILE_VERSION="${GOMOBILE_VERSION:-v0.1.12}"
 
 log() {
     printf '[build-libbox] %s\n' "$*"
@@ -44,8 +47,8 @@ check_go_version() {
     go_version="$(go env GOVERSION | sed 's/^go//')"
     local major minor
     IFS='.' read -r major minor _ <<<"${go_version}"
-    if (( major < 1 || (major == 1 && minor < 21) )); then
-        die "Go 1.21+ required (found go${go_version})"
+    if (( major < 1 || (major == 1 && minor < 24) )); then
+        die "Go 1.24+ required for sing-box v${SINGBOX_VERSION} (found go${go_version})"
     fi
     log "Go version OK: go${go_version}"
 }
@@ -80,13 +83,28 @@ check_android_sdk() {
     log "ANDROID_HOME OK: ${ANDROID_HOME}"
 }
 
+install_gomobile() {
+    log "Installing sagernet/gomobile ${GOMOBILE_VERSION} (upstream fork, supports -libname)"
+    go install "github.com/sagernet/gomobile/cmd/gomobile@${GOMOBILE_VERSION}"
+    go install "github.com/sagernet/gomobile/cmd/gobind@${GOMOBILE_VERSION}"
+    gomobile init
+}
+
 check_gomobile() {
-    local gomobile_bin
-    gomobile_bin="$(go env GOPATH)/bin/gomobile"
-    if [[ ! -x "${gomobile_bin}" ]]; then
-        die "gomobile not found at ${gomobile_bin}. Run: go install golang.org/x/mobile/cmd/gomobile@latest && gomobile init"
+    local gobin gomobile_bin gobind_bin
+    gobin="$(go env GOPATH)/bin"
+    gomobile_bin="${gobin}/gomobile"
+    gobind_bin="${gobin}/gobind"
+
+    if [[ ! -x "${gomobile_bin}" || ! -x "${gobind_bin}" ]]; then
+        install_gomobile
+        gomobile_bin="${gobin}/gomobile"
+        gobind_bin="${gobin}/gobind"
     fi
-    log "gomobile OK: ${gomobile_bin}"
+
+    [[ -x "${gomobile_bin}" ]] || die "gomobile not found after install: ${gomobile_bin}"
+    [[ -x "${gobind_bin}" ]] || die "gobind not found after install: ${gobind_bin}"
+    log "gomobile OK: ${gomobile_bin} (${GOMOBILE_VERSION})"
 }
 
 prepare_singbox_source() {
