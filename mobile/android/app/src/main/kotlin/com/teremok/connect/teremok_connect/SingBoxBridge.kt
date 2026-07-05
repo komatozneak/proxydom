@@ -90,20 +90,20 @@ class SingBoxBridge private constructor() {
     }
 
     /**
-     * Инициализирует libbox runtime. Имя сохранено для совместимости с [TeremokVpnService].
+     * Инициализирует libbox runtime.
      */
-    fun installBinary(): Boolean {
+    fun loadLibrary(): Boolean {
         val ctx = appContext
         if (ctx == null) {
-            Log.e(TAG, "installBinary: bind() не вызван")
+            Log.e(TAG, "loadLibrary: bind() не вызван")
             return false
         }
         return try {
             ensureSetup()
-            Log.i(TAG, "installBinary: libbox ${Libbox.version()} ready")
+            Log.i(TAG, "loadLibrary: libbox ${Libbox.version()} ready")
             true
         } catch (e: Exception) {
-            Log.e(TAG, "installBinary: libbox setup failed", e)
+            Log.e(TAG, "loadLibrary: libbox setup failed", e)
             false
         }
     }

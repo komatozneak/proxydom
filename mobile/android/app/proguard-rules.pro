@@ -10,12 +10,9 @@
 -keep class android.net.VpnService { *; }
 -keep class com.teremok.connect.teremok_connect.** { *; }
 
-# libbox JNI (sing-box v1.13.14 via gomobile)
+# libbox JNI (sing-box v1.13.14 via gomobile) — CLI binaries removed in v0.2.0
 -keep class io.nekohasekai.libbox.** { *; }
 -keep class go.** { *; }
-
-# Sing-box native binary (Шаг 14 CLI fallback — удалится в Commit 5)
--keep class sing.box.** { *; }
 
 # JSON serialization annotations (для будущих моделей)
 -keepclassmembers class * {

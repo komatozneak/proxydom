@@ -185,7 +185,7 @@ class TeremokVpnService : VpnService() {
 
             val bridge = SingBoxBridge.instance
             bridge.bind(this)
-            if (!bridge.installBinary()) {
+            if (!bridge.loadLibrary()) {
                 Log.e(TAG, "startVpn: libbox init failed")
                 currentStatus = "error"
                 VpnStatusBroadcaster.emit(currentStatus)
