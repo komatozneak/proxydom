@@ -74,7 +74,7 @@ check_android_sdk() {
 
     if [[ -z "$(find "${ANDROID_HOME}/ndk" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | head -n1 || true)" ]]; then
         log "WARN: no NDK found under ANDROID_HOME/ndk"
-        log "      Install via: sdkmanager \"ndk;28.0.10000000\""
+        log "      Install via: sdkmanager \"ndk;28.0.13004108\""
     fi
 
     log "ANDROID_HOME OK: ${ANDROID_HOME}"
