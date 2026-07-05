@@ -150,8 +150,12 @@ verify_aar() {
     unzip -l "${aar_path}" | grep 'libbox\.so' || true
 
     if command -v jar >/dev/null 2>&1; then
+        local classes_jar
+        classes_jar="$(mktemp /tmp/libbox-classes.XXXXXX.jar)"
+        unzip -p "${aar_path}" classes.jar > "${classes_jar}"
         log "Java package namespace (first 15 entries):"
-        unzip -p "${aar_path}" classes.jar | jar tf - | head -15 || true
+        jar tf "${classes_jar}" | head -15 || true
+        rm -f "${classes_jar}"
     fi
 }
 
