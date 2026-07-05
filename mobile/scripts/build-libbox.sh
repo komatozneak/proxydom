@@ -141,7 +141,8 @@ verify_aar() {
     local aar_path="$1"
     require_cmd unzip
 
-    if ! unzip -l "${aar_path}" | grep -q 'lib/.*/libbox\.so'; then
+    # gomobile bind stores native libs under jni/<abi>/libbox.so (not lib/<abi>/)
+    if ! unzip -l "${aar_path}" | grep -q 'libbox\.so'; then
         die "AAR does not contain libbox.so: ${aar_path}"
     fi
 
