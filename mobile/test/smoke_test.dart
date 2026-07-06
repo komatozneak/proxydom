@@ -380,6 +380,19 @@ void main() {
   test('AppConfig.baseUrl is set to Android emulator default', () {
     expect(AppConfig.baseUrl, isNotEmpty);
     expect(AppConfig.baseUrl, contains('/api/v1'));
+    expect(AppConfig.baseUrl, AppConfig.androidBaseUrl);
+    expect(AppConfig.baseUrl, isNot(equals(AppConfig.vpsBaseUrl)));
+  });
+
+  test('AppConfig.vpsBaseUrl points to Yottasrc VPS prod backend', () {
+    expect(AppConfig.vpsBaseUrl, 'http://204.11.2.216:8080/api/v1');
+    expect(AppConfig.vpsBaseUrl, contains('204.11.2.216'));
+    expect(AppConfig.vpsBaseUrl, contains('/api/v1'));
+  });
+
+  test('AppConfig prod switch via APP_ENV dart-define', () {
+    expect(AppConfig.baseUrlForEnvironment('prod'), AppConfig.vpsBaseUrl);
+    expect(AppConfig.baseUrlForEnvironment('dev'), AppConfig.androidBaseUrl);
   });
 
   group('AppTheme (Material 3)', () {
