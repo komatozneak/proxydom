@@ -8,11 +8,16 @@ import 'features/auth/application/auth_provider.dart';
 import 'features/auth/application/auth_state.dart';
 
 void main() {
-  // Проверочный print — в логах flutter run должно быть:
-  //   [Teremok Connect] baseUrl=http://10.0.2.2:8000/api/v1
-  // Если для физического Android — adb reverse tcp:8000 tcp:8000 + поменяй baseUrl
   // ignore: avoid_print
   print('[Teremok Connect] baseUrl=${AppConfig.baseUrl}');
+  if (AppConfig.baseUrl.contains('10.0.2.2')) {
+    // ignore: avoid_print
+    print(
+      '[Teremok Connect] WARNING: 10.0.2.2 только для эмулятора. '
+      'Запусти: flutter run --dart-define=APP_ENV=dev (эмулятор) '
+      'или без флага / run_prod.ps1 (prod VPS)',
+    );
+  }
 
   final container = ProviderContainer();
 

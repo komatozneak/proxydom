@@ -29,6 +29,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.dispose();
   }
 
+  String _formatDioError(DioException e) {
+    final data = e.response?.data;
+    if (data is Map<String, dynamic>) {
+      final detail = data['detail'];
+      if (detail is String) return detail;
+      if (detail is List && detail.isNotEmpty) {
+        final first = detail.first;
+        if (first is Map && first['msg'] != null) {
+          return first['msg'].toString();
+        }
+      }
+    }
+    return e.message ?? 'Network error';
+  }
+
   Future<void> _onCallPressed() async {
     final phone = _controller.text.trim();
     if (!_phoneRegex.hasMatch(phone)) {
@@ -55,9 +70,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       }
     } on DioException catch (e) {
       setState(() {
-        _error = e.response?.data?['detail']?.toString() ??
-            e.message ??
-            'Network error';
+        _error = _formatDioError(e);
       });
     } catch (e) {
       setState(() {

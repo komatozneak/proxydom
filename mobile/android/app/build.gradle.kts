@@ -34,7 +34,7 @@ android {
         // Жёстко фиксируем minSdk = 23 для VpnService.Builder.establish.
         // Flutter plugin иногда откатывает на flutter.minSdkVersion — поэтому
         // повторяем после каждого `flutter build apk`.
-        minSdk = 23
+        minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -90,4 +90,5 @@ flutter {
 
 dependencies {
     implementation(files("libs/libbox.aar"))
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 }

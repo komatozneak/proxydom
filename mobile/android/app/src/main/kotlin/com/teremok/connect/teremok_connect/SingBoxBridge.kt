@@ -38,13 +38,22 @@ class SingBoxBridge private constructor() {
     private var vpnService: VpnService? = null
     private var commandServer: CommandServer? = null
     private var tunFd: Int? = null
+    private var platform: LibboxPlatform? = null
     private val isSetup = AtomicBoolean(false)
     private val isRunning = AtomicBoolean(false)
 
-    private val platform = LibboxPlatform(
-        tunFdProvider = { tunFd },
-        protectSocket = { fd -> vpnService?.protect(fd) == true },
-    )
+    @Volatile
+    var lastErrorMessage: String? = null
+        private set
+
+    private fun ensurePlatform(): LibboxPlatform {
+        val ctx = appContext ?: error("SingBoxBridge.bind(context) must be called first")
+        return platform ?: LibboxPlatform(
+            appContext = ctx,
+            tunFdProvider = { tunFd },
+            protectSocket = { fd -> vpnService?.protect(fd) == true },
+        ).also { platform = it }
+    }
 
     private val commandHandler = object : CommandServerHandler {
         override fun getSystemProxyStatus(): SystemProxyStatus? = null
@@ -130,9 +139,10 @@ class SingBoxBridge private constructor() {
 
         return try {
             ensureSetup()
+            lastErrorMessage = null
             Libbox.checkConfig(singBoxConfigJson)
 
-            val server = Libbox.newCommandServer(commandHandler, platform)
+            val server = Libbox.newCommandServer(commandHandler, ensurePlatform())
             server.start()
             server.startOrReloadService(singBoxConfigJson, OverrideOptions())
             commandServer = server
@@ -141,6 +151,7 @@ class SingBoxBridge private constructor() {
             Log.i(TAG, "start: libbox CommandServer started (${Libbox.version()})")
             true
         } catch (e: Exception) {
+            lastErrorMessage = e.message ?: e.toString()
             Log.e(TAG, "start: failed", e)
             commandServer?.close()
             commandServer = null

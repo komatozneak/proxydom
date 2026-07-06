@@ -1,11 +1,15 @@
 package com.teremok.connect.teremok_connect
 
 import android.content.Intent
+import android.net.IpPrefix
 import android.net.VpnService
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.ParcelFileDescriptor
+import android.provider.Settings
 import android.util.Log
+import java.net.InetAddress
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
@@ -29,6 +33,12 @@ class TeremokVpnService : VpnService() {
         const val EXTRA_USERNAME = "username"
         const val EXTRA_PROTOCOL = "protocol"
         const val EXTRA_PARAMS_JSON = "paramsJson"
+
+        /** Минимальный интервал между попытками start (debounce reconnect storm). */
+        private const val START_DEBOUNCE_MS = 2000L
+
+        @Volatile
+        private var lastStartAttemptMs: Long = 0L
 
         /** Получить системный Intent для запроса VPN-разрешения, или null если уже есть. */
         fun prepareVpn(context: android.content.Context): Intent? {
@@ -94,8 +104,19 @@ class TeremokVpnService : VpnService() {
             Log.w(TAG, "startVpn: уже запущен, пропускаем")
             return
         }
+        if (currentStatus == "preparing" || currentStatus == "connecting") {
+            Log.w(TAG, "startVpn: уже в процессе ($currentStatus), пропускаем")
+            return
+        }
+        val now = System.currentTimeMillis()
+        if (now - lastStartAttemptMs < START_DEBOUNCE_MS) {
+            Log.w(TAG, "startVpn: debounce (${now - lastStartAttemptMs}ms), пропускаем")
+            return
+        }
+        lastStartAttemptMs = now
 
         try {
+            VpnStatusBroadcaster.clearError()
             currentStatus = "preparing"
             VpnStatusBroadcaster.emit(currentStatus)
 
@@ -108,7 +129,7 @@ class TeremokVpnService : VpnService() {
             val routes = (params["routes"] as? List<String>) ?: listOf("0.0.0.0/0")
             @Suppress("UNCHECKED_CAST")
             val dnsServers = (params["dnsServers"] as? List<String>)
-                ?: listOf("1.1.1.1", "8.8.8.8")
+                ?: listOf(tunDnsPeerAddress(address, addressPrefix))
             val outboundServer = (params["outboundServer"] as? String) ?: "unknown"
             val outboundServerPort = (params["outboundServerPort"] as? Number)?.toInt() ?: 443
             val outboundUuid = (params["outboundUuid"] as? String) ?: ""
@@ -137,6 +158,11 @@ class TeremokVpnService : VpnService() {
             for (route in routes) {
                 val parts = route.split("/")
                 if (parts.size == 2) {
+                    // IPv6 default route без v6-адреса на TUN ломает connectivity на Android.
+                    if (parts[0].contains(":")) {
+                        Log.w(TAG, "  skip IPv6 route '$route' (no inet6 on TUN)")
+                        continue
+                    }
                     try {
                         builder.addRoute(parts[0], parts[1].toInt())
                         Log.i(TAG, "  added route: $route")
@@ -152,44 +178,76 @@ class TeremokVpnService : VpnService() {
                 builder.addDnsServer(dns)
             }
 
+            // В lockdown-режиме (Always-on + Block connections without VPN)
+            // bypass через excludeRoute блокируется системой и рвёт outbound.
+            // В этом режиме полагаемся только на VpnService.protect(fd) из LibboxPlatform.
+            val lockdownEnabled = runCatching {
+                Settings.Secure.getInt(contentResolver, "always_on_vpn_lockdown", 0) == 1
+            }.getOrDefault(false)
+            if (lockdownEnabled) {
+                Log.i(TAG, "  skip excludeRoute: always_on_vpn_lockdown=1")
+            } else if (
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                outboundServer.isNotEmpty() &&
+                outboundServer != "unknown"
+            ) {
+                try {
+                    val prefix = IpPrefix(InetAddress.getByName(outboundServer), 32)
+                    builder.excludeRoute(prefix)
+                    Log.i(TAG, "  excludeRoute: $outboundServer/32")
+                } catch (e: Exception) {
+                    Log.w(TAG, "  excludeRoute failed for $outboundServer", e)
+                }
+            }
+
             currentStatus = "connecting"
             VpnStatusBroadcaster.emit(currentStatus)
+
+            // До TUN: underlying network должен быть известен для direct→VPS.
+            DefaultNetworkMonitor.prewarm(this)
+            ProtectGuard.reset()
+            ProtectGuard.onFailure = {
+                Log.e(TAG, "startVpn: protect() failed — stopping VPN")
+                Handler(Looper.getMainLooper()).post {
+                    if (isRunning) {
+                        failStart("VpnService.protect() failed")
+                    }
+                }
+            }
 
             tunInterface = builder.establish()
 
             if (tunInterface == null) {
-                currentStatus = "error"
-                VpnStatusBroadcaster.emit(currentStatus)
-                Log.e(TAG, "startVpn: Builder.establish() вернул null (permission denied?)")
-                stopSelf()
+                ProtectGuard.onFailure = null
+                failStart("VPN permission denied or establish() returned null")
                 return
             }
 
             isRunning = true
 
-            val singBoxConfigJson = buildSingBoxJson(
-                params = params,
-                address = address,
-                addressPrefix = addressPrefix,
-                mtu = mtu,
-                outboundServer = outboundServer,
-                outboundServerPort = outboundServerPort,
-                outboundUuid = outboundUuid,
-                outboundFlow = outboundFlow,
-                tlsFingerprint = tlsFingerprint,
-                tlsSni = tlsSni,
-                tlsPublicKey = tlsPublicKey,
-                tlsShortId = tlsShortId,
-            )
+            val singBoxConfigJson = (params["singBoxConfigJson"] as? String)
+                ?.takeIf { it.isNotBlank() }
+                ?: buildSingBoxJson(
+                    params = params,
+                    address = address,
+                    addressPrefix = addressPrefix,
+                    mtu = mtu,
+                    outboundServer = outboundServer,
+                    outboundServerPort = outboundServerPort,
+                    outboundUuid = outboundUuid,
+                    outboundFlow = outboundFlow,
+                    tlsFingerprint = tlsFingerprint,
+                    tlsSni = tlsSni,
+                    tlsPublicKey = tlsPublicKey,
+                    tlsShortId = tlsShortId,
+                )
             Log.i(TAG, "startVpn: sing-box config (${singBoxConfigJson.length} chars)")
 
             val bridge = SingBoxBridge.instance
             bridge.bind(this)
             if (!bridge.loadLibrary()) {
                 Log.e(TAG, "startVpn: libbox init failed")
-                currentStatus = "error"
-                VpnStatusBroadcaster.emit(currentStatus)
-                stopVpn()
+                failStart("libbox init failed")
                 return
             }
 
@@ -201,18 +259,27 @@ class TeremokVpnService : VpnService() {
                 tunForwarder?.start()
             } else {
                 Log.e(TAG, "startVpn: tunInterface is null")
-                currentStatus = "error"
-                VpnStatusBroadcaster.emit(currentStatus)
-                stopVpn()
+                failStart("TUN interface is null")
+                return
+            }
+
+            if (!DefaultNetworkMonitor.awaitUnderlyingNetwork(this, 5000)) {
+                Log.e(TAG, "startVpn: underlying network timeout — aborting")
+                failStart("underlying network not ready")
                 return
             }
 
             val started = bridge.start(singBoxConfigJson)
             if (!started) {
-                Log.e(TAG, "startVpn: libbox не запустился")
-                currentStatus = "error"
-                VpnStatusBroadcaster.emit(currentStatus)
-                stopVpn()
+                val detail = bridge.lastErrorMessage ?: "unknown libbox error"
+                Log.e(TAG, "startVpn: libbox не запустился: $detail")
+                failStart(detail)
+                return
+            }
+
+            if (ProtectGuard.hasFailed()) {
+                Log.e(TAG, "startVpn: protect() failed during libbox start — aborting")
+                failStart("VpnService.protect() failed")
                 return
             }
 
@@ -220,11 +287,16 @@ class TeremokVpnService : VpnService() {
             VpnStatusBroadcaster.emit(currentStatus)
             Log.i(TAG, "startVpn: TUN interface established (protocol=$protocol)")
         } catch (e: Exception) {
-            currentStatus = "error"
-            VpnStatusBroadcaster.emit(currentStatus)
             Log.e(TAG, "startVpn: failed", e)
-            stopSelf()
+            failStart(e.message ?: e.toString())
         }
+    }
+
+    private fun failStart(message: String) {
+        VpnStatusBroadcaster.setError(message)
+        currentStatus = "error"
+        VpnStatusBroadcaster.emit(currentStatus)
+        stopVpn()
     }
 
     private fun stopVpn() {
@@ -246,6 +318,7 @@ class TeremokVpnService : VpnService() {
         } catch (e: Exception) {
             Log.e(TAG, "stopVpn: error closing tunInterface", e)
         } finally {
+            ProtectGuard.onFailure = null
             tunInterface = null
             isRunning = false
             currentStatus = "idle"
@@ -281,7 +354,7 @@ object VpnChannelRegistry {
         engine: FlutterEngine,
         appContext: android.content.Context,
         serviceProvider: () -> TeremokVpnService?,
-        onPermissionRequest: () -> Boolean,
+        onPermissionRequest: (MethodChannel.Result) -> Unit,
     ) {
         // MethodChannel — команды от Flutter
         MethodChannel(engine.dartExecutor.binaryMessenger, METHOD_CHANNEL)
@@ -326,10 +399,14 @@ object VpnChannelRegistry {
                         result.success(true)
                     }
                     "getStatus" -> {
-                        result.success(serviceProvider()?.currentStatus ?: "idle")
+                        val fromService = serviceProvider()?.currentStatus
+                        result.success(fromService ?: VpnStatusBroadcaster.currentStatus())
+                    }
+                    "getLastError" -> {
+                        result.success(VpnStatusBroadcaster.lastError())
                     }
                     "requestPermission" -> {
-                        result.success(onPermissionRequest())
+                        onPermissionRequest(result)
                     }
                     else -> result.notImplemented()
                 }
@@ -382,6 +459,27 @@ internal fun jsonArrayToList(arr: JSONArray): List<Any?> {
 /**
  * Собирает sing-box config JSON для libbox [CommandServer].
  */
+internal fun tunDnsPeerAddress(address: String, prefixLength: Int): String {
+    val octets = address.split(".").mapNotNull { it.toIntOrNull() }
+    if (octets.size != 4) return "172.19.0.2"
+
+    val ip = (octets[0] shl 24) or (octets[1] shl 16) or (octets[2] shl 8) or octets[3]
+    val mask = if (prefixLength == 0) 0 else (-1 shl (32 - prefixLength))
+    val network = ip and mask
+    val broadcast = network or mask.inv()
+    val host1 = network + 1
+    val host2 = broadcast - 1
+    val peer = when (ip) {
+        host1 -> host2
+        host2 -> host1
+        else -> host2
+    }
+    return "${(peer shr 24) and 0xff}.${(peer shr 16) and 0xff}.${(peer shr 8) and 0xff}.${peer and 0xff}"
+}
+
+/**
+ * Собирает sing-box config JSON для libbox [CommandServer].
+ */
 internal fun buildSingBoxJson(
     params: Map<String, Any?>,
     address: String,
@@ -399,6 +497,7 @@ internal fun buildSingBoxJson(
     val outbound = JSONObject().apply {
         put("type", "vless")
         put("tag", "proxy")
+        put("network", "tcp")
         put("server", outboundServer)
         put("server_port", outboundServerPort)
         put("uuid", outboundUuid)
@@ -430,7 +529,55 @@ internal fun buildSingBoxJson(
     }
 
     val root = JSONObject().apply {
-        put("log", JSONObject().apply { put("level", "info") })
+        put("log", JSONObject().apply { put("level", "debug") })
+        put(
+            "dns",
+            JSONObject().apply {
+                put(
+                    "servers",
+                    JSONArray().apply {
+                        put(
+                            JSONObject().apply {
+                                put("type", "https")
+                                put("tag", "dns-remote")
+                                put("server", "1.1.1.1")
+                                put("server_port", 443)
+                                put("path", "/dns-query")
+                                put("detour", "proxy")
+                            },
+                        )
+                        put(
+                            JSONObject().apply {
+                                put("type", "fakeip")
+                                put("tag", "dns-fakeip")
+                                put("inet4_range", "198.18.0.0/15")
+                            },
+                        )
+                    },
+                )
+                put(
+                    "rules",
+                    JSONArray().apply {
+                        put(
+                            JSONObject().apply {
+                                put(
+                                    "query_type",
+                                    JSONArray().apply {
+                                        put("A")
+                                        put("AAAA")
+                                    },
+                                )
+                                put("server", "dns-fakeip")
+                            },
+                        )
+                    },
+                )
+                put("final", "dns-remote")
+                put("reverse_mapping", true)
+                put("strategy", "ipv4_only")
+                put("independent_cache", true)
+            },
+        )
         put(
             "inbounds",
             JSONArray().apply {
@@ -445,8 +592,7 @@ internal fun buildSingBoxJson(
                             JSONArray().apply { put("$address/$addressPrefix") },
                         )
                         put("auto_route", false)
-                        put("strict_route", true)
-                        put("stack", "gvisor")
+                        put("stack", "system")
                     },
                 )
             },
@@ -461,7 +607,51 @@ internal fun buildSingBoxJson(
         put(
             "route",
             JSONObject().apply {
+                put(
+                    "rules",
+                    JSONArray().apply {
+                        put(
+                            JSONObject().apply {
+                                put("inbound", "tun-in")
+                                put("action", "sniff")
+                            },
+                        )
+                        put(
+                            JSONObject().apply {
+                                put("port", JSONArray().apply { put(53) })
+                                put("action", "hijack-dns")
+                            },
+                        )
+                        put(
+                            JSONObject().apply {
+                                put("protocol", "dns")
+                                put("action", "hijack-dns")
+                            },
+                        )
+                        put(
+                            JSONObject().apply {
+                                put(
+                                    "ip_cidr",
+                                    JSONArray().apply { put("198.18.0.0/15") },
+                                )
+                                put("outbound", "proxy")
+                            },
+                        )
+                        if (outboundServer.isNotEmpty() && outboundServer != "unknown") {
+                            put(
+                                JSONObject().apply {
+                                    put(
+                                        "ip_cidr",
+                                        JSONArray().apply { put("$outboundServer/32") },
+                                    )
+                                    put("outbound", "direct")
+                                },
+                            )
+                        }
+                    },
+                )
                 put("final", "proxy")
+                put("auto_detect_interface", true)
             },
         )
     }
@@ -477,10 +667,38 @@ internal fun buildSingBoxJson(
 object VpnStatusBroadcaster {
     @Volatile
     private var sink: EventChannel.EventSink? = null
+
+    /** Последний статус — для getStatus() когда VpnService не bound к Activity. */
+    @Volatile
+    private var lastStatus: String = "idle"
+
+    @Volatile
+    private var lastErrorMessage: String? = null
+
     private val mainHandler = Handler(Looper.getMainLooper())
+
+    fun currentStatus(): String = lastStatus
+
+    fun lastError(): String? = lastErrorMessage
+
+    fun setError(message: String) {
+        lastErrorMessage = message
+    }
+
+    fun clearError() {
+        lastErrorMessage = null
+    }
 
     fun register(sink: EventChannel.EventSink) {
         this.sink = sink
+        val replay = lastStatus
+        mainHandler.post {
+            try {
+                sink.success(replay)
+            } catch (e: Exception) {
+                Log.w(TeremokVpnService.TAG, "VpnStatusBroadcaster.replay failed: ${e.message}")
+            }
+        }
     }
 
     fun unregister() {
@@ -488,6 +706,7 @@ object VpnStatusBroadcaster {
     }
 
     fun emit(status: String) {
+        lastStatus = status
         val current = sink ?: return
         mainHandler.post {
             try {

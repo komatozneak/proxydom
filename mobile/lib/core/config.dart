@@ -2,14 +2,8 @@
 ///
 /// ## Dev vs prod backend
 ///
-/// По умолчанию [baseUrl] указывает на Android-эмулятор (`10.0.2.2` = localhost
-/// хост-машины). Для **production smoke** на Yottasrc VPS:
-///
-/// ```bash
-/// flutter run --dart-define=APP_ENV=prod
-/// ```
-///
-/// Это переключит [baseUrl] на [vpsBaseUrl] (`204.11.2.216:8080`).
+/// По умолчанию [baseUrl] = [vpsBaseUrl] (prod smoke на Pixel).
+/// Для эмулятора: `flutter run --dart-define=APP_ENV=dev`
 ///
 /// ## Платформенные URL (dev)
 ///
@@ -28,10 +22,11 @@ class AppConfig {
   static const String iosBaseUrl = 'http://127.0.0.1:8000/api/v1';
   static const String desktopBaseUrl = 'http://localhost:8000/api/v1';
 
-  /// Compile-time env: `dev` (default) или `prod` (`--dart-define=APP_ENV=prod`).
+  /// Compile-time env: `prod` (default на физ. устройстве) или `dev` (эмулятор).
+  /// Эмулятор: `flutter run --dart-define=APP_ENV=dev`
   static const String _appEnv = String.fromEnvironment(
     'APP_ENV',
-    defaultValue: 'dev',
+    defaultValue: 'prod',
   );
 
   /// Активный base URL. Dev по умолчанию — не менять на [vpsBaseUrl] напрямую.

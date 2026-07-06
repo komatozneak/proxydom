@@ -33,6 +33,14 @@ class VpnNotifier extends Notifier<VpnStatus> {
   StreamSubscription<VpnNativeStatus>? _statusSubscription;
   Timer? _reconnectTimer;
 
+  Future<String> _nativeErrorMessage() async {
+    final detail = await VpnController.instance.getLastError();
+    if (detail != null && detail.isNotEmpty) {
+      return 'libbox: $detail';
+    }
+    return 'Native VPN error';
+  }
+
   @override
   VpnStatus build() {
     // Если пользователь разлогинился — сбрасываем VPN в Disconnected
@@ -103,6 +111,9 @@ class VpnNotifier extends Notifier<VpnStatus> {
       }
       state = const VpnConnecting(progress: 0.5);
 
+      // Подписка до start — иначе пропускаем connected из EventChannel.
+      _subscribeToStatus();
+
       // 3. Стартуем VpnService (через MethodChannel) с retry на transient
       final started = await _retryPolicy.execute(
         () => VpnController.instance.start(_config!),
@@ -118,19 +129,38 @@ class VpnNotifier extends Notifier<VpnStatus> {
       }
       state = const VpnConnecting(progress: 0.8);
 
-      // 4. Подписываемся на нативный статус
-      _subscribeToStatus();
-
-      // 5. Fallback timeout (3 сек) — если нативный код не прислал "connected"
-      await Future<void>.delayed(const Duration(seconds: 3));
+      // 4. Ждём connected/error (poll + EventChannel), до 15 с
+      const pollInterval = Duration(milliseconds: 250);
+      final deadline = DateTime.now().add(const Duration(seconds: 15));
+      while (state is VpnConnecting && DateTime.now().isBefore(deadline)) {
+        final nativeStatus = await VpnController.instance.getStatus();
+        if (nativeStatus == VpnNativeStatus.connected) {
+          final serverName = _config?.username ?? 'unknown';
+          final protocol =
+              _config?.singBoxConfig.primaryOutbound?.type ?? 'unknown';
+          state = VpnConnected(
+            serverName: serverName,
+            protocol: protocol,
+            connectedSince: DateTime.now(),
+          );
+          return;
+        }
+        if (nativeStatus == VpnNativeStatus.error) {
+          state = VpnError(message: await _nativeErrorMessage());
+          return;
+        }
+        if (nativeStatus == VpnNativeStatus.idle) {
+          final detail = await VpnController.instance.getLastError();
+          if (detail != null && detail.isNotEmpty) {
+            state = VpnError(message: 'libbox: $detail');
+            return;
+          }
+        }
+        await Future<void>.delayed(pollInterval);
+      }
       if (state is VpnConnecting) {
-        final serverName = _config?.username ?? 'unknown';
-        final protocol =
-            _config?.singBoxConfig.primaryOutbound?.type ?? 'unknown';
-        state = VpnConnected(
-          serverName: serverName,
-          protocol: protocol,
-          connectedSince: DateTime.now(),
+        state = const VpnError(
+          message: 'VPN connection timeout',
         );
       }
     } catch (e, st) {
@@ -199,11 +229,21 @@ class VpnNotifier extends Notifier<VpnStatus> {
         }
       case VpnNativeStatus.revoked:
         // VPN отозван системой (например, юзер переключил VPN в Settings).
+        final wasConnected = state is VpnConnected;
         state = const VpnError(message: 'VPN was revoked by system');
-        _scheduleReconnect();
+        if (wasConnected) {
+          _scheduleReconnect();
+        }
       case VpnNativeStatus.error:
-        state = const VpnError(message: 'Native VPN error');
-        _scheduleReconnect();
+        final wasConnected = state is VpnConnected;
+        unawaited(
+          _nativeErrorMessage().then((msg) {
+            state = VpnError(message: msg);
+          }),
+        );
+        if (wasConnected) {
+          _scheduleReconnect();
+        }
       case VpnNativeStatus.unknown:
       case VpnNativeStatus.preparing:
       case VpnNativeStatus.connecting:

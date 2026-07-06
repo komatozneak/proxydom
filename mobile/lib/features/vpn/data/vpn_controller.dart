@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 
 import 'vpn_config.dart';
 import 'vpn_service_config.dart';
+import 'sing_box_runtime_config.dart';
 
 /// Контроллер VPN-сессии — мост между Flutter UI и Android VpnService.
 ///
@@ -36,7 +37,11 @@ class VpnController {
       }
 
       final serviceConfig = VpnServiceConfig.fromVpnConfig(config);
-      final paramsJson = serviceConfig.toJsonString();
+      final singBoxConfigJson = buildRuntimeSingBoxJson(
+        config: config,
+        service: serviceConfig,
+      );
+      final paramsJson = serviceConfig.toJsonStringWithSingBox(singBoxConfigJson);
 
       final result = await _methodChannel
           .invokeMethod<bool>('start', {'paramsJson': paramsJson})
@@ -87,6 +92,15 @@ class VpnController {
       );
     } on PlatformException {
       return VpnNativeStatus.unknown;
+    }
+  }
+
+  /// Последнее сообщение об ошибке от libbox/VpnService (если status == error).
+  Future<String?> getLastError() async {
+    try {
+      return await _methodChannel.invokeMethod<String>('getLastError');
+    } on PlatformException {
+      return null;
     }
   }
 

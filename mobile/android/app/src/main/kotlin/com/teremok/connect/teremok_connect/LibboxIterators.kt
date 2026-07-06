@@ -30,3 +30,12 @@ internal class EmptyNetworkInterfaceIterator : NetworkInterfaceIterator {
 
     override fun next(): NetworkInterface = error("empty iterator")
 }
+
+/** Wraps a Kotlin iterator as libbox [NetworkInterfaceIterator]. */
+internal class KotlinNetworkInterfaceIterator(
+    private val iterator: Iterator<NetworkInterface>,
+) : NetworkInterfaceIterator {
+    override fun hasNext(): Boolean = iterator.hasNext()
+
+    override fun next(): NetworkInterface = iterator.next()
+}

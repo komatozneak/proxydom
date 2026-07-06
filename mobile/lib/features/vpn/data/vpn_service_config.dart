@@ -2,6 +2,31 @@ import 'dart:convert';
 
 import 'vpn_config.dart';
 
+/// Peer-адрес TUN (/30) для [VpnService.Builder.addDnsServer].
+///
+/// Android шлёт DNS на этот адрес внутри туннеля; sing-box перехватывает через hijack-dns.
+String tunDnsPeerAddress(String address, int prefixLength) {
+  final octets = address.split('.').map(int.parse).toList();
+  if (octets.length != 4) return '172.19.0.2';
+
+  final ip = (octets[0] << 24) | (octets[1] << 16) | (octets[2] << 8) | octets[3];
+  final mask = prefixLength == 0 ? 0 : (-1 << (32 - prefixLength));
+  final network = ip & mask;
+  final broadcast = network | (~mask & 0xffffffff);
+  final host1 = network + 1;
+  final host2 = broadcast - 1;
+
+  final int peer;
+  if (ip == host1) {
+    peer = host2;
+  } else if (ip == host2) {
+    peer = host1;
+  } else {
+    peer = host2;
+  }
+  return '${(peer >> 24) & 0xff}.${(peer >> 16) & 0xff}.${(peer >> 8) & 0xff}.${peer & 0xff}';
+}
+
 /// Параметры для VpnService.Builder, извлечённые из sing-box config.
 ///
 /// Используется для передачи между Flutter (Dart) и Android (Kotlin)
@@ -90,6 +115,10 @@ class VpnServiceConfig {
   /// передавать через Bundle, чем вложенный Map).
   String toJsonString() => jsonEncode(toMap());
 
+  /// JSON с полным sing-box config для libbox (см. [buildRuntimeSingBoxJson]).
+  String toJsonStringWithSingBox(String singBoxConfigJson) =>
+      jsonEncode({...toMap(), 'singBoxConfigJson': singBoxConfigJson});
+
   /// Парсинг из VpnConfig + username.
   ///
   /// Приоритет:
@@ -118,20 +147,22 @@ class VpnServiceConfig {
       }
     }
 
-    // Routes: дефолт "весь IPv4" + IPv6 если strictRoute включён
+    // Routes: дефолт "весь IPv4". IPv6 только если задан inet6_address —
+    // иначе Android VpnService добавит ::/0 без v6-адреса и оборвёт интернет.
     final routes = <String>[];
     if (inbound == null || inbound.autoRoute) {
       routes.add('0.0.0.0/0');
     }
-    if (inbound?.strictRoute ?? false) {
+    final hasInet6 = inbound != null && inbound.inet6Address.isNotEmpty;
+    if ((inbound?.strictRoute ?? false) && hasInet6) {
       routes.add('::/0');
     }
     if (routes.isEmpty) {
       routes.add('0.0.0.0/0'); // safety fallback
     }
 
-    // DNS: дефолт Cloudflare + Google
-    const dnsServers = ['1.1.1.1', '8.8.8.8'];
+    // DNS на peer TUN (/30): Android шлёт запросы в туннель → sing-box hijack-dns.
+    final dnsServers = [tunDnsPeerAddress(address, addressPrefix)];
 
     return VpnServiceConfig(
       sessionName: 'Teremok VPN (${config.username})',

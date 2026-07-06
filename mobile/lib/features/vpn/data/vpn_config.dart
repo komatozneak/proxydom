@@ -82,12 +82,14 @@ class SingBoxInbound {
   const SingBoxInbound({
     required this.type,
     required this.inet4Address,
+    this.inet6Address = '',
     required this.autoRoute,
     required this.strictRoute,
   });
 
   final String type;
   final String inet4Address;
+  final String inet6Address;
   final bool autoRoute;
   final bool strictRoute;
 
@@ -95,6 +97,7 @@ class SingBoxInbound {
     return SingBoxInbound(
       type: json['type'] as String,
       inet4Address: (json['inet4_address'] as String?) ?? '172.19.0.1/30',
+      inet6Address: (json['inet6_address'] as String?) ?? '',
       autoRoute: (json['auto_route'] as bool?) ?? true,
       strictRoute: (json['strict_route'] as bool?) ?? true,
     );
@@ -103,6 +106,7 @@ class SingBoxInbound {
   Map<String, dynamic> toJson() => {
     'type': type,
     'inet4_address': inet4Address,
+    if (inet6Address.isNotEmpty) 'inet6_address': inet6Address,
     'auto_route': autoRoute,
     'strict_route': strictRoute,
   };

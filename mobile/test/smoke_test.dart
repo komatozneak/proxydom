@@ -294,7 +294,7 @@ void main() {
       expect(service.address, '10.255.255.1');
       expect(service.addressPrefix, 30);
       expect(service.routes, ['0.0.0.0/0']);
-      expect(service.dnsServers, ['1.1.1.1', '8.8.8.8']);
+      expect(service.dnsServers, ['10.255.255.2']);
       expect(service.outboundServer, 'unknown');
       expect(service.outboundServerPort, 443);
       expect(service.sessionName, 'Teremok VPN (test_user)');
@@ -340,7 +340,8 @@ void main() {
       final service = VpnServiceConfig.fromVpnConfig(config);
       expect(service.address, '192.168.50.1');
       expect(service.addressPrefix, 24);
-      expect(service.routes, containsAll(['0.0.0.0/0', '::/0']));
+      expect(service.routes, contains('0.0.0.0/0'));
+      expect(service.routes, isNot(contains('::/0')));
       expect(service.outboundServer, 'real-server.example');
       expect(service.outboundServerPort, 8443);
       expect(service.outboundUuid, 'real-uuid-1234');
@@ -377,11 +378,10 @@ void main() {
     });
   });
 
-  test('AppConfig.baseUrl is set to Android emulator default', () {
+  test('AppConfig.baseUrl defaults to prod VPS', () {
     expect(AppConfig.baseUrl, isNotEmpty);
     expect(AppConfig.baseUrl, contains('/api/v1'));
-    expect(AppConfig.baseUrl, AppConfig.androidBaseUrl);
-    expect(AppConfig.baseUrl, isNot(equals(AppConfig.vpsBaseUrl)));
+    expect(AppConfig.baseUrl, AppConfig.vpsBaseUrl);
   });
 
   test('AppConfig.vpsBaseUrl points to Yottasrc VPS prod backend', () {
@@ -390,9 +390,10 @@ void main() {
     expect(AppConfig.vpsBaseUrl, contains('/api/v1'));
   });
 
-  test('AppConfig prod switch via APP_ENV dart-define', () {
+  test('AppConfig dev switch via APP_ENV=dev dart-define', () {
     expect(AppConfig.baseUrlForEnvironment('prod'), AppConfig.vpsBaseUrl);
     expect(AppConfig.baseUrlForEnvironment('dev'), AppConfig.androidBaseUrl);
+    expect(AppConfig.baseUrlForEnvironment('dev'), isNot(equals(AppConfig.vpsBaseUrl)));
   });
 
   group('AppTheme (Material 3)', () {
