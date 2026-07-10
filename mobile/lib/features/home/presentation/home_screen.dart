@@ -6,6 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../auth/application/auth_provider.dart';
 import '../../auth/application/auth_state.dart';
 import '../../auth/application/logout_handler.dart';
+import '../../vpn/data/vpn_node.dart';
+import '../../vpn/data/vpn_nodes_repository.dart';
+import '../../vpn/presentation/region_picker.dart';
 import '../application/vpn_provider.dart';
 import '../application/vpn_status.dart';
 import '../data/external_ip_service.dart';
@@ -21,6 +24,36 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _logoutInProgress = false;
+  String _regionSubtitle = '…';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _refreshRegionLabel());
+  }
+
+  Future<void> _refreshRegionLabel() async {
+    final l = AppL10n.of(context);
+    final nodesRepo = ref.read(vpnNodesRepositoryProvider);
+    try {
+      final selectedId = await nodesRepo.getSelectedNodeId();
+      final nodes = await nodesRepo.listNodes();
+      if (!mounted) return;
+      if (nodes.isEmpty) {
+        setState(() => _regionSubtitle = l.homeRegion);
+        return;
+      }
+      final VpnNode selected = nodes.where((n) => n.id == selectedId).firstOrNull ??
+          nodes.where((n) => n.isDefault).firstOrNull ??
+          nodes.first;
+      final label = selected.label.isNotEmpty ? selected.label : selected.host;
+      setState(() => _regionSubtitle = label);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _regionSubtitle = l.homeRegion);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -85,16 +118,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 children: [
                   _IconAction(
                     icon: Icons.dns,
-                    label: l.homeRegion,
-                    onPressed: vpnStatus is VpnConnected
-                        ? null
-                        : () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Region select — Step 12'),
-                              ),
-                            );
-                          },
+                    label: _regionSubtitle,
+                    onPressed: () async {
+                      await showRegionPicker(context, ref);
+                      if (mounted) await _refreshRegionLabel();
+                    },
                   ),
                   _IconAction(
                     icon: Icons.tune,

@@ -17,13 +17,22 @@ class VpnConfigRepository {
   /// Получить конфиг. По умолчанию — cache-first.
   ///
   /// Если [forceRefresh] — игнорирует кеш и всегда делает сетевой запрос.
-  Future<VpnConfig> getConfig({bool forceRefresh = false}) async {
-    if (!forceRefresh && _cache.current != null) {
+  /// [nodeId] selects Marzban multi-node egress (`?node_id=`).
+  Future<VpnConfig> getConfig({
+    bool forceRefresh = false,
+    String? nodeId,
+  }) async {
+    if (!forceRefresh && nodeId == null && _cache.current != null) {
       return _cache.current!;
     }
 
     try {
-      final resp = await _dio.get<Map<String, dynamic>>('/vpn/config');
+      final resp = await _dio.get<Map<String, dynamic>>(
+        '/vpn/config',
+        queryParameters: {
+          if (nodeId != null && nodeId.isNotEmpty) 'node_id': nodeId,
+        },
+      );
       if (resp.statusCode == 200 && resp.data != null) {
         final config = VpnConfig.fromJson(resp.data!);
         _cache.set(config);

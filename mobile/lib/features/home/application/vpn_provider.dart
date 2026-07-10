@@ -9,11 +9,16 @@ import '../../auth/application/auth_state.dart';
 import '../../vpn/data/vpn_config.dart';
 import '../../vpn/data/vpn_config_repository.dart';
 import '../../vpn/data/vpn_controller.dart';
+import '../../vpn/data/vpn_nodes_repository.dart';
 import 'vpn_status.dart';
 
 /// Singleton-репозиторий для VPN-конфига.
 final vpnConfigRepositoryProvider = Provider<VpnConfigRepository>(
   (ref) => VpnConfigRepository(),
+);
+
+final vpnNodesRepositoryProvider = Provider<VpnNodesRepository>(
+  (ref) => VpnNodesRepository(),
 );
 
 /// Retry policy для VPN-операций (максимум 3 попытки).
@@ -78,9 +83,14 @@ class VpnNotifier extends Notifier<VpnStatus> {
   /// Получить конфиг без подключения (для UI/preview).
   ///
   /// Retry на transient ошибках (5xx, network), без retry на 4xx.
-  Future<VpnConfig> fetchConfig() {
+  Future<VpnConfig> fetchConfig({String? nodeId}) async {
+    final nodesRepo = ref.read(vpnNodesRepositoryProvider);
+    final selected = nodeId ?? await nodesRepo.getSelectedNodeId();
     return _retryPolicy.execute(
-      () => ref.read(vpnConfigRepositoryProvider).getConfig(),
+      () => ref.read(vpnConfigRepositoryProvider).getConfig(
+            forceRefresh: nodeId != null,
+            nodeId: selected,
+          ),
       shouldRetry: (e) async {
         if (e is DioException) {
           // Не повторяем 4xx — это проблема авторизации/клиента, бессмысленно.
@@ -96,6 +106,29 @@ class VpnNotifier extends Notifier<VpnStatus> {
         print('[VPN] fetchConfig retry $attempt after error: $e');
       },
     );
+  }
+
+  /// Persist region and refresh cached config (disconnect → fetch → reconnect).
+  Future<void> selectNode(String nodeId) async {
+    final nodesRepo = ref.read(vpnNodesRepositoryProvider);
+    final wasConnected = state is VpnConnected || state is VpnConnecting;
+    await nodesRepo.setSelectedNodeId(nodeId);
+    ref.read(vpnConfigRepositoryProvider).clearCache();
+    if (wasConnected) {
+      _reconnectTimer?.cancel();
+      _statusSubscription?.cancel();
+      _statusSubscription = null;
+      try {
+        await VpnController.instance.stop();
+      } catch (_) {
+        // Best-effort before region switch.
+      }
+      state = const VpnDisconnected();
+    }
+    _config = await fetchConfig(nodeId: nodeId);
+    if (wasConnected) {
+      await connect();
+    }
   }
 
   Future<void> connect() async {
