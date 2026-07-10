@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/retry_policy.dart';
 import '../../auth/application/auth_provider.dart';
@@ -28,6 +29,8 @@ final _retryPolicy = RetryPolicy(
   maxDelay: const Duration(seconds: 3),
 );
 
+const _connectedSinceKey = 'vpn_connected_since_ms';
+
 /// VPN-контроллер. Шаг 16: retry/reconnect логика поверх VpnController + native.
 class VpnNotifier extends Notifier<VpnStatus> {
   VpnConfig? _config;
@@ -46,6 +49,40 @@ class VpnNotifier extends Notifier<VpnStatus> {
     return 'Native VPN error';
   }
 
+  /// Keep uptime across UI restarts while the same VpnService session lives.
+  Future<DateTime> _resolveConnectedSince({required bool freshSession}) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!freshSession) {
+      final ms = prefs.getInt(_connectedSinceKey);
+      if (ms != null && ms > 0) {
+        return DateTime.fromMillisecondsSinceEpoch(ms);
+      }
+    }
+    final now = DateTime.now();
+    await prefs.setInt(_connectedSinceKey, now.millisecondsSinceEpoch);
+    return now;
+  }
+
+  Future<void> _clearConnectedSince() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_connectedSinceKey);
+  }
+
+  Future<void> _enterConnected({required bool freshSession}) async {
+    if (state is VpnConnected && !freshSession) {
+      return;
+    }
+    final serverName = _config?.username ?? 'unknown';
+    final protocol =
+        _config?.singBoxConfig.primaryOutbound?.type ?? 'unknown';
+    final since = await _resolveConnectedSince(freshSession: freshSession);
+    state = VpnConnected(
+      serverName: serverName,
+      protocol: protocol,
+      connectedSince: since,
+    );
+  }
+
   @override
   VpnStatus build() {
     // Если пользователь разлогинился — сбрасываем VPN в Disconnected
@@ -56,7 +93,42 @@ class VpnNotifier extends Notifier<VpnStatus> {
       }
     });
     ref.onDispose(_cleanupOnLogout);
+    // Dart UI restarts independently of VpnService — sync tray/native status.
+    Future.microtask(_syncFromNative);
     return const VpnDisconnected();
+  }
+
+  /// Align UI with native VpnService after cold start / Activity recreate.
+  Future<void> syncFromNative() => _syncFromNative();
+
+  Future<void> _syncFromNative() async {
+    try {
+      final native = await VpnController.instance.getStatus();
+      // ignore: avoid_print
+      print('[VPN] syncFromNative status=$native');
+      if (native == VpnNativeStatus.connected) {
+        if (state is VpnConnected) return;
+        _config ??= await fetchConfig();
+        _subscribeToStatus();
+        await _enterConnected(freshSession: false);
+        return;
+      }
+      if (native == VpnNativeStatus.connecting ||
+          native == VpnNativeStatus.preparing) {
+        _subscribeToStatus();
+        state = const VpnConnecting(progress: 0.5);
+        return;
+      }
+      if (native == VpnNativeStatus.error) {
+        state = VpnError(message: await _nativeErrorMessage());
+      }
+      if (native == VpnNativeStatus.idle || native == VpnNativeStatus.unknown) {
+        await _clearConnectedSince();
+      }
+    } catch (e) {
+      // ignore: avoid_print
+      print('[VPN] syncFromNative failed: $e');
+    }
   }
 
   Future<void> _cleanupOnLogout() async {
@@ -68,6 +140,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
     _statusSubscription = null;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
+    await _clearConnectedSince();
     try {
       ref.read(vpnConfigRepositoryProvider).clearCache();
     } on StateError {
@@ -123,6 +196,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
       } catch (_) {
         // Best-effort before region switch.
       }
+      await _clearConnectedSince();
       state = const VpnDisconnected();
     }
     _config = await fetchConfig(nodeId: nodeId);
@@ -133,6 +207,14 @@ class VpnNotifier extends Notifier<VpnStatus> {
 
   Future<void> connect() async {
     if (state is VpnConnecting || state is VpnConnected) return;
+
+    // Already up in the system tray (UI lost state after Activity recreate).
+    final existing = await VpnController.instance.getStatus();
+    if (existing == VpnNativeStatus.connected) {
+      await _syncFromNative();
+      return;
+    }
+
     state = const VpnConnecting(progress: 0.0);
 
     try {
@@ -172,14 +254,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
       while (state is VpnConnecting && DateTime.now().isBefore(deadline)) {
         final nativeStatus = await VpnController.instance.getStatus();
         if (nativeStatus == VpnNativeStatus.connected) {
-          final serverName = _config?.username ?? 'unknown';
-          final protocol =
-              _config?.singBoxConfig.primaryOutbound?.type ?? 'unknown';
-          state = VpnConnected(
-            serverName: serverName,
-            protocol: protocol,
-            connectedSince: DateTime.now(),
-          );
+          await _enterConnected(freshSession: true);
           return;
         }
         if (nativeStatus == VpnNativeStatus.error) {
@@ -210,7 +285,13 @@ class VpnNotifier extends Notifier<VpnStatus> {
   }
 
   Future<void> disconnect() async {
-    if (state is! VpnConnected) return;
+    // Allow stop even if UI thought we were disconnected (native still up).
+    final native = await VpnController.instance.getStatus();
+    if (state is! VpnConnected &&
+        native != VpnNativeStatus.connected &&
+        native != VpnNativeStatus.connecting) {
+      return;
+    }
     state = const VpnConnecting(progress: 0.5); // reuse как "disconnecting"
     _reconnectTimer?.cancel();
 
@@ -223,6 +304,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
     } finally {
       _statusSubscription?.cancel();
       _statusSubscription = null;
+      await _clearConnectedSince();
       state = const VpnDisconnected();
     }
   }
@@ -251,28 +333,27 @@ class VpnNotifier extends Notifier<VpnStatus> {
   void _onNativeStatus(VpnNativeStatus nativeStatus) {
     switch (nativeStatus) {
       case VpnNativeStatus.connected:
-        final serverName = _config?.username ?? 'unknown';
-        final protocol =
-            _config?.singBoxConfig.primaryOutbound?.type ?? 'unknown';
-        state = VpnConnected(
-          serverName: serverName,
-          protocol: protocol,
-          connectedSince: DateTime.now(),
-        );
+        if (state is VpnConnected) return;
+        // Coming from Connecting → new session; from elsewhere → restore stamp.
+        final fresh = state is VpnConnecting;
+        unawaited(_enterConnected(freshSession: fresh));
       case VpnNativeStatus.disconnecting:
       case VpnNativeStatus.idle:
         if (state is VpnConnected) {
+          unawaited(_clearConnectedSince());
           state = const VpnDisconnected();
         }
       case VpnNativeStatus.revoked:
         // VPN отозван системой (например, юзер переключил VPN в Settings).
         final wasConnected = state is VpnConnected;
+        unawaited(_clearConnectedSince());
         state = const VpnError(message: 'VPN was revoked by system');
         if (wasConnected) {
           _scheduleReconnect();
         }
       case VpnNativeStatus.error:
         final wasConnected = state is VpnConnected;
+        unawaited(_clearConnectedSince());
         unawaited(
           _nativeErrorMessage().then((msg) {
             state = VpnError(message: msg);

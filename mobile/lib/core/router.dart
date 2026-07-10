@@ -25,11 +25,13 @@ class AppRouter {
       GoRouterRefreshNotifier();
 
   static final GoRouter config = GoRouter(
-    initialLocation: '/login',
+    // Prefer /home: with tokens restored in main() before runApp, redirect
+    // sends authed users straight home instead of flashing /login.
+    initialLocation: '/home',
     refreshListenable: refreshNotifier,
     redirect: (context, state) {
       final auth = _readAuth(context);
-      // Пока AsyncNotifier не зарезолвился — пропускаем, первый build покажет loader.
+      // Still loading / no ProviderScope — do not bounce to login.
       if (auth == null) return null;
 
       final loc = state.matchedLocation;
@@ -65,13 +67,21 @@ class AppRouter {
     ],
   );
 
-  /// Достаёт AuthState через [ProviderScope.containerOf]. В тестах без
-  /// ProviderScope вернёт null — redirect пропустит (первый кадр).
+  /// Достаёт AuthState через [ProviderScope.containerOf].
+  ///
+  /// Returns `null` while [authProvider] is still loading so redirect does not
+  /// treat a cold start as logged-out.
   static AuthState? _readAuth(BuildContext context) {
     try {
       final container = ProviderScope.containerOf(context);
-      final auth = container.read(authProvider).valueOrNull;
-      return auth ?? const AuthStateUnknown();
+      final async = container.read(authProvider);
+      if (async.isLoading && !async.hasValue) {
+        return null;
+      }
+      if (async.hasError && !async.hasValue) {
+        return const AuthStateUnauthenticated();
+      }
+      return async.valueOrNull ?? const AuthStateUnauthenticated();
     } catch (_) {
       return null;
     }

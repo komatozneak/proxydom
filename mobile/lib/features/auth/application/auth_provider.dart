@@ -11,17 +11,21 @@ import 'auth_state.dart';
 class AuthNotifier extends AsyncNotifier<AuthState> {
   @override
   Future<AuthState> build() async {
-    final tokens = TokenStorage.instance;
-    final access = await tokens.readAccessToken();
-    final refresh = await tokens.readRefreshToken();
-    if (access != null &&
-        refresh != null &&
-        access.isNotEmpty &&
-        refresh.isNotEmpty) {
-      return AuthStateAuthenticated(
-        accessToken: access,
-        refreshToken: refresh,
-      );
+    try {
+      final tokens = TokenStorage.instance;
+      final access = await tokens.readAccessToken();
+      final refresh = await tokens.readRefreshToken();
+      if (access != null &&
+          refresh != null &&
+          access.isNotEmpty &&
+          refresh.isNotEmpty) {
+        return AuthStateAuthenticated(
+          accessToken: access,
+          refreshToken: refresh,
+        );
+      }
+    } catch (e, st) {
+      debugPrint('auth.restore_failed: $e\n$st');
     }
     return const AuthStateUnauthenticated();
   }
@@ -31,6 +35,10 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
     required String accessToken,
     required String refreshToken,
   }) async {
+    await TokenStorage.instance.saveTokens(
+      accessToken: accessToken,
+      refreshToken: refreshToken,
+    );
     state = AsyncData(
       AuthStateAuthenticated(
         accessToken: accessToken,

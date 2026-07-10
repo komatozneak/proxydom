@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// Контракт хранилища JWT — для подмены в unit-тестах interceptor'а.
@@ -11,8 +12,10 @@ abstract class TokenStore {
   Future<void> clear();
 }
 
-/// Хранилище JWT-токенов в Keychain (iOS) / Keystore (Android).
-/// Сейчас хранит только access/refresh — больше пока ничего.
+/// Хранилище JWT-токенов в Keychain (iOS) / EncryptedSharedPreferences (Android).
+///
+/// Android: named prefs + prefix so Auto Backup / debug reinstalls are less
+/// likely to wipe or collide with other encrypted stores.
 class TokenStorage implements TokenStore {
   TokenStorage._();
   static final TokenStorage instance = TokenStorage._();
@@ -21,7 +24,11 @@ class TokenStorage implements TokenStore {
   static const _refreshKey = 'tc.refresh_token';
 
   final FlutterSecureStorage _storage = const FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+    aOptions: AndroidOptions(
+      encryptedSharedPreferences: true,
+      sharedPreferencesName: 'teremok_secure_tokens',
+      preferencesKeyPrefix: 'tc_',
+    ),
     iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
   );
 
@@ -34,6 +41,13 @@ class TokenStorage implements TokenStore {
       _storage.write(key: _accessKey, value: accessToken),
       _storage.write(key: _refreshKey, value: refreshToken),
     ]);
+    if (kDebugMode) {
+      final check = await readRefreshToken();
+      // ignore: avoid_print
+      print(
+        '[TokenStorage] saved refresh=${check != null && check.isNotEmpty}',
+      );
+    }
   }
 
   @override

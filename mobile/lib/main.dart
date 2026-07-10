@@ -7,7 +7,10 @@ import 'core/router.dart';
 import 'features/auth/application/auth_provider.dart';
 import 'features/auth/application/auth_state.dart';
 
-void main() {
+void main() async {
+  // Required before flutter_secure_storage / path_provider on cold start.
+  WidgetsFlutterBinding.ensureInitialized();
+
   // ignore: avoid_print
   print('[Teremok Connect] baseUrl=${AppConfig.baseUrl}');
   if (AppConfig.baseUrl.contains('10.0.2.2')) {
@@ -21,12 +24,15 @@ void main() {
 
   final container = ProviderContainer();
 
+  // Warm auth restore before first frame so GoRouter sees tokens on cold start.
+  await container.read(authProvider.future);
+
   // Связываем GoRouter с authProvider: при смене состояния авторизации
   // вызываем refreshNotifier.notifyAuthChanged(), чтобы GoRouter пересчитал redirect.
   container.listen<AsyncValue<AuthState>>(
     authProvider,
     (_, __) => AppRouter.refreshNotifier.notifyAuthChanged(),
-    fireImmediately: false,
+    fireImmediately: true,
   );
 
   runApp(

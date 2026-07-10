@@ -1,4 +1,4 @@
-/// Страны с Flash Call через Zvonok (RU, KZ, BY).
+/// Страны с Flash Call через Zvonok (RU, BY).
 class PhoneCountry {
   const PhoneCountry({
     required this.isoCode,
@@ -29,12 +29,6 @@ class PhoneCountry {
       nationalDigits: 10,
     ),
     PhoneCountry(
-      isoCode: 'KZ',
-      flagEmoji: '🇰🇿',
-      dialCode: '+7',
-      nationalDigits: 10,
-    ),
-    PhoneCountry(
       isoCode: 'BY',
       flagEmoji: '🇧🇾',
       dialCode: '+375',
@@ -46,7 +40,10 @@ class PhoneCountry {
 
   static PhoneCountry? tryParseE164(String phone) {
     final normalized = phone.replaceAll(RegExp(r'[\s\-()]'), '');
-    for (final country in zvonokPool) {
+    // Longer dial codes first so +375 wins over a bare +7 prefix match.
+    final ordered = [...zvonokPool]
+      ..sort((a, b) => b.dialCode.length.compareTo(a.dialCode.length));
+    for (final country in ordered) {
       if (!normalized.startsWith(country.dialCode)) continue;
       final national = normalized.substring(country.dialCode.length);
       if (country.isValidNational(national)) return country;

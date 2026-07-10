@@ -102,6 +102,9 @@ class TeremokVpnService : VpnService() {
     ) {
         if (isRunning) {
             Log.w(TAG, "startVpn: уже запущен, пропускаем")
+            // Re-emit so Flutter UI that restarted can sync to Connected.
+            currentStatus = "connected"
+            VpnStatusBroadcaster.emit(currentStatus)
             return
         }
         if (currentStatus == "preparing" || currentStatus == "connecting") {
