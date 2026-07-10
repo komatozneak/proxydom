@@ -84,7 +84,7 @@ void main() {
       expect(inbound['tag'], 'tun-in');
     });
 
-    test('route rules: sniff, hijack-dns, FakeIP→proxy, VPS direct', () {
+    test('route rules: sniff, hijack-dns, VPS+RU direct, then FakeIP→proxy', () {
       final json = jsonDecode(
         buildRuntimeSingBoxJson(
           config: _sampleVpnConfig(server: '204.11.2.216'),
@@ -100,12 +100,16 @@ void main() {
       });
       expect(rules[2], {'protocol': 'dns', 'action': 'hijack-dns'});
       expect(rules[3], {
-        'ip_cidr': <String>[fakeIpV4Range],
-        'outbound': 'proxy',
-      });
-      expect(rules[4], {
         'ip_cidr': <String>['204.11.2.216/32'],
         'outbound': 'direct',
+      });
+      expect(rules[4], {
+        'rule_set': 'geosite-category-ru',
+        'outbound': 'direct',
+      });
+      expect(rules.last, {
+        'ip_cidr': <String>[fakeIpV4Range],
+        'outbound': 'proxy',
       });
     });
 
