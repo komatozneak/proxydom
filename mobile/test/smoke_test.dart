@@ -458,6 +458,13 @@ void main() {
   });
 
   test('TokenStorage can be cleared safely on empty storage', () async {
+    const channel = MethodChannel('plugins.it_nomads.com/flutter_secure_storage');
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async => null);
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+    });
     await TokenStorage.instance.clear();
   });
 

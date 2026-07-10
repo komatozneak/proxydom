@@ -248,7 +248,7 @@ class _StatusIndicator extends ConsumerWidget {
           height: 240,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: color.withValues(alpha: 0.1),
+            color: color.withOpacity(0.1),
             border: Border.all(color: color, width: 3),
           ),
           child: Center(child: child),

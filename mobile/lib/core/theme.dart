@@ -110,7 +110,7 @@ class AppTheme {
       ),
 
       // === Card ===
-      cardTheme: CardThemeData(
+      cardTheme: CardTheme(
         elevation: 2,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
@@ -121,7 +121,7 @@ class AppTheme {
       // === InputDecoration (TextField) ===
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        fillColor: scheme.surfaceContainerHighest.withOpacity(0.3),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: scheme.outline),

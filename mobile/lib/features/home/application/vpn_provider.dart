@@ -63,7 +63,11 @@ class VpnNotifier extends Notifier<VpnStatus> {
     _statusSubscription = null;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
-    ref.read(vpnConfigRepositoryProvider).clearCache();
+    try {
+      ref.read(vpnConfigRepositoryProvider).clearCache();
+    } on StateError {
+      // ProviderContainer may already be disposed (unit tests).
+    }
     try {
       await VpnController.instance.stop();
     } catch (_) {
@@ -106,7 +110,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
       // 2. Проверяем permission (на Android открывает системный диалог)
       final hasPermission = await VpnController.instance.requestPermission();
       if (!hasPermission) {
-        state = VpnError(message: 'VPN permission denied');
+        state = const VpnError(message: 'VPN permission denied');
         return;
       }
       state = const VpnConnecting(progress: 0.5);
@@ -124,7 +128,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
         },
       );
       if (!started) {
-        state = VpnError(message: 'Failed to start VPN service');
+        state = const VpnError(message: 'Failed to start VPN service');
         return;
       }
       state = const VpnConnecting(progress: 0.8);

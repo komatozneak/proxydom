@@ -34,7 +34,7 @@ android {
         // Жёстко фиксируем minSdk = 23 для VpnService.Builder.establish.
         // Flutter plugin иногда откатывает на flutter.minSdkVersion — поэтому
         // повторяем после каждого `flutter build apk`.
-        minSdk = flutter.minSdkVersion
+        minSdk = 23
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
