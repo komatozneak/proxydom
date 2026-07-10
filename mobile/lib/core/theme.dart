@@ -110,8 +110,9 @@ class AppTheme {
       ),
 
       // === Card ===
-      // CardTheme for Flutter 3.24 CI; CardThemeData in 3.27+.
-      cardTheme: const CardTheme(
+      // CardThemeData: required on Flutter 3.27+ / 3.41 (local Pixel builds).
+      // CI Flutter 3.29.3 accepts CardThemeData as well.
+      cardTheme: const CardThemeData(
         elevation: 2,
         margin: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
         shape: RoundedRectangleBorder(
