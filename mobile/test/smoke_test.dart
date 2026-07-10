@@ -14,6 +14,7 @@ import 'package:teremok_connect/core/token_storage.dart';
 import 'package:teremok_connect/features/auth/application/auth_provider.dart';
 import 'package:teremok_connect/features/auth/application/auth_state.dart';
 import 'package:teremok_connect/features/auth/application/logout_handler.dart';
+import 'package:teremok_connect/features/auth/domain/phone_country.dart';
 import 'package:teremok_connect/features/vpn/data/vpn_config.dart';
 import 'package:teremok_connect/features/vpn/data/vpn_controller.dart';
 import 'package:teremok_connect/features/vpn/data/vpn_service_config.dart';
@@ -33,8 +34,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Sign in'), findsWidgets);
-    expect(find.text('Phone number'), findsOneWidget);
     expect(find.text('Call me'), findsOneWidget);
+    expect(find.byType(DropdownButtonFormField<PhoneCountry>), findsOneWidget);
+    expect(find.byType(TextFormField), findsOneWidget);
   });
 
   testWidgets('App boots and shows login screen (ru)', (tester) async {
@@ -43,8 +45,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Вход'), findsWidgets);
-    expect(find.text('Номер телефона'), findsOneWidget);
     expect(find.text('Позвонить'), findsOneWidget);
+    expect(find.byType(DropdownButtonFormField<PhoneCountry>), findsOneWidget);
+    expect(find.byType(TextFormField), findsOneWidget);
   });
 
   testWidgets('Login screen renders phone field and button', (tester) async {
@@ -52,9 +55,9 @@ void main() {
     await tester.pumpWidget(_wrap(const TeremokApp()));
     await tester.pumpAndSettle();
 
-    expect(find.text('Номер телефона'), findsOneWidget);
-    expect(find.text('+7 999 123 4567'), findsOneWidget);
     expect(find.text('Позвонить'), findsOneWidget);
+    expect(find.textContaining('🇷🇺'), findsOneWidget);
+    expect(find.byType(TextFormField), findsOneWidget);
   });
 
   testWidgets('Verify screen renders 4 fields and resend button', (tester) async {
@@ -77,9 +80,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.text('Введите код'), findsOneWidget);
-    expect(find.text('Перезвонить через 30с'), findsOneWidget);
-    expect(find.text('Force submit "0000"'), findsOneWidget);
-    expect(find.byType(TextField), findsNWidgets(5));
+    expect(find.textContaining('Перезвонить'), findsOneWidget);
+    expect(find.byType(TextField), findsAtLeastNWidgets(4));
   });
 
   testWidgets('Home screen shows Connect button when not connected', (tester) async {

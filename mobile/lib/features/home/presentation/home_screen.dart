@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -6,6 +8,7 @@ import '../../auth/application/auth_state.dart';
 import '../../auth/application/logout_handler.dart';
 import '../application/vpn_provider.dart';
 import '../application/vpn_status.dart';
+import '../data/external_ip_service.dart';
 import '../../../../app.dart';
 import '../../../../l10n/app_localizations.dart';
 
@@ -274,6 +277,8 @@ class _StatusIndicator extends ConsumerWidget {
               ),
             ),
           ],
+          const SizedBox(height: 8),
+          _ConnectedDetails(connected: status as VpnConnected),
         ],
         if (status is VpnError) ...[
           const SizedBox(height: 4),
@@ -304,6 +309,107 @@ class _StatusIndicator extends ConsumerWidget {
             label: Text(l.homeFetchConfig),
           ),
         ],
+      ],
+    );
+  }
+}
+
+/// Uptime + external IP while VPN is connected (E2E visibility).
+class _ConnectedDetails extends StatefulWidget {
+  const _ConnectedDetails({required this.connected});
+
+  final VpnConnected connected;
+
+  @override
+  State<_ConnectedDetails> createState() => _ConnectedDetailsState();
+}
+
+class _ConnectedDetailsState extends State<_ConnectedDetails> {
+  Timer? _uptimeTimer;
+  String? _externalIp;
+  bool _ipLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _uptimeTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+    _loadExternalIp();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ConnectedDetails oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.connected.connectedSince != widget.connected.connectedSince) {
+      _loadExternalIp();
+    }
+  }
+
+  Future<void> _loadExternalIp() async {
+    setState(() {
+      _ipLoading = true;
+      _externalIp = null;
+    });
+    final ip = await fetchExternalIp();
+    if (!mounted) return;
+    setState(() {
+      _externalIp = ip;
+      _ipLoading = false;
+    });
+  }
+
+  @override
+  void dispose() {
+    _uptimeTimer?.cancel();
+    super.dispose();
+  }
+
+  String _formatUptime(Duration d) {
+    final h = d.inHours;
+    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    if (h > 0) {
+      return '${h.toString().padLeft(2, '0')}:$m:$s';
+    }
+    return '$m:$s';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final uptime = DateTime.now().difference(widget.connected.connectedSince);
+
+    return Column(
+      children: [
+        Text(
+          'Uptime: ${_formatUptime(uptime)}',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.outline,
+          ),
+        ),
+        const SizedBox(height: 4),
+        if (_ipLoading)
+          Text(
+            'IP: …',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.outline,
+            ),
+          )
+        else if (_externalIp != null)
+          Text(
+            'IP: $_externalIp',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          )
+        else
+          Text(
+            'IP: unavailable',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.error,
+            ),
+          ),
       ],
     );
   }

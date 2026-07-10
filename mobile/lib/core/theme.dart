@@ -110,12 +110,13 @@ class AppTheme {
       ),
 
       // === Card ===
-      cardTheme: CardThemeData(
+      // CardTheme for Flutter 3.24 CI; CardThemeData in 3.27+.
+      cardTheme: const CardTheme(
         elevation: 2,
+        margin: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.all(Radius.circular(16)),
         ),
-        margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       ),
 
       // === InputDecoration (TextField) ===
