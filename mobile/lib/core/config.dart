@@ -38,6 +38,11 @@ class AppConfig {
       appEnv == 'prod' ? vpsBaseUrl : androidBaseUrl;
 
   /// Таймаут dio по умолчанию.
-  static const Duration connectTimeout = Duration(seconds: 10);
-  static const Duration receiveTimeout = Duration(seconds: 15);
+  /// Flash-call ждёт ответ Zvonok на VPS — даём запас на мобильной сети.
+  static const Duration connectTimeout = Duration(seconds: 30);
+  static const Duration receiveTimeout = Duration(seconds: 60);
+
+  /// Длиннее для /auth/flash-call/* (Zvonok API на backend может отвечать 15–30 с).
+  static const Duration authConnectTimeout = Duration(seconds: 45);
+  static const Duration authReceiveTimeout = Duration(seconds: 90);
 }

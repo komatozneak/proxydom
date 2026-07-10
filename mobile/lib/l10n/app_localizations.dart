@@ -142,8 +142,26 @@ abstract class AppL10n {
   /// No description provided for @loginPhoneError.
   ///
   /// In en, this message translates to:
-  /// **'Format: +7XXXXXXXXXX (must be 12 chars)'**
+  /// **'Enter a valid number for the selected country'**
   String get loginPhoneError;
+
+  /// No description provided for @loginErrorTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Server did not respond'**
+  String get loginErrorTimeout;
+
+  /// No description provided for @loginErrorNetwork.
+  ///
+  /// In en, this message translates to:
+  /// **'No connection to server'**
+  String get loginErrorNetwork;
+
+  /// No description provided for @loginErrorGeneric.
+  ///
+  /// In en, this message translates to:
+  /// **'Request failed'**
+  String get loginErrorGeneric;
 
   /// No description provided for @loginCallButton.
   ///

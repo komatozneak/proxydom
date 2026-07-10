@@ -30,7 +30,16 @@ class AppL10nRu extends AppL10n {
   String get loginPhoneHelper => 'Позвоним для подтверждения';
 
   @override
-  String get loginPhoneError => 'Формат: +7XXXXXXXXXX (12 символов)';
+  String get loginPhoneError => 'Введите корректный номер для выбранной страны';
+
+  @override
+  String get loginErrorTimeout => 'Нет ответа от сервера';
+
+  @override
+  String get loginErrorNetwork => 'Нет связи с сервером';
+
+  @override
+  String get loginErrorGeneric => 'Не удалось выполнить запрос';
 
   @override
   String get loginCallButton => 'Позвонить';

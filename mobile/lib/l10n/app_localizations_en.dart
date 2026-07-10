@@ -30,7 +30,16 @@ class AppL10nEn extends AppL10n {
   String get loginPhoneHelper => 'We\'ll call you for verification';
 
   @override
-  String get loginPhoneError => 'Format: +7XXXXXXXXXX (must be 12 chars)';
+  String get loginPhoneError => 'Enter a valid number for the selected country';
+
+  @override
+  String get loginErrorTimeout => 'Server did not respond';
+
+  @override
+  String get loginErrorNetwork => 'No connection to server';
+
+  @override
+  String get loginErrorGeneric => 'Request failed';
 
   @override
   String get loginCallButton => 'Call me';

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -93,7 +94,7 @@ class _VerifyScreenState extends ConsumerState<VerifyScreen> {
       _error = null;
     });
     try {
-      await ApiClient.instance.post(
+      await ApiClient.postAuth(
         '/auth/flash-call/request',
         data: {'phone': widget.phone},
       );
@@ -125,7 +126,7 @@ class _VerifyScreenState extends ConsumerState<VerifyScreen> {
     });
 
     try {
-      final resp = await ApiClient.instance.post(
+      final resp = await ApiClient.postAuth(
         '/auth/flash-call/verify',
         data: {'phone': widget.phone, 'last_4': code},
       );
@@ -151,25 +152,25 @@ class _VerifyScreenState extends ConsumerState<VerifyScreen> {
       }
 
       setState(() {
-        _error = 'Неверный код (HTTP ${resp.statusCode})';
+        _error = AppL10n.of(context).verifyWrongCode;
         for (final c in _controllers) {
           c.clear();
         }
         _focusNodes[0].requestFocus();
       });
     } on DioException catch (e) {
+      final detail = e.response?.data;
+      final msg = detail is Map ? detail['detail']?.toString() : null;
       setState(() {
-        _error = e.response?.data?['detail']?.toString() ??
-            e.message ??
-            'Network error';
+        _error = msg ?? AppL10n.of(context).verifyWrongCode;
         for (final c in _controllers) {
           c.clear();
         }
         _focusNodes[0].requestFocus();
       });
-    } catch (e) {
+    } catch (_) {
       setState(() {
-        _error = e.toString();
+        _error = AppL10n.of(context).verifyWrongCode;
       });
     } finally {
       if (mounted) {
@@ -180,7 +181,31 @@ class _VerifyScreenState extends ConsumerState<VerifyScreen> {
     }
   }
 
+  void _onBackspace(int index) {
+    if (_controllers[index].text.isNotEmpty) {
+      _controllers[index].clear();
+      return;
+    }
+    if (index > 0) {
+      _controllers[index - 1].clear();
+      _focusNodes[index - 1].requestFocus();
+    }
+  }
+
+  KeyEventResult _handleKeyEvent(int index, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    if (event.logicalKey == LogicalKeyboardKey.backspace) {
+      _onBackspace(index);
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
   void _onDigitInput(int index, String value) {
+    if (value.isEmpty) {
+      _onBackspace(index);
+      return;
+    }
     if (value.length > 1) {
       if (value.length == 4 && RegExp(r'^\d{4}$').hasMatch(value)) {
         for (var i = 0; i < 4; i++) {
@@ -203,7 +228,6 @@ class _VerifyScreenState extends ConsumerState<VerifyScreen> {
   @override
   Widget build(BuildContext context) {
     final l = AppL10n.of(context);
-    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: Text(l.verifyTitle),
@@ -217,15 +241,7 @@ class _VerifyScreenState extends ConsumerState<VerifyScreen> {
           padding: const EdgeInsets.all(24),
           child: Column(
             children: [
-              const SizedBox(height: 24),
-              const Icon(Icons.dialpad, size: 96),
-              const SizedBox(height: 16),
-              Text(
-                l.verifySentTo(widget.phone),
-                style: theme.textTheme.titleMedium,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 48),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(
@@ -235,13 +251,15 @@ class _VerifyScreenState extends ConsumerState<VerifyScreen> {
                     child: SizedBox(
                       width: 56,
                       height: 64,
+                      child: Focus(
+                      onKeyEvent: (node, event) => _handleKeyEvent(i, event),
                       child: TextField(
                         controller: _controllers[i],
                         focusNode: _focusNodes[i],
                         keyboardType: TextInputType.number,
                         textAlign: TextAlign.center,
                         maxLength: 1,
-                        style: theme.textTheme.headlineMedium,
+                        style: Theme.of(context).textTheme.headlineMedium,
                         decoration: InputDecoration(
                           counterText: '',
                           contentPadding: EdgeInsets.zero,
@@ -254,6 +272,7 @@ class _VerifyScreenState extends ConsumerState<VerifyScreen> {
                           if (i < 3) _focusNodes[i + 1].requestFocus();
                         },
                       ),
+                    ),
                     ),
                   ),
                 ),
@@ -276,27 +295,6 @@ class _VerifyScreenState extends ConsumerState<VerifyScreen> {
                 ),
               ),
               const SizedBox(height: 48),
-              Padding(
-                padding: const EdgeInsets.only(top: 32),
-                child: Text(
-                  'TEST MODE: Звонок от Zvonok не приходит, потому что у нас нет живого key. '
-                  'Для проверки флоу создай юзера через SQL и используй код 0000.',
-                  style: theme.textTheme.bodySmall,
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              TextButton(
-                onPressed: _verifying
-                    ? null
-                    : () {
-                        for (var i = 0; i < 4; i++) {
-                          _controllers[i].text = '0';
-                        }
-                        _focusNodes[3].unfocus();
-                        _onCodeComplete();
-                      },
-                child: const Text('Force submit "0000"'),
-              ),
             ],
           ),
         ),

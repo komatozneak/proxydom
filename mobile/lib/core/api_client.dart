@@ -58,4 +58,19 @@ class ApiClient {
 
     return dio;
   }
+
+  /// POST с увеличенным таймаутом для flash-call (Zvonok на backend).
+  static Future<Response<dynamic>> postAuth(
+    String path, {
+    Object? data,
+  }) {
+    return instance.post(
+      path,
+      data: data,
+      options: Options(
+        connectTimeout: AppConfig.authConnectTimeout,
+        receiveTimeout: AppConfig.authReceiveTimeout,
+      ),
+    );
+  }
 }
