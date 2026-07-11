@@ -106,7 +106,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             },
             child: Text(
               AppLocale.current.languageCode.toUpperCase(),
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onPrimary,
+              ),
             ),
           ),
           if (isAuthed)
@@ -271,7 +273,11 @@ class _StatusIndicator extends ConsumerWidget {
         child = Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, size: 64, color: Colors.red),
+            Icon(
+              Icons.error_outline,
+              size: 64,
+              color: theme.colorScheme.error,
+            ),
             const SizedBox(height: 8),
             Text(
               msg,

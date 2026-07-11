@@ -32,6 +32,8 @@ flutter:
   uses-material-design: true
   generate: true
   assets:
+    # Brand / onboarding (palette v3 oak+moss).
+    - assets/brand/
     # Offline copies of sing-box rule-sets (runtime still uses remote URLs).
     - assets/rules/geosite-category-ru.srs
     - assets/rules/geosite-tld-ru.srs

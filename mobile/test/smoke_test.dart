@@ -423,10 +423,11 @@ void main() {
     });
 
     test('AppBrand constants заданы', () {
-      expect(AppBrand.primary, const Color(0xFF00897B));
-      expect(AppBrand.success, const Color(0xFF43A047));
-      expect(AppBrand.warning, const Color(0xFFFFA000));
-      expect(AppBrand.error, const Color(0xFFE53935));
+      // Palette v3 oak+moss — expectations updated with hex migration.
+      expect(AppBrand.primary, const Color(0xFF5D4037));
+      expect(AppBrand.success, const Color(0xFF2E7D32));
+      expect(AppBrand.warning, const Color(0xFFFF8F00));
+      expect(AppBrand.error, const Color(0xFF5D4037));
     });
 
     test('textTheme настроен для всех уровней', () {

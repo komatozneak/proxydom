@@ -127,7 +127,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             },
             child: Text(
               AppLocale.current.languageCode.toUpperCase(),
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onPrimary,
+              ),
             ),
           ),
         ],

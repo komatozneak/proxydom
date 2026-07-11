@@ -1,60 +1,89 @@
 import 'package:flutter/material.dart';
 
-/// Бренд-цвета Teremok Connect.
+/// Бренд-цвета Teremok Connect — palette v3 «Дуб и мох» (2026-07-11).
+///
+/// Hex values live only here. Widget code must use [AppBrand] or
+/// `Theme.of(context).colorScheme.*`, never raw `Color(0xFF…)`.
 class AppBrand {
   AppBrand._();
 
-  /// Основной teal (deep, надёжный).
-  static const Color primary = Color(0xFF00897B);
+  /// Oak — AppBar, primary CTA, active toggle.
+  static const Color primary = Color(0xFF5D4037);
 
-  /// Accent для highlights (warm orange).
+  /// Oak light — M3 primary containers.
+  static const Color primaryContainer = Color(0xFF8D6E63);
+
+  /// Moss — secondary accent, progress, active states.
+  static const Color secondary = Color(0xFF558B2F);
+
+  /// Honey amber — brand highlight (unchanged from v1).
   static const Color accent = Color(0xFFFF8F00);
 
-  /// Success / Connected (bright green).
-  static const Color success = Color(0xFF43A047);
+  /// Sage — connected / success.
+  static const Color success = Color(0xFF2E7D32);
 
-  /// Error / Disconnected (red).
-  static const Color error = Color(0xFFE53935);
+  /// Oak (not red) — disconnected / soft error (anti-pattern fix).
+  static const Color error = Color(0xFF5D4037);
 
-  /// Warning / Connecting (amber).
-  static const Color warning = Color(0xFFFFA000);
+  /// Honey — connecting / warning.
+  static const Color warning = Color(0xFFFF8F00);
 
-  /// Neutral surface (light gray).
-  static const Color surfaceLight = Color(0xFFF5F5F5);
+  /// Cream parchment — light theme surface.
+  static const Color surfaceLight = Color(0xFFFAF8F3);
 
-  /// Neutral surface (dark gray).
-  static const Color surfaceDark = Color(0xFF121212);
+  /// Oak dark — dark theme surface.
+  static const Color surfaceDark = Color(0xFF3E2723);
+
+  /// Mid oak — dark cards / surface variant.
+  static const Color surfaceVariantDark = Color(0xFF4E342E);
+
+  /// Forest — info chips (v3 token).
+  static const Color info = Color(0xFF33691E);
 }
 
 class AppTheme {
   AppTheme._();
 
-  /// Светлая тема — Material 3, brand teal.
-  static final ThemeData light = _build(
-    brightness: Brightness.light,
-    seed: AppBrand.primary,
-  );
+  /// Светлая тема — Material 3, oak+moss.
+  static final ThemeData light = _build(brightness: Brightness.light);
 
-  /// Тёмная тема — Material 3, brand teal (auto-derived from seed).
-  static final ThemeData dark = _build(
-    brightness: Brightness.dark,
-    seed: AppBrand.primary,
-  );
+  /// Тёмная тема — Material 3, oak+moss.
+  static final ThemeData dark = _build(brightness: Brightness.dark);
 
-  static ThemeData _build({
-    required Brightness brightness,
-    required Color seed,
-  }) {
+  static ThemeData _build({required Brightness brightness}) {
+    final isDark = brightness == Brightness.dark;
+    final surface = isDark ? AppBrand.surfaceDark : AppBrand.surfaceLight;
+    final onSurface = isDark ? AppBrand.surfaceLight : AppBrand.surfaceDark;
+
+    // Explicit brand overrides so ColorScheme.primary matches AppBrand.primary
+    // (fromSeed alone shifts the tonal palette away from the seed hex).
     final scheme = ColorScheme.fromSeed(
-      seedColor: seed,
+      seedColor: AppBrand.primary,
       brightness: brightness,
+      primary: AppBrand.primary,
+      onPrimary: AppBrand.surfaceLight,
+      primaryContainer: AppBrand.primaryContainer,
+      onPrimaryContainer: AppBrand.surfaceDark,
+      secondary: AppBrand.secondary,
+      onSecondary: AppBrand.surfaceLight,
+      tertiary: AppBrand.accent,
+      onTertiary: AppBrand.surfaceDark,
+      error: AppBrand.error,
+      onError: AppBrand.surfaceLight,
+      surface: surface,
+      onSurface: onSurface,
+    ).copyWith(
+      // Map AppBrand.info onto inversePrimary for info chips / badges.
+      inversePrimary: AppBrand.info,
+      surfaceContainerHighest:
+          isDark ? AppBrand.surfaceVariantDark : AppBrand.primaryContainer,
     );
 
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
       colorScheme: scheme,
-      scaffoldBackgroundColor: scheme.surface,
+      scaffoldBackgroundColor: surface,
 
       // === Typography ===
       textTheme: _buildTextTheme(scheme),
@@ -123,7 +152,7 @@ class AppTheme {
       // === InputDecoration (TextField) ===
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: scheme.surfaceContainerHighest.withOpacity(0.3),
+        fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.3),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: scheme.outline),

@@ -279,7 +279,12 @@ class _VerifyScreenState extends ConsumerState<VerifyScreen> {
               ),
               if (_error != null) ...[
                 const SizedBox(height: 16),
-                Text(_error!, style: const TextStyle(color: Colors.red)),
+                Text(
+                  _error!,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                ),
               ],
               if (_verifying) ...[
                 const SizedBox(height: 24),
