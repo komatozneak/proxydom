@@ -30,6 +30,10 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/brand/
+    - assets/backgrounds/textures/
+    - assets/backgrounds/empty_states/
   generate: true
   assets:
     # Brand / onboarding (palette v3 oak+moss).
