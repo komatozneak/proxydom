@@ -49,7 +49,10 @@ Future<void> showRegionPicker(BuildContext context, WidgetRef ref) async {
                 value: node.id,
                 groupValue: selectedId,
                 title: Text(node.label.isNotEmpty ? node.label : node.host),
-                subtitle: Text('${node.host}:${node.port} · ${node.status}'),
+                subtitle: Text(
+                  '${node.host}:${node.port} · '
+                  '${node.isConnected || node.isDefault ? 'online' : 'offline'}',
+                ),
                 onChanged: node.isConnected || node.isDefault
                     ? (value) async {
                         if (value == null) return;

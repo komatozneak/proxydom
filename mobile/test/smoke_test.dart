@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:teremok_connect/app.dart';
 import 'package:teremok_connect/core/api_client.dart';
 import 'package:teremok_connect/core/config.dart';
@@ -15,10 +16,22 @@ import 'package:teremok_connect/features/auth/application/auth_provider.dart';
 import 'package:teremok_connect/features/auth/application/auth_state.dart';
 import 'package:teremok_connect/features/auth/application/logout_handler.dart';
 import 'package:teremok_connect/features/auth/domain/phone_country.dart';
+import 'package:teremok_connect/features/home/application/vpn_provider.dart';
 import 'package:teremok_connect/features/vpn/data/vpn_config.dart';
 import 'package:teremok_connect/features/vpn/data/vpn_controller.dart';
+import 'package:teremok_connect/features/vpn/data/vpn_node.dart';
+import 'package:teremok_connect/features/vpn/data/vpn_nodes_repository.dart';
 import 'package:teremok_connect/features/vpn/data/vpn_service_config.dart';
 import 'package:teremok_connect/l10n/app_localizations.dart';
+
+/// Instant nodes catalog — home init must not hit the real VPS in CI.
+class _FakeVpnNodesRepository extends VpnNodesRepository {
+  @override
+  Future<List<VpnNode>> listNodes() async => const [];
+
+  @override
+  Future<String?> getSelectedNodeId() async => null;
+}
 
 /// Обёртка для тестов: подкладывает ProviderContainer, чтобы ConsumerWidget
 /// могли читать authProvider/vpnProvider.
@@ -31,6 +44,9 @@ void main() {
   testWidgets('App boots and shows login screen (en by default)', (tester) async {
     AppLocale.set(const Locale('en'));
     await tester.pumpWidget(_wrap(const TeremokApp()));
+    await tester.pump();
+    // initialLocation=/home; auth still loading → redirect skipped. Go login explicitly.
+    AppRouter.config.go('/login');
     await tester.pumpAndSettle();
 
     expect(find.text('Sign in'), findsWidgets);
@@ -42,6 +58,8 @@ void main() {
   testWidgets('App boots and shows login screen (ru)', (tester) async {
     AppLocale.set(const Locale('ru'));
     await tester.pumpWidget(_wrap(const TeremokApp()));
+    await tester.pump();
+    AppRouter.config.go('/login');
     await tester.pumpAndSettle();
 
     expect(find.text('Вход'), findsWidgets);
@@ -53,6 +71,8 @@ void main() {
   testWidgets('Login screen renders phone field and button', (tester) async {
     AppLocale.set(const Locale('ru'));
     await tester.pumpWidget(_wrap(const TeremokApp()));
+    await tester.pump();
+    AppRouter.config.go('/login');
     await tester.pumpAndSettle();
 
     expect(find.text('Позвонить'), findsOneWidget);
@@ -85,14 +105,44 @@ void main() {
   });
 
   testWidgets('Home screen shows Connect button when not connected', (tester) async {
+    // authenticated() writes flutter_secure_storage — without a mock the
+    // platform channel never completes and the test hits the 10m timeout.
+    const secureChannel =
+        MethodChannel('plugins.it_nomads.com/flutter_secure_storage');
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(secureChannel, (call) async => null);
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(secureChannel, null);
+    });
+
+    const vpnChannel = MethodChannel('teremok/vpn');
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(vpnChannel, (call) async {
+      if (call.method == 'getStatus') return 'idle';
+      if (call.method == 'getLastError') return '';
+      return null;
+    });
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(vpnChannel, null);
+    });
+
+    SharedPreferences.setMockInitialValues({});
     AppLocale.set(const Locale('ru'));
-    final container = ProviderContainer();
+
+    final container = ProviderContainer(
+      overrides: [
+        vpnNodesRepositoryProvider.overrideWithValue(_FakeVpnNodesRepository()),
+      ],
+    );
     addTearDown(container.dispose);
-    // Переводим в authenticated чтобы GoRouter пустил на /home
+
     await container.read(authProvider.notifier).authenticated(
           accessToken: 'fake',
           refreshToken: 'fake',
         );
+    AppRouter.refreshNotifier.notifyAuthChanged();
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -100,7 +150,11 @@ void main() {
         child: const TeremokApp(),
       ),
     );
-    await tester.pumpAndSettle();
+    // Avoid pumpAndSettle — CircularProgressIndicator / timers never settle.
+    await tester.pump();
+    AppRouter.config.go('/home');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('Подключиться'), findsOneWidget);
     expect(find.text('Отключено'), findsOneWidget);

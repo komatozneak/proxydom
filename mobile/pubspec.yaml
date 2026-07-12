@@ -30,14 +30,12 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  assets:
-    - assets/brand/
-    - assets/backgrounds/textures/
-    - assets/backgrounds/empty_states/
   generate: true
   assets:
     # Brand / onboarding (palette v3 oak+moss).
     - assets/brand/
+    - assets/backgrounds/textures/
+    - assets/backgrounds/empty_states/
     # Offline copies of sing-box rule-sets (runtime still uses remote URLs).
     - assets/rules/geosite-category-ru.srs
     - assets/rules/geosite-tld-ru.srs

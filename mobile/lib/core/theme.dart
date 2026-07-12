@@ -139,9 +139,8 @@ class AppTheme {
       ),
 
       // === Card ===
-      // CardThemeData: required on Flutter 3.27+ / 3.41 (local Pixel builds).
-      // CI Flutter 3.29.3 accepts CardThemeData as well.
-      cardTheme: const CardThemeData(
+      // CardTheme: Flutter 3.24 CI; CardThemeData alias lands in newer SDKs.
+      cardTheme: const CardTheme(
         elevation: 2,
         margin: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
         shape: RoundedRectangleBorder(
@@ -152,7 +151,8 @@ class AppTheme {
       // === InputDecoration (TextField) ===
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        // withOpacity: CI Flutter 3.24; withValues is 3.27+.
+        fillColor: scheme.surfaceContainerHighest.withOpacity(0.3),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: scheme.outline),

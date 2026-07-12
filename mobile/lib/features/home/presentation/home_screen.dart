@@ -7,7 +7,6 @@ import '../../auth/application/auth_provider.dart';
 import '../../auth/application/auth_state.dart';
 import '../../auth/application/logout_handler.dart';
 import '../../vpn/data/vpn_node.dart';
-import '../../vpn/data/vpn_nodes_repository.dart';
 import '../../vpn/presentation/region_picker.dart';
 import '../application/vpn_provider.dart';
 import '../application/vpn_status.dart';
