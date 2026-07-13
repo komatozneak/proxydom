@@ -41,7 +41,10 @@ VPN-клиент для подписчиков Teremok Connect. Кросс-пл�
 ### UI (Material 3 + dark mode)
 - ✅ **Home screen** (Шаг 9) — круглый 240×240 индикатор, FilledButton Connect/Disconnect
 - ✅ **VPN статус states** (Шаг 9) — Disconnected / Connecting(progress) / Connected / Error
-- ✅ **Material 3 theming** (Шаг 18) — AppTheme.light/dark с teal seed #00897B
+- ✅ **Palette v3 «Дуб и мох»** — `AppBrand` / `AppTheme` (oak `#5D4037` + moss `#558B2F`)
+- ✅ **Phosphor icons** — `AppIcon` / `AppIcons` (не Material Icons в home/verify)
+- ✅ **Adaptive icon** — 3 слоя (cream bg + oak/moss fg + monochrome) для Android 13+ themed icons
+- ⚠️ **PR #35 textures/empty_states** — deprecated, не бандлятся (Klein 9B NC license)
 - ✅ **Локализация** (Шаг 3) — ru-RU + en-US через flutter_localizations + ARB
 - ✅ **Error handling** (Шаг 16) — RetryPolicy с exponential backoff, auto-reconnect 5s
 

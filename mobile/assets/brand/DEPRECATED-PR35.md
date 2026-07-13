@@ -1,0 +1,29 @@
+# DEPRECATED — PR #35 visual assets (do not ship)
+
+**Date:** 2026-07-12  
+**Status:** kept on disk for audit only — **not** listed in `pubspec.yaml` assets.
+
+## Why
+
+12 PNGs under `assets/backgrounds/textures/` and `assets/backgrounds/empty_states/`
+were generated with **FLUX.2 Klein 9B**, which has a **non-commercial license**.
+They must not ship in a commercial VPN client (Teremok Connect).
+
+Additional quality issues (oak→orange drift, noisy textures, look-alike empty
+states) are secondary; license alone is a ship-blocker.
+
+## Research
+
+See wiki (when synced): `queries/research-ai-visuals-flutter-alpha-2026-07-12.md`  
+In-repo workflow: `docs/hermes-cursor-workflow.md`  
+Product gates: `docs/product-first-users.md`
+
+## Replacement path (Visual epic #2 = A→B)
+
+1. **A (this epic):** code-only polish — theme tokens, Phosphor icons, 3-layer
+   adaptive icon, optional Rive/CustomPainter motion. No new AI batch.
+2. **B (later):** at most one commercial-clean hero (FLUX.2 flex / Recraft), if
+   owner wants “wow” after Pixel smoke.
+
+Do **not** re-bundle these directories without a commercial-clean re-generation
+and explicit owner go.

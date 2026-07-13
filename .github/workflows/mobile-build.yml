@@ -20,7 +20,7 @@ on:
         type: boolean
 
 env:
-  FLUTTER_VERSION: "3.24.5"
+  FLUTTER_VERSION: "3.29.3"
   JAVA_VERSION: "17"
   MIN_SDK: "23"
 

@@ -6,12 +6,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../auth/application/auth_provider.dart';
 import '../../auth/application/auth_state.dart';
 import '../../auth/application/logout_handler.dart';
+import '../../vpn/data/node_display.dart';
 import '../../vpn/data/vpn_node.dart';
 import '../../vpn/presentation/region_picker.dart';
 import '../application/vpn_provider.dart';
 import '../application/vpn_status.dart';
 import '../data/external_ip_service.dart';
 import '../../../../app.dart';
+import '../../../../core/widgets/app_icon.dart';
 import '../../../../l10n/app_localizations.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -51,20 +53,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   Future<void> _refreshRegionLabel() async {
     final l = AppL10n.of(context);
+    final locale = Localizations.localeOf(context).languageCode;
     final nodesRepo = ref.read(vpnNodesRepositoryProvider);
     try {
       final selectedId = await nodesRepo.getSelectedNodeId();
+      if (!mounted) return;
+      if (selectedId == null || selectedId == kRegionAutoId) {
+        setState(() => _regionSubtitle = l.homeRegionAuto);
+        return;
+      }
       final nodes = await nodesRepo.listNodes();
       if (!mounted) return;
       if (nodes.isEmpty) {
         setState(() => _regionSubtitle = l.homeRegion);
         return;
       }
-      final VpnNode selected = nodes.where((n) => n.id == selectedId).firstOrNull ??
-          nodes.where((n) => n.isDefault).firstOrNull ??
-          nodes.first;
-      final label = selected.label.isNotEmpty ? selected.label : selected.host;
-      setState(() => _regionSubtitle = label);
+      final index = nodes.indexWhere((n) => n.id == selectedId);
+      final VpnNode selected = index >= 0
+          ? nodes[index]
+          : nodes.where((n) => n.isDefault).firstOrNull ?? nodes.first;
+      final place = placeForNode(
+        selected,
+        index: index >= 0 ? index : 0,
+      );
+      setState(
+        () => _regionSubtitle = place.displayTitle(locale),
+      );
     } catch (_) {
       if (mounted) {
         setState(() => _regionSubtitle = l.homeRegion);
@@ -118,7 +132,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       height: 18,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Icon(Icons.logout),
+                  : const AppIcon(AppIcons.logout),
               tooltip: l.logoutTooltip,
               onPressed: _logoutInProgress ? null : _onLogoutPressed,
             ),
@@ -136,7 +150,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   _IconAction(
-                    icon: Icons.dns,
+                    icon: AppIcons.servers,
                     label: _regionSubtitle,
                     onPressed: () async {
                       await showRegionPicker(context, ref);
@@ -144,7 +158,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     },
                   ),
                   _IconAction(
-                    icon: Icons.tune,
+                    icon: AppIcons.settings,
                     label: l.homeSettings,
                     onPressed: () {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -155,7 +169,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     },
                   ),
                   _IconAction(
-                    icon: Icons.info_outline,
+                    icon: AppIcons.info,
                     label: l.homeAbout,
                     onPressed: () {
                       showAboutDialog(
@@ -232,13 +246,13 @@ class _StatusIndicator extends ConsumerWidget {
     late final String label;
     late final Widget child;
     String? errorMessage;
-    String? serverInfo;
+    String? serverLabel;
 
     switch (status) {
       case VpnDisconnected():
         color = theme.colorScheme.outline;
         label = l.homeDisconnected;
-        child = const Icon(Icons.power_settings_new, size: 96);
+        child = const AppIcon(AppIcons.power, size: 96);
       case VpnConnecting():
         final p = (status as VpnConnecting).progress;
         color = theme.colorScheme.tertiary;
@@ -253,17 +267,18 @@ class _StatusIndicator extends ConsumerWidget {
           ),
         );
       case VpnConnected():
-        final s = (status as VpnConnected).serverName;
-        final p = (status as VpnConnected).protocol;
         final host = vpnConfig?.singBoxConfig.primaryOutbound?.server;
-        final port = vpnConfig?.singBoxConfig.primaryOutbound?.serverPort;
         color = theme.colorScheme.primary;
         label = l.homeConnected;
-        child = Icon(Icons.shield, size: 96, color: color);
-        // suppress unused warning for destructured locals
-        assert(s.isNotEmpty && p.isNotEmpty);
-        if (host != null && port != null) {
-          serverInfo = '$host:$port';
+        child = AppIcon(AppIcons.shield, size: 96, color: color);
+        if (host != null) {
+          final locale = Localizations.localeOf(context).languageCode;
+          final place = placeForHost(
+            host,
+            fallbackLabel: (status as VpnConnected).serverName,
+          );
+          serverLabel =
+              '${place.flag} ${place.displayTitle(locale)} · ${place.displaySubtitle(locale)}';
         }
       case VpnError():
         final msg = (status as VpnError).message;
@@ -272,8 +287,8 @@ class _StatusIndicator extends ConsumerWidget {
         child = Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.error_outline,
+            AppIcon(
+              AppIcons.warning,
               size: 64,
               color: theme.colorScheme.error,
             ),
@@ -313,19 +328,12 @@ class _StatusIndicator extends ConsumerWidget {
           style: theme.textTheme.headlineSmall?.copyWith(color: color),
         ),
         if (status is VpnConnected) ...[
-          const SizedBox(height: 4),
-          Text(
-            '${(status as VpnConnected).serverName} · '
-            '${(status as VpnConnected).protocol}',
-            style: theme.textTheme.bodyMedium,
-          ),
-          if (serverInfo != null) ...[
-            const SizedBox(height: 2),
+          if (serverLabel != null) ...[
+            const SizedBox(height: 4),
             Text(
-              'VPS: $serverInfo',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.outline,
-              ),
+              l.homeServer(serverLabel),
+              style: theme.textTheme.bodyMedium,
+              textAlign: TextAlign.center,
             ),
           ],
           const SizedBox(height: 8),
@@ -356,7 +364,7 @@ class _StatusIndicator extends ConsumerWidget {
                 }
               }
             },
-            icon: const Icon(Icons.cloud_download),
+            icon: const AppIcon(AppIcons.download),
             label: Text(l.homeFetchConfig),
           ),
         ],
@@ -429,12 +437,13 @@ class _ConnectedDetailsState extends State<_ConnectedDetails> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppL10n.of(context);
     final uptime = DateTime.now().difference(widget.connected.connectedSince);
 
     return Column(
       children: [
         Text(
-          'Uptime: ${_formatUptime(uptime)}',
+          l.homeUptime(_formatUptime(uptime)),
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.outline,
           ),
@@ -442,21 +451,21 @@ class _ConnectedDetailsState extends State<_ConnectedDetails> {
         const SizedBox(height: 4),
         if (_ipLoading)
           Text(
-            'IP: …',
+            l.homeIpLoading,
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.outline,
             ),
           )
         else if (_externalIp != null)
           Text(
-            'IP: $_externalIp',
+            l.homeIp(_externalIp!),
             style: theme.textTheme.bodyMedium?.copyWith(
               fontWeight: FontWeight.w600,
             ),
           )
         else
           Text(
-            'IP: unavailable',
+            l.homeIpUnavailable,
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.error,
             ),
@@ -483,22 +492,22 @@ class _ConnectButton extends ConsumerWidget {
     switch (status) {
       case VpnDisconnected():
         label = l.homeConnect;
-        icon = Icons.play_arrow;
+        icon = AppIcons.play;
         background = Theme.of(context).colorScheme.primary;
         onPressed = () => ref.read(vpnProvider.notifier).connect();
       case VpnConnecting():
         label = l.homeConnecting;
-        icon = Icons.hourglass_empty;
+        icon = AppIcons.hourglass;
         background = Theme.of(context).colorScheme.tertiary;
         onPressed = null;
       case VpnConnected():
         label = l.homeDisconnect;
-        icon = Icons.stop;
+        icon = AppIcons.stop;
         background = Theme.of(context).colorScheme.error;
         onPressed = () => ref.read(vpnProvider.notifier).disconnect();
       case VpnError():
         label = l.homeConnect;
-        icon = Icons.refresh;
+        icon = AppIcons.refresh;
         background = Theme.of(context).colorScheme.error;
         onPressed = () => ref.read(vpnProvider.notifier).connect();
     }
@@ -508,7 +517,7 @@ class _ConnectButton extends ConsumerWidget {
       height: 64,
       child: FilledButton.icon(
         onPressed: onPressed,
-        icon: Icon(icon, size: 28),
+        icon: AppIcon(icon, size: 28),
         label: Text(label, style: Theme.of(context).textTheme.titleMedium),
         style: FilledButton.styleFrom(
           backgroundColor: background,
@@ -537,7 +546,7 @@ class _IconAction extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 28),
+          AppIcon(icon, size: 28),
           const SizedBox(height: 4),
           Text(label, style: Theme.of(context).textTheme.bodySmall),
         ],

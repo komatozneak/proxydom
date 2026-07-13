@@ -89,6 +89,79 @@ class AppL10nRu extends AppL10n {
   String get homeFetchConfig => 'Получить конфиг';
 
   @override
+  String homeUptime(String time) {
+    return 'Время сессии: $time';
+  }
+
+  @override
+  String homeServer(String name) {
+    return 'Сервер: $name';
+  }
+
+  @override
+  String homeIp(String ip) {
+    return 'Ваш IP: $ip';
+  }
+
+  @override
+  String get homeIpLoading => 'Ваш IP: …';
+
+  @override
+  String get homeIpUnavailable => 'Ваш IP: недоступен';
+
+  @override
+  String get homeRegionAuto => 'Авто';
+
+  @override
+  String get regionTitle => 'Регион';
+
+  @override
+  String get regionSubtitle =>
+      'Выберите сервер или оставьте автоматический выбор';
+
+  @override
+  String get regionAutoTitle => 'Автоматически';
+
+  @override
+  String get regionAutoSubtitle => 'Лучший доступный сервер';
+
+  @override
+  String get regionSelected => 'Выбрано';
+
+  @override
+  String get regionSectionServers => 'Серверы';
+
+  @override
+  String get regionOnline => 'онлайн';
+
+  @override
+  String get regionOffline => 'офлайн';
+
+  @override
+  String get regionFree => 'Свободно';
+
+  @override
+  String get regionNoneOnline => 'Нет доступных серверов — попробуйте позже';
+
+  @override
+  String regionLoadError(String error) {
+    return 'Не удалось загрузить список: $error';
+  }
+
+  @override
+  String get regionEmpty => 'Список серверов пуст';
+
+  @override
+  String regionChanged(String name) {
+    return 'Регион: $name';
+  }
+
+  @override
+  String regionChangeFailed(String error) {
+    return 'Не удалось сменить регион: $error';
+  }
+
+  @override
   String get logoutTooltip => 'Выйти';
 
   @override

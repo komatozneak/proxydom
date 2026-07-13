@@ -89,6 +89,78 @@ class AppL10nEn extends AppL10n {
   String get homeFetchConfig => 'Fetch config';
 
   @override
+  String homeUptime(String time) {
+    return 'Session: $time';
+  }
+
+  @override
+  String homeServer(String name) {
+    return 'Server: $name';
+  }
+
+  @override
+  String homeIp(String ip) {
+    return 'Your IP: $ip';
+  }
+
+  @override
+  String get homeIpLoading => 'Your IP: …';
+
+  @override
+  String get homeIpUnavailable => 'Your IP: unavailable';
+
+  @override
+  String get homeRegionAuto => 'Auto';
+
+  @override
+  String get regionTitle => 'Region';
+
+  @override
+  String get regionSubtitle => 'Pick a server or leave automatic selection';
+
+  @override
+  String get regionAutoTitle => 'Automatic';
+
+  @override
+  String get regionAutoSubtitle => 'Best available server';
+
+  @override
+  String get regionSelected => 'Selected';
+
+  @override
+  String get regionSectionServers => 'Servers';
+
+  @override
+  String get regionOnline => 'online';
+
+  @override
+  String get regionOffline => 'offline';
+
+  @override
+  String get regionFree => 'Available';
+
+  @override
+  String get regionNoneOnline => 'No servers online — try again later';
+
+  @override
+  String regionLoadError(String error) {
+    return 'Failed to load servers: $error';
+  }
+
+  @override
+  String get regionEmpty => 'No servers available';
+
+  @override
+  String regionChanged(String name) {
+    return 'Region: $name';
+  }
+
+  @override
+  String regionChangeFailed(String error) {
+    return 'Failed to change region: $error';
+  }
+
+  @override
   String get logoutTooltip => 'Sign out';
 
   @override

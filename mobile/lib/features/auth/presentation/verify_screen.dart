@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/api_client.dart';
 import '../../../core/router.dart';
 import '../../../core/token_storage.dart';
+import '../../../core/widgets/app_icon.dart';
 import '../../../l10n/app_localizations.dart';
 import '../application/auth_provider.dart';
 
@@ -23,11 +24,9 @@ class VerifyScreen extends ConsumerStatefulWidget {
 }
 
 class _VerifyScreenState extends ConsumerState<VerifyScreen> {
-  final List<TextEditingController> _controllers = List.generate(
-    4,
-    (i) => TextEditingController(),
-  );
-  final List<FocusNode> _focusNodes = List.generate(4, (i) => FocusNode());
+  /// One field — soft-keyboard backspace works across all digits.
+  final TextEditingController _codeController = TextEditingController();
+  final FocusNode _codeFocus = FocusNode();
 
   bool _verifying = false;
   bool _allowResend = false;
@@ -41,8 +40,9 @@ class _VerifyScreenState extends ConsumerState<VerifyScreen> {
   void initState() {
     super.initState();
     _startResendCooldown();
+    _codeController.addListener(_onCodeChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _focusNodes[0].requestFocus();
+      _codeFocus.requestFocus();
     });
   }
 
@@ -50,12 +50,9 @@ class _VerifyScreenState extends ConsumerState<VerifyScreen> {
   void dispose() {
     _cooldownTimer?.cancel();
     _cooldownTimer = null;
-    for (final c in _controllers) {
-      c.dispose();
-    }
-    for (final f in _focusNodes) {
-      f.dispose();
-    }
+    _codeController.removeListener(_onCodeChanged);
+    _codeController.dispose();
+    _codeFocus.dispose();
     super.dispose();
   }
 
@@ -104,10 +101,8 @@ class _VerifyScreenState extends ConsumerState<VerifyScreen> {
         _allowResend = false;
       });
       _startResendCooldown();
-      for (final c in _controllers) {
-        c.clear();
-      }
-      _focusNodes[0].requestFocus();
+      _codeController.clear();
+      _codeFocus.requestFocus();
     } on DioException catch (e) {
       setState(() {
         _error = e.response?.data?['detail']?.toString() ?? 'Network error';
@@ -115,10 +110,25 @@ class _VerifyScreenState extends ConsumerState<VerifyScreen> {
     }
   }
 
-  String _getCode() => _controllers.map((c) => c.text).join();
+  String get _code => _codeController.text;
+
+  void _onCodeChanged() {
+    final digits = _codeController.text.replaceAll(RegExp(r'\D'), '');
+    if (digits != _codeController.text) {
+      _codeController.value = TextEditingValue(
+        text: digits,
+        selection: TextSelection.collapsed(offset: digits.length),
+      );
+      return;
+    }
+    setState(() {});
+    if (digits.length == 4 && !_verifying) {
+      _onCodeComplete();
+    }
+  }
 
   Future<void> _onCodeComplete() async {
-    final code = _getCode();
+    final code = _code;
     if (code.length != 4) return;
     setState(() {
       _verifying = true;
@@ -142,7 +152,6 @@ class _VerifyScreenState extends ConsumerState<VerifyScreen> {
           );
           AppRouter.pendingPhone = null;
           if (!mounted) return;
-          // Пишем в authProvider — GoRouter сам перенаправит на /home.
           await ref.read(authProvider.notifier).authenticated(
                 accessToken: access,
                 refreshToken: refresh,
@@ -153,20 +162,16 @@ class _VerifyScreenState extends ConsumerState<VerifyScreen> {
 
       setState(() {
         _error = AppL10n.of(context).verifyWrongCode;
-        for (final c in _controllers) {
-          c.clear();
-        }
-        _focusNodes[0].requestFocus();
+        _codeController.clear();
+        _codeFocus.requestFocus();
       });
     } on DioException catch (e) {
       final detail = e.response?.data;
       final msg = detail is Map ? detail['detail']?.toString() : null;
       setState(() {
         _error = msg ?? AppL10n.of(context).verifyWrongCode;
-        for (final c in _controllers) {
-          c.clear();
-        }
-        _focusNodes[0].requestFocus();
+        _codeController.clear();
+        _codeFocus.requestFocus();
       });
     } catch (_) {
       setState(() {
@@ -181,58 +186,17 @@ class _VerifyScreenState extends ConsumerState<VerifyScreen> {
     }
   }
 
-  void _onBackspace(int index) {
-    if (_controllers[index].text.isNotEmpty) {
-      _controllers[index].clear();
-      return;
-    }
-    if (index > 0) {
-      _controllers[index - 1].clear();
-      _focusNodes[index - 1].requestFocus();
-    }
-  }
-
-  KeyEventResult _handleKeyEvent(int index, KeyEvent event) {
-    if (event is! KeyDownEvent) return KeyEventResult.ignored;
-    if (event.logicalKey == LogicalKeyboardKey.backspace) {
-      _onBackspace(index);
-      return KeyEventResult.handled;
-    }
-    return KeyEventResult.ignored;
-  }
-
-  void _onDigitInput(int index, String value) {
-    if (value.isEmpty) {
-      _onBackspace(index);
-      return;
-    }
-    if (value.length > 1) {
-      if (value.length == 4 && RegExp(r'^\d{4}$').hasMatch(value)) {
-        for (var i = 0; i < 4; i++) {
-          _controllers[i].text = value[i];
-        }
-        _focusNodes[3].unfocus();
-        _onCodeComplete();
-        return;
-      }
-      _controllers[index].text = value[value.length - 1];
-    }
-    if (_controllers[index].text.isNotEmpty && index < 3) {
-      _focusNodes[index + 1].requestFocus();
-    }
-    if (_getCode().length == 4 && !_verifying) {
-      _onCodeComplete();
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final l = AppL10n.of(context);
+    final theme = Theme.of(context);
+    final code = _code;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(l.verifyTitle),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const AppIcon(AppIcons.back),
           onPressed: () => context.go('/login'),
         ),
       ),
@@ -242,47 +206,75 @@ class _VerifyScreenState extends ConsumerState<VerifyScreen> {
           child: Column(
             children: [
               const SizedBox(height: 48),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(
-                  4,
-                  (i) => Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                    child: SizedBox(
-                      width: 56,
-                      height: 64,
-                      child: Focus(
-                      onKeyEvent: (node, event) => _handleKeyEvent(i, event),
-                      child: TextField(
-                        controller: _controllers[i],
-                        focusNode: _focusNodes[i],
-                        keyboardType: TextInputType.number,
-                        textAlign: TextAlign.center,
-                        maxLength: 1,
-                        style: Theme.of(context).textTheme.headlineMedium,
-                        decoration: InputDecoration(
-                          counterText: '',
-                          contentPadding: EdgeInsets.zero,
-                          border: OutlineInputBorder(
+              // Visual 4 boxes; one real TextField underneath for IME backspace.
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(4, (i) {
+                      final filled = i < code.length;
+                      final focused = _codeFocus.hasFocus &&
+                          (code.length == i ||
+                              (code.length == 4 && i == 3));
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 120),
+                          width: 56,
+                          height: 64,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: focused
+                                  ? theme.colorScheme.primary
+                                  : theme.colorScheme.outline,
+                              width: focused ? 2 : 1.5,
+                            ),
+                          ),
+                          child: Text(
+                            filled ? code[i] : '',
+                            style: theme.textTheme.headlineMedium,
                           ),
                         ),
-                        onChanged: (v) => _onDigitInput(i, v),
-                        onSubmitted: (_) {
-                          if (i < 3) _focusNodes[i + 1].requestFocus();
-                        },
+                      );
+                    }),
+                  ),
+                  Opacity(
+                    opacity: 0.01,
+                    child: SizedBox(
+                      width: 56 * 4 + 12 * 3,
+                      height: 64,
+                      child: TextField(
+                        controller: _codeController,
+                        focusNode: _codeFocus,
+                        keyboardType: TextInputType.number,
+                        textInputAction: TextInputAction.done,
+                        maxLength: 4,
+                        showCursor: false,
+                        enableInteractiveSelection: false,
+                        style: const TextStyle(color: Colors.transparent),
+                        decoration: const InputDecoration(
+                          counterText: '',
+                          border: InputBorder.none,
+                        ),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(4),
+                        ],
+                        onTap: () => _codeFocus.requestFocus(),
                       ),
                     ),
-                    ),
                   ),
-                ),
+                ],
               ),
               if (_error != null) ...[
                 const SizedBox(height: 16),
                 Text(
                   _error!,
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.error,
+                    color: theme.colorScheme.error,
                   ),
                 ),
               ],

@@ -80,7 +80,7 @@ void main() {
     expect(find.byType(TextFormField), findsOneWidget);
   });
 
-  testWidgets('Verify screen renders 4 fields and resend button', (tester) async {
+  testWidgets('Verify screen renders digit boxes and resend button', (tester) async {
     AppLocale.set(const Locale('ru'));
     AppRouter.pendingPhone = '+79991234567';
 
@@ -101,7 +101,15 @@ void main() {
 
     expect(find.text('Введите код'), findsOneWidget);
     expect(find.textContaining('Перезвонить'), findsOneWidget);
-    expect(find.byType(TextField), findsAtLeastNWidgets(4));
+    // PIN uses one hidden numeric TextField (maxLength 4) + 4 visual boxes.
+    // Login phone TextField may still be in the router stack — don't count all.
+    expect(
+      find.byWidgetPredicate(
+        (w) => w is TextField && w.maxLength == 4,
+      ),
+      findsOneWidget,
+    );
+    expect(find.byType(AnimatedContainer), findsAtLeastNWidgets(4));
   });
 
   testWidgets('Home screen shows Connect button when not connected', (tester) async {

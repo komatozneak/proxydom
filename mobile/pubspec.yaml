@@ -20,6 +20,10 @@ dependencies:
   flutter_riverpod: ^2.6.1
   path_provider: ^2.1.5
   shared_preferences: ^2.3.3
+  phosphor_flutter: ^2.1.0
+  flutter_svg: 2.2.2
+  # rive deferred until we have a .riv asset (CI Flutter 3.24 / Dart 3.5
+  # cannot resolve rive ^0.14 which needs SDK >=3.6).
   # env-конфиг используем через const — пока без package
 
 dev_dependencies:
@@ -27,6 +31,7 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^4.0.0
   http_mock_adapter: ^0.6.1
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
@@ -34,9 +39,21 @@ flutter:
   assets:
     # Brand / onboarding (palette v3 oak+moss).
     - assets/brand/
-    - assets/backgrounds/textures/
-    - assets/backgrounds/empty_states/
+    # PR #35 textures/empty_states intentionally NOT bundled (see
+    # assets/brand/DEPRECATED-PR35.md — FLUX Klein 9B non-commercial).
     # Offline copies of sing-box rule-sets (runtime still uses remote URLs).
     - assets/rules/geosite-category-ru.srs
     - assets/rules/geosite-tld-ru.srs
     - assets/rules/geoip-ru.srs
+
+# Android 13+ themed icons: background + foreground + monochrome.
+# Regenerate: dart run flutter_launcher_icons
+# Source layers: python tool/generate_adaptive_icon.py
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: assets/icon/fg_oak_moss.png
+  adaptive_icon_background: "#FAF8F3"
+  adaptive_icon_foreground: assets/icon/fg_oak_moss.png
+  adaptive_icon_monochrome: assets/icon/mono.png
+  min_sdk_android: 23

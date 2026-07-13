@@ -9,23 +9,14 @@ const _selectedNodeKey = SelectedRegionStore.key;
 
 /// Repository for node catalog + local selection persistence.
 ///
-/// Prefers `GET /api/v1/nodes` (connected workers); falls back to
-/// `GET /api/v1/vpn/nodes` (includes local default + labels) if needed.
+/// Uses `GET /api/v1/vpn/nodes` (local default + remote workers + labels).
 class VpnNodesRepository {
   VpnNodesRepository();
 
   final Dio _dio = ApiClient.instance;
-  final VpnNodesApi _nodesApi = VpnNodesApi();
 
   Future<List<VpnNode>> listNodes() async {
-    try {
-      final fromNodes = await _nodesApi.listConnectedNodes();
-      if (fromNodes.isNotEmpty) {
-        return fromNodes;
-      }
-    } catch (_) {
-      // Fall through to vpn/nodes catalog.
-    }
+    // Full catalog (local + workers + labels) — not only /nodes workers.
     final resp = await _dio.get<Map<String, dynamic>>('/vpn/nodes');
     final raw = resp.data?['nodes'];
     if (raw is! List) {

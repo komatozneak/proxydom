@@ -1,18 +1,25 @@
-# Brand assets — palette v3 oak+moss (2026-07-11)
+# Brand assets — palette v3 oak+moss
 
-## Hero globe (onboarding)
+## Ship (bundled)
 
-- **File:** `onboarding_globe.png`
-- **Source:** moodboard v3 / `oak_moss_hero_01.png`
-- **Palette:** moss green globe + amber continents + oak arcs + cream background
-- **Semantic match:** Russian forest / teremok aesthetic
-- **Usage:** `Image.asset('assets/brand/onboarding_globe.png')` (raster PNG, not SVG)
+| Path | Notes |
+|---|---|
+| `onboarding_globe.png` | Hero from PR #34 (oak+moss moodboard). Raster PNG. |
+| `icon/` | Adaptive icon layers (fg + monochrome); bg color in flutter_launcher_icons. |
+| `anim/` | Optional Rive `.riv` (connecting state) — add when ready. |
+| `empty/` | Prefer code-drawn SVG / CustomPainter; keep empty for now. |
 
-## Logo placeholders (НЕ реальный бренд)
+## Do not ship
 
-`logo/teremok_logo_*.svg` — PLACEHOLDER v1, юзер заменит later. Do not ship SVG rendering
-for the hero; keep production hero as PNG.
+`../backgrounds/textures/` and `../backgrounds/empty_states/` — see
+`DEPRECATED-PR35.md` (Klein 9B non-commercial).
 
 ## Tagline
 
 «Тёплый дом в холодном интернете»
+
+## Rules
+
+- No text baked into PNGs (Cyrillic = Flutter Text widgets).
+- Colors only via `AppBrand.*` / `Theme.of(context).colorScheme.*`.
+- No AI logo / store icon without commercial license + human review.

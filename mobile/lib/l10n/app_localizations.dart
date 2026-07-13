@@ -253,6 +253,126 @@ abstract class AppL10n {
   /// **'Fetch config'**
   String get homeFetchConfig;
 
+  /// No description provided for @homeUptime.
+  ///
+  /// In en, this message translates to:
+  /// **'Session: {time}'**
+  String homeUptime(String time);
+
+  /// No description provided for @homeServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Server: {name}'**
+  String homeServer(String name);
+
+  /// No description provided for @homeIp.
+  ///
+  /// In en, this message translates to:
+  /// **'Your IP: {ip}'**
+  String homeIp(String ip);
+
+  /// No description provided for @homeIpLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Your IP: …'**
+  String get homeIpLoading;
+
+  /// No description provided for @homeIpUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Your IP: unavailable'**
+  String get homeIpUnavailable;
+
+  /// No description provided for @homeRegionAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto'**
+  String get homeRegionAuto;
+
+  /// No description provided for @regionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Region'**
+  String get regionTitle;
+
+  /// No description provided for @regionSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a server or leave automatic selection'**
+  String get regionSubtitle;
+
+  /// No description provided for @regionAutoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic'**
+  String get regionAutoTitle;
+
+  /// No description provided for @regionAutoSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Best available server'**
+  String get regionAutoSubtitle;
+
+  /// No description provided for @regionSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected'**
+  String get regionSelected;
+
+  /// No description provided for @regionSectionServers.
+  ///
+  /// In en, this message translates to:
+  /// **'Servers'**
+  String get regionSectionServers;
+
+  /// No description provided for @regionOnline.
+  ///
+  /// In en, this message translates to:
+  /// **'online'**
+  String get regionOnline;
+
+  /// No description provided for @regionOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'offline'**
+  String get regionOffline;
+
+  /// No description provided for @regionFree.
+  ///
+  /// In en, this message translates to:
+  /// **'Available'**
+  String get regionFree;
+
+  /// No description provided for @regionNoneOnline.
+  ///
+  /// In en, this message translates to:
+  /// **'No servers online — try again later'**
+  String get regionNoneOnline;
+
+  /// No description provided for @regionLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load servers: {error}'**
+  String regionLoadError(String error);
+
+  /// No description provided for @regionEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No servers available'**
+  String get regionEmpty;
+
+  /// No description provided for @regionChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Region: {name}'**
+  String regionChanged(String name);
+
+  /// No description provided for @regionChangeFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to change region: {error}'**
+  String regionChangeFailed(String error);
+
   /// No description provided for @logoutTooltip.
   ///
   /// In en, this message translates to:

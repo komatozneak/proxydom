@@ -7,6 +7,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/retry_policy.dart';
 import '../../auth/application/auth_provider.dart';
 import '../../auth/application/auth_state.dart';
+import '../../vpn/data/node_auto_selector.dart';
+import '../../vpn/data/node_display.dart';
 import '../../vpn/data/vpn_config.dart';
 import '../../vpn/data/vpn_config_repository.dart';
 import '../../vpn/data/vpn_controller.dart';
@@ -156,13 +158,35 @@ class VpnNotifier extends Notifier<VpnStatus> {
   /// Получить конфиг без подключения (для UI/preview).
   ///
   /// Retry на transient ошибках (5xx, network), без retry на 4xx.
+  /// When stored region is [kRegionAutoId], probes online nodes and picks fastest.
   Future<VpnConfig> fetchConfig({String? nodeId}) async {
     final nodesRepo = ref.read(vpnNodesRepositoryProvider);
-    final selected = nodeId ?? await nodesRepo.getSelectedNodeId();
+    String? selected = nodeId ?? await nodesRepo.getSelectedNodeId();
+    if (selected == null || selected.isEmpty) {
+      selected = kRegionAutoId;
+    }
+
+    String? apiNodeId = selected;
+    if (selected == kRegionAutoId) {
+      try {
+        final catalog = await nodesRepo.listNodes();
+        apiNodeId = await resolveNodeIdForConfig(
+          storedId: kRegionAutoId,
+          catalog: catalog,
+        );
+        // ignore: avoid_print
+        print('[VPN] auto selected node_id=$apiNodeId');
+      } catch (e) {
+        // ignore: avoid_print
+        print('[VPN] auto pick failed, using default: $e');
+        apiNodeId = null;
+      }
+    }
+
     return _retryPolicy.execute(
       () => ref.read(vpnConfigRepositoryProvider).getConfig(
             forceRefresh: nodeId != null,
-            nodeId: selected,
+            nodeId: apiNodeId,
           ),
       shouldRetry: (e) async {
         if (e is DioException) {
@@ -185,7 +209,12 @@ class VpnNotifier extends Notifier<VpnStatus> {
   Future<void> selectNode(String nodeId) async {
     final nodesRepo = ref.read(vpnNodesRepositoryProvider);
     final wasConnected = state is VpnConnected || state is VpnConnecting;
-    await nodesRepo.setSelectedNodeId(nodeId);
+    final useAuto = nodeId == kRegionAutoId;
+    if (useAuto) {
+      await nodesRepo.setSelectedNodeId(kRegionAutoId);
+    } else {
+      await nodesRepo.setSelectedNodeId(nodeId);
+    }
     ref.read(vpnConfigRepositoryProvider).clearCache();
     if (wasConnected) {
       _reconnectTimer?.cancel();
@@ -199,7 +228,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
       await _clearConnectedSince();
       state = const VpnDisconnected();
     }
-    _config = await fetchConfig(nodeId: nodeId);
+    _config = await fetchConfig(nodeId: useAuto ? null : nodeId);
     if (wasConnected) {
       await connect();
     }

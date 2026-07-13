@@ -12,9 +12,21 @@ Rules for AI agents working in `mobile/`. Complements root `AGENTS.md`.
 - Error is oak brown (not Material red) — anti-pattern fix
 - Docs: `docs/design/palette-v3-decision.md`
 - Hero: `assets/brand/onboarding_globe.png` (raster PNG from oak+moss moodboard)
+- Icons: **Phosphor** via `lib/core/widgets/app_icon.dart` (`AppIcons.*` /
+  `PhosphorIconsRegular.*` static only — never dynamic `IconData(0x…)`)
+- Adaptive icon: `assets/icon/fg_oak_moss.png` + `mono.png` + cream bg
+  (`flutter_launcher_icons`; regenerate with `dart run flutter_launcher_icons`)
+- Motion: CustomPainter / progress indicators for now; **rive deferred** (SDK)
+
+### PR #35 assets — DO NOT SHIP
+
+`assets/backgrounds/textures/` and `empty_states/` are **deprecated** (FLUX Klein
+9B non-commercial). See `assets/brand/DEPRECATED-PR35.md`. Not in `pubspec.yaml`.
 
 Do **not** hardcode `Color(0xFF…)` or `Colors.teal` / `Colors.red` in widgets —
 use `Theme.of(context).colorScheme.*` or `AppBrand.*`.
+
+Do **not** bulk-generate AI PNGs without commercial license + owner go (Visual A→B).
 
 ## Stack
 
@@ -26,4 +38,4 @@ use `Theme.of(context).colorScheme.*` or `AppBrand.*`.
 
 Add new tests for palette / brand changes; prefer not rewriting unrelated smoke
 coverage. Palette suite: `test/palette_v3_test.dart`, `test/hero_asset_test.dart`,
-`test/palette_consistency_test.dart`.
+`test/palette_consistency_test.dart`, `test/phosphor_swap_test.dart`.

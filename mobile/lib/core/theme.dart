@@ -84,6 +84,7 @@ class AppTheme {
       brightness: brightness,
       colorScheme: scheme,
       scaffoldBackgroundColor: surface,
+      iconTheme: IconThemeData(color: onSurface, size: 24),
 
       // === Typography ===
       textTheme: _buildTextTheme(scheme),
@@ -139,8 +140,8 @@ class AppTheme {
       ),
 
       // === Card ===
-      // CardTheme: Flutter 3.24 CI; CardThemeData alias lands in newer SDKs.
-      cardTheme: const CardTheme(
+      // CardThemeData: required on Flutter 3.27+ (local 3.41 / CI bump).
+      cardTheme: const CardThemeData(
         elevation: 2,
         margin: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
         shape: RoundedRectangleBorder(
