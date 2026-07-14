@@ -107,7 +107,11 @@ class AppL10nRu extends AppL10n {
   String get homeIpLoading => 'Ваш IP: …';
 
   @override
-  String get homeIpUnavailable => 'Ваш IP: недоступен';
+  String get homeIpUnavailable => 'Ваш IP: недоступен — туннель без интернета';
+
+  @override
+  String get homeIpLockdownHint =>
+      'Отключите «Всегда VPN» и «Блокировать без VPN» в системных настройках VPN, затем подключитесь снова';
 
   @override
   String get homeRegionAuto => 'Авто';
@@ -147,6 +151,10 @@ class AppL10nRu extends AppL10n {
   String regionLoadError(String error) {
     return 'Не удалось загрузить список: $error';
   }
+
+  @override
+  String get regionLoadErrorAbort =>
+      'API недоступен — отключите «Всегда VPN» (и «Блокировать без VPN») в системе, затем откройте список снова';
 
   @override
   String get regionEmpty => 'Список серверов пуст';

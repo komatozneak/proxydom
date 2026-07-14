@@ -37,6 +37,12 @@ class TeremokVpnService : VpnService() {
         /** Минимальный интервал между попытками start (debounce reconnect storm). */
         private const val START_DEBOUNCE_MS = 2000L
 
+        private const val PREFS_NAME = "teremok_vpn_session"
+        private const val KEY_PARAMS_JSON = "params_json"
+        private const val KEY_USERNAME = "username"
+        private const val KEY_PROTOCOL = "protocol"
+        private const val KEY_ACTIVE = "active"
+
         @Volatile
         private var lastStartAttemptMs: Long = 0L
 
@@ -73,6 +79,9 @@ class TeremokVpnService : VpnService() {
                 val protocol = intent.getStringExtra(EXTRA_PROTOCOL) ?: "unknown"
                 val paramsJson = intent.getStringExtra(EXTRA_PARAMS_JSON) ?: "{}"
                 Log.i(TAG, "onStartCommand: ACTION_START (user=$username, proto=$protocol)")
+                // Persist before establish so Always-on / sticky restart after reboot
+                // can rebuild the tunnel without Flutter reinjecting params.
+                persistSession(username, protocol, paramsJson)
                 val params = runCatching { jsonToMap(JSONObject(paramsJson)) }
                     .onFailure { Log.w(TAG, "failed to parse paramsJson, using defaults", it) }
                     .getOrDefault(emptyMap())
@@ -80,13 +89,117 @@ class TeremokVpnService : VpnService() {
             }
             ACTION_STOP -> {
                 Log.i(TAG, "onStartCommand: ACTION_STOP")
+                clearSession()
                 stopVpn()
             }
             else -> {
-                Log.w(TAG, "onStartCommand: unknown action=${intent?.action}")
+                // Always-on VPN / START_STICKY restart: intent is often null.
+                Log.w(TAG, "onStartCommand: restore path action=${intent?.action}")
+                restoreSessionIfNeeded()
             }
         }
         return START_STICKY
+    }
+
+    private fun prefs() = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+
+    private fun persistSession(username: String, protocol: String, paramsJson: String) {
+        prefs().edit()
+            .putBoolean(KEY_ACTIVE, true)
+            .putString(KEY_USERNAME, username)
+            .putString(KEY_PROTOCOL, protocol)
+            .putString(KEY_PARAMS_JSON, paramsJson)
+            .apply()
+        Log.i(TAG, "persistSession: saved (${paramsJson.length} chars)")
+    }
+
+    private fun clearSession() {
+        prefs().edit().clear().apply()
+        Log.i(TAG, "clearSession: wiped stored VPN params")
+    }
+
+    /**
+     * After reboot / process death Always-on restarts VpnService without ACTION_START.
+     * Rebuild tunnel from the last successful session if the user left VPN "active".
+     */
+    private fun restoreSessionIfNeeded() {
+        if (isRunning || currentStatus == "preparing" || currentStatus == "connecting") {
+            Log.i(TAG, "restoreSessionIfNeeded: already active ($currentStatus)")
+            return
+        }
+        val store = prefs()
+        if (!store.getBoolean(KEY_ACTIVE, false)) {
+            Log.i(TAG, "restoreSessionIfNeeded: no active session")
+            return
+        }
+        val paramsJson = store.getString(KEY_PARAMS_JSON, null)
+        if (paramsJson.isNullOrBlank()) {
+            Log.w(TAG, "restoreSessionIfNeeded: active flag without params — clearing")
+            clearSession()
+            return
+        }
+        val username = store.getString(KEY_USERNAME, "anonymous") ?: "anonymous"
+        val protocol = store.getString(KEY_PROTOCOL, "unknown") ?: "unknown"
+        Log.i(TAG, "restoreSessionIfNeeded: restarting (user=$username, proto=$protocol)")
+        val params = runCatching { jsonToMap(JSONObject(paramsJson)) }
+            .onFailure { Log.w(TAG, "restoreSessionIfNeeded: bad JSON", it) }
+            .getOrDefault(emptyMap())
+        if (params.isEmpty()) {
+            clearSession()
+            return
+        }
+        startVpn(username, protocol, params)
+    }
+
+    /** Secure setting — do not override [VpnService.isLockdownEnabled] (API 29+). */
+    private fun isAlwaysOnVpnLockdownSetting(): Boolean =
+        runCatching {
+            Settings.Secure.getInt(contentResolver, "always_on_vpn_lockdown", 0) == 1
+        }.getOrDefault(false)
+
+    /**
+     * Keep VLESS egress + control-plane API off the TUN so Dio/API survives a
+     * half-dead tunnel. Lockdown ("Block connections without VPN") forbids
+     * bypass — then we can only rely on [VpnService.protect].
+     */
+    private fun applyBypassRoutes(
+        builder: Builder,
+        outboundServer: String,
+        params: Map<String, Any?>,
+    ) {
+        if (isAlwaysOnVpnLockdownSetting()) {
+            Log.i(TAG, "  skip excludeRoute: always_on_vpn_lockdown=1")
+            return
+        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            Log.i(TAG, "  skip excludeRoute: API < 33")
+            return
+        }
+        val hosts = linkedSetOf<String>()
+        if (outboundServer.isNotEmpty() && outboundServer != "unknown") {
+            hosts.add(outboundServer)
+        }
+        @Suppress("UNCHECKED_CAST")
+        val controlPlane = params["controlPlaneHosts"] as? List<*>
+        controlPlane?.forEach { host ->
+            if (host is String && host.isNotBlank()) {
+                hosts.add(host.trim())
+            }
+        }
+        for (host in hosts) {
+            try {
+                val inet = InetAddress.getByName(host)
+                // Only IPv4 /32 bypass — IPv6 literals need separate handling.
+                if (inet.hostAddress?.contains(':') == true) {
+                    Log.w(TAG, "  skip excludeRoute IPv6 host=$host")
+                    continue
+                }
+                builder.excludeRoute(IpPrefix(inet, 32))
+                Log.i(TAG, "  excludeRoute: $host/32")
+            } catch (e: Exception) {
+                Log.w(TAG, "  excludeRoute failed for $host", e)
+            }
+        }
     }
 
     /**
@@ -181,27 +294,7 @@ class TeremokVpnService : VpnService() {
                 builder.addDnsServer(dns)
             }
 
-            // В lockdown-режиме (Always-on + Block connections without VPN)
-            // bypass через excludeRoute блокируется системой и рвёт outbound.
-            // В этом режиме полагаемся только на VpnService.protect(fd) из LibboxPlatform.
-            val lockdownEnabled = runCatching {
-                Settings.Secure.getInt(contentResolver, "always_on_vpn_lockdown", 0) == 1
-            }.getOrDefault(false)
-            if (lockdownEnabled) {
-                Log.i(TAG, "  skip excludeRoute: always_on_vpn_lockdown=1")
-            } else if (
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                outboundServer.isNotEmpty() &&
-                outboundServer != "unknown"
-            ) {
-                try {
-                    val prefix = IpPrefix(InetAddress.getByName(outboundServer), 32)
-                    builder.excludeRoute(prefix)
-                    Log.i(TAG, "  excludeRoute: $outboundServer/32")
-                } catch (e: Exception) {
-                    Log.w(TAG, "  excludeRoute failed for $outboundServer", e)
-                }
-            }
+            applyBypassRoutes(builder, outboundServer, params)
 
             currentStatus = "connecting"
             VpnStatusBroadcaster.emit(currentStatus)
@@ -407,6 +500,16 @@ object VpnChannelRegistry {
                     }
                     "getLastError" -> {
                         result.success(VpnStatusBroadcaster.lastError())
+                    }
+                    "isLockdownEnabled" -> {
+                        val locked = runCatching {
+                            Settings.Secure.getInt(
+                                appContext.contentResolver,
+                                "always_on_vpn_lockdown",
+                                0,
+                            ) == 1
+                        }.getOrDefault(false)
+                        result.success(locked)
                     }
                     "requestPermission" -> {
                         onPermissionRequest(result)
@@ -650,6 +753,21 @@ internal fun buildSingBoxJson(
                                     put("outbound", "direct")
                                 },
                             )
+                        }
+                        @Suppress("UNCHECKED_CAST")
+                        val controlPlane = params["controlPlaneHosts"] as? List<*>
+                        controlPlane?.forEach { host ->
+                            if (host is String && host.isNotBlank()) {
+                                put(
+                                    JSONObject().apply {
+                                        put(
+                                            "ip_cidr",
+                                            JSONArray().apply { put("${host.trim()}/32") },
+                                        )
+                                        put("outbound", "direct")
+                                    },
+                                )
+                            }
                         }
                     },
                 )

@@ -8,6 +8,7 @@ import '../../auth/application/auth_state.dart';
 import '../../auth/application/logout_handler.dart';
 import '../../vpn/data/node_display.dart';
 import '../../vpn/data/vpn_node.dart';
+import '../../vpn/data/vpn_controller.dart';
 import '../../vpn/presentation/region_picker.dart';
 import '../application/vpn_provider.dart';
 import '../application/vpn_status.dart';
@@ -387,6 +388,7 @@ class _ConnectedDetailsState extends State<_ConnectedDetails> {
   Timer? _uptimeTimer;
   String? _externalIp;
   bool _ipLoading = true;
+  bool _lockdownEnabled = false;
 
   @override
   void initState() {
@@ -409,11 +411,16 @@ class _ConnectedDetailsState extends State<_ConnectedDetails> {
     setState(() {
       _ipLoading = true;
       _externalIp = null;
+      _lockdownEnabled = false;
     });
-    final ip = await fetchExternalIp();
+    final results = await Future.wait<Object?>([
+      fetchExternalIp(),
+      VpnController.instance.isLockdownEnabled(),
+    ]);
     if (!mounted) return;
     setState(() {
-      _externalIp = ip;
+      _externalIp = results[0] as String?;
+      _lockdownEnabled = results[1] as bool? ?? false;
       _ipLoading = false;
     });
   }
@@ -463,13 +470,25 @@ class _ConnectedDetailsState extends State<_ConnectedDetails> {
               fontWeight: FontWeight.w600,
             ),
           )
-        else
+        else ...[
           Text(
             l.homeIpUnavailable,
+            textAlign: TextAlign.center,
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.error,
             ),
           ),
+          if (_lockdownEnabled) ...[
+            const SizedBox(height: 6),
+            Text(
+              l.homeIpLockdownHint,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.error,
+              ),
+            ),
+          ],
+        ],
       ],
     );
   }

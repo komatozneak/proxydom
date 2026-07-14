@@ -49,7 +49,7 @@ VpnServiceConfig _sampleServiceConfig() {
 
 void main() {
   group('buildRuntimeSingBoxJson', () {
-    test('включает FakeIP DNS с reverse_mapping и dns.final', () {
+    test('использует UDP DNS через proxy (без FakeIP)', () {
       final json = jsonDecode(
         buildRuntimeSingBoxJson(
           config: _sampleVpnConfig(),
@@ -58,16 +58,15 @@ void main() {
       ) as Map<String, dynamic>;
 
       final dns = json['dns'] as Map<String, dynamic>;
-      expect(dns['reverse_mapping'], isTrue);
       expect(dns['strategy'], 'ipv4_only');
       expect(dns['final'], 'dns-remote');
+      expect(dns.containsKey('reverse_mapping'), isFalse);
 
       final servers = dns['servers'] as List<dynamic>;
-      expect(servers, hasLength(2));
-      expect(servers[0]['type'], 'https');
+      expect(servers, hasLength(1));
+      expect(servers[0]['type'], 'udp');
+      expect(servers[0]['server'], '1.1.1.1');
       expect(servers[0]['detour'], 'proxy');
-      expect(servers[1]['type'], 'fakeip');
-      expect(servers[1]['inet4_range'], fakeIpV4Range);
     });
 
     test('tun inbound использует system stack', () {
@@ -84,7 +83,7 @@ void main() {
       expect(inbound['tag'], 'tun-in');
     });
 
-    test('route rules: sniff, hijack-dns, VPS+RU direct, then FakeIP→proxy', () {
+    test('without local rules: sniff + VPS direct; final=proxy', () {
       final json = jsonDecode(
         buildRuntimeSingBoxJson(
           config: _sampleVpnConfig(server: '204.11.2.216'),
@@ -92,25 +91,44 @@ void main() {
         ),
       ) as Map<String, dynamic>;
 
-      final rules = (json['route'] as Map)['rules'] as List<dynamic>;
+      final route = json['route'] as Map<String, dynamic>;
+      final rules = route['rules'] as List<dynamic>;
       expect(rules[0], {'inbound': 'tun-in', 'action': 'sniff'});
-      expect(rules[1], {
-        'port': <int>[53],
-        'action': 'hijack-dns',
-      });
-      expect(rules[2], {'protocol': 'dns', 'action': 'hijack-dns'});
       expect(rules[3], {
         'ip_cidr': <String>['204.11.2.216/32'],
         'outbound': 'direct',
       });
-      expect(rules[4], {
-        'rule_set': 'geosite-category-ru',
-        'outbound': 'direct',
-      });
-      expect(rules.last, {
-        'ip_cidr': <String>[fakeIpV4Range],
-        'outbound': 'proxy',
-      });
+      expect(rules.length, 4);
+      expect(route['final'], 'proxy');
+      expect(route.containsKey('rule_set'), isFalse);
+    });
+
+    test('with local rules: no GitHub URLs, type=local paths', () {
+      final json = jsonDecode(
+        buildRuntimeSingBoxJson(
+          config: _sampleVpnConfig(),
+          service: _sampleServiceConfig(),
+          localRulePaths: {
+            'geosite-category-ru': '/data/rules/geosite-category-ru.srs',
+            'geosite-tld-ru': '/data/rules/geosite-tld-ru.srs',
+            'geoip-ru': '/data/rules/geoip-ru.srs',
+          },
+        ),
+      ) as Map<String, dynamic>;
+
+      final route = json['route'] as Map<String, dynamic>;
+      final ruleSets = route['rule_set'] as List<dynamic>;
+      expect(ruleSets, hasLength(3));
+      for (final raw in ruleSets) {
+        final rs = raw as Map<String, dynamic>;
+        expect(rs['type'], 'local');
+        expect(rs['format'], 'binary');
+        expect(rs['path'], isNot(contains('github')));
+        expect(rs['path'], endsWith('.srs'));
+      }
+      final encoded = jsonEncode(json);
+      expect(encoded.contains('raw.githubusercontent.com'), isFalse);
+      expect(encoded.contains('download_detour'), isFalse);
     });
 
     test('final outbound — proxy tag из config', () {

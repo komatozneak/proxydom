@@ -439,6 +439,7 @@ void main() {
       expect(map['outboundServer'], 's');
       expect(map['outboundServerPort'], 443);
       expect(map['outboundUuid'], 'u');
+      expect(map['controlPlaneHosts'], contains('204.11.2.216'));
     });
   });
 

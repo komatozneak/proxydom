@@ -6,6 +6,7 @@ import '../../../core/widgets/app_icon.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../home/application/vpn_provider.dart';
 import '../data/node_display.dart';
+import '../data/vpn_controller.dart';
 import '../data/vpn_node.dart';
 
 /// Bottom sheet: auto-select + friendly region list (oak+moss, reference-inspired).
@@ -19,8 +20,22 @@ Future<void> showRegionPicker(BuildContext context, WidgetRef ref) async {
     selectedId = await nodesRepo.getSelectedNodeId();
   } catch (e) {
     if (context.mounted) {
+      final raw = e.toString();
+      final looksLikeAbort = raw.contains('connection abort') ||
+          raw.contains('Software caused connection abort') ||
+          raw.contains('HttpException');
+      final lockdown = looksLikeAbort
+          ? await VpnController.instance.isLockdownEnabled()
+          : false;
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l.regionLoadError(e.toString()))),
+        SnackBar(
+          content: Text(
+            (looksLikeAbort || lockdown)
+                ? l.regionLoadErrorAbort
+                : l.regionLoadError(raw),
+          ),
+        ),
       );
     }
     return;

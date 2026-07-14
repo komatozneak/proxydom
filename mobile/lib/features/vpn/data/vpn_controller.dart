@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'vpn_config.dart';
 import 'vpn_service_config.dart';
 import 'sing_box_runtime_config.dart';
+import 'vpn_rule_sets.dart';
 
 /// Контроллер VPN-сессии — мост между Flutter UI и Android VpnService.
 ///
@@ -37,9 +38,19 @@ class VpnController {
       }
 
       final serviceConfig = VpnServiceConfig.fromVpnConfig(config);
+      // Bundled .srs — never download from GitHub at connect time (RF blocks).
+      Map<String, String> localRules = const {};
+      try {
+        localRules = await prepareLocalRuleSetPaths();
+      } catch (e) {
+        // Unit tests lack path_provider; connect still works without RU split.
+        // ignore: avoid_print
+        print('[VPN] local rule-sets skipped: $e');
+      }
       final singBoxConfigJson = buildRuntimeSingBoxJson(
         config: config,
         service: serviceConfig,
+        localRulePaths: localRules,
       );
       final paramsJson = serviceConfig.toJsonStringWithSingBox(singBoxConfigJson);
 
@@ -101,6 +112,18 @@ class VpnController {
       return await _methodChannel.invokeMethod<String>('getLastError');
     } on PlatformException {
       return null;
+    }
+  }
+
+  /// Android Always-on "Block connections without VPN" — blocks excludeRoute.
+  Future<bool> isLockdownEnabled() async {
+    try {
+      final result = await _methodChannel.invokeMethod<bool>('isLockdownEnabled');
+      return result ?? false;
+    } on PlatformException {
+      return false;
+    } on MissingPluginException {
+      return false;
     }
   }
 

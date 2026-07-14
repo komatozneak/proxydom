@@ -280,8 +280,14 @@ abstract class AppL10n {
   /// No description provided for @homeIpUnavailable.
   ///
   /// In en, this message translates to:
-  /// **'Your IP: unavailable'**
+  /// **'Your IP: unavailable — tunnel has no internet'**
   String get homeIpUnavailable;
+
+  /// No description provided for @homeIpLockdownHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable Always-on “Block connections without VPN” in system VPN settings, then reconnect'**
+  String get homeIpLockdownHint;
 
   /// No description provided for @homeRegionAuto.
   ///
@@ -354,6 +360,12 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Failed to load servers: {error}'**
   String regionLoadError(String error);
+
+  /// No description provided for @regionLoadErrorAbort.
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot reach API — turn off Always-on VPN (and “Block without VPN”), then reopen the region list'**
+  String get regionLoadErrorAbort;
 
   /// No description provided for @regionEmpty.
   ///

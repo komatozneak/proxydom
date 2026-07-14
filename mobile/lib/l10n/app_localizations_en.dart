@@ -107,7 +107,12 @@ class AppL10nEn extends AppL10n {
   String get homeIpLoading => 'Your IP: …';
 
   @override
-  String get homeIpUnavailable => 'Your IP: unavailable';
+  String get homeIpUnavailable =>
+      'Your IP: unavailable — tunnel has no internet';
+
+  @override
+  String get homeIpLockdownHint =>
+      'Disable Always-on “Block connections without VPN” in system VPN settings, then reconnect';
 
   @override
   String get homeRegionAuto => 'Auto';
@@ -146,6 +151,10 @@ class AppL10nEn extends AppL10n {
   String regionLoadError(String error) {
     return 'Failed to load servers: $error';
   }
+
+  @override
+  String get regionLoadErrorAbort =>
+      'Cannot reach API — turn off Always-on VPN (and “Block without VPN”), then reopen the region list';
 
   @override
   String get regionEmpty => 'No servers available';

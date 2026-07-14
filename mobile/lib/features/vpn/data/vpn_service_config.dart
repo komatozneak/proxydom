@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../../../core/config.dart';
 import 'vpn_config.dart';
 
 /// Peer-адрес TUN (/30) для [VpnService.Builder.addDnsServer].
@@ -90,6 +91,21 @@ class VpnServiceConfig {
   /// Reality short ID (hex).
   final String? outboundTlsShortId;
 
+  /// Hosts that must stay off TUN (prod API, etc.) via Android [excludeRoute].
+  ///
+  /// Without this, Dio to `baseUrl` goes into a broken tunnel →
+  /// `Software caused connection abort` on `/vpn/nodes`.
+  List<String> get controlPlaneHosts {
+    final hosts = <String>{};
+    try {
+      final host = Uri.parse(AppConfig.baseUrl).host;
+      if (host.isNotEmpty) hosts.add(host);
+    } catch (_) {
+      // ignore malformed baseUrl in tests
+    }
+    return hosts.toList();
+  }
+
   /// Flat Map для MethodChannel.
   Map<String, dynamic> toMap() {
     return {
@@ -108,6 +124,7 @@ class VpnServiceConfig {
       'outboundTlsSni': outboundTlsSni,
       'outboundTlsPublicKey': outboundTlsPublicKey,
       'outboundTlsShortId': outboundTlsShortId,
+      'controlPlaneHosts': controlPlaneHosts,
     };
   }
 

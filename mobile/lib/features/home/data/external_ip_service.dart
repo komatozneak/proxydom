@@ -14,11 +14,22 @@ Future<String?> fetchExternalIp() async {
     ),
   );
   try {
-    final response = await dio.get<String>('https://ifconfig.me/ip');
+    // Prefer IPv4 for E2E checks (ifconfig.me may return VPS IPv6 first).
+    final response = await dio.get<String>(
+      'https://ipv4.icanhazip.com',
+      options: Options(followRedirects: true),
+    );
     final ip = response.data?.trim();
     if (ip == null || ip.isEmpty) return null;
     return ip;
   } on DioException {
-    return null;
+    try {
+      final fallback = await dio.get<String>('https://ifconfig.me/ip');
+      final ip = fallback.data?.trim();
+      if (ip == null || ip.isEmpty) return null;
+      return ip;
+    } on DioException {
+      return null;
+    }
   }
 }

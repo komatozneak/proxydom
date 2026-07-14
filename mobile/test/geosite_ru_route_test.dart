@@ -44,11 +44,16 @@ VpnConfig _sampleVpnConfig({String server = '204.11.2.216'}) {
 }
 
 void main() {
-  test('geosite/geoip RU rule-sets route to direct before FakeIP proxy', () {
+  test('local RU rule-sets route to direct before final proxy', () {
     final json = jsonDecode(
       buildRuntimeSingBoxJson(
         config: _sampleVpnConfig(),
         service: VpnServiceConfig.fromVpnConfig(_sampleVpnConfig()),
+        localRulePaths: {
+          'geosite-category-ru': '/tmp/geosite-category-ru.srs',
+          'geosite-tld-ru': '/tmp/geosite-tld-ru.srs',
+          'geoip-ru': '/tmp/geoip-ru.srs',
+        },
       ),
     ) as Map<String, dynamic>;
 
@@ -63,6 +68,10 @@ void main() {
         'geosite-tld-ru',
         'geoip-ru',
       ]),
+    );
+    expect(
+      ruleSets.every((e) => (e as Map)['type'] == 'local'),
+      isTrue,
     );
 
     final directRuleSets = rules
@@ -79,18 +88,7 @@ void main() {
       ]),
     );
 
-    final fakeIpIdx = rules.indexWhere(
-      (r) =>
-          r is Map &&
-          r['ip_cidr'] is List &&
-          (r['ip_cidr'] as List).contains(fakeIpV4Range),
-    );
-    final categoryIdx = rules.indexWhere(
-      (r) => r is Map && r['rule_set'] == 'geosite-category-ru',
-    );
-    expect(categoryIdx, lessThan(fakeIpIdx));
-
-    final experimental = json['experimental'] as Map<String, dynamic>;
-    expect(experimental['cache_file']['enabled'], isTrue);
+    expect(route['final'], 'proxy');
+    expect(jsonEncode(json).contains('githubusercontent'), isFalse);
   });
 }

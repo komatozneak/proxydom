@@ -68,10 +68,13 @@ jobs:
       - name: Verify minSdk = 23
         working-directory: mobile
         run: |
-          if grep -q "minSdk = ${{ env.MIN_SDK }}" android/app/build.gradle.kts; then
-            echo "minSdk OK"
+          # minSdk enforced via androidComponents.finalizeDsl (Flutter tooling
+          # rewrites a literal `minSdk = 23` back to flutter.minSdkVersion).
+          if grep -q "requiredMinSdk = ${{ env.MIN_SDK }}" android/app/build.gradle.kts \
+            && grep -q "finalizeDsl" android/app/build.gradle.kts; then
+            echo "minSdk enforcement OK (finalizeDsl -> ${{ env.MIN_SDK }})"
           else
-            echo "minSdk reverted! Flutter plugin override detected."
+            echo "minSdk enforcement missing! finalizeDsl hook removed or requiredMinSdk changed."
             exit 1
           fi
 

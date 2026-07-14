@@ -15,6 +15,11 @@ val keystoreProperties = Properties().apply {
     }
 }
 
+// libbox.aar (sing-box JNI) declares minSdk 23; VpnService.Builder.establish
+// also requires it. Flutter tooling rewrites the literal in defaultConfig back
+// to flutter.minSdkVersion (21), so the real enforcement is finalizeDsl below.
+val requiredMinSdk = 23
+
 android {
     namespace = "com.teremok.connect.teremok_connect"
     compileSdk = flutter.compileSdkVersion
@@ -31,10 +36,8 @@ android {
 
     defaultConfig {
         applicationId = "com.teremok.connect.teremok_connect"
-        // Жёстко фиксируем minSdk = 23 для VpnService.Builder.establish.
-        // Flutter plugin иногда откатывает на flutter.minSdkVersion — поэтому
-        // повторяем после каждого `flutter build apk` / `flutter run`.
-        minSdk = 23
+        // Placeholder only — finalizeDsl ниже поднимает до requiredMinSdk (23).
+        minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -86,6 +89,20 @@ android {
 
 flutter {
     source = "../.."
+}
+
+// AGP 8 locks the android DSL right after project evaluation, so a plain
+// afterEvaluate override is too late for the manifest merger (CI failed with
+// "minSdkVersion 21 cannot be smaller than 23 declared in libbox.aar").
+// finalizeDsl is the AGP-sanctioned last-write hook and survives Flutter's
+// build.gradle.kts rewrites because it never touches the literal above.
+androidComponents {
+    finalizeDsl { extension ->
+        val current = extension.defaultConfig.minSdk ?: 0
+        if (current < requiredMinSdk) {
+            extension.defaultConfig.minSdk = requiredMinSdk
+        }
+    }
 }
 
 dependencies {
