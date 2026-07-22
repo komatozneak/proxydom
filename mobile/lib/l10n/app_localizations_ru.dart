@@ -78,6 +78,59 @@ class AppL10nRu extends AppL10n {
   String get homeSettings => 'Настройки';
 
   @override
+  String get settingsTitle => 'Настройки';
+
+  @override
+  String get settingsSendReport => 'Отправить отчёт';
+
+  @override
+  String get settingsSendReportHint =>
+      'Отправляется владельцу для отладки. Номер телефона маскируется на сервере.';
+
+  @override
+  String get settingsSendReportConfirm => 'Отправить';
+
+  @override
+  String get settingsReportSent => 'Отчёт отправлен';
+
+  @override
+  String settingsReportFailed(String error) {
+    return 'Не удалось отправить отчёт: $error';
+  }
+
+  @override
+  String get settingsVpnNotificationTitle => 'Уведомление в шторке';
+
+  @override
+  String get settingsVpnNotificationHint =>
+      'Подробная карточка: регион, скорость, отключение';
+
+  @override
+  String get settingsQsTileTitle => 'Плитка в шторке';
+
+  @override
+  String get settingsQsTileHint =>
+      'Быстрое подключение и отключение из панели быстрых настроек Android';
+
+  @override
+  String get settingsQsTileAdd => 'Добавить в шторку';
+
+  @override
+  String get settingsQsTileAddHint =>
+      'Показать системный запрос на добавление плитки';
+
+  @override
+  String get settingsQsTileAdded => 'Плитка добавлена в шторку';
+
+  @override
+  String get settingsQsTileAlreadyAdded =>
+      'Плитка уже в шторке — откройте панель и пролистайте';
+
+  @override
+  String get settingsQsTileManual =>
+      'Добавьте вручную: шторка → карандаш → «Теремок VPN»';
+
+  @override
   String get homeAbout => 'О приложении';
 
   @override

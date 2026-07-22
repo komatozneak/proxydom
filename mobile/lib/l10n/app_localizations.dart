@@ -235,6 +235,96 @@ abstract class AppL10n {
   /// **'Settings'**
   String get homeSettings;
 
+  /// No description provided for @settingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get settingsTitle;
+
+  /// No description provided for @settingsSendReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Send diagnostic report'**
+  String get settingsSendReport;
+
+  /// No description provided for @settingsSendReportHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent to the owner for debugging. Your phone number is masked on the server.'**
+  String get settingsSendReportHint;
+
+  /// No description provided for @settingsSendReportConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get settingsSendReportConfirm;
+
+  /// No description provided for @settingsReportSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Report sent'**
+  String get settingsReportSent;
+
+  /// No description provided for @settingsReportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to send report: {error}'**
+  String settingsReportFailed(String error);
+
+  /// No description provided for @settingsVpnNotificationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Shade notification'**
+  String get settingsVpnNotificationTitle;
+
+  /// No description provided for @settingsVpnNotificationHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Detailed card: region, speed, disconnect'**
+  String get settingsVpnNotificationHint;
+
+  /// No description provided for @settingsQsTileTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick Settings tile'**
+  String get settingsQsTileTitle;
+
+  /// No description provided for @settingsQsTileHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect and disconnect from the Android Quick Settings shade'**
+  String get settingsQsTileHint;
+
+  /// No description provided for @settingsQsTileAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to Quick Settings'**
+  String get settingsQsTileAdd;
+
+  /// No description provided for @settingsQsTileAddHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Show the system prompt to pin the tile'**
+  String get settingsQsTileAddHint;
+
+  /// No description provided for @settingsQsTileAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Tile added to Quick Settings'**
+  String get settingsQsTileAdded;
+
+  /// No description provided for @settingsQsTileAlreadyAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Tile already in Quick Settings — open the shade and scroll'**
+  String get settingsQsTileAlreadyAdded;
+
+  /// No description provided for @settingsQsTileManual.
+  ///
+  /// In en, this message translates to:
+  /// **'Add manually: shade → pencil → “Teremok VPN”'**
+  String get settingsQsTileManual;
+
   /// No description provided for @homeAbout.
   ///
   /// In en, this message translates to:

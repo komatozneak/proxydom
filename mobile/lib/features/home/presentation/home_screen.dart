@@ -16,6 +16,7 @@ import '../data/external_ip_service.dart';
 import '../../../../app.dart';
 import '../../../../core/widgets/app_icon.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../settings/presentation/settings_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -162,9 +163,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     icon: AppIcons.settings,
                     label: l.homeSettings,
                     onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Settings — out of MVP'),
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const SettingsScreen(),
                         ),
                       );
                     },
@@ -268,7 +269,8 @@ class _StatusIndicator extends ConsumerWidget {
           ),
         );
       case VpnConnected():
-        final host = vpnConfig?.singBoxConfig.primaryOutbound?.server;
+        final host = vpnConfig?.expectedEgressHost ??
+            vpnConfig?.singBoxConfig.primaryOutbound?.server;
         color = theme.colorScheme.primary;
         label = l.homeConnected;
         child = AppIcon(AppIcons.shield, size: 96, color: color);

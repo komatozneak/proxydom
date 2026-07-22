@@ -12,7 +12,9 @@ import '../../vpn/data/node_display.dart';
 import '../../vpn/data/vpn_config.dart';
 import '../../vpn/data/vpn_config_repository.dart';
 import '../../vpn/data/vpn_controller.dart';
+import '../../vpn/data/vpn_node.dart';
 import '../../vpn/data/vpn_nodes_repository.dart';
+import '../../vpn/data/vpn_service_config.dart';
 import 'vpn_status.dart';
 
 /// Singleton-репозиторий для VPN-конфига.
@@ -36,6 +38,9 @@ const _connectedSinceKey = 'vpn_connected_since_ms';
 /// VPN-контроллер. Шаг 16: retry/reconnect логика поверх VpnController + native.
 class VpnNotifier extends Notifier<VpnStatus> {
   VpnConfig? _config;
+
+  /// Label from catalog after Auto/manual pick (overrides generic host fallback).
+  String? _displayLabel;
 
   /// Последний полученный конфиг. Доступен из UI для preview.
   VpnConfig? get config => _config;
@@ -74,9 +79,13 @@ class VpnNotifier extends Notifier<VpnStatus> {
     if (state is VpnConnected && !freshSession) {
       return;
     }
-    final serverName = _config?.username ?? 'unknown';
-    final protocol =
-        _config?.singBoxConfig.primaryOutbound?.type ?? 'unknown';
+    final config = _config;
+    final serverName = config != null
+        ? resolveVpnDisplayLabel(config, displayLabel: _displayLabel)
+        : kVpnBrandSessionName;
+    final protocol = friendlyProtocolLabel(
+      config?.singBoxConfig.primaryOutbound?.type,
+    );
     final since = await _resolveConnectedSince(freshSession: freshSession);
     state = VpnConnected(
       serverName: serverName,
@@ -138,6 +147,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
       state = const VpnDisconnected();
     }
     _config = null;
+    _displayLabel = null;
     _statusSubscription?.cancel();
     _statusSubscription = null;
     _reconnectTimer?.cancel();
@@ -167,9 +177,11 @@ class VpnNotifier extends Notifier<VpnStatus> {
     }
 
     String? apiNodeId = selected;
+    _displayLabel = null;
+    List<VpnNode>? catalog;
     if (selected == kRegionAutoId) {
       try {
-        final catalog = await nodesRepo.listNodes();
+        catalog = await nodesRepo.listNodes();
         apiNodeId = await resolveNodeIdForConfig(
           storedId: kRegionAutoId,
           catalog: catalog,
@@ -183,10 +195,12 @@ class VpnNotifier extends Notifier<VpnStatus> {
       }
     }
 
+    _displayLabel = await _labelForNodeId(apiNodeId, catalog: catalog);
+
     return _retryPolicy.execute(
       () => ref.read(vpnConfigRepositoryProvider).getConfig(
             forceRefresh: nodeId != null,
-            nodeId: apiNodeId,
+            nodeId: apiNodeId == kRegionAutoId ? null : apiNodeId,
           ),
       shouldRetry: (e) async {
         if (e is DioException) {
@@ -203,6 +217,24 @@ class VpnNotifier extends Notifier<VpnStatus> {
         print('[VPN] fetchConfig retry $attempt after error: $e');
       },
     );
+  }
+
+  /// Friendly title from `/vpn/nodes` catalog (Auto pick or manual region).
+  Future<String?> _labelForNodeId(
+    String? nodeId, {
+    List<VpnNode>? catalog,
+  }) async {
+    if (nodeId == null || nodeId.isEmpty || nodeId == kRegionAutoId) {
+      return null;
+    }
+    try {
+      final nodes = catalog ?? await ref.read(vpnNodesRepositoryProvider).listNodes();
+      final index = nodes.indexWhere((n) => n.id == nodeId);
+      if (index < 0) return null;
+      return placeForNode(nodes[index], index: index).title;
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Persist region and refresh cached config (disconnect → fetch → reconnect).
@@ -257,6 +289,8 @@ class VpnNotifier extends Notifier<VpnStatus> {
         state = const VpnError(message: 'VPN permission denied');
         return;
       }
+      // Android 13+: without this the Amnezia-style VPN card stays hidden.
+      await VpnController.instance.requestNotificationPermission();
       state = const VpnConnecting(progress: 0.5);
 
       // Подписка до start — иначе пропускаем connected из EventChannel.
@@ -264,7 +298,10 @@ class VpnNotifier extends Notifier<VpnStatus> {
 
       // 3. Стартуем VpnService (через MethodChannel) с retry на transient
       final started = await _retryPolicy.execute(
-        () => VpnController.instance.start(_config!),
+        () => VpnController.instance.start(
+          _config!,
+          displayLabel: _displayLabel,
+        ),
         shouldRetry: (e) async => e is! VpnControllerException,
         onRetry: (attempt, e) {
           // ignore: avoid_print

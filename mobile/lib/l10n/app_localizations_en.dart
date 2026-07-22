@@ -78,6 +78,58 @@ class AppL10nEn extends AppL10n {
   String get homeSettings => 'Settings';
 
   @override
+  String get settingsTitle => 'Settings';
+
+  @override
+  String get settingsSendReport => 'Send diagnostic report';
+
+  @override
+  String get settingsSendReportHint =>
+      'Sent to the owner for debugging. Your phone number is masked on the server.';
+
+  @override
+  String get settingsSendReportConfirm => 'Send';
+
+  @override
+  String get settingsReportSent => 'Report sent';
+
+  @override
+  String settingsReportFailed(String error) {
+    return 'Failed to send report: $error';
+  }
+
+  @override
+  String get settingsVpnNotificationTitle => 'Shade notification';
+
+  @override
+  String get settingsVpnNotificationHint =>
+      'Detailed card: region, speed, disconnect';
+
+  @override
+  String get settingsQsTileTitle => 'Quick Settings tile';
+
+  @override
+  String get settingsQsTileHint =>
+      'Connect and disconnect from the Android Quick Settings shade';
+
+  @override
+  String get settingsQsTileAdd => 'Add to Quick Settings';
+
+  @override
+  String get settingsQsTileAddHint => 'Show the system prompt to pin the tile';
+
+  @override
+  String get settingsQsTileAdded => 'Tile added to Quick Settings';
+
+  @override
+  String get settingsQsTileAlreadyAdded =>
+      'Tile already in Quick Settings — open the shade and scroll';
+
+  @override
+  String get settingsQsTileManual =>
+      'Add manually: shade → pencil → “Teremok VPN”';
+
+  @override
   String get homeAbout => 'About';
 
   @override

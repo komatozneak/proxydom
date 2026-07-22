@@ -7,6 +7,7 @@ import '../features/auth/application/auth_state.dart';
 import '../features/auth/presentation/login_screen.dart';
 import '../features/auth/presentation/verify_screen.dart';
 import '../features/home/presentation/home_screen.dart';
+import '../features/settings/presentation/settings_screen.dart';
 
 /// Роутер приложения.
 ///
@@ -38,6 +39,7 @@ class AppRouter {
       final goingToLogin = loc == '/login';
       final goingToVerify = loc.startsWith('/verify');
       final goingToHome = loc == '/home';
+      final goingToSettings = loc == '/settings';
 
       final isAuthed = auth is AuthStateAuthenticated;
 
@@ -47,10 +49,10 @@ class AppRouter {
       if (!isAuthed && !goingToLogin && !goingToVerify) {
         return '/login'; // back-button protection: не пускаем на /home
       }
-      if (isAuthed && goingToHome) {
-        return null; // уже на home
+      if (isAuthed && (goingToHome || goingToSettings)) {
+        return null; // уже на home/settings
       }
-      if (isAuthed && !goingToHome) {
+      if (isAuthed && !goingToHome && !goingToSettings) {
         return '/home';
       }
       return null;
@@ -64,6 +66,7 @@ class AppRouter {
         ),
       ),
       GoRoute(path: '/home', builder: (c, s) => const HomeScreen()),
+      GoRoute(path: '/settings', builder: (c, s) => const SettingsScreen()),
     ],
   );
 

@@ -14,8 +14,13 @@
 class AppConfig {
   AppConfig._();
 
-  /// Production backend на Yottasrc VPS (ADR-001 gate smoke).
-  static const String vpsBaseUrl = 'http://204.11.2.216:8080/api/v1';
+  /// Production backend — HTTPS via Caddy :8443 (Reality keeps :443).
+  static const String vpsBaseUrl =
+      'https://api.teremokconnect.online:8443/api/v1';
+
+  /// Known A-record for [vpsBaseUrl] host — used for TUN exclude / sing-box
+  /// direct CIDR (hostname/32 is invalid).
+  static const String vpsIpv4 = '204.11.2.216';
 
   /// Базовый URL API (с /api/v1 на конце) — dev defaults.
   static const String androidBaseUrl = 'http://10.0.2.2:8000/api/v1';

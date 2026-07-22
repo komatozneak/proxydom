@@ -1,9 +1,14 @@
 package com.teremok.connect.teremok_connect
 
+import android.Manifest
 import android.app.Activity
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.VpnService
+import android.os.Build
 import android.util.Log
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -12,27 +17,27 @@ class MainActivity : FlutterActivity() {
     companion object {
         private const val TAG = "MainActivity"
         private const val REQUEST_VPN_PERMISSION = 1001
+        private const val REQUEST_POST_NOTIFICATIONS = 1002
     }
-
-    /**
-     * Текущий инстанс сервиса. На этом шаге сервис создаётся через
-     * startService() (см. VpnChannelRegistry.start/stop), поэтому
-     * ссылка может быть null — getStatus() вернёт "idle".
-     * В Шаге 14 заменим на реальный binding через IBinder.
-     */
-    @Volatile
-    private var activeService: TeremokVpnService? = null
 
     @Volatile
     private var pendingPermissionResult: MethodChannel.Result? = null
 
+    @Volatile
+    private var pendingNotificationResult: MethodChannel.Result? = null
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        VpnStatusBroadcaster.attachAppContext(applicationContext)
+        // Prompt early so FGS notification is visible when VPN connects.
+        ensureNotificationPermission(null)
 
         VpnChannelRegistry.register(
             engine = flutterEngine,
             appContext = applicationContext,
-            serviceProvider = { activeService },
+            activityProvider = { this },
+            serviceProvider = { TeremokVpnService.currentInstance() },
             onPermissionRequest = { result ->
                 val prepareIntent: Intent? = TeremokVpnService.prepareVpn(this)
                 if (prepareIntent == null) {
@@ -51,7 +56,56 @@ class MainActivity : FlutterActivity() {
                     }
                 }
             },
+            onNotificationPermissionRequest = { result ->
+                ensureNotificationPermission(result)
+            },
         )
+    }
+
+    /** Android 13+: runtime POST_NOTIFICATIONS so VPN card appears in the shade. */
+    private fun ensureNotificationPermission(result: MethodChannel.Result?) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            result?.success(true)
+            return
+        }
+        val granted = ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.POST_NOTIFICATIONS,
+        ) == PackageManager.PERMISSION_GRANTED
+        if (granted) {
+            result?.success(true)
+            return
+        }
+        if (result != null) {
+            if (pendingNotificationResult != null) {
+                result.error("busy", "notification permission request in progress", null)
+                return
+            }
+            pendingNotificationResult = result
+        }
+        Log.i(TAG, "Requesting POST_NOTIFICATIONS")
+        ActivityCompat.requestPermissions(
+            this,
+            arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+            REQUEST_POST_NOTIFICATIONS,
+        )
+        if (result == null) {
+            // Fire-and-forget from configureFlutterEngine — no Flutter Result to fill.
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray,
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode != REQUEST_POST_NOTIFICATIONS) return
+        val granted = grantResults.isNotEmpty() &&
+            grantResults[0] == PackageManager.PERMISSION_GRANTED
+        Log.i(TAG, "POST_NOTIFICATIONS granted=$granted")
+        pendingNotificationResult?.success(granted)
+        pendingNotificationResult = null
     }
 
     @Suppress("DEPRECATION")

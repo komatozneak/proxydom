@@ -6,6 +6,7 @@ import 'vpn_config.dart';
 import 'vpn_service_config.dart';
 import 'sing_box_runtime_config.dart';
 import 'vpn_rule_sets.dart';
+import 'vpn_session_meta.dart';
 
 /// Контроллер VPN-сессии — мост между Flutter UI и Android VpnService.
 ///
@@ -30,23 +31,35 @@ class VpnController {
   ///
   /// Преобразует [VpnConfig] в [VpnServiceConfig] (с дефолтами для dev)
   /// и передаёт как JSON-строку в нативный код через MethodChannel.
-  Future<bool> start(VpnConfig config) async {
+  ///
+  /// [displayLabel] — явная подпись региона/ноды (например после Авто-пика).
+  Future<bool> start(VpnConfig config, {String? displayLabel}) async {
     try {
       final outbound = config.singBoxConfig.primaryOutbound;
       if (outbound == null) {
         throw VpnControllerException('sing-box config has no outbounds');
       }
 
-      final serviceConfig = VpnServiceConfig.fromVpnConfig(config);
+      final serviceConfig = VpnServiceConfig.fromVpnConfig(
+        config,
+        displayLabel: displayLabel,
+      );
       // Bundled .srs — never download from GitHub at connect time (RF blocks).
       Map<String, String> localRules = const {};
+      var ruRulesLoaded = false;
       try {
         localRules = await prepareLocalRuleSetPaths();
+        ruRulesLoaded = localRules.length == kRuleSetAssets.length;
       } catch (e) {
         // Unit tests lack path_provider; connect still works without RU split.
         // ignore: avoid_print
         print('[VPN] local rule-sets skipped: $e');
       }
+      await VpnSessionMeta.saveConnectMeta(
+        ruRulesLoaded: ruRulesLoaded,
+        ruRuleTags: localRules.keys.toList(),
+        expectedEgressHost: config.expectedEgressHost,
+      );
       final singBoxConfigJson = buildRuntimeSingBoxJson(
         config: config,
         service: serviceConfig,
@@ -115,6 +128,33 @@ class VpnController {
     }
   }
 
+  /// Last N lines of sing-box stderr log (Android libbox working dir).
+  Future<String?> getSingBoxStderrTail({int maxLines = 30}) async {
+    try {
+      return await _methodChannel.invokeMethod<String>(
+        'getSingBoxStderrTail',
+        {'maxLines': maxLines},
+      );
+    } on PlatformException {
+      return null;
+    } on MissingPluginException {
+      return null;
+    }
+  }
+
+  /// Underlying cellular/Wi‑Fi interface name while VPN is up (Android).
+  Future<String?> getUnderlyingNetworkInterface() async {
+    try {
+      return await _methodChannel.invokeMethod<String>(
+        'getUnderlyingNetworkInterface',
+      );
+    } on PlatformException {
+      return null;
+    } on MissingPluginException {
+      return null;
+    }
+  }
+
   /// Android Always-on "Block connections without VPN" — blocks excludeRoute.
   Future<bool> isLockdownEnabled() async {
     try {
@@ -124,6 +164,19 @@ class VpnController {
       return false;
     } on MissingPluginException {
       return false;
+    }
+  }
+
+  /// Android 13+: ask for POST_NOTIFICATIONS so VPN shade card is visible.
+  Future<bool> requestNotificationPermission() async {
+    try {
+      final result =
+          await _methodChannel.invokeMethod<bool>('requestNotificationPermission');
+      return result ?? true;
+    } on PlatformException {
+      return false;
+    } on MissingPluginException {
+      return true;
     }
   }
 

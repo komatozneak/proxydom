@@ -306,7 +306,9 @@ void main() {
         final paramsString = args['paramsJson'] as String;
         final params = VpnServiceConfig.fromVpnConfig(config).toMap();
         // sanity: обязательные поля
-        expect(params['sessionName'], 'Teremok VPN (test_user)');
+        expect(params['sessionName'], 'Теремок VPN');
+        expect(params['displayLabel'], 'Теремок VPN');
+        expect(params['outboundType'], 'vless');
         expect(params['mtu'], 1500);
         expect(params['address'], '10.255.255.1');
         expect(params['addressPrefix'], 30);
@@ -361,7 +363,9 @@ void main() {
       expect(service.dnsServers, ['10.255.255.2']);
       expect(service.outboundServer, 'unknown');
       expect(service.outboundServerPort, 443);
-      expect(service.sessionName, 'Teremok VPN (test_user)');
+      expect(service.sessionName, 'Теремок VPN');
+      expect(service.displayLabel, 'Теремок VPN');
+      expect(service.outboundType, 'vless');
     });
 
     test('fromVpnConfig использует inbound и outbound из JSON', () {
@@ -406,12 +410,93 @@ void main() {
       expect(service.addressPrefix, 24);
       expect(service.routes, contains('0.0.0.0/0'));
       expect(service.routes, isNot(contains('::/0')));
+      expect(service.sessionName, 'Теремок VPN');
+      expect(service.outboundType, 'vless');
       expect(service.outboundServer, 'real-server.example');
       expect(service.outboundServerPort, 8443);
       expect(service.outboundUuid, 'real-uuid-1234');
       expect(service.outboundTlsFingerprint, 'safari');
       expect(service.outboundTlsPublicKey, 'realpublickey123');
       expect(service.outboundTlsShortId, 'realshortid');
+    });
+
+    test('resolveVpnDisplayLabel: node_host maps to known place over outbound', () {
+      final config = VpnConfig.fromJson({
+        'username': 'u_3',
+        'links': const <String>[],
+        'expire': 1785654092,
+        'node_host': '185.139.228.192',
+        'sing_box_config': {
+          'log': {'level': 'info'},
+          'inbounds': const [],
+          'outbounds': [
+            {
+              'type': 'vless',
+              'tag': 'proxy',
+              'server': 'cdn-front.example',
+              'server_port': 443,
+              'uuid': 'uuid-1',
+            },
+          ],
+        },
+      });
+      expect(resolveVpnDisplayLabel(config), 'Нидерланды');
+      final service = VpnServiceConfig.fromVpnConfig(config);
+      expect(service.displayLabel, 'Нидерланды');
+      expect(service.sessionName, 'Теремок VPN');
+    });
+
+    test('resolveVpnDisplayLabel: unknown host is brand, not Сервер 1', () {
+      final config = VpnConfig.fromJson({
+        'username': 'u_3',
+        'links': const <String>[],
+        'expire': 1785654092,
+        'sing_box_config': {
+          'log': {'level': 'info'},
+          'inbounds': const [],
+          'outbounds': [
+            {
+              'type': 'vless',
+              'tag': 'proxy',
+              'server': 'unknown-vps.example',
+              'server_port': 443,
+              'uuid': 'uuid-1',
+            },
+          ],
+        },
+      });
+      expect(resolveVpnDisplayLabel(config), 'Теремок VPN');
+      expect(resolveVpnDisplayLabel(config), isNot(contains('Сервер')));
+      expect(
+        VpnServiceConfig.fromVpnConfig(config).displayLabel,
+        'Теремок VPN',
+      );
+    });
+
+    test('resolveVpnDisplayLabel: explicit displayLabel wins', () {
+      final config = VpnConfig.fromJson({
+        'username': 'u_3',
+        'links': const <String>[],
+        'expire': 1785654092,
+        'node_host': '185.139.228.192',
+        'sing_box_config': {
+          'log': {'level': 'info'},
+          'inbounds': const [],
+          'outbounds': [
+            {
+              'type': 'vless',
+              'tag': 'proxy',
+              'server': '185.139.228.192',
+              'server_port': 443,
+              'uuid': 'uuid-1',
+            },
+          ],
+        },
+      });
+      expect(
+        resolveVpnDisplayLabel(config, displayLabel: 'Авто · Германия'),
+        'Авто · Германия',
+      );
     });
 
     test('toMap() возвращает flat keys (без вложенного outbound)', () {
@@ -450,9 +535,13 @@ void main() {
   });
 
   test('AppConfig.vpsBaseUrl points to Yottasrc VPS prod backend', () {
-    expect(AppConfig.vpsBaseUrl, 'http://204.11.2.216:8080/api/v1');
-    expect(AppConfig.vpsBaseUrl, contains('204.11.2.216'));
+    expect(
+      AppConfig.vpsBaseUrl,
+      'https://api.teremokconnect.online:8443/api/v1',
+    );
+    expect(AppConfig.vpsBaseUrl, startsWith('https://'));
     expect(AppConfig.vpsBaseUrl, contains('/api/v1'));
+    expect(AppConfig.vpsIpv4, '204.11.2.216');
   });
 
   test('AppConfig dev switch via APP_ENV=dev dart-define', () {

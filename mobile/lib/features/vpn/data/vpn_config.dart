@@ -15,6 +15,7 @@ class VpnConfig {
     required this.links,
     required this.expire,
     required this.singBoxConfig,
+    this.nodeHost,
   });
 
   final String username;
@@ -22,7 +23,25 @@ class VpnConfig {
   final DateTime expire;
   final SingBoxConfig singBoxConfig;
 
+  /// Egress VPS host from `GET /vpn/config` (`node_host`).
+  final String? nodeHost;
+
+  /// Expected public egress IP/host for E2E checks (falls back to outbound server).
+  String? get expectedEgressHost {
+    final host = nodeHost?.trim();
+    if (host != null && host.isNotEmpty) return host;
+    final server = singBoxConfig.primaryOutbound?.server.trim();
+    if (server != null && server.isNotEmpty && server != 'unknown') {
+      return server;
+    }
+    return null;
+  }
+
   factory VpnConfig.fromJson(Map<String, dynamic> json) {
+    final singBox = SingBoxConfig.fromJson(
+      json['sing_box_config'] as Map<String, dynamic>,
+    );
+    final nodeHost = json['node_host'] as String?;
     return VpnConfig(
       username: json['username'] as String,
       links: (json['links'] as List).cast<String>(),
@@ -30,9 +49,10 @@ class VpnConfig {
         (json['expire'] as int) * 1000,
         isUtc: true,
       ),
-      singBoxConfig: SingBoxConfig.fromJson(
-        json['sing_box_config'] as Map<String, dynamic>,
-      ),
+      singBoxConfig: singBox,
+      nodeHost: nodeHost?.isNotEmpty == true
+          ? nodeHost
+          : singBox.primaryOutbound?.server,
     );
   }
 
@@ -41,6 +61,7 @@ class VpnConfig {
     'links': links,
     'expire': expire.millisecondsSinceEpoch ~/ 1000,
     'sing_box_config': singBoxConfig.toJson(),
+    if (nodeHost != null) 'node_host': nodeHost,
   };
 }
 

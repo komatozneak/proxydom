@@ -5,13 +5,13 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
     <application
-        android:label="Teremok Connect"
+        android:label="Теремок VPN"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:usesCleartextTraffic="true"
         android:allowBackup="false"
         android:fullBackupContent="false">
         <activity
@@ -37,17 +37,24 @@
             </intent-filter>
         </activity>
 
-        <!-- Шаг 11: Android VpnService скелет.
-             Реальный VPN-трафик (через sing-box) будет в Шаге 15. -->
+        <!-- VpnService as FGS specialUse (targetSdk 34+). systemExempted requires
+             privileged FOREGROUND_SERVICE_SYSTEM_EXEMPTED — crashes on normal apps. -->
         <service
             android:name=".TeremokVpnService"
             android:permission="android.permission.BIND_VPN_SERVICE"
             android:exported="false"
-            android:foregroundServiceType="systemExempted">
+            android:foregroundServiceType="specialUse">
             <intent-filter>
                 <action android:name="android.net.VpnService"/>
             </intent-filter>
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="vpn"/>
         </service>
+
+        <receiver
+            android:name=".VpnActionReceiver"
+            android:exported="false" />
 
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

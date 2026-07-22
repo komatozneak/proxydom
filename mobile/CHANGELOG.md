@@ -1,5 +1,12 @@
 # Changelog — Teremok Connect Mobile
 
+## v0.1.2 — diagnostics + VPN notification (2026-07-17)
+
+### Added
+- Extended beta diagnostic report (`external_ip`, `egress_ok`, `ru_rules_loaded`, libbox stderr, underlying network)
+- Settings screen with «Send report» → `POST /support/diagnostics` → Telegram
+- Android foreground notification (Amnezia-style): speeds ↑↓, session, «Отключиться» action
+
 ## v0.2.0 — libbox JNI tun2socks (2026-07-05)
 
 ### Added

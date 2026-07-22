@@ -1,7 +1,61 @@
 import 'dart:convert';
 
 import '../../../core/config.dart';
+import 'node_display.dart';
 import 'vpn_config.dart';
+
+/// User-facing brand name for VPN session / fallback labels (no Marzban id).
+const kVpnBrandSessionName = 'Теремок VPN';
+
+/// Normalize outbound type for native/UI (never `"unknown"`).
+String normalizeOutboundType(String? type) {
+  final t = (type ?? '').trim().toLowerCase();
+  if (t.isEmpty || t == 'unknown') return 'vless';
+  return t;
+}
+
+/// Protocol label for Home / notification (e.g. `VLESS`).
+String friendlyProtocolLabel(String? type) =>
+    normalizeOutboundType(type).toUpperCase();
+
+/// Human label for region/node; never Marzban `username`.
+///
+/// Order: explicit [displayLabel] → [VpnConfig.nodeHost] /
+/// [VpnConfig.expectedEgressHost] → outbound server → brand name.
+/// Avoids generic «Сервер N» when host is not in [kKnownNodePlaces].
+String resolveVpnDisplayLabel(VpnConfig config, {String? displayLabel}) {
+  final explicit = displayLabel?.trim();
+  if (explicit != null && explicit.isNotEmpty) return explicit;
+
+  final hosts = <String>{};
+  void addHost(String? value) {
+    final h = value?.trim();
+    if (h != null && h.isNotEmpty && h != 'unknown') {
+      hosts.add(h);
+    }
+  }
+
+  addHost(config.nodeHost);
+  addHost(config.expectedEgressHost);
+  addHost(config.singBoxConfig.primaryOutbound?.server);
+
+  for (final host in hosts) {
+    final known = kKnownNodePlaces[host];
+    if (known != null) return known.title;
+  }
+
+  for (final host in hosts) {
+    final place = placeForHost(host);
+    if (!_isGenericServerPlaceholder(place.title)) {
+      return place.title;
+    }
+  }
+
+  return kVpnBrandSessionName;
+}
+
+bool _isGenericServerPlaceholder(String title) =>
+    RegExp(r'^(Сервер|Server) \d+$').hasMatch(title);
 
 /// Peer-адрес TUN (/30) для [VpnService.Builder.addDnsServer].
 ///
@@ -38,6 +92,8 @@ String tunDnsPeerAddress(String address, int prefixLength) {
 class VpnServiceConfig {
   const VpnServiceConfig({
     required this.sessionName,
+    required this.displayLabel,
+    required this.outboundType,
     required this.mtu,
     required this.address,
     required this.addressPrefix,
@@ -53,8 +109,14 @@ class VpnServiceConfig {
     required this.outboundTlsShortId,
   });
 
-  /// Имя сессии для системного диалога ("Teremok VPN (username)").
+  /// Имя сессии для системного [VpnService.Builder.setSession] (без Marzban id).
   final String sessionName;
+
+  /// Человекочитаемая строка для уведомления (регион/нода).
+  final String displayLabel;
+
+  /// Нормализованный тип outbound (`vless`, …) — никогда `unknown`.
+  final String outboundType;
 
   /// MTU TUN-интерфейса (обычно 1500).
   final int mtu;
@@ -99,7 +161,15 @@ class VpnServiceConfig {
     final hosts = <String>{};
     try {
       final host = Uri.parse(AppConfig.baseUrl).host;
-      if (host.isNotEmpty) hosts.add(host);
+      if (host.isEmpty) {
+        // keep empty
+      } else if (RegExp(r'^(\d{1,3}\.){3}\d{1,3}$').hasMatch(host)) {
+        hosts.add(host);
+      } else if (host == 'api.teremokconnect.online' ||
+          host.endsWith('.teremokconnect.online')) {
+        // Android excludeRoute / TUN bypass need an IP, not a hostname.
+        hosts.add(AppConfig.vpsIpv4);
+      }
     } catch (_) {
       // ignore malformed baseUrl in tests
     }
@@ -110,6 +180,8 @@ class VpnServiceConfig {
   Map<String, dynamic> toMap() {
     return {
       'sessionName': sessionName,
+      'displayLabel': displayLabel,
+      'outboundType': outboundType,
       'mtu': mtu,
       'address': address,
       'addressPrefix': addressPrefix,
@@ -136,12 +208,17 @@ class VpnServiceConfig {
   String toJsonStringWithSingBox(String singBoxConfigJson) =>
       jsonEncode({...toMap(), 'singBoxConfigJson': singBoxConfigJson});
 
-  /// Парсинг из VpnConfig + username.
+  /// Парсинг из [VpnConfig] для native VpnService.
   ///
   /// Приоритет:
   /// 1. Реальный inbound из sing-box JSON (если есть inet4_address)
   /// 2. Дефолты для dev/test
-  factory VpnServiceConfig.fromVpnConfig(VpnConfig config) {
+  ///
+  /// [displayLabel] — опциональная подпись региона/ноды; иначе из host.
+  factory VpnServiceConfig.fromVpnConfig(
+    VpnConfig config, {
+    String? displayLabel,
+  }) {
     final inbound = config.singBoxConfig.inbounds.isNotEmpty
         ? config.singBoxConfig.inbounds.first
         : null;
@@ -182,7 +259,9 @@ class VpnServiceConfig {
     final dnsServers = [tunDnsPeerAddress(address, addressPrefix)];
 
     return VpnServiceConfig(
-      sessionName: 'Teremok VPN (${config.username})',
+      sessionName: kVpnBrandSessionName,
+      displayLabel: resolveVpnDisplayLabel(config, displayLabel: displayLabel),
+      outboundType: normalizeOutboundType(outbound?.type),
       mtu: 1500,
       address: address,
       addressPrefix: addressPrefix,

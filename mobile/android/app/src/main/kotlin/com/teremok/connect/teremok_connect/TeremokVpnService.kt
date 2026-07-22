@@ -37,7 +37,7 @@ class TeremokVpnService : VpnService() {
         /** Минимальный интервал между попытками start (debounce reconnect storm). */
         private const val START_DEBOUNCE_MS = 2000L
 
-        private const val PREFS_NAME = "teremok_vpn_session"
+        const val PREFS_NAME = "teremok_vpn_session"
         private const val KEY_PARAMS_JSON = "params_json"
         private const val KEY_USERNAME = "username"
         private const val KEY_PROTOCOL = "protocol"
@@ -46,15 +46,79 @@ class TeremokVpnService : VpnService() {
         @Volatile
         private var lastStartAttemptMs: Long = 0L
 
+        @Volatile
+        private var instance: TeremokVpnService? = null
+
+        fun currentInstance(): TeremokVpnService? = instance
+
         /** Получить системный Intent для запроса VPN-разрешения, или null если уже есть. */
         fun prepareVpn(context: android.content.Context): Intent? {
             return VpnService.prepare(context)
+        }
+
+        fun readSingBoxStderrTail(context: android.content.Context, maxLines: Int): String {
+            val file = java.io.File(context.filesDir, "sing-box/stderr.log")
+            if (!file.exists()) return "(none)"
+            return runCatching {
+                val lines = file.readLines()
+                if (lines.isEmpty()) "(empty)" else lines.takeLast(maxLines).joinToString("\n")
+            }.getOrElse { "(read error: ${it.message})" }
+        }
+
+        fun sessionPrefs(context: android.content.Context) =
+            context.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
+
+        /** Last successful connect params still on disk (survives intentional disconnect). */
+        fun hasPersistedParams(context: android.content.Context): Boolean {
+            val json = sessionPrefs(context).getString(KEY_PARAMS_JSON, null)
+            return !json.isNullOrBlank()
+        }
+
+        fun isVpnRunning(): Boolean {
+            val s = VpnStatusBroadcaster.currentStatus()
+            return s == "connected" || s == "connecting" || s == "preparing"
+        }
+
+        /**
+         * Start VPN from last saved params (Quick Settings tile / reconnect).
+         * Returns false if no params — caller should open the app.
+         */
+        fun startFromPersistedSession(context: android.content.Context): Boolean {
+            val store = sessionPrefs(context)
+            val paramsJson = store.getString(KEY_PARAMS_JSON, null)
+            if (paramsJson.isNullOrBlank()) {
+                Log.w(TAG, "startFromPersistedSession: no params")
+                return false
+            }
+            val username = store.getString(KEY_USERNAME, "anonymous") ?: "anonymous"
+            val protocol = store.getString(KEY_PROTOCOL, "unknown") ?: "unknown"
+            val intent = Intent(context, TeremokVpnService::class.java).apply {
+                action = ACTION_START
+                putExtra(EXTRA_USERNAME, username)
+                putExtra(EXTRA_PROTOCOL, protocol)
+                putExtra(EXTRA_PARAMS_JSON, paramsJson)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
+            return true
+        }
+
+        fun stopVpnService(context: android.content.Context) {
+            val intent = Intent(context, TeremokVpnService::class.java).apply {
+                action = ACTION_STOP
+            }
+            context.startService(intent)
         }
     }
 
     private var tunInterface: ParcelFileDescriptor? = null
     private var isRunning = false
     private var tunForwarder: TunForwarder? = null
+    private var trafficMonitor: VpnTrafficMonitor? = null
+    private var notificationSessionLine: String = "Теремок VPN"
 
     /**
      * Текущий статус сервиса для [VpnStatusBroadcaster].
@@ -67,6 +131,8 @@ class TeremokVpnService : VpnService() {
 
     override fun onCreate() {
         super.onCreate()
+        instance = this
+        VpnStatusBroadcaster.attachAppContext(applicationContext)
         currentStatus = "idle"
         VpnStatusBroadcaster.emit(currentStatus)
         Log.i(TAG, "onCreate: VpnService создан")
@@ -89,7 +155,8 @@ class TeremokVpnService : VpnService() {
             }
             ACTION_STOP -> {
                 Log.i(TAG, "onStartCommand: ACTION_STOP")
-                clearSession()
+                // Keep params_json so Quick Settings can reconnect without Flutter.
+                markSessionInactive()
                 stopVpn()
             }
             else -> {
@@ -113,6 +180,13 @@ class TeremokVpnService : VpnService() {
         Log.i(TAG, "persistSession: saved (${paramsJson.length} chars)")
     }
 
+    /** Intentional disconnect — keep last config for QS tile reconnect. */
+    private fun markSessionInactive() {
+        prefs().edit().putBoolean(KEY_ACTIVE, false).apply()
+        Log.i(TAG, "markSessionInactive: active=false (params retained)")
+    }
+
+    /** Wipe params (corrupt session / no usable JSON). */
     private fun clearSession() {
         prefs().edit().clear().apply()
         Log.i(TAG, "clearSession: wiped stored VPN params")
@@ -203,6 +277,32 @@ class TeremokVpnService : VpnService() {
     }
 
     /**
+     * User-facing notification subtitle: region/node label, optional protocol.
+     * Never Marzban username (`u_3`) or `UNKNOWN`.
+     */
+    private fun buildNotificationSessionLine(
+        params: Map<String, Any?>,
+        protocolExtra: String,
+    ): String {
+        val label = listOf(
+            params["displayLabel"] as? String,
+            params["sessionName"] as? String,
+        ).firstOrNull { !it.isNullOrBlank() } ?: "Теремок VPN"
+
+        val fromParams = (params["outboundType"] as? String)?.trim().orEmpty()
+        val proto = when {
+            fromParams.isNotEmpty() -> fromParams
+            else -> protocolExtra.trim()
+        }.lowercase()
+
+        return if (proto.isEmpty() || proto == "unknown") {
+            label
+        } else {
+            "$label · ${proto.uppercase()}"
+        }
+    }
+
+    /**
      * Создаёт TUN-интерфейс через Builder.establish() на основе распарсенных
      * параметров из sing-box config (см. [VpnServiceConfig.toJsonString] в Dart).
      *
@@ -231,13 +331,20 @@ class TeremokVpnService : VpnService() {
         }
         lastStartAttemptMs = now
 
+        notificationSessionLine = buildNotificationSessionLine(params, protocol)
+        startForeground(
+            VpnNotificationHelper.notificationId(),
+            VpnNotificationHelper.startConnecting(this),
+        )
+
         try {
             VpnStatusBroadcaster.clearError()
             currentStatus = "preparing"
             VpnStatusBroadcaster.emit(currentStatus)
 
             val sessionName = (params["sessionName"] as? String)
-                ?: "Teremok VPN ($username)"
+                ?.takeIf { it.isNotBlank() }
+                ?: "Теремок VPN"
             val mtu = (params["mtu"] as? Number)?.toInt() ?: 1500
             val address = (params["address"] as? String) ?: "10.255.255.1"
             val addressPrefix = (params["addressPrefix"] as? Number)?.toInt() ?: 30
@@ -381,6 +488,8 @@ class TeremokVpnService : VpnService() {
 
             currentStatus = "connected"
             VpnStatusBroadcaster.emit(currentStatus)
+            showConnectedNotification()
+            startTrafficMonitor()
             Log.i(TAG, "startVpn: TUN interface established (protocol=$protocol)")
         } catch (e: Exception) {
             Log.e(TAG, "startVpn: failed", e)
@@ -405,6 +514,7 @@ class TeremokVpnService : VpnService() {
         try {
             currentStatus = "disconnecting"
             VpnStatusBroadcaster.emit(currentStatus)
+            stopTrafficMonitor()
             // Сначала останавливаем sing-box, потом forwarder, потом закрываем TUN
             SingBoxBridge.instance.stop()
             tunForwarder?.stop()
@@ -419,8 +529,65 @@ class TeremokVpnService : VpnService() {
             isRunning = false
             currentStatus = "idle"
             VpnStatusBroadcaster.emit(currentStatus)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+            } else {
+                @Suppress("DEPRECATION")
+                stopForeground(true)
+            }
             stopSelf()
         }
+    }
+
+    private fun showConnectedNotification(
+        downText: String = "",
+        upText: String = "",
+    ) {
+        val notification = VpnNotificationHelper.buildConnected(
+            context = this,
+            sessionLine = notificationSessionLine,
+            downText = downText,
+            upText = upText,
+        )
+        startForeground(VpnNotificationHelper.notificationId(), notification)
+    }
+
+    /** Settings toggled detailed shade card — refresh FGS notification style. */
+    fun onNotificationStyleChanged() {
+        if (currentStatus != "connected" && currentStatus != "connecting" &&
+            currentStatus != "preparing"
+        ) {
+            return
+        }
+        if (VpnNotificationHelper.isDetailedEnabled(this) && currentStatus == "connected") {
+            startTrafficMonitor()
+            showConnectedNotification()
+        } else {
+            stopTrafficMonitor()
+            if (currentStatus == "connected") {
+                showConnectedNotification()
+            } else {
+                startForeground(
+                    VpnNotificationHelper.notificationId(),
+                    VpnNotificationHelper.startConnecting(this),
+                )
+            }
+        }
+    }
+
+    private fun startTrafficMonitor() {
+        stopTrafficMonitor()
+        if (!VpnNotificationHelper.isDetailedEnabled(this)) return
+        trafficMonitor = VpnTrafficMonitor(this) { down, up ->
+            if (currentStatus == "connected") {
+                showConnectedNotification(downText = down, upText = up)
+            }
+        }.also { it.start() }
+    }
+
+    private fun stopTrafficMonitor() {
+        trafficMonitor?.stop()
+        trafficMonitor = null
     }
 
     override fun onRevoke() {
@@ -433,6 +600,7 @@ class TeremokVpnService : VpnService() {
 
     override fun onDestroy() {
         Log.i(TAG, "onDestroy: VpnService уничтожен")
+        if (instance === this) instance = null
         stopVpn()
         super.onDestroy()
     }
@@ -449,8 +617,10 @@ object VpnChannelRegistry {
     fun register(
         engine: FlutterEngine,
         appContext: android.content.Context,
+        activityProvider: () -> android.app.Activity?,
         serviceProvider: () -> TeremokVpnService?,
         onPermissionRequest: (MethodChannel.Result) -> Unit,
+        onNotificationPermissionRequest: (MethodChannel.Result) -> Unit = {},
     ) {
         // MethodChannel — команды от Flutter
         MethodChannel(engine.dartExecutor.binaryMessenger, METHOD_CHANNEL)
@@ -459,18 +629,16 @@ object VpnChannelRegistry {
                     "start" -> {
                         // paramsJson — JSON-строка с flat keys (см. VpnServiceConfig)
                         val paramsJson = call.argument<String>("paramsJson") ?: "{}"
-                        // username и protocol — для удобства логирования (можно вытащить
-                        // и из JSON, но проще держать отдельно для теста)
+                        val json = try {
+                            JSONObject(paramsJson)
+                        } catch (e: Exception) {
+                            JSONObject()
+                        }
+                        // username — только для логов; UI берёт displayLabel / sessionName
                         val username = call.argument<String>("username")
-                            ?: try {
-                                JSONObject(paramsJson).optString("sessionName", "anonymous")
-                                    .removePrefix("Teremok VPN (")
-                                    .removeSuffix(")")
-                            } catch (e: Exception) { "anonymous" }
+                            ?: json.optString("username", "").ifBlank { "anonymous" }
                         val protocol = call.argument<String>("protocol")
-                            ?: try {
-                                JSONObject(paramsJson).optString("outboundType", "unknown")
-                            } catch (e: Exception) { "unknown" }
+                            ?: json.optString("outboundType", "").ifBlank { "vless" }
 
                         val intent = Intent(
                             appContext,
@@ -511,8 +679,30 @@ object VpnChannelRegistry {
                         }.getOrDefault(false)
                         result.success(locked)
                     }
+                    "getSingBoxStderrTail" -> {
+                        val maxLines = call.argument<Int>("maxLines") ?: 30
+                        result.success(
+                            TeremokVpnService.readSingBoxStderrTail(appContext, maxLines),
+                        )
+                    }
+                    "getUnderlyingNetworkInterface" -> {
+                        result.success(DefaultNetworkMonitor.currentInterfaceName ?: "(unknown)")
+                    }
                     "requestPermission" -> {
                         onPermissionRequest(result)
+                    }
+                    "requestNotificationPermission" -> {
+                        onNotificationPermissionRequest(result)
+                    }
+                    "isVpnNotificationDetailedEnabled" -> {
+                        result.success(VpnNotificationHelper.isDetailedEnabled(appContext))
+                    }
+                    "setVpnNotificationDetailedEnabled" -> {
+                        val enabled = call.argument<Boolean>("enabled") ?: true
+                        VpnNotificationHelper.setDetailedEnabled(appContext, enabled)
+                        val svc = serviceProvider() ?: TeremokVpnService.currentInstance()
+                        svc?.onNotificationStyleChanged()
+                        result.success(true)
                     }
                     else -> result.notImplemented()
                 }
@@ -796,7 +986,14 @@ object VpnStatusBroadcaster {
     @Volatile
     private var lastErrorMessage: String? = null
 
+    @Volatile
+    private var appContext: android.content.Context? = null
+
     private val mainHandler = Handler(Looper.getMainLooper())
+
+    fun attachAppContext(context: android.content.Context) {
+        appContext = context.applicationContext
+    }
 
     fun currentStatus(): String = lastStatus
 
@@ -828,12 +1025,14 @@ object VpnStatusBroadcaster {
 
     fun emit(status: String) {
         lastStatus = status
-        val current = sink ?: return
         mainHandler.post {
-            try {
-                current.success(status)
-            } catch (e: Exception) {
-                Log.w(TeremokVpnService.TAG, "VpnStatusBroadcaster.emit failed: ${e.message}")
+            val current = sink
+            if (current != null) {
+                try {
+                    current.success(status)
+                } catch (e: Exception) {
+                    Log.w(TeremokVpnService.TAG, "VpnStatusBroadcaster.emit failed: ${e.message}")
+                }
             }
         }
     }

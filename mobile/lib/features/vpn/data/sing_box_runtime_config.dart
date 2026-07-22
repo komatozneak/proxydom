@@ -30,12 +30,13 @@ String buildRuntimeSingBoxJson({
   outboundJson.putIfAbsent('network', () => 'tcp');
 
   final directCidrs = <String>{
-    if (serverHost.isNotEmpty && serverHost != 'unknown') '$serverHost/32',
-    ...service.controlPlaneHosts.map((h) => '$h/32'),
+    if (_ipv4Cidr(serverHost) != null) _ipv4Cidr(serverHost)!,
+    ...service.controlPlaneHosts.map(_ipv4Cidr).whereType<String>(),
   };
   try {
     final apiHost = Uri.parse(AppConfig.baseUrl).host;
-    if (apiHost.isNotEmpty) directCidrs.add('$apiHost/32');
+    final apiCidr = _ipv4Cidr(apiHost);
+    if (apiCidr != null) directCidrs.add(apiCidr);
   } catch (_) {}
 
   final hasLocalRules = localRulePaths.isNotEmpty;
@@ -123,4 +124,17 @@ String buildRuntimeSingBoxJson({
   };
 
   return jsonEncode(runtime);
+}
+
+final _ipv4Host = RegExp(r'^(\d{1,3}\.){3}\d{1,3}$');
+
+/// sing-box `ip_cidr` needs an address, not a DNS name (`hostname/32` is invalid).
+String? _ipv4Cidr(String host) {
+  if (host.isEmpty || host == 'unknown') return null;
+  if (_ipv4Host.hasMatch(host)) return '$host/32';
+  if (host == 'api.teremokconnect.online' ||
+      host.endsWith('.teremokconnect.online')) {
+    return '${AppConfig.vpsIpv4}/32';
+  }
+  return null;
 }

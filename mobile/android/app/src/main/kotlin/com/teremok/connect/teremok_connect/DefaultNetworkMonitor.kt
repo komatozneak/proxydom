@@ -22,6 +22,10 @@ internal object DefaultNetworkMonitor {
     var defaultNetwork: Network? = null
         private set
 
+    /** Last known underlying (non-VPN) interface name, e.g. rmnet1 / wlan0. */
+    var currentInterfaceName: String? = null
+        private set
+
     private var listener: InterfaceUpdateListener? = null
     private var connectivity: ConnectivityManager? = null
     private var callback: ConnectivityManager.NetworkCallback? = null
@@ -107,6 +111,7 @@ internal object DefaultNetworkMonitor {
             override fun onLost(network: Network) {
                 if (defaultNetwork == network) {
                     defaultNetwork = null
+                    currentInterfaceName = null
                 }
                 listener?.updateDefaultInterface("", -1, false, false)
             }
@@ -186,6 +191,7 @@ internal object DefaultNetworkMonitor {
                 return@repeat
             }
             updateListener.updateDefaultInterface(interfaceName, interfaceIndex, false, false)
+            currentInterfaceName = interfaceName
             Log.i(TAG, "default interface: $interfaceName (index=$interfaceIndex)")
             return
         }
