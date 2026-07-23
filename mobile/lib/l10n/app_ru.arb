@@ -80,5 +80,10 @@
   "verifyResend": "Перезвонить",
   "verifyResendIn": "Перезвонить через {seconds}с",
   "verifyWrongCode": "Неверный код, попробуйте снова",
-  "switchLanguage": "RU"
+  "switchLanguage": "RU",
+  "updateAvailableTitle": "Доступно обновление",
+  "updateAvailableBody": "Вышла версия {version}. Рекомендуем обновиться.",
+  "@updateAvailableBody": {"placeholders": {"version": {"type": "String"}}},
+  "updateNow": "Обновить",
+  "updateLater": "Позже"
 }

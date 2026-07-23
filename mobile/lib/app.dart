@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'core/router.dart';
 import 'core/theme.dart';
+import 'core/updates/update_check_service.dart';
 import 'l10n/app_localizations.dart';
 
 /// Текущий язык приложения. Хранится пока в памяти.
@@ -37,6 +38,37 @@ class TeremokApp extends StatelessWidget {
       supportedLocales: AppLocale.supportedLocales,
       localizationsDelegates: AppL10n.localizationsDelegates,
       routerConfig: AppRouter.config,
+      builder: (context, child) {
+        return _UpdateCheckHost(child: child ?? const SizedBox.shrink());
+      },
     );
   }
+}
+
+/// Runs a one-shot soft update check after the first frame (does not block auth).
+class _UpdateCheckHost extends StatefulWidget {
+  const _UpdateCheckHost({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_UpdateCheckHost> createState() => _UpdateCheckHostState();
+}
+
+class _UpdateCheckHostState extends State<_UpdateCheckHost> {
+  var _started = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started) return;
+    _started = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      UpdateCheckService().maybePrompt(context);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

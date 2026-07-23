@@ -258,4 +258,18 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get switchLanguage => 'EN';
+
+  @override
+  String get updateAvailableTitle => 'Update available';
+
+  @override
+  String updateAvailableBody(String version) {
+    return 'Version $version is available. Please update.';
+  }
+
+  @override
+  String get updateNow => 'Update';
+
+  @override
+  String get updateLater => 'Later';
 }

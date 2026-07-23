@@ -259,4 +259,18 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get switchLanguage => 'RU';
+
+  @override
+  String get updateAvailableTitle => 'Доступно обновление';
+
+  @override
+  String updateAvailableBody(String version) {
+    return 'Вышла версия $version. Рекомендуем обновиться.';
+  }
+
+  @override
+  String get updateNow => 'Обновить';
+
+  @override
+  String get updateLater => 'Позже';
 }

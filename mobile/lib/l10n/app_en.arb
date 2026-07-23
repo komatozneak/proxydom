@@ -95,5 +95,10 @@
   "switchLanguage": "EN",
   "@switchLanguage": {
     "description": "Short label of language toggle button (shows next-language code)"
-  }
+  },
+  "updateAvailableTitle": "Update available",
+  "updateAvailableBody": "Version {version} is available. Please update.",
+  "@updateAvailableBody": {"placeholders": {"version": {"type": "String"}}},
+  "updateNow": "Update",
+  "updateLater": "Later"
 }

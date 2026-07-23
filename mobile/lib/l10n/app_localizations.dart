@@ -540,6 +540,30 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'EN'**
   String get switchLanguage;
+
+  /// No description provided for @updateAvailableTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Update available'**
+  String get updateAvailableTitle;
+
+  /// No description provided for @updateAvailableBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version} is available. Please update.'**
+  String updateAvailableBody(String version);
+
+  /// No description provided for @updateNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Update'**
+  String get updateNow;
+
+  /// No description provided for @updateLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Later'**
+  String get updateLater;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {
