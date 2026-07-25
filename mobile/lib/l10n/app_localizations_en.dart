@@ -48,7 +48,7 @@ class AppL10nEn extends AppL10n {
   String get loginCallingTitle => 'Calling...';
 
   @override
-  String get homeTitle => 'Home';
+  String get homeTitle => 'Teremok';
 
   @override
   String get homeVpnHint => 'VPN UI — comes in step 9+';
@@ -61,6 +61,9 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get homeConnected => 'Connected';
+
+  @override
+  String get homeProtected => 'Protected';
 
   @override
   String get homeError => 'Connection failed';
@@ -76,6 +79,159 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get homeSettings => 'Settings';
+
+  @override
+  String get homeStatServer => 'Server';
+
+  @override
+  String get homeStatPing => 'Ping';
+
+  @override
+  String get homeLinkOnline => 'Home online';
+
+  @override
+  String get homeLinkOffline => 'Home offline';
+
+  @override
+  String get homeLinkLabel => 'Link';
+
+  @override
+  String get homeStatDownload => 'Download';
+
+  @override
+  String get homeStatUpload => 'Upload';
+
+  @override
+  String get homeStatPlaceholder => '—';
+
+  @override
+  String get homeMoreMenu => 'More';
+
+  @override
+  String get homeRetry => 'Retry';
+
+  @override
+  String get homeErrorFriendly => 'Couldn’t connect. Please try again.';
+
+  @override
+  String get homeConfigErrorFriendly =>
+      'Couldn’t fetch config. Check your connection and try again.';
+
+  @override
+  String get networkErrorFriendly =>
+      'No connection to the server. Please try again.';
+
+  @override
+  String get settingsSectionAccount => 'Account';
+
+  @override
+  String get settingsSectionConnection => 'Connection';
+
+  @override
+  String get settingsSectionApp => 'Application';
+
+  @override
+  String get settingsPhone => 'Phone number';
+
+  @override
+  String get settingsPhoneReadonly =>
+      'Phone changes only when you sign in again';
+
+  @override
+  String get settingsSubscription => 'Access';
+
+  @override
+  String get settingsSubscriptionActive => 'Active';
+
+  @override
+  String get settingsProBadge => 'PRO';
+
+  @override
+  String get settingsActiveBadge => 'Active';
+
+  @override
+  String get settingsAccessEarlyTitle => 'Early access';
+
+  @override
+  String get settingsAccessEarlySubtitle =>
+      'Everything is open for now, no limits.';
+
+  @override
+  String settingsAccessActiveUntil(String date) {
+    return 'Valid until $date.';
+  }
+
+  @override
+  String get settingsAccessCancelledSubtitle => 'Auto-renewal is off.';
+
+  @override
+  String settingsSubscriptionActiveUntil(String date) {
+    return 'Active until $date';
+  }
+
+  @override
+  String settingsSubscriptionTrialUntil(String date) {
+    return 'Trial until $date';
+  }
+
+  @override
+  String get settingsSubscriptionAlpha => 'Early access';
+
+  @override
+  String get settingsSubscriptionExpired => 'Subscription expired';
+
+  @override
+  String get settingsSubscriptionLoadError => 'Couldn’t load status';
+
+  @override
+  String get settingsServerRegion => 'Server region';
+
+  @override
+  String get settingsProtocol => 'Protocol';
+
+  @override
+  String get settingsProtocolLocked =>
+      'Only VLESS + Reality is available for now';
+
+  @override
+  String get settingsKillSwitch => 'Kill switch';
+
+  @override
+  String get settingsKillSwitchHint => 'Block internet if the VPN drops';
+
+  @override
+  String get settingsKillSwitchHintSystem =>
+      'Enable Always-on VPN and Block connections without VPN in system VPN settings';
+
+  @override
+  String get settingsAutoReconnect => 'Auto-reconnect';
+
+  @override
+  String get settingsAutoReconnectHint =>
+      'Reconnect quickly if the tunnel drops';
+
+  @override
+  String get settingsDarkTheme => 'Dark theme';
+
+  @override
+  String get settingsThemeSystem => 'Match system';
+
+  @override
+  String get settingsThemeDark => 'Always dark';
+
+  @override
+  String get settingsThemeLight => 'Light';
+
+  @override
+  String get settingsDiagnostics => 'Diagnostics';
+
+  @override
+  String get settingsDiagnosticsHint => 'Check connection';
+
+  @override
+  String settingsVersion(String version) {
+    return 'Version $version';
+  }
 
   @override
   String get settingsTitle => 'Settings';
@@ -146,6 +302,9 @@ class AppL10nEn extends AppL10n {
   }
 
   @override
+  String get homeSessionLabel => 'Session';
+
+  @override
   String homeServer(String name) {
     return 'Server: $name';
   }
@@ -170,6 +329,12 @@ class AppL10nEn extends AppL10n {
   String get homeRegionAuto => 'Auto';
 
   @override
+  String get homeVpnDisconnected => 'Disconnected';
+
+  @override
+  String get homeDisconnectUndo => 'Undo';
+
+  @override
   String get regionTitle => 'Region';
 
   @override
@@ -186,6 +351,9 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get regionSectionServers => 'Servers';
+
+  @override
+  String get regionSectionOffline => 'Unavailable servers';
 
   @override
   String get regionOnline => 'online';

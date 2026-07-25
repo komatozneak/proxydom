@@ -1,12 +1,15 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../../core/diagnostics/diagnostics_service.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../auth/application/auth_provider.dart';
 import '../../auth/application/auth_state.dart';
 import '../../home/application/vpn_provider.dart';
+import '../application/subscription_status_provider.dart';
+import '../data/subscription_status.dart';
 import '../data/vpn_notification_prefs.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -43,6 +46,51 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await VpnNotificationPrefs.setEnabled(value);
     if (!mounted) return;
     setState(() => _notifLoading = false);
+  }
+
+  String _formatAccessDate(DateTime dt) {
+    final locale = Localizations.localeOf(context).toString();
+    return DateFormat('d MMMM y', locale).format(dt);
+  }
+
+  String _accessTitle(AppL10n l, AsyncValue<SubscriptionStatus> async) {
+    return async.when(
+      data: (s) {
+        if (s.hasActivePaid || s.isTrial) {
+          return l.settingsSubscriptionActive;
+        }
+        if (s.status == 'cancelled' && s.expiresAt != null) {
+          return l.settingsSubscriptionActiveUntil(_formatAccessDate(s.expiresAt!));
+        }
+        return l.settingsAccessEarlyTitle;
+      },
+      loading: () => l.settingsSubscription,
+      error: (_, __) => l.settingsSubscription,
+    );
+  }
+
+  String _accessSubtitle(AppL10n l, AsyncValue<SubscriptionStatus> async) {
+    return async.when(
+      data: (s) {
+        if (s.hasActivePaid && s.expiresAt != null) {
+          // TODO(subscription): expired copy blocked until Marzban deactivate
+          // rollout is trusted on all friends (PR-A smoke OK for u_7).
+          return l.settingsAccessActiveUntil(_formatAccessDate(s.expiresAt!));
+        }
+        if (s.isTrial && s.expiresAt != null) {
+          return l.settingsAccessActiveUntil(_formatAccessDate(s.expiresAt!));
+        }
+        if (s.status == 'cancelled' && s.expiresAt != null) {
+          return l.settingsAccessCancelledSubtitle;
+        }
+        if (s.status == 'expired' && s.expiresAt != null) {
+          return l.settingsAccessActiveUntil(_formatAccessDate(s.expiresAt!));
+        }
+        return l.settingsAccessEarlySubtitle;
+      },
+      loading: () => '…',
+      error: (_, __) => l.settingsSubscriptionLoadError,
+    );
   }
 
   Future<void> _sendReport() async {
@@ -107,11 +155,33 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final theme = Theme.of(context);
     final showNotif = VpnNotificationPrefs.isSupported;
     final notifOn = _notifEnabled ?? true;
+    final subAsync = ref.watch(subscriptionStatusProvider);
 
     return Scaffold(
       appBar: AppBar(title: Text(l.settingsTitle)),
       body: ListView(
         children: [
+          ListTile(
+            leading: const Icon(Icons.verified_user_outlined),
+            title: Text(_accessTitle(l, subAsync)),
+            subtitle: Text(
+              _accessSubtitle(l, subAsync),
+              style: theme.textTheme.bodySmall,
+            ),
+            trailing: subAsync.when(
+              data: (_) => null,
+              loading: () => const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              error: (_, __) => TextButton(
+                onPressed: () =>
+                    ref.read(subscriptionStatusProvider.notifier).refresh(),
+                child: Text(l.homeRetry),
+              ),
+            ),
+          ),
           if (showNotif)
             SwitchListTile(
               secondary: const Icon(Icons.notifications_outlined),

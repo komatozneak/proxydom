@@ -63,7 +63,7 @@ import 'app_localizations_ru.dart';
 /// property.
 abstract class AppL10n {
   AppL10n(String locale)
-      : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+    : localeName = intl.Intl.canonicalizedLocale(locale.toString());
 
   final String localeName;
 
@@ -85,16 +85,16 @@ abstract class AppL10n {
   /// of delegates is preferred or required.
   static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
       <LocalizationsDelegate<dynamic>>[
-    delegate,
-    GlobalMaterialLocalizations.delegate,
-    GlobalCupertinoLocalizations.delegate,
-    GlobalWidgetsLocalizations.delegate,
-  ];
+        delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ];
 
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[
     Locale('en'),
-    Locale('ru')
+    Locale('ru'),
   ];
 
   /// Title shown in app bar and OS task switcher
@@ -178,7 +178,7 @@ abstract class AppL10n {
   /// No description provided for @homeTitle.
   ///
   /// In en, this message translates to:
-  /// **'Home'**
+  /// **'Teremok'**
   String get homeTitle;
 
   /// No description provided for @homeVpnHint.
@@ -204,6 +204,12 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Connected'**
   String get homeConnected;
+
+  /// No description provided for @homeProtected.
+  ///
+  /// In en, this message translates to:
+  /// **'Protected'**
+  String get homeProtected;
 
   /// No description provided for @homeError.
   ///
@@ -234,6 +240,282 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Settings'**
   String get homeSettings;
+
+  /// No description provided for @homeStatServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Server'**
+  String get homeStatServer;
+
+  /// No description provided for @homeStatPing.
+  ///
+  /// In en, this message translates to:
+  /// **'Ping'**
+  String get homeStatPing;
+
+  /// No description provided for @homeLinkOnline.
+  ///
+  /// In en, this message translates to:
+  /// **'Home online'**
+  String get homeLinkOnline;
+
+  /// No description provided for @homeLinkOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'Home offline'**
+  String get homeLinkOffline;
+
+  /// No description provided for @homeLinkLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Link'**
+  String get homeLinkLabel;
+
+  /// No description provided for @homeStatDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get homeStatDownload;
+
+  /// No description provided for @homeStatUpload.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload'**
+  String get homeStatUpload;
+
+  /// No description provided for @homeStatPlaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'—'**
+  String get homeStatPlaceholder;
+
+  /// No description provided for @homeMoreMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'More'**
+  String get homeMoreMenu;
+
+  /// No description provided for @homeRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get homeRetry;
+
+  /// No description provided for @homeErrorFriendly.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t connect. Please try again.'**
+  String get homeErrorFriendly;
+
+  /// No description provided for @homeConfigErrorFriendly.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t fetch config. Check your connection and try again.'**
+  String get homeConfigErrorFriendly;
+
+  /// No description provided for @networkErrorFriendly.
+  ///
+  /// In en, this message translates to:
+  /// **'No connection to the server. Please try again.'**
+  String get networkErrorFriendly;
+
+  /// No description provided for @settingsSectionAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Account'**
+  String get settingsSectionAccount;
+
+  /// No description provided for @settingsSectionConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection'**
+  String get settingsSectionConnection;
+
+  /// No description provided for @settingsSectionApp.
+  ///
+  /// In en, this message translates to:
+  /// **'Application'**
+  String get settingsSectionApp;
+
+  /// No description provided for @settingsPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone number'**
+  String get settingsPhone;
+
+  /// No description provided for @settingsPhoneReadonly.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone changes only when you sign in again'**
+  String get settingsPhoneReadonly;
+
+  /// No description provided for @settingsSubscription.
+  ///
+  /// In en, this message translates to:
+  /// **'Access'**
+  String get settingsSubscription;
+
+  /// No description provided for @settingsSubscriptionActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get settingsSubscriptionActive;
+
+  /// No description provided for @settingsProBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'PRO'**
+  String get settingsProBadge;
+
+  /// No description provided for @settingsActiveBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get settingsActiveBadge;
+
+  /// No description provided for @settingsAccessEarlyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Early access'**
+  String get settingsAccessEarlyTitle;
+
+  /// No description provided for @settingsAccessEarlySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Everything is open for now, no limits.'**
+  String get settingsAccessEarlySubtitle;
+
+  /// No description provided for @settingsAccessActiveUntil.
+  ///
+  /// In en, this message translates to:
+  /// **'Valid until {date}.'**
+  String settingsAccessActiveUntil(String date);
+
+  /// No description provided for @settingsAccessCancelledSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-renewal is off.'**
+  String get settingsAccessCancelledSubtitle;
+
+  /// No description provided for @settingsSubscriptionActiveUntil.
+  ///
+  /// In en, this message translates to:
+  /// **'Active until {date}'**
+  String settingsSubscriptionActiveUntil(String date);
+
+  /// No description provided for @settingsSubscriptionTrialUntil.
+  ///
+  /// In en, this message translates to:
+  /// **'Trial until {date}'**
+  String settingsSubscriptionTrialUntil(String date);
+
+  /// No description provided for @settingsSubscriptionAlpha.
+  ///
+  /// In en, this message translates to:
+  /// **'Early access'**
+  String get settingsSubscriptionAlpha;
+
+  /// No description provided for @settingsSubscriptionExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscription expired'**
+  String get settingsSubscriptionExpired;
+
+  /// No description provided for @settingsSubscriptionLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t load status'**
+  String get settingsSubscriptionLoadError;
+
+  /// No description provided for @settingsServerRegion.
+  ///
+  /// In en, this message translates to:
+  /// **'Server region'**
+  String get settingsServerRegion;
+
+  /// No description provided for @settingsProtocol.
+  ///
+  /// In en, this message translates to:
+  /// **'Protocol'**
+  String get settingsProtocol;
+
+  /// No description provided for @settingsProtocolLocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Only VLESS + Reality is available for now'**
+  String get settingsProtocolLocked;
+
+  /// No description provided for @settingsKillSwitch.
+  ///
+  /// In en, this message translates to:
+  /// **'Kill switch'**
+  String get settingsKillSwitch;
+
+  /// No description provided for @settingsKillSwitchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Block internet if the VPN drops'**
+  String get settingsKillSwitchHint;
+
+  /// No description provided for @settingsKillSwitchHintSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable Always-on VPN and Block connections without VPN in system VPN settings'**
+  String get settingsKillSwitchHintSystem;
+
+  /// No description provided for @settingsAutoReconnect.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-reconnect'**
+  String get settingsAutoReconnect;
+
+  /// No description provided for @settingsAutoReconnectHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconnect quickly if the tunnel drops'**
+  String get settingsAutoReconnectHint;
+
+  /// No description provided for @settingsDarkTheme.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark theme'**
+  String get settingsDarkTheme;
+
+  /// No description provided for @settingsThemeSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'Match system'**
+  String get settingsThemeSystem;
+
+  /// No description provided for @settingsThemeDark.
+  ///
+  /// In en, this message translates to:
+  /// **'Always dark'**
+  String get settingsThemeDark;
+
+  /// No description provided for @settingsThemeLight.
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get settingsThemeLight;
+
+  /// No description provided for @settingsDiagnostics.
+  ///
+  /// In en, this message translates to:
+  /// **'Diagnostics'**
+  String get settingsDiagnostics;
+
+  /// No description provided for @settingsDiagnosticsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Check connection'**
+  String get settingsDiagnosticsHint;
+
+  /// No description provided for @settingsVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version}'**
+  String settingsVersion(String version);
 
   /// No description provided for @settingsTitle.
   ///
@@ -349,6 +631,12 @@ abstract class AppL10n {
   /// **'Session: {time}'**
   String homeUptime(String time);
 
+  /// No description provided for @homeSessionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Session'**
+  String get homeSessionLabel;
+
   /// No description provided for @homeServer.
   ///
   /// In en, this message translates to:
@@ -385,6 +673,18 @@ abstract class AppL10n {
   /// **'Auto'**
   String get homeRegionAuto;
 
+  /// No description provided for @homeVpnDisconnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnected'**
+  String get homeVpnDisconnected;
+
+  /// No description provided for @homeDisconnectUndo.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get homeDisconnectUndo;
+
   /// No description provided for @regionTitle.
   ///
   /// In en, this message translates to:
@@ -420,6 +720,12 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Servers'**
   String get regionSectionServers;
+
+  /// No description provided for @regionSectionOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'Unavailable servers'**
+  String get regionSectionOffline;
 
   /// No description provided for @regionOnline.
   ///
@@ -592,8 +898,9 @@ AppL10n lookupAppL10n(Locale locale) {
   }
 
   throw FlutterError(
-      'AppL10n.delegate failed to load unsupported locale "$locale". This is likely '
-      'an issue with the localizations generation tool. Please file an issue '
-      'on GitHub with a reproducible sample app and the gen-l10n configuration '
-      'that was used.');
+    'AppL10n.delegate failed to load unsupported locale "$locale". This is likely '
+    'an issue with the localizations generation tool. Please file an issue '
+    'on GitHub with a reproducible sample app and the gen-l10n configuration '
+    'that was used.',
+  );
 }

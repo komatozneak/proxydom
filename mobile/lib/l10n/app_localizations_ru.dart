@@ -21,13 +21,14 @@ class AppL10nRu extends AppL10n {
   String get loginTestButton => 'Войти (тестовая кнопка)';
 
   @override
-  String get loginPhoneLabel => 'Номер телефона';
+  String get loginPhoneLabel => 'Введите номер телефона';
 
   @override
-  String get loginPhoneHint => '+7 999 123 4567';
+  String get loginPhoneHint => '+7 (999) 123-45-67';
 
   @override
-  String get loginPhoneHelper => 'Позвоним для подтверждения';
+  String get loginPhoneHelper =>
+      'Мы позвоним вам. Последние 4 цифры номера — ваш код. Без СМС и паролей.';
 
   @override
   String get loginPhoneError => 'Введите корректный номер для выбранной страны';
@@ -42,13 +43,13 @@ class AppL10nRu extends AppL10n {
   String get loginErrorGeneric => 'Не удалось выполнить запрос';
 
   @override
-  String get loginCallButton => 'Позвонить';
+  String get loginCallButton => 'Позвонить мне';
 
   @override
   String get loginCallingTitle => 'Звоним...';
 
   @override
-  String get homeTitle => 'Главная';
+  String get homeTitle => 'Теремок';
 
   @override
   String get homeVpnHint => 'VPN UI — в шагах 9+';
@@ -61,6 +62,9 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get homeConnected => 'Подключено';
+
+  @override
+  String get homeProtected => 'Защищено';
 
   @override
   String get homeError => 'Ошибка подключения';
@@ -76,6 +80,156 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get homeSettings => 'Настройки';
+
+  @override
+  String get homeStatServer => 'Сервер';
+
+  @override
+  String get homeStatPing => 'Пинг';
+
+  @override
+  String get homeLinkOnline => 'Дом на связи';
+
+  @override
+  String get homeLinkOffline => 'Нет подключения';
+
+  @override
+  String get homeLinkLabel => 'Связь';
+
+  @override
+  String get homeStatDownload => 'Скачивание';
+
+  @override
+  String get homeStatUpload => 'Отправка';
+
+  @override
+  String get homeStatPlaceholder => '—';
+
+  @override
+  String get homeMoreMenu => 'Ещё';
+
+  @override
+  String get homeRetry => 'Повторить';
+
+  @override
+  String get homeErrorFriendly => 'Не удалось подключиться. Попробуйте снова.';
+
+  @override
+  String get homeConfigErrorFriendly =>
+      'Не удалось получить конфиг. Проверьте связь и попробуйте снова.';
+
+  @override
+  String get networkErrorFriendly => 'Нет связи с сервером. Попробуйте снова.';
+
+  @override
+  String get settingsSectionAccount => 'Аккаунт';
+
+  @override
+  String get settingsSectionConnection => 'Подключение';
+
+  @override
+  String get settingsSectionApp => 'Приложение';
+
+  @override
+  String get settingsPhone => 'Номер телефона';
+
+  @override
+  String get settingsPhoneReadonly =>
+      'Номер меняется только при повторном входе';
+
+  @override
+  String get settingsSubscription => 'Доступ';
+
+  @override
+  String get settingsSubscriptionActive => 'Активна';
+
+  @override
+  String get settingsProBadge => 'PRO';
+
+  @override
+  String get settingsActiveBadge => 'Активна';
+
+  @override
+  String get settingsAccessEarlyTitle => 'Ранний доступ';
+
+  @override
+  String get settingsAccessEarlySubtitle =>
+      'Пока открыто всё, без ограничений.';
+
+  @override
+  String settingsAccessActiveUntil(String date) {
+    return 'Действует до $date.';
+  }
+
+  @override
+  String get settingsAccessCancelledSubtitle => 'Автопродление выключено.';
+
+  @override
+  String settingsSubscriptionActiveUntil(String date) {
+    return 'Активна до $date';
+  }
+
+  @override
+  String settingsSubscriptionTrialUntil(String date) {
+    return 'Пробный период до $date';
+  }
+
+  @override
+  String get settingsSubscriptionAlpha => 'Ранний доступ';
+
+  @override
+  String get settingsSubscriptionExpired => 'Подписка истекла';
+
+  @override
+  String get settingsSubscriptionLoadError => 'Не удалось загрузить статус';
+
+  @override
+  String get settingsServerRegion => 'Регион сервера';
+
+  @override
+  String get settingsProtocol => 'Протокол';
+
+  @override
+  String get settingsProtocolLocked => 'Сейчас доступен только VLESS + Reality';
+
+  @override
+  String get settingsKillSwitch => 'Kill switch';
+
+  @override
+  String get settingsKillSwitchHint => 'Отключить интернет при разрыве VPN';
+
+  @override
+  String get settingsKillSwitchHintSystem =>
+      'Включите «Всегда VPN» и «Блокировать без VPN» в системных настройках VPN';
+
+  @override
+  String get settingsAutoReconnect => 'Авто-переподключение';
+
+  @override
+  String get settingsAutoReconnectHint => 'Быстрое переподключение при обрыве';
+
+  @override
+  String get settingsDarkTheme => 'Тёмная тема';
+
+  @override
+  String get settingsThemeSystem => 'Как в системе';
+
+  @override
+  String get settingsThemeDark => 'Всегда тёмная';
+
+  @override
+  String get settingsThemeLight => 'Светлая';
+
+  @override
+  String get settingsDiagnostics => 'Диагностика';
+
+  @override
+  String get settingsDiagnosticsHint => 'Проверить соединение';
+
+  @override
+  String settingsVersion(String version) {
+    return 'Версия $version';
+  }
 
   @override
   String get settingsTitle => 'Настройки';
@@ -147,6 +301,9 @@ class AppL10nRu extends AppL10n {
   }
 
   @override
+  String get homeSessionLabel => 'Сессия';
+
+  @override
   String homeServer(String name) {
     return 'Сервер: $name';
   }
@@ -170,6 +327,12 @@ class AppL10nRu extends AppL10n {
   String get homeRegionAuto => 'Авто';
 
   @override
+  String get homeVpnDisconnected => 'Отключено';
+
+  @override
+  String get homeDisconnectUndo => 'Отменить';
+
+  @override
   String get regionTitle => 'Регион';
 
   @override
@@ -187,6 +350,9 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get regionSectionServers => 'Серверы';
+
+  @override
+  String get regionSectionOffline => 'Недоступные серверы';
 
   @override
   String get regionOnline => 'онлайн';
@@ -239,19 +405,19 @@ class AppL10nRu extends AppL10n {
   String get cancel => 'Отмена';
 
   @override
-  String get verifyTitle => 'Введите код';
+  String get verifyTitle => 'Код из звонка';
 
   @override
   String verifySentTo(String phone) {
-    return 'Позвонили на $phone';
+    return 'Последние 4 цифры номера, с которого позвонили на $phone';
   }
 
   @override
-  String get verifyResend => 'Перезвонить';
+  String get verifyResend => 'Позвонить повторно';
 
   @override
   String verifyResendIn(int seconds) {
-    return 'Перезвонить через $secondsс';
+    return 'Позвонить повторно через 00:$seconds';
   }
 
   @override
