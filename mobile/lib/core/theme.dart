@@ -16,14 +16,26 @@ class AppBrand {
   /// Moss — secondary accent, progress, active states.
   static const Color secondary = Color(0xFF558B2F);
 
-  /// Honey amber — brand highlight (unchanged from v1).
+  /// Honey amber — brand highlight (light / transient).
   static const Color accent = Color(0xFFFF8F00);
+
+  /// Living House mustard (S1 mascot body) — glyph only, not UI chrome.
+  static const Color livingHouse = Color(0xFFC78F29);
+
+  /// Brightened honey for dark surfaces (WCAG AA on OLED).
+  static const Color accentOnDark = Color(0xFFFFB300);
+
+  /// Soft orange-50 wash behind Nest while connecting (not honey — avoids double-glow).
+  static const Color connectingAura = Color(0xFFFFE0B2);
 
   /// Sage — connected / success.
   static const Color success = Color(0xFF2E7D32);
 
   /// Oak (not red) — disconnected / soft error (anti-pattern fix).
   static const Color error = Color(0xFF5D4037);
+
+  /// Destructive actions (logout) — Telegram-style red, not soft oak error.
+  static const Color destructive = Color(0xFFE53935);
 
   /// Honey — connecting / warning.
   static const Color warning = Color(0xFFFF8F00);
@@ -34,11 +46,20 @@ class AppBrand {
   /// Oak dark — dark theme surface.
   static const Color surfaceDark = Color(0xFF3E2723);
 
-  /// Mid oak — dark cards / surface variant.
-  static const Color surfaceVariantDark = Color(0xFF4E342E);
+  /// Mid oak — dark cards / surface variant (lighter than surface for contrast).
+  static const Color surfaceVariantDark = Color(0xFF5D4037);
 
   /// Forest — info chips (v3 token).
   static const Color info = Color(0xFF33691E);
+
+  /// Readable subtitle / secondary text on dark oak surfaces.
+  static const Color onSurfaceVariantDark = Color(0xFFE8DED6);
+
+  static Color oakWithOpacity(double opacity) =>
+      Color.fromRGBO(93, 64, 55, opacity);
+
+  static Color mossWithOpacity(double opacity) =>
+      Color.fromRGBO(85, 139, 47, opacity);
 }
 
 class AppTheme {
@@ -66,7 +87,8 @@ class AppTheme {
       onPrimaryContainer: AppBrand.surfaceDark,
       secondary: AppBrand.secondary,
       onSecondary: AppBrand.surfaceLight,
-      tertiary: AppBrand.accent,
+      // Dark: accentOnDark so connecting honey stays ≥4.5:1 on OLED.
+      tertiary: isDark ? AppBrand.accentOnDark : AppBrand.accent,
       onTertiary: AppBrand.surfaceDark,
       error: AppBrand.error,
       onError: AppBrand.surfaceLight,
@@ -77,6 +99,10 @@ class AppTheme {
       inversePrimary: AppBrand.info,
       surfaceContainerHighest:
           isDark ? AppBrand.surfaceVariantDark : AppBrand.primaryContainer,
+      // Dark mode: warm light gray so Settings subtitles / card labels stay readable.
+      onSurfaceVariant: isDark
+          ? AppBrand.onSurfaceVariantDark
+          : const Color(0xFF6D4C41),
     );
 
     return ThemeData(

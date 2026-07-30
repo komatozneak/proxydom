@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api_client.dart';
 import '../../auth/application/auth_provider.dart';
 import '../../auth/application/auth_state.dart';
+import '../../beta/application/beta_usage_tracker.dart';
 import '../data/subscription_status.dart';
 
 final subscriptionStatusProvider =
@@ -38,6 +39,11 @@ class SubscriptionStatusNotifier
         response: resp,
         message: 'subscription status failed: ${resp.statusCode}',
       );
+    }
+    try {
+      ref.read(betaUsageTrackerProvider).recordAccessStatusLoadOk();
+    } on StateError {
+      // Provider disposed in tests.
     }
     return SubscriptionStatus.fromJson(resp.data!);
   }

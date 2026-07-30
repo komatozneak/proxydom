@@ -18,6 +18,7 @@ class MainActivity : FlutterActivity() {
         private const val TAG = "MainActivity"
         private const val REQUEST_VPN_PERMISSION = 1001
         private const val REQUEST_POST_NOTIFICATIONS = 1002
+        private const val REQUEST_INTERNET = 1003
     }
 
     @Volatile
@@ -25,6 +26,33 @@ class MainActivity : FlutterActivity() {
 
     @Volatile
     private var pendingNotificationResult: MethodChannel.Result? = null
+
+    override fun onCreate(savedInstanceState: android.os.Bundle?) {
+        // Android 17 (API 37) on this Pixel: INTERNET is prot=dangerous.
+        // Without a runtime grant, Dart sockets fail with errno 13 (EACCES).
+        ensureInternetPermission()
+        super.onCreate(savedInstanceState)
+    }
+
+    /**
+     * Request INTERNET when the platform treats it as dangerous (Android 17+).
+     * On older builds where INTERNET is still normal/install-time, check returns
+     * GRANTED and we no-op.
+     */
+    private fun ensureInternetPermission() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.INTERNET)
+            == PackageManager.PERMISSION_GRANTED
+        ) {
+            Log.i(TAG, "INTERNET already granted")
+            return
+        }
+        Log.i(TAG, "Requesting runtime INTERNET (dangerous on Android 17+)")
+        ActivityCompat.requestPermissions(
+            this,
+            arrayOf(Manifest.permission.INTERNET),
+            REQUEST_INTERNET,
+        )
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -100,12 +128,20 @@ class MainActivity : FlutterActivity() {
         grantResults: IntArray,
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode != REQUEST_POST_NOTIFICATIONS) return
-        val granted = grantResults.isNotEmpty() &&
-            grantResults[0] == PackageManager.PERMISSION_GRANTED
-        Log.i(TAG, "POST_NOTIFICATIONS granted=$granted")
-        pendingNotificationResult?.success(granted)
-        pendingNotificationResult = null
+        when (requestCode) {
+            REQUEST_INTERNET -> {
+                val granted = grantResults.isNotEmpty() &&
+                    grantResults[0] == PackageManager.PERMISSION_GRANTED
+                Log.i(TAG, "INTERNET granted=$granted")
+            }
+            REQUEST_POST_NOTIFICATIONS -> {
+                val granted = grantResults.isNotEmpty() &&
+                    grantResults[0] == PackageManager.PERMISSION_GRANTED
+                Log.i(TAG, "POST_NOTIFICATIONS granted=$granted")
+                pendingNotificationResult?.success(granted)
+                pendingNotificationResult = null
+            }
+        }
     }
 
     @Suppress("DEPRECATION")

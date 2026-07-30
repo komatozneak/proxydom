@@ -33,6 +33,7 @@ class AppIcon extends StatelessWidget {
 abstract final class AppIcons {
   static const IconData power = PhosphorIconsRegular.power;
   static const IconData shield = PhosphorIconsRegular.shield;
+  static const IconData shieldCheck = PhosphorIconsRegular.shieldCheck;
   static const IconData warning = PhosphorIconsRegular.warningCircle;
   static const IconData play = PhosphorIconsRegular.play;
   static const IconData stop = PhosphorIconsRegular.stop;
@@ -40,8 +41,35 @@ abstract final class AppIcons {
   static const IconData hourglass = PhosphorIconsRegular.hourglass;
   static const IconData servers = PhosphorIconsRegular.hardDrives;
   static const IconData settings = PhosphorIconsRegular.gearSix;
+  static const IconData gear = PhosphorIconsRegular.gear;
   static const IconData info = PhosphorIconsRegular.info;
+  static const IconData question = PhosphorIconsRegular.question;
   static const IconData logout = PhosphorIconsRegular.signOut;
   static const IconData back = PhosphorIconsRegular.arrowLeft;
   static const IconData download = PhosphorIconsRegular.cloudArrowDown;
+  static const IconData upload = PhosphorIconsRegular.cloudArrowUp;
+  static const IconData globe = PhosphorIconsRegular.globe;
+  static const IconData globeHemisphereWest =
+      PhosphorIconsRegular.globeHemisphereWest;
+  static const IconData gauge = PhosphorIconsRegular.gauge;
+  static const IconData phone = PhosphorIconsRegular.phone;
+  static const IconData crown = PhosphorIconsRegular.crown;
+  static const IconData sliders = PhosphorIconsRegular.sliders;
+  static const IconData moon = PhosphorIconsRegular.moon;
+  static const IconData bug = PhosphorIconsRegular.bug;
+  static const IconData notifications = PhosphorIconsRegular.bell;
+  static const IconData chevronRight = PhosphorIconsRegular.caretRight;
+  static const IconData search = PhosphorIconsRegular.magnifyingGlass;
+  static const IconData plus = PhosphorIconsRegular.plus;
+  static const IconData trash = PhosphorIconsRegular.trash;
+  static const IconData tree = PhosphorIconsRegular.tree;
+  static const IconData treeFill = PhosphorIconsFill.tree;
+  static const IconData house = PhosphorIconsRegular.house;
+  static const IconData houseFill = PhosphorIconsFill.house;
+  static const IconData check = PhosphorIconsRegular.check;
+  static const IconData checkCircle = PhosphorIconsRegular.checkCircle;
+  static const IconData checkCircleFill = PhosphorIconsFill.checkCircle;
+  static const IconData x = PhosphorIconsRegular.x;
+  static const IconData xCircle = PhosphorIconsRegular.xCircle;
+  static const IconData xCircleFill = PhosphorIconsFill.xCircle;
 }

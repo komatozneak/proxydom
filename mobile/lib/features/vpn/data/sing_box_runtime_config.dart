@@ -16,11 +16,13 @@ const fakeIpV4Range = '198.18.0.0/15';
 /// - **No remote rule-sets from GitHub** — RF block of GitHub (2026-07-14) breaks
 ///   `download_detour: direct` on connect; use [localRulePaths] from APK assets.
 /// - **UDP DNS via proxy** — DoH/FakeIP were hanging when egress was sick.
-/// - Split-tunnel RU via **local** `.srs` only (VK/Yandex → direct).
+/// - Split-tunnel RU via **local** `.srs` only (VK/Yandex → direct), toggleable.
 String buildRuntimeSingBoxJson({
   required VpnConfig config,
   required VpnServiceConfig service,
   Map<String, String> localRulePaths = const {},
+  bool includeBundledRuRuleSets = true,
+  List<String> customDirectDomainSuffixes = const [],
 }) {
   final outbound = config.singBoxConfig.primaryOutbound!;
   final proxyTag = outbound.tag.isNotEmpty ? outbound.tag : 'proxy';
@@ -39,7 +41,14 @@ String buildRuntimeSingBoxJson({
     if (apiCidr != null) directCidrs.add(apiCidr);
   } catch (_) {}
 
-  final hasLocalRules = localRulePaths.isNotEmpty;
+  final useBundledRu =
+      includeBundledRuRuleSets && localRulePaths.isNotEmpty;
+  final customSuffixes = customDirectDomainSuffixes
+      .map((e) => e.trim().toLowerCase())
+      .where((e) => e.isNotEmpty)
+      .toSet()
+      .toList()
+    ..sort();
 
   final routeRules = <Map<String, dynamic>>[
     {
@@ -59,7 +68,7 @@ String buildRuntimeSingBoxJson({
         'ip_cidr': directCidrs.toList(),
         'outbound': 'direct',
       },
-    if (hasLocalRules) ...[
+    if (useBundledRu) ...[
       {
         'rule_set': 'geosite-category-ru',
         'outbound': 'direct',
@@ -73,6 +82,11 @@ String buildRuntimeSingBoxJson({
         'outbound': 'direct',
       },
     ],
+    if (customSuffixes.isNotEmpty)
+      {
+        'domain_suffix': customSuffixes,
+        'outbound': 'direct',
+      },
   ];
 
   final runtime = <String, dynamic>{
@@ -108,7 +122,7 @@ String buildRuntimeSingBoxJson({
     ],
     'route': {
       'rules': routeRules,
-      if (hasLocalRules)
+      if (useBundledRu)
         'rule_set': [
           for (final e in localRulePaths.entries)
             {

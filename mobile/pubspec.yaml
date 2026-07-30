@@ -1,7 +1,7 @@
 name: teremok_connect
 description: Teremok Connect VPN client
 publish_to: 'none'
-version: 0.1.3+2004
+version: 0.1.6+2013
 
 environment:
   sdk: ^3.5.0
@@ -24,8 +24,8 @@ dependencies:
   url_launcher: ^6.3.1
   phosphor_flutter: ^2.1.0
   flutter_svg: 2.2.2
-  # rive deferred until we have a .riv asset (CI Flutter 3.24 / Dart 3.5
-  # cannot resolve rive ^0.14 which needs SDK >=3.6).
+  rive: ^0.14.10
+  # Living House Signal Nest — see SignalNestHero + assets/rive/.
   # env-конфиг используем через const — пока без package
 
 dev_dependencies:
@@ -40,7 +40,12 @@ flutter:
   generate: true
   assets:
     # Brand / onboarding (palette v3 oak+moss).
+    # Directory entries are NOT recursive — nest paths must be listed.
     - assets/brand/
+    - assets/brand/connect/s1-flat-launcher.png
+    - assets/icon/mono_teremok.png
+    - assets/icon/nav_vpn_teremok.png
+    - assets/rive/signal_nest_connect.riv
     # PR #35 textures/empty_states intentionally NOT bundled (see
     # assets/brand/DEPRECATED-PR35.md — FLUX Klein 9B non-commercial).
     # Offline copies of sing-box rule-sets (runtime still uses remote URLs).
@@ -49,13 +54,15 @@ flutter:
     - assets/rules/geoip-ru.srs
 
 # Android 13+ themed icons: background + foreground + monochrome.
-# Regenerate: dart run flutter_launcher_icons
-# Source layers: python tool/generate_adaptive_icon.py
+# Regenerate:
+#   python tool/generate_adaptive_icon.py
+#   dart run flutter_launcher_icons
+# Source: Living House mascot (s1-flat-launcher.png) — not oak/moss shield.
 flutter_launcher_icons:
   android: true
   ios: false
-  image_path: assets/icon/fg_oak_moss.png
+  image_path: assets/icon/fg_teremok.png
   adaptive_icon_background: "#FAF8F3"
-  adaptive_icon_foreground: assets/icon/fg_oak_moss.png
-  adaptive_icon_monochrome: assets/icon/mono.png
+  adaptive_icon_foreground: assets/icon/fg_teremok.png
+  adaptive_icon_monochrome: assets/icon/mono_teremok.png
   min_sdk_android: 23

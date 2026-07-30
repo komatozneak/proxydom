@@ -1,40 +1,31 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'core/app_locale.dart';
 import 'core/router.dart';
 import 'core/theme.dart';
 import 'core/updates/update_check_service.dart';
+import 'features/settings/application/locale_provider.dart';
+import 'features/settings/application/theme_mode_provider.dart';
 import 'l10n/app_localizations.dart';
 
-/// Текущий язык приложения. Хранится пока в памяти.
-/// В Шаге 11 заменим на Riverpod + secure_storage.
-class AppLocale {
-  AppLocale._();
+export 'core/app_locale.dart' show AppLocale;
 
-  static Locale _current = const Locale('ru');
-
-  static Locale get current => _current;
-
-  static void set(Locale locale) {
-    _current = locale;
-  }
-
-  static const supportedLocales = [
-    Locale('en'),
-    Locale('ru'),
-  ];
-}
-
-class TeremokApp extends StatelessWidget {
+class TeremokApp extends ConsumerWidget {
   const TeremokApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode =
+        ref.watch(themeModeProvider).valueOrNull ?? ThemeMode.system;
+    final locale = ref.watch(localeProvider).valueOrNull ?? AppLocale.current;
+
     return MaterialApp.router(
       title: 'Teremok Connect',
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.system,
-      locale: AppLocale.current,
+      themeMode: themeMode,
+      locale: locale,
       supportedLocales: AppLocale.supportedLocales,
       localizationsDelegates: AppL10n.localizationsDelegates,
       routerConfig: AppRouter.config,

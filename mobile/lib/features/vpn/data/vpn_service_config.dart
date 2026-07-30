@@ -40,7 +40,7 @@ String resolveVpnDisplayLabel(VpnConfig config, {String? displayLabel}) {
   addHost(config.singBoxConfig.primaryOutbound?.server);
 
   for (final host in hosts) {
-    final known = kKnownNodePlaces[host];
+    final known = placeForKnownHost(host);
     if (known != null) return known.title;
   }
 

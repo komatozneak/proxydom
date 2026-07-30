@@ -1,0 +1,436 @@
+import 'dart:async';
+
+import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../core/theme.dart';
+import '../../../core/widgets/app_icon.dart';
+import '../../../l10n/app_localizations.dart';
+import '../../home/application/vpn_provider.dart';
+import '../../shell/presentation/main_shell.dart';
+import '../data/node_display.dart';
+import '../data/vpn_controller.dart';
+import '../data/vpn_node.dart';
+
+/// Full-screen region list (Locations tab).
+class LocationsScreen extends ConsumerStatefulWidget {
+  const LocationsScreen({super.key});
+
+  @override
+  ConsumerState<LocationsScreen> createState() => _LocationsScreenState();
+}
+
+class _LocationsScreenState extends ConsumerState<LocationsScreen> {
+  List<VpnNode>? _nodes;
+  String? _selectedId;
+  Object? _error;
+  bool _loading = true;
+  bool _lockdownHint = false;
+  bool _fromCache = false;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(_load);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppL10n.of(context);
+    final theme = Theme.of(context);
+
+    ref.listen<int>(locationsTabTickProvider, (prev, next) {
+      if (prev != null && next != prev && !_loading) {
+        unawaited(_load());
+      }
+    });
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(l.regionTitle),
+        centerTitle: true,
+        automaticallyImplyLeading: false,
+      ),
+      body: _buildBody(l, theme),
+    );
+  }
+
+  bool _isTransientNetwork(Object e) {
+    if (e is DioException) {
+      return e.type == DioExceptionType.connectionError ||
+          e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.sendTimeout;
+    }
+    final raw = e.toString().toLowerCase();
+    return raw.contains('connection reset') ||
+        raw.contains('connection abort') ||
+        raw.contains('failed host lookup') ||
+        raw.contains('network is unreachable') ||
+        raw.contains('software caused connection abort');
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+      _lockdownHint = false;
+      _fromCache = false;
+    });
+
+    Object? lastError;
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        final nodesRepo = ref.read(vpnNodesRepositoryProvider);
+        final result = await nodesRepo.listNodesDetailed(
+          // First attempts prefer live; last attempt may use cache.
+          allowCacheFallback: attempt >= 1,
+        );
+        var selectedId = await nodesRepo.getSelectedNodeId();
+        selectedId ??= kRegionAutoId;
+        if (selectedId != kRegionAutoId &&
+            !result.nodes.any((n) => n.id == selectedId)) {
+          selectedId = kRegionAutoId;
+        }
+        if (!mounted) return;
+        setState(() {
+          _nodes = result.nodes;
+          _selectedId = selectedId;
+          _loading = false;
+          _fromCache = result.fromCache;
+        });
+        // Warm GeoIP only for hosts outside the known product pool.
+        for (final n in result.nodes) {
+          if (placeForKnownHost(n.host) != null) continue;
+          unawaited(
+            warmGeoCache(n.host).then((_) {
+              if (mounted) setState(() {});
+            }),
+          );
+        }
+        return;
+      } catch (e) {
+        lastError = e;
+        if (attempt < 2 && _isTransientNetwork(e)) {
+          await Future<void>.delayed(Duration(milliseconds: 400 * (attempt + 1)));
+          continue;
+        }
+        break;
+      }
+    }
+
+    final e = lastError ?? StateError('unknown');
+    final raw = e.toString();
+    final looksLikeAbort = _isTransientNetwork(e) ||
+        raw.contains('connection abort') ||
+        raw.contains('Software caused connection abort') ||
+        raw.contains('HttpException') ||
+        raw.contains('Connection reset');
+    final lockdown = looksLikeAbort
+        ? await VpnController.instance.isLockdownEnabled()
+        : false;
+    if (!mounted) return;
+    setState(() {
+      _error = e;
+      _lockdownHint = looksLikeAbort || lockdown;
+      _loading = false;
+    });
+  }
+
+  Future<void> _pick(String id, String toastLabel) async {
+    final l = AppL10n.of(context);
+    try {
+      await ref.read(vpnProvider.notifier).selectNode(id);
+      if (!mounted) return;
+      setState(() => _selectedId = id);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.regionChanged(toastLabel))),
+      );
+      context.go('/home');
+    } catch (e) {
+      if (!mounted) return;
+      final msg = _isTransientNetwork(e)
+          ? AppL10n.of(context).networkErrorFriendly
+          : l.regionChangeFailed(e.toString());
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg)),
+      );
+    }
+  }
+
+  String _friendlyError(AppL10n l) {
+    if (_lockdownHint) return l.regionLoadErrorAbort;
+    return l.networkErrorFriendly;
+  }
+
+  Widget _buildBody(AppL10n l, ThemeData theme) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const AppIcon(AppIcons.warning, size: 36),
+              const SizedBox(height: 12),
+              Text(
+                _friendlyError(l),
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyLarge,
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: _load,
+                child: Text(l.homeRetry),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final nodes = _nodes ?? const <VpnNode>[];
+    if (nodes.isEmpty) {
+      return Center(child: Text(l.regionEmpty));
+    }
+
+    // Product pool: only show reachable egress (hide Marzban offline workers).
+    final online = nodes.where((n) => n.isConnected || n.isDefault).toList()
+      ..sort((a, b) => a.host.compareTo(b.host));
+
+    var selectedId = _selectedId ?? kRegionAutoId;
+    if (selectedId != kRegionAutoId &&
+        !online.any((n) => n.id == selectedId)) {
+      selectedId = kRegionAutoId;
+    }
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      children: [
+        Text(
+          l.regionSubtitle,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        if (_fromCache) ...[
+          const SizedBox(height: 8),
+          Text(
+            l.regionCachedHint,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+        const SizedBox(height: 16),
+        RegionTile(
+          selected: selectedId == kRegionAutoId,
+          leading: CircleAvatar(
+            backgroundColor: AppBrand.secondary.withValues(alpha: 0.2),
+            child: const AppIcon(AppIcons.servers, size: 22),
+          ),
+          title: l.regionAutoTitle,
+          subtitle: l.regionAutoSubtitle,
+          trailingBadge: l.regionSelected,
+          showBadge: selectedId == kRegionAutoId,
+          onTap: () => _pick(kRegionAutoId, l.regionAutoTitle),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          l.regionSectionServers,
+          style: theme.textTheme.titleSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 8),
+        for (var i = 0; i < online.length; i++)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Builder(
+              builder: (_) {
+                final node = online[i];
+                final locale = Localizations.localeOf(context).languageCode;
+                final place = placeForNode(node, index: i);
+                final selected = selectedId == node.id;
+                final city = place.displaySubtitle(locale);
+                return RegionTile(
+                  selected: selected,
+                  enabled: true,
+                  leading: CircleAvatar(
+                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                    child: Text(
+                      place.flag,
+                      style: const TextStyle(fontSize: 22),
+                    ),
+                  ),
+                  title: place.displayTitle(locale),
+                  subtitle: '$city · ${l.regionOnline}',
+                  trailingBadge: l.regionFree,
+                  showBadge: selected,
+                  signalGood: true,
+                  onTap: () => _pick(node.id, place.displayTitle(locale)),
+                );
+              },
+            ),
+          ),
+        if (online.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              l.regionNoneOnline,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.error,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// Shared region row (Locations tab / legacy sheet).
+class RegionTile extends StatelessWidget {
+  const RegionTile({
+    super.key,
+    required this.selected,
+    required this.leading,
+    required this.title,
+    required this.subtitle,
+    required this.trailingBadge,
+    required this.showBadge,
+    this.enabled = true,
+    this.signalGood = true,
+    this.onTap,
+  });
+
+  final bool selected;
+  final bool enabled;
+  final Widget leading;
+  final String title;
+  final String subtitle;
+  final String trailingBadge;
+  final bool showBadge;
+  final bool signalGood;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final border = selected
+        ? Border.all(color: AppBrand.accent, width: 1.5)
+        : Border.all(color: theme.colorScheme.outlineVariant);
+
+    return Material(
+      color: theme.colorScheme.surfaceContainerHighest.withValues(
+        alpha: enabled ? 0.35 : 0.15,
+      ),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: border,
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: Row(
+            children: [
+              leading,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: enabled
+                            ? theme.colorScheme.onSurface
+                            : theme.colorScheme.outline,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (showBadge)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppBrand.accent.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    trailingBadge,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: AppBrand.accent,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                )
+              else
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    trailingBadge,
+                    style: theme.textTheme.labelSmall,
+                  ),
+                ),
+              const SizedBox(width: 8),
+              _SignalBars(good: signalGood && enabled),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SignalBars extends StatelessWidget {
+  const _SignalBars({required this.good});
+
+  final bool good;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = good ? AppBrand.success : AppBrand.warning;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: List.generate(4, (i) {
+        final h = 6.0 + i * 3;
+        return Padding(
+          padding: const EdgeInsets.only(left: 2),
+          child: Container(
+            width: 4,
+            height: h,
+            decoration: BoxDecoration(
+              color: i < (good ? 4 : 2)
+                  ? color
+                  : color.withValues(alpha: 0.25),
+              borderRadius: BorderRadius.circular(1),
+            ),
+          ),
+        );
+      }),
+    );
+  }
+}

@@ -41,6 +41,7 @@ class VpnConfigRepository {
       throw DioException(
         requestOptions: resp.requestOptions,
         response: resp,
+        type: DioExceptionType.badResponse,
         error: 'Unexpected status: ${resp.statusCode}',
       );
     } on DioException {

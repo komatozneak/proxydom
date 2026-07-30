@@ -12,15 +12,33 @@ import io.nekohasekai.libbox.StatusMessage
 
 /**
  * Subscribes to libbox [CommandClient] status stream for live uplink/downlink speeds.
+ *
+ * [onSpeeds] receives raw bytes/s plus formatted strings for the shade notification.
  */
 class VpnTrafficMonitor(
     private val context: Context,
-    private val onSpeeds: (downText: String, upText: String) -> Unit,
+    private val onSpeeds: (
+        downlinkBps: Long,
+        uplinkBps: Long,
+        downText: String,
+        upText: String,
+    ) -> Unit,
 ) {
     companion object {
         private const val TAG = "VpnTrafficMonitor"
         /** Status interval in nanoseconds (1 s). */
         private const val STATUS_INTERVAL_NS = 1_000_000_000L
+
+        fun formatSpeed(bytesPerSecond: Long): String {
+            if (bytesPerSecond <= 0) return "0 B/s"
+            val kib = 1024.0
+            val mib = kib * 1024.0
+            return when {
+                bytesPerSecond >= mib -> String.format("%.2f MiB/s", bytesPerSecond / mib)
+                bytesPerSecond >= kib -> String.format("%.2f KiB/s", bytesPerSecond / kib)
+                else -> "$bytesPerSecond B/s"
+            }
+        }
     }
 
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -51,9 +69,11 @@ class VpnTrafficMonitor(
 
         override fun writeStatus(status: StatusMessage?) {
             if (status == null || !status.trafficAvailable) return
-            val down = formatSpeed(status.downlink)
-            val up = formatSpeed(status.uplink)
-            mainHandler.post { onSpeeds(down, up) }
+            val downBps = status.downlink
+            val upBps = status.uplink
+            val down = formatSpeed(downBps)
+            val up = formatSpeed(upBps)
+            mainHandler.post { onSpeeds(downBps, upBps, down, up) }
         }
     }
 
@@ -78,16 +98,5 @@ class VpnTrafficMonitor(
         client = null
         runCatching { active.disconnect() }
             .onFailure { Log.w(TAG, "disconnect: ${it.message}") }
-    }
-
-    private fun formatSpeed(bytesPerSecond: Long): String {
-        if (bytesPerSecond <= 0) return "0 B/s"
-        val kib = 1024.0
-        val mib = kib * 1024.0
-        return when {
-            bytesPerSecond >= mib -> String.format("%.2f MiB/s", bytesPerSecond / mib)
-            bytesPerSecond >= kib -> String.format("%.2f KiB/s", bytesPerSecond / kib)
-            else -> "$bytesPerSecond B/s"
-        }
     }
 }

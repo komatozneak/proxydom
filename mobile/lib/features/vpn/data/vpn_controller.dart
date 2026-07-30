@@ -3,10 +3,11 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 
 import 'vpn_config.dart';
+import 'vpn_rule_sets.dart';
 import 'vpn_service_config.dart';
 import 'sing_box_runtime_config.dart';
-import 'vpn_rule_sets.dart';
 import 'vpn_session_meta.dart';
+import '../../settings/data/split_tunnel_prefs.dart';
 
 /// Контроллер VPN-сессии — мост между Flutter UI и Android VpnService.
 ///
@@ -18,6 +19,8 @@ class VpnController {
 
   static const _methodChannel = MethodChannel('teremok/vpn');
   static const _eventChannel = EventChannel('teremok/vpn/status');
+  static const _trafficEventChannel = EventChannel('teremok/vpn/traffic');
+  static const _pingEventChannel = EventChannel('teremok/vpn/ping');
 
   /// Таймаут на start (Шаг 16): 10 сек.
   static const Duration startTimeout = Duration(seconds: 10);
@@ -26,6 +29,8 @@ class VpnController {
   static const Duration stopTimeout = Duration(seconds: 5);
 
   Stream<VpnNativeStatus>? _statusStream;
+  Stream<VpnTrafficStats>? _trafficStream;
+  Stream<int?>? _pingStream;
 
   /// Подключиться к VPN с переданным конфигом.
   ///
@@ -47,9 +52,13 @@ class VpnController {
       // Bundled .srs — never download from GitHub at connect time (RF blocks).
       Map<String, String> localRules = const {};
       var ruRulesLoaded = false;
+      final includeBundledRu = await SplitTunnelPrefs.isBundledRuEnabled();
+      final customSuffixes = await SplitTunnelPrefs.enabledDomainSuffixes();
       try {
-        localRules = await prepareLocalRuleSetPaths();
-        ruRulesLoaded = localRules.length == kRuleSetAssets.length;
+        if (includeBundledRu) {
+          localRules = await prepareLocalRuleSetPaths();
+          ruRulesLoaded = localRules.length == kRuleSetAssets.length;
+        }
       } catch (e) {
         // Unit tests lack path_provider; connect still works without RU split.
         // ignore: avoid_print
@@ -64,6 +73,8 @@ class VpnController {
         config: config,
         service: serviceConfig,
         localRulePaths: localRules,
+        includeBundledRuRuleSets: includeBundledRu,
+        customDirectDomainSuffixes: customSuffixes,
       );
       final paramsJson = serviceConfig.toJsonStringWithSingBox(singBoxConfigJson);
 
@@ -77,6 +88,9 @@ class VpnController {
               );
             },
           );
+      if (result == true) {
+        await SplitTunnelPrefs.markApplied();
+      }
       return result ?? false;
     } on TimeoutException catch (e) {
       throw VpnControllerException('start timeout: $e');
@@ -119,6 +133,18 @@ class VpnController {
     }
   }
 
+  /// Native session flag (`active=true`) — set on connect, cleared on intentional stop.
+  Future<bool> hasActiveSession() async {
+    try {
+      final result = await _methodChannel.invokeMethod<bool>('hasActiveSession');
+      return result ?? false;
+    } on PlatformException {
+      return false;
+    } on MissingPluginException {
+      return false;
+    }
+  }
+
   /// Последнее сообщение об ошибке от libbox/VpnService (если status == error).
   Future<String?> getLastError() async {
     try {
@@ -156,9 +182,32 @@ class VpnController {
   }
 
   /// Android Always-on "Block connections without VPN" — blocks excludeRoute.
+  ///
+  /// Prefer [queryLockdownState] when OFF vs query-failure must be distinct.
   Future<bool> isLockdownEnabled() async {
+    return (await queryLockdownState()) == VpnLockdownState.enabled;
+  }
+
+  /// Observed Android lockdown: enabled / disabled / unavailable (query error).
+  Future<VpnLockdownState> queryLockdownState() async {
     try {
-      final result = await _methodChannel.invokeMethod<bool>('isLockdownEnabled');
+      final result =
+          await _methodChannel.invokeMethod<bool>('isLockdownEnabled');
+      if (result == null) return VpnLockdownState.unavailable;
+      return result ? VpnLockdownState.enabled : VpnLockdownState.disabled;
+    } on PlatformException {
+      return VpnLockdownState.unavailable;
+    } on MissingPluginException {
+      return VpnLockdownState.unavailable;
+    }
+  }
+
+  /// Opens system VPN settings (`Settings.ACTION_VPN_SETTINGS`). Returns false
+  /// if the OEM has no matching activity or the launch fails.
+  Future<bool> openVpnSettings() async {
+    try {
+      final result =
+          await _methodChannel.invokeMethod<bool>('openVpnSettings');
       return result ?? false;
     } on PlatformException {
       return false;
@@ -201,6 +250,48 @@ class VpnController {
     return _statusStream!;
   }
 
+  /// Live ↓/↑ from Android libbox (~1 Hz). Empty/zeros when disconnected or iOS.
+  Stream<VpnTrafficStats> get trafficStream {
+    _trafficStream ??= _trafficEventChannel
+        .receiveBroadcastStream()
+        .map((event) {
+          if (event is Map) {
+            final down = event['downlinkBps'];
+            final up = event['uplinkBps'];
+            return VpnTrafficStats(
+              downlinkBps: (down is num) ? down.toInt() : 0,
+              uplinkBps: (up is num) ? up.toInt() : 0,
+            );
+          }
+          return const VpnTrafficStats.zero();
+        })
+        .handleError((_) => const VpnTrafficStats.zero());
+    return _trafficStream!;
+  }
+
+  /// Live path RTT (ms) from libbox urlTest. Nulls filtered; invalid samples
+  /// never leave the native monitor.
+  Stream<int?> get pingStream {
+    _pingStream ??= _pingEventChannel
+        .receiveBroadcastStream()
+        .map((event) {
+          if (event is Map) {
+            final ms = event['delayMs'];
+            if (ms is num) {
+              final v = ms.toInt();
+              if (v >= 30 && v <= 5000) return v;
+            }
+          }
+          if (event is num) {
+            final v = event.toInt();
+            if (v >= 30 && v <= 5000) return v;
+          }
+          return null;
+        })
+        .handleError((_) => null);
+    return _pingStream!;
+  }
+
   /// Проверить/запросить VPN permission. На Android покажет системный диалог.
   ///
   /// Возвращает true если permission уже есть (или был только что выдан).
@@ -216,7 +307,15 @@ class VpnController {
 }
 
 /// Статусы, возвращаемые нативным кодом через EventChannel `teremok/vpn/status`.
+/// Observed Android "Block connections without VPN" (Always-on lockdown).
 ///
+/// [unavailable] means the platform query failed — never treat as [disabled].
+enum VpnLockdownState {
+  enabled,
+  disabled,
+  unavailable,
+}
+
 /// Имена совпадают со строковыми значениями в [VpnStatusBroadcaster] на Kotlin
 /// (см. TeremokVpnService.kt).
 enum VpnNativeStatus {
@@ -228,6 +327,35 @@ enum VpnNativeStatus {
   disconnecting,
   revoked,
   error,
+}
+
+/// Live traffic rates from Android libbox (bytes per second).
+final class VpnTrafficStats {
+  const VpnTrafficStats({
+    required this.downlinkBps,
+    required this.uplinkBps,
+  });
+
+  const VpnTrafficStats.zero()
+      : downlinkBps = 0,
+        uplinkBps = 0;
+
+  final int downlinkBps;
+  final int uplinkBps;
+
+  /// Compact tile label (matches shade units: B/s · KiB/s · MiB/s).
+  static String formatSpeed(int bytesPerSecond) {
+    if (bytesPerSecond <= 0) return '0 B/s';
+    const kib = 1024.0;
+    const mib = kib * 1024.0;
+    if (bytesPerSecond >= mib) {
+      return '${(bytesPerSecond / mib).toStringAsFixed(2)} MiB/s';
+    }
+    if (bytesPerSecond >= kib) {
+      return '${(bytesPerSecond / kib).toStringAsFixed(2)} KiB/s';
+    }
+    return '$bytesPerSecond B/s';
+  }
 }
 
 class VpnControllerException implements Exception {

@@ -1,7 +1,10 @@
 package com.teremok.connect.teremok_connect
 
+import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.net.ConnectivityManager
 import android.net.IpPrefix
+import android.net.NetworkCapabilities
 import android.net.VpnService
 import android.os.Build
 import android.os.Handler
@@ -50,6 +53,76 @@ class TeremokVpnService : VpnService() {
         private var instance: TeremokVpnService? = null
 
         fun currentInstance(): TeremokVpnService? = instance
+
+        /**
+         * Always-on "Block connections without VPN".
+         *
+         * Prefer [VpnService.isLockdownEnabled] (system runtime SoT on API 29+).
+         * [Settings.Secure] `always_on_vpn_lockdown` alone can lag after Off→On.
+         */
+        fun queryAlwaysOnVpnLockdown(
+            context: android.content.Context,
+            service: TeremokVpnService? = currentInstance(),
+        ): Boolean {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val svc = service ?: currentInstance()
+                if (svc != null) {
+                    val enabled = svc.isLockdownEnabled
+                    Log.i(TAG, "lockdown VpnService.isLockdownEnabled=$enabled")
+                    return enabled
+                }
+            }
+            val fromSecure = Settings.Secure.getInt(
+                context.contentResolver,
+                "always_on_vpn_lockdown",
+                0,
+            ) == 1
+            val alwaysOnPkg = Settings.Secure.getString(
+                context.contentResolver,
+                "always_on_vpn_app",
+            )
+            Log.i(
+                TAG,
+                "lockdown Secure=$fromSecure alwaysOnPkg=$alwaysOnPkg pkg=${context.packageName}",
+            )
+            // If package is recorded and it isn't us, treat as off for our tile.
+            if (alwaysOnPkg != null && alwaysOnPkg != context.packageName) {
+                return false
+            }
+            return fromSecure
+        }
+
+        /** Last successful connect still marked active (Always-on / UI sync). */
+        fun hasActiveSession(context: android.content.Context): Boolean =
+            sessionPrefs(context).getBoolean(KEY_ACTIVE, false)
+
+        /** System reports a VPN transport (works even if [instance] is briefly null). */
+        fun isSystemVpnUp(context: android.content.Context): Boolean {
+            val cm = context.getSystemService(ConnectivityManager::class.java) ?: return false
+            return cm.allNetworks.any { network ->
+                val caps = cm.getNetworkCapabilities(network)
+                caps?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
+            }
+        }
+
+        /**
+         * Status for Flutter [getStatus] — prefer live service, then
+         * active-session + system VPN (Always-on / process race).
+         */
+        fun resolveUiStatus(context: android.content.Context): String {
+            val live = instance?.currentStatus
+            if (live != null && live != "idle") return live
+            if (hasActiveSession(context) && isSystemVpnUp(context)) {
+                return "connected"
+            }
+            if (live != null) return live
+            val broadcast = VpnStatusBroadcaster.currentStatus()
+            if (broadcast != "idle") return broadcast
+            if (hasActiveSession(context) && isSystemVpnUp(context)) {
+                return "connected"
+            }
+            return broadcast
+        }
 
         /** Получить системный Intent для запроса VPN-разрешения, или null если уже есть. */
         fun prepareVpn(context: android.content.Context): Intent? {
@@ -116,8 +189,12 @@ class TeremokVpnService : VpnService() {
 
     private var tunInterface: ParcelFileDescriptor? = null
     private var isRunning = false
+    /** True only while [startVpn] is establishing TUN/libbox (not onCreate hint). */
+    @Volatile
+    private var establishInProgress = false
     private var tunForwarder: TunForwarder? = null
     private var trafficMonitor: VpnTrafficMonitor? = null
+    private var pingMonitor: VpnPingMonitor? = null
     private var notificationSessionLine: String = "Теремок VPN"
 
     /**
@@ -133,9 +210,16 @@ class TeremokVpnService : VpnService() {
         super.onCreate()
         instance = this
         VpnStatusBroadcaster.attachAppContext(applicationContext)
-        currentStatus = "idle"
-        VpnStatusBroadcaster.emit(currentStatus)
-        Log.i(TAG, "onCreate: VpnService создан")
+        // Do NOT broadcast "idle" here when Always-on is about to restore —
+        // Flutter syncFromNative would paint Disconnected while the tunnel is up.
+        if (prefs().getBoolean(KEY_ACTIVE, false)) {
+            currentStatus = "preparing"
+            VpnStatusBroadcaster.emit(currentStatus)
+        } else {
+            currentStatus = "idle"
+            VpnStatusBroadcaster.emit(currentStatus)
+        }
+        Log.i(TAG, "onCreate: VpnService создан status=$currentStatus")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -195,41 +279,51 @@ class TeremokVpnService : VpnService() {
     /**
      * After reboot / process death Always-on restarts VpnService without ACTION_START.
      * Rebuild tunnel from the last successful session if the user left VPN "active".
+     *
+     * Important: [onCreate] may set [currentStatus] to `preparing` as a UI hint when
+     * KEY_ACTIVE is set. That must NOT block restore — otherwise we stick in
+     * preparing forever and Flutter shows endless «Подключение…».
      */
     private fun restoreSessionIfNeeded() {
-        if (isRunning || currentStatus == "preparing" || currentStatus == "connecting") {
-            Log.i(TAG, "restoreSessionIfNeeded: already active ($currentStatus)")
+        if (isRunning) {
+            Log.i(TAG, "restoreSessionIfNeeded: already running")
             return
         }
         val store = prefs()
         if (!store.getBoolean(KEY_ACTIVE, false)) {
             Log.i(TAG, "restoreSessionIfNeeded: no active session")
+            if (currentStatus == "preparing") {
+                currentStatus = "idle"
+                VpnStatusBroadcaster.emit(currentStatus)
+            }
             return
         }
         val paramsJson = store.getString(KEY_PARAMS_JSON, null)
         if (paramsJson.isNullOrBlank()) {
             Log.w(TAG, "restoreSessionIfNeeded: active flag without params — clearing")
             clearSession()
+            currentStatus = "idle"
+            VpnStatusBroadcaster.emit(currentStatus)
             return
         }
         val username = store.getString(KEY_USERNAME, "anonymous") ?: "anonymous"
         val protocol = store.getString(KEY_PROTOCOL, "unknown") ?: "unknown"
-        Log.i(TAG, "restoreSessionIfNeeded: restarting (user=$username, proto=$protocol)")
+        Log.i(TAG, "restoreSessionIfNeeded: restarting (user=$username, proto=$protocol, was=$currentStatus)")
         val params = runCatching { jsonToMap(JSONObject(paramsJson)) }
             .onFailure { Log.w(TAG, "restoreSessionIfNeeded: bad JSON", it) }
             .getOrDefault(emptyMap())
         if (params.isEmpty()) {
             clearSession()
+            currentStatus = "idle"
+            VpnStatusBroadcaster.emit(currentStatus)
             return
         }
         startVpn(username, protocol, params)
     }
 
-    /** Secure setting — do not override [VpnService.isLockdownEnabled] (API 29+). */
+    /** Prefer runtime SoT; Secure can lag right after the user toggles lockdown. */
     private fun isAlwaysOnVpnLockdownSetting(): Boolean =
-        runCatching {
-            Settings.Secure.getInt(contentResolver, "always_on_vpn_lockdown", 0) == 1
-        }.getOrDefault(false)
+        queryAlwaysOnVpnLockdown(this, this)
 
     /**
      * Keep VLESS egress + control-plane API off the TUN so Dio/API survives a
@@ -320,8 +414,11 @@ class TeremokVpnService : VpnService() {
             VpnStatusBroadcaster.emit(currentStatus)
             return
         }
-        if (currentStatus == "preparing" || currentStatus == "connecting") {
-            Log.w(TAG, "startVpn: уже в процессе ($currentStatus), пропускаем")
+        // Note: onCreate may set currentStatus=preparing when KEY_ACTIVE (UI hint
+        // for Always-on). That must NOT block a real ACTION_START — only an
+        // in-flight establish / debounce should.
+        if (establishInProgress) {
+            Log.w(TAG, "startVpn: establish already in progress, пропускаем")
             return
         }
         val now = System.currentTimeMillis()
@@ -330,6 +427,7 @@ class TeremokVpnService : VpnService() {
             return
         }
         lastStartAttemptMs = now
+        establishInProgress = true
 
         notificationSessionLine = buildNotificationSessionLine(params, protocol)
         startForeground(
@@ -486,6 +584,7 @@ class TeremokVpnService : VpnService() {
                 return
             }
 
+            establishInProgress = false
             currentStatus = "connected"
             VpnStatusBroadcaster.emit(currentStatus)
             showConnectedNotification()
@@ -498,6 +597,7 @@ class TeremokVpnService : VpnService() {
     }
 
     private fun failStart(message: String) {
+        establishInProgress = false
         VpnStatusBroadcaster.setError(message)
         currentStatus = "error"
         VpnStatusBroadcaster.emit(currentStatus)
@@ -506,6 +606,7 @@ class TeremokVpnService : VpnService() {
 
     private fun stopVpn() {
         if (!isRunning) {
+            establishInProgress = false
             currentStatus = "idle"
             VpnStatusBroadcaster.emit(currentStatus)
             Log.w(TAG, "stopVpn: не запущен, пропускаем")
@@ -527,6 +628,7 @@ class TeremokVpnService : VpnService() {
             ProtectGuard.onFailure = null
             tunInterface = null
             isRunning = false
+            establishInProgress = false
             currentStatus = "idle"
             VpnStatusBroadcaster.emit(currentStatus)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -559,35 +661,59 @@ class TeremokVpnService : VpnService() {
         ) {
             return
         }
-        if (VpnNotificationHelper.isDetailedEnabled(this) && currentStatus == "connected") {
+        // Traffic monitor always runs while connected (feeds Home + optional shade).
+        if (currentStatus == "connected") {
             startTrafficMonitor()
-            showConnectedNotification()
-        } else {
-            stopTrafficMonitor()
-            if (currentStatus == "connected") {
-                showConnectedNotification()
+            val down = if (VpnNotificationHelper.isDetailedEnabled(this)) {
+                VpnTrafficBroadcaster.lastDownText
             } else {
-                startForeground(
-                    VpnNotificationHelper.notificationId(),
-                    VpnNotificationHelper.startConnecting(this),
-                )
+                ""
             }
+            val up = if (VpnNotificationHelper.isDetailedEnabled(this)) {
+                VpnTrafficBroadcaster.lastUpText
+            } else {
+                ""
+            }
+            showConnectedNotification(downText = down, upText = up)
+        } else {
+            startForeground(
+                VpnNotificationHelper.notificationId(),
+                VpnNotificationHelper.startConnecting(this),
+            )
         }
     }
 
     private fun startTrafficMonitor() {
         stopTrafficMonitor()
-        if (!VpnNotificationHelper.isDetailedEnabled(this)) return
-        trafficMonitor = VpnTrafficMonitor(this) { down, up ->
-            if (currentStatus == "connected") {
-                showConnectedNotification(downText = down, upText = up)
+        trafficMonitor = VpnTrafficMonitor(this) { downBps, upBps, downText, upText ->
+            VpnTrafficBroadcaster.emit(downBps, upBps, downText, upText)
+            if (currentStatus == "connected" &&
+                VpnNotificationHelper.isDetailedEnabled(this)
+            ) {
+                showConnectedNotification(downText = downText, upText = upText)
             }
         }.also { it.start() }
+        startPingMonitor()
     }
 
     private fun stopTrafficMonitor() {
+        stopPingMonitor()
         trafficMonitor?.stop()
         trafficMonitor = null
+        VpnTrafficBroadcaster.clear()
+    }
+
+    private fun startPingMonitor() {
+        stopPingMonitor()
+        pingMonitor = VpnPingMonitor { delayMs ->
+            VpnPingBroadcaster.emit(delayMs)
+        }.also { it.start() }
+    }
+
+    private fun stopPingMonitor() {
+        pingMonitor?.stop()
+        pingMonitor = null
+        VpnPingBroadcaster.clear()
     }
 
     override fun onRevoke() {
@@ -613,6 +739,8 @@ class TeremokVpnService : VpnService() {
 object VpnChannelRegistry {
     const val METHOD_CHANNEL = "teremok/vpn"
     const val EVENT_CHANNEL = "teremok/vpn/status"
+    const val TRAFFIC_EVENT_CHANNEL = "teremok/vpn/traffic"
+    const val PING_EVENT_CHANNEL = "teremok/vpn/ping"
 
     fun register(
         engine: FlutterEngine,
@@ -663,21 +791,64 @@ object VpnChannelRegistry {
                         result.success(true)
                     }
                     "getStatus" -> {
-                        val fromService = serviceProvider()?.currentStatus
-                        result.success(fromService ?: VpnStatusBroadcaster.currentStatus())
+                        result.success(TeremokVpnService.resolveUiStatus(appContext))
+                    }
+                    "hasActiveSession" -> {
+                        result.success(TeremokVpnService.hasActiveSession(appContext))
                     }
                     "getLastError" -> {
                         result.success(VpnStatusBroadcaster.lastError())
                     }
                     "isLockdownEnabled" -> {
-                        val locked = runCatching {
-                            Settings.Secure.getInt(
-                                appContext.contentResolver,
-                                "always_on_vpn_lockdown",
-                                0,
-                            ) == 1
-                        }.getOrDefault(false)
-                        result.success(locked)
+                        // Distinguish query failure from "off" — do not default to false.
+                        // Prefer VpnService.isLockdownEnabled (system SoT); Secure alone can
+                        // stay stale after Off→On until a later process restart.
+                        runCatching {
+                            TeremokVpnService.queryAlwaysOnVpnLockdown(
+                                appContext,
+                                serviceProvider() ?: TeremokVpnService.currentInstance(),
+                            )
+                        }.fold(
+                            onSuccess = { result.success(it) },
+                            onFailure = { e ->
+                                result.error(
+                                    "LOCKDOWN_QUERY_FAILED",
+                                    e.message,
+                                    null,
+                                )
+                            },
+                        )
+                    }
+                    "openVpnSettings" -> {
+                        // Prefer Activity context; fall back to app + NEW_TASK.
+                        // Do not treat resolveActivity==null as hard fail before
+                        // start — API 30+ package visibility can hide Settings
+                        // unless <queries> declares VPN_SETTINGS (see manifest).
+                        try {
+                            val activity = activityProvider()
+                            val intent = Intent(Settings.ACTION_VPN_SETTINGS)
+                            if (activity == null) {
+                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            val pm = (activity ?: appContext).packageManager
+                            val resolved = intent.resolveActivity(pm)
+                            Log.i(
+                                TeremokVpnService.TAG,
+                                "openVpnSettings resolve=$resolved activity=${activity != null}",
+                            )
+                            if (activity != null) {
+                                activity.startActivity(intent)
+                            } else {
+                                appContext.startActivity(intent)
+                            }
+                            result.success(true)
+                        } catch (e: ActivityNotFoundException) {
+                            Log.w(TeremokVpnService.TAG, "openVpnSettings: no activity", e)
+                            result.error("VPN_SETTINGS_UNAVAILABLE", e.message, null)
+                        } catch (e: Exception) {
+                            Log.w(TeremokVpnService.TAG, "openVpnSettings failed", e)
+                            result.error("VPN_SETTINGS_FAILED", e.message, null)
+                        }
                     }
                     "getSingBoxStderrTail" -> {
                         val maxLines = call.argument<Int>("maxLines") ?: 30
@@ -717,6 +888,30 @@ object VpnChannelRegistry {
 
                 override fun onCancel(arguments: Any?) {
                     VpnStatusBroadcaster.unregister()
+                }
+            })
+
+        // EventChannel — live ↓/↑ bytes/s for Home stats (independent of shade prefs)
+        EventChannel(engine.dartExecutor.binaryMessenger, TRAFFIC_EVENT_CHANNEL)
+            .setStreamHandler(object : EventChannel.StreamHandler {
+                override fun onListen(arguments: Any?, events: EventChannel.EventSink) {
+                    VpnTrafficBroadcaster.register(events)
+                }
+
+                override fun onCancel(arguments: Any?) {
+                    VpnTrafficBroadcaster.unregister()
+                }
+            })
+
+        // EventChannel — libbox urlTest delay (ms) for Home ping
+        EventChannel(engine.dartExecutor.binaryMessenger, PING_EVENT_CHANNEL)
+            .setStreamHandler(object : EventChannel.StreamHandler {
+                override fun onListen(arguments: Any?, events: EventChannel.EventSink) {
+                    VpnPingBroadcaster.register(events)
+                }
+
+                override fun onCancel(arguments: Any?) {
+                    VpnPingBroadcaster.unregister()
                 }
             })
     }
@@ -1032,6 +1227,131 @@ object VpnStatusBroadcaster {
                     current.success(status)
                 } catch (e: Exception) {
                     Log.w(TeremokVpnService.TAG, "VpnStatusBroadcaster.emit failed: ${e.message}")
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Broadcasts libbox downlink/uplink rates to Flutter EventChannel `teremok/vpn/traffic`.
+ */
+object VpnTrafficBroadcaster {
+    @Volatile
+    private var sink: EventChannel.EventSink? = null
+
+    @Volatile
+    var lastDownlinkBps: Long = 0
+        private set
+
+    @Volatile
+    var lastUplinkBps: Long = 0
+        private set
+
+    @Volatile
+    var lastDownText: String = ""
+        private set
+
+    @Volatile
+    var lastUpText: String = ""
+        private set
+
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    fun register(sink: EventChannel.EventSink) {
+        this.sink = sink
+        val payload = mapOf(
+            "downlinkBps" to lastDownlinkBps,
+            "uplinkBps" to lastUplinkBps,
+        )
+        mainHandler.post {
+            try {
+                sink.success(payload)
+            } catch (e: Exception) {
+                Log.w(TeremokVpnService.TAG, "VpnTrafficBroadcaster.replay failed: ${e.message}")
+            }
+        }
+    }
+
+    fun unregister() {
+        sink = null
+    }
+
+    fun clear() {
+        lastDownlinkBps = 0
+        lastUplinkBps = 0
+        lastDownText = ""
+        lastUpText = ""
+        emit(0, 0, "", "")
+    }
+
+    fun emit(downlinkBps: Long, uplinkBps: Long, downText: String, upText: String) {
+        lastDownlinkBps = downlinkBps
+        lastUplinkBps = uplinkBps
+        lastDownText = downText
+        lastUpText = upText
+        val payload = mapOf(
+            "downlinkBps" to downlinkBps,
+            "uplinkBps" to uplinkBps,
+        )
+        mainHandler.post {
+            val current = sink
+            if (current != null) {
+                try {
+                    current.success(payload)
+                } catch (e: Exception) {
+                    Log.w(TeremokVpnService.TAG, "VpnTrafficBroadcaster.emit failed: ${e.message}")
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Broadcasts libbox urlTest delay (ms) to Flutter EventChannel `teremok/vpn/ping`.
+ */
+object VpnPingBroadcaster {
+    @Volatile
+    private var sink: EventChannel.EventSink? = null
+
+    @Volatile
+    var lastDelayMs: Int? = null
+        private set
+
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    fun register(sink: EventChannel.EventSink) {
+        this.sink = sink
+        val replay = lastDelayMs
+        if (replay != null) {
+            mainHandler.post {
+                try {
+                    sink.success(mapOf("delayMs" to replay))
+                } catch (e: Exception) {
+                    Log.w(TeremokVpnService.TAG, "VpnPingBroadcaster.replay failed: ${e.message}")
+                }
+            }
+        }
+    }
+
+    fun unregister() {
+        sink = null
+    }
+
+    fun clear() {
+        lastDelayMs = null
+    }
+
+    fun emit(delayMs: Int) {
+        lastDelayMs = delayMs
+        val payload = mapOf("delayMs" to delayMs)
+        mainHandler.post {
+            val current = sink
+            if (current != null) {
+                try {
+                    current.success(payload)
+                } catch (e: Exception) {
+                    Log.w(TeremokVpnService.TAG, "VpnPingBroadcaster.emit failed: ${e.message}")
                 }
             }
         }

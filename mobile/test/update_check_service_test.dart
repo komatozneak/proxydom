@@ -83,7 +83,7 @@ void main() {
 
     test('returns shouldPrompt when server is newer', () async {
       adapter.onGet(
-        'app/version',
+        '/app/version',
         (server) => server.reply(200, {
           'version': '0.1.3',
           'build_number': 2004,
@@ -100,7 +100,7 @@ void main() {
 
     test('skips prompt when download_url empty', () async {
       adapter.onGet(
-        'app/version',
+        '/app/version',
         (server) => server.reply(200, {
           'version': '0.1.3',
           'build_number': 2004,
@@ -115,11 +115,11 @@ void main() {
 
     test('silent on network error', () async {
       adapter.onGet(
-        'app/version',
+        '/app/version',
         (server) => server.throws(
           500,
           DioException(
-            requestOptions: RequestOptions(path: 'app/version'),
+            requestOptions: RequestOptions(path: '/app/version'),
             type: DioExceptionType.connectionTimeout,
           ),
         ),

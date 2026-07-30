@@ -20,7 +20,8 @@ on:
         type: boolean
 
 env:
-  FLUTTER_VERSION: "3.29.3"
+  # rive_native 0.1.x needs SemanticsRole / isRequired (post-3.29).
+  FLUTTER_VERSION: "3.35.1"
   JAVA_VERSION: "17"
   MIN_SDK: "23"
 
@@ -131,37 +132,20 @@ jobs:
           echo "=== Sizes ==="
           du -sh build/app/outputs/flutter-apk/*.apk 2>/dev/null || true
 
+      # Compile must produce the universal APK; upload is best-effort so an
+      # Actions storage-quota hit cannot fail an otherwise green build
+      # (4× ABI uploads @ 30d previously exhausted the account).
+      - name: Verify release APK exists
+        run: test -f mobile/build/app/outputs/flutter-apk/app-release.apk
+
       - name: Upload universal APK
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: android-apk-universal
           path: mobile/build/app/outputs/flutter-apk/app-release.apk
-          retention-days: 30
+          retention-days: 7
           if-no-files-found: error
-
-      - name: Upload arm64-v8a APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-apk-arm64-v8a
-          path: mobile/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
-          retention-days: 30
-          if-no-files-found: warn
-
-      - name: Upload armeabi-v7a APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-apk-armeabi-v7a
-          path: mobile/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
-          retention-days: 30
-          if-no-files-found: warn
-
-      - name: Upload x86_64 APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-apk-x86_64
-          path: mobile/build/app/outputs/flutter-apk/app-x86_64-release.apk
-          retention-days: 30
-          if-no-files-found: warn
 
       - name: Build summary
         if: always()
@@ -171,18 +155,14 @@ jobs:
             echo ""
             echo "| Artifact | Path | Approx Size |"
             echo "|---|---|---|"
-            echo "| Universal APK | android-apk-universal | 108 MB |"
-            echo "| arm64-v8a | android-apk-arm64-v8a | 74 MB |"
-            echo "| armeabi-v7a | android-apk-armeabi-v7a | 71 MB |"
-            echo "| x86_64 | android-apk-x86_64 | 75 MB |"
+            echo "| Universal APK | android-apk-universal | ~110 MB |"
             echo ""
-            echo "All artifacts retention: 30 days."
+            echo "Retention: 7 days (universal only; ABI splits not uploaded)."
+            echo "Upload is best-effort (continue-on-error) so storage quota"
+            echo "cannot fail a green compile."
             echo ""
-            echo "Download the right APK for your device:"
-            echo "- Most modern Android devices -> **arm64-v8a**"
-            echo "- Older devices 2018-2020 -> **armeabi-v7a**"
-            echo "- Emulator on Mac/PC with Intel -> **x86_64**"
-            echo "- Universal (all architectures) -> **android-apk-universal**"
+            echo "Local/Pixel: prefer \`flutter build apk --release --split-per-abi\`"
+            echo "and install arm64-v8a for modern devices."
           } >> "$GITHUB_STEP_SUMMARY"
 
   integration-test:

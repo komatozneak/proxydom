@@ -27,7 +27,14 @@ import 'package:teremok_connect/l10n/app_localizations.dart';
 /// Instant nodes catalog — home init must not hit the real VPS in CI.
 class _FakeVpnNodesRepository extends VpnNodesRepository {
   @override
-  Future<List<VpnNode>> listNodes() async => const [];
+  Future<List<VpnNode>> listNodes({bool allowCacheFallback = true}) async =>
+      const [];
+
+  @override
+  Future<({List<VpnNode> nodes, bool fromCache})> listNodesDetailed({
+    bool allowCacheFallback = true,
+  }) async =>
+      (nodes: <VpnNode>[], fromCache: false);
 
   @override
   Future<String?> getSelectedNodeId() async => null;
@@ -63,7 +70,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Вход'), findsWidgets);
-    expect(find.text('Позвонить'), findsOneWidget);
+    expect(find.text('Позвонить мне'), findsOneWidget);
     expect(find.byType(DropdownButtonFormField<PhoneCountry>), findsOneWidget);
     expect(find.byType(TextFormField), findsOneWidget);
   });
@@ -75,7 +82,7 @@ void main() {
     AppRouter.config.go('/login');
     await tester.pumpAndSettle();
 
-    expect(find.text('Позвонить'), findsOneWidget);
+    expect(find.text('Позвонить мне'), findsOneWidget);
     expect(find.textContaining('🇷🇺'), findsOneWidget);
     expect(find.byType(TextFormField), findsOneWidget);
   });
@@ -99,8 +106,8 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.text('Введите код'), findsOneWidget);
-    expect(find.textContaining('Перезвонить'), findsOneWidget);
+    expect(find.text('Код из звонка'), findsOneWidget);
+    expect(find.textContaining('Позвонить повторно'), findsOneWidget);
     // PIN uses one hidden numeric TextField (maxLength 4) + 4 visual boxes.
     // Login phone TextField may still be in the router stack — don't count all.
     expect(
@@ -150,6 +157,7 @@ void main() {
           accessToken: 'fake',
           refreshToken: 'fake',
         );
+    AppRouter.postAuthResolved = true;
     AppRouter.refreshNotifier.notifyAuthChanged();
 
     await tester.pumpWidget(
@@ -162,10 +170,19 @@ void main() {
     await tester.pump();
     AppRouter.config.go('/home');
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    // VpnNotifier syncFromNative uses staggered Future.delayed retries.
+    await tester.pump(const Duration(seconds: 5));
 
-    expect(find.text('Подключиться'), findsOneWidget);
-    expect(find.text('Отключено'), findsOneWidget);
+    expect(find.text('ОТКЛЮЧЕНО'), findsOneWidget);
+    // Shell nav labels; some also appear as section/AppBar titles.
+    expect(find.text('Главная'), findsAtLeastNWidgets(1));
+    expect(find.text('Локации'), findsAtLeastNWidgets(1));
+    expect(find.text('Настройки'), findsAtLeastNWidgets(1));
+    expect(find.byType(NavigationBar), findsOneWidget);
+
+    // Nest uses repeating AnimationControllers — dispose before timer check.
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 1));
   });
 
   test('AuthState sealed: defaults to Unauthenticated when no tokens', () async {

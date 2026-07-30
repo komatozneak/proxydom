@@ -1,23 +1,24 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../auth/application/auth_provider.dart';
-import '../../auth/application/auth_state.dart';
-import '../../auth/application/logout_handler.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../core/widgets/connect_button.dart';
+import '../../../core/widgets/signal_nest_hero.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../vpn/data/node_display.dart';
 import '../../vpn/data/vpn_node.dart';
-import '../../vpn/data/vpn_controller.dart';
-import '../../vpn/presentation/region_picker.dart';
 import '../application/vpn_provider.dart';
 import '../application/vpn_status.dart';
-import '../data/external_ip_service.dart';
-import '../../../../app.dart';
-import '../../../../core/widgets/app_icon.dart';
-import '../../../../l10n/app_localizations.dart';
-import '../../settings/presentation/settings_screen.dart';
+import 'widgets/compact_metrics_row.dart';
+import 'widgets/radial_gradient_ground.dart';
+import 'widgets/server_card.dart';
+import 'widgets/uptime_row.dart';
 
+/// Variant 4 Home: Nest CTA + Server card + compact metrics (hide-until-connected).
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
@@ -27,15 +28,19 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen>
     with WidgetsBindingObserver {
-  bool _logoutInProgress = false;
-  String _regionSubtitle = '…';
+  String _serverTitle = '…';
+  String _serverSubtitle = '';
+  String _serverFlag = '🌐';
+  bool _isAuto = true;
+  /// Sticky key for last good Server card (node id or egress host).
+  String? _placeStickyKey;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _refreshRegionLabel();
+      _refreshServerCard();
       ref.read(vpnProvider.notifier).syncFromNative();
     });
   }
@@ -53,38 +58,129 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     }
   }
 
-  Future<void> _refreshRegionLabel() async {
+  Future<void> _refreshServerCard() async {
     final l = AppL10n.of(context);
     final locale = Localizations.localeOf(context).languageCode;
     final nodesRepo = ref.read(vpnNodesRepositoryProvider);
     try {
       final selectedId = await nodesRepo.getSelectedNodeId();
       if (!mounted) return;
-      if (selectedId == null || selectedId == kRegionAutoId) {
-        setState(() => _regionSubtitle = l.homeRegionAuto);
-        return;
-      }
+      final isAuto = selectedId == null || selectedId == kRegionAutoId;
       final nodes = await nodesRepo.listNodes();
       if (!mounted) return;
-      if (nodes.isEmpty) {
-        setState(() => _regionSubtitle = l.homeRegion);
+
+      VpnNode? node;
+      var index = 0;
+      if (isAuto) {
+        node = nodes.where((n) => n.isDefault).firstOrNull ??
+            nodes.where((n) => n.isConnected).firstOrNull;
+      } else {
+        index = nodes.indexWhere((n) => n.id == selectedId);
+        if (index >= 0) {
+          node = nodes[index];
+        } else {
+          node = nodes.where((n) => n.isDefault).firstOrNull ?? nodes.firstOrNull;
+          index = 0;
+        }
+      }
+
+      if (node == null) {
+        setState(() {
+          _serverTitle = l.homeRegionAuto;
+          _serverSubtitle = l.homeStatServer;
+          _serverFlag = '🌐';
+          _isAuto = true;
+          _placeStickyKey = null;
+        });
         return;
       }
-      final index = nodes.indexWhere((n) => n.id == selectedId);
-      final VpnNode selected = index >= 0
-          ? nodes[index]
-          : nodes.where((n) => n.isDefault).firstOrNull ?? nodes.first;
-      final place = placeForNode(
-        selected,
-        index: index >= 0 ? index : 0,
-      );
-      setState(
-        () => _regionSubtitle = place.displayTitle(locale),
-      );
-    } catch (_) {
-      if (mounted) {
-        setState(() => _regionSubtitle = l.homeRegion);
+
+      // Prefer selected node geo; when Auto+connected, resolve actual egress.
+      final vpnStatus = ref.read(vpnProvider);
+      final config = ref.read(vpnProvider.notifier).config;
+      final egressHost = config?.expectedEgressHost ??
+          config?.singBoxConfig.primaryOutbound?.server;
+
+      late final NodePlace place;
+      late final String stickyKey;
+      if (isAuto && vpnStatus is VpnConnected && egressHost != null) {
+        stickyKey = 'egress:$egressHost';
+        place = await resolvePlaceForHost(
+          egressHost,
+          index: index,
+          fallbackLabel: vpnStatus.serverName,
+        );
+      } else {
+        stickyKey = 'node:${node.id}';
+        place = await resolvePlaceForNode(node, index: index);
       }
+      if (!mounted) return;
+
+      // Sticky last-good geo: connect refresh often misses GeoIP through TUN.
+      final selectionChanged = _placeStickyKey != stickyKey;
+      if (!isResolvedPlace(place) &&
+          !selectionChanged &&
+          isResolvedPlace(
+            NodePlace(
+              title: _serverTitle,
+              subtitle: _serverSubtitle,
+              flag: _serverFlag,
+            ),
+          )) {
+        setState(() => _isAuto = isAuto);
+        return;
+      }
+
+      setState(() {
+        _serverTitle = place.displayTitle(locale);
+        final city = place.displaySubtitle(locale);
+        _serverSubtitle = isAuto
+            ? (city.isEmpty
+                ? l.homeRegionAuto
+                : '$city · ${l.homeRegionAuto}')
+            : city;
+        _serverFlag = place.flag;
+        _isAuto = isAuto;
+        if (isResolvedPlace(place)) {
+          _placeStickyKey = stickyKey;
+        }
+      });
+    } catch (_) {
+      // Keep sticky card on transient list/geo failures (esp. mid-connect).
+      if (!mounted) return;
+      if (isResolvedPlace(
+        NodePlace(
+          title: _serverTitle,
+          subtitle: _serverSubtitle,
+          flag: _serverFlag,
+        ),
+      )) {
+        return;
+      }
+      setState(() {
+        _serverTitle = l.homeRegion;
+        _serverSubtitle = l.homeStatServer;
+        _serverFlag = '🌐';
+        _isAuto = true;
+        _placeStickyKey = null;
+      });
+    }
+  }
+
+  Future<void> _onNestTap() async {
+    final status = ref.read(vpnProvider);
+    final notifier = ref.read(vpnProvider.notifier);
+    if (status is VpnDisconnected || status is VpnError) {
+      await notifier.connect();
+      return;
+    }
+    if (status is VpnConnecting) {
+      // Cancel stuck / in-flight connect (preparing forever, permission hang).
+      await notifier.disconnect();
+      return;
+    }
+    if (status is VpnConnected) {
+      await notifier.disconnect();
     }
   }
 
@@ -92,486 +188,168 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Widget build(BuildContext context) {
     final l = AppL10n.of(context);
     final theme = Theme.of(context);
-    final authState =
-        ref.watch(authProvider).valueOrNull ?? const AuthStateUnknown();
-    final isAuthed = authState is AuthStateAuthenticated;
     final vpnStatus = ref.watch(vpnProvider);
+
+    ref.listen(vpnProvider, (prev, next) {
+      if (prev.runtimeType != next.runtimeType) {
+        unawaited(_refreshServerCard());
+      }
+    });
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         title: Text(l.homeTitle),
-        actions: [
-          TextButton(
-            onPressed: () {
-              final next = AppLocale.current.languageCode == 'ru'
-                  ? const Locale('en')
-                  : const Locale('ru');
-              AppLocale.set(next);
-              (context as Element).findAncestorWidgetOfExactType<MaterialApp>();
-              Navigator.of(context).pop();
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const Scaffold(
-                    body: Center(child: CircularProgressIndicator()),
-                  ),
-                ),
-              );
-              Navigator.of(context).pop();
-            },
-            child: Text(
-              AppLocale.current.languageCode.toUpperCase(),
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onPrimary,
-              ),
-            ),
-          ),
-          if (isAuthed)
-            IconButton(
-              icon: _logoutInProgress
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const AppIcon(AppIcons.logout),
-              tooltip: l.logoutTooltip,
-              onPressed: _logoutInProgress ? null : _onLogoutPressed,
-            ),
-        ],
+        centerTitle: true,
       ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _StatusIndicator(status: vpnStatus),
-              _ConnectButton(status: vpnStatus),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _IconAction(
-                    icon: AppIcons.servers,
-                    label: _regionSubtitle,
-                    onPressed: () async {
-                      await showRegionPicker(context, ref);
-                      if (mounted) await _refreshRegionLabel();
-                    },
-                  ),
-                  _IconAction(
-                    icon: AppIcons.settings,
-                    label: l.homeSettings,
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const SettingsScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  _IconAction(
-                    icon: AppIcons.info,
-                    label: l.homeAbout,
-                    onPressed: () {
-                      showAboutDialog(
-                        context: context,
-                        applicationName: 'Teremok Connect',
-                        applicationVersion: '0.1.0',
-                        applicationLegalese: '© 2026',
-                      );
-                    },
-                  ),
-                ],
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+              child: _DashboardBody(
+                status: vpnStatus,
+                maxHeight: constraints.maxHeight,
+                serverTitle: _serverTitle,
+                serverSubtitle: _isAuto && _serverSubtitle.isEmpty
+                    ? l.homeRegionAuto
+                    : _serverSubtitle,
+                serverFlag: _serverFlag,
+                onNestTap: _onNestTap,
+                onPlaceRefresh: _refreshServerCard,
+                onServerTap: () async {
+                  context.go('/locations');
+                },
               ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _onLogoutPressed() async {
-    final l = AppL10n.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l.logoutConfirmTitle),
-        content: Text(l.logoutConfirmMessage),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(l.cancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(l.logoutTooltip),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true || !mounted) return;
-
-    setState(() => _logoutInProgress = true);
-
-    final result = await ref.read(logoutHandlerProvider).logout();
-
-    if (!mounted) return;
-    setState(() => _logoutInProgress = false);
-
-    if (result is LogoutPartialFailure && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${l.logoutWarning}: ${result.message}'),
-          duration: const Duration(seconds: 5),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
-    }
-    // GoRouter сам перенаправит на /login через refreshListenable.
-  }
-}
-
-class _StatusIndicator extends ConsumerWidget {
-  const _StatusIndicator({required this.status});
-
-  final VpnStatus status;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final l = AppL10n.of(context);
-    final vpnConfig = ref.watch(vpnProvider.notifier).config;
-
-    late final Color color;
-    late final String label;
-    late final Widget child;
-    String? errorMessage;
-    String? serverLabel;
-
-    switch (status) {
-      case VpnDisconnected():
-        color = theme.colorScheme.outline;
-        label = l.homeDisconnected;
-        child = const AppIcon(AppIcons.power, size: 96);
-      case VpnConnecting():
-        final p = (status as VpnConnecting).progress;
-        color = theme.colorScheme.tertiary;
-        label = l.homeConnecting;
-        child = SizedBox(
-          width: 96,
-          height: 96,
-          child: CircularProgressIndicator(
-            value: p,
-            strokeWidth: 6,
-            color: color,
-          ),
-        );
-      case VpnConnected():
-        final host = vpnConfig?.expectedEgressHost ??
-            vpnConfig?.singBoxConfig.primaryOutbound?.server;
-        color = theme.colorScheme.primary;
-        label = l.homeConnected;
-        child = AppIcon(AppIcons.shield, size: 96, color: color);
-        if (host != null) {
-          final locale = Localizations.localeOf(context).languageCode;
-          final place = placeForHost(
-            host,
-            fallbackLabel: (status as VpnConnected).serverName,
-          );
-          serverLabel =
-              '${place.flag} ${place.displayTitle(locale)} · ${place.displaySubtitle(locale)}';
-        }
-      case VpnError():
-        final msg = (status as VpnError).message;
-        color = theme.colorScheme.error;
-        label = l.homeError;
-        child = Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            AppIcon(
-              AppIcons.warning,
-              size: 64,
-              color: theme.colorScheme.error,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              msg,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Auto-retry in 5s...',
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.outline,
-              ),
-            ),
-          ],
-        );
-        errorMessage = msg;
-    }
-
-    return Column(
-      children: [
-        Container(
-          width: 240,
-          height: 240,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: color.withOpacity(0.1),
-            border: Border.all(color: color, width: 3),
-          ),
-          child: Center(child: child),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          label,
-          style: theme.textTheme.headlineSmall?.copyWith(color: color),
-        ),
-        if (status is VpnConnected) ...[
-          if (serverLabel != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              l.homeServer(serverLabel),
-              style: theme.textTheme.bodyMedium,
-              textAlign: TextAlign.center,
-            ),
-          ],
-          const SizedBox(height: 8),
-          _ConnectedDetails(connected: status as VpnConnected),
-        ],
-        if (status is VpnError) ...[
-          const SizedBox(height: 4),
-          Text(
-            errorMessage ?? '',
-            style: theme.textTheme.bodySmall?.copyWith(color: color),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: () async {
-              try {
-                await ref.read(vpnProvider.notifier).fetchConfig();
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(l.homeFetchConfig)),
-                  );
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(l.homeConfigError(e.toString()))),
-                  );
-                }
-              }
-            },
-            icon: const AppIcon(AppIcons.download),
-            label: Text(l.homeFetchConfig),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-/// Uptime + external IP while VPN is connected (E2E visibility).
-class _ConnectedDetails extends StatefulWidget {
-  const _ConnectedDetails({required this.connected});
-
-  final VpnConnected connected;
-
-  @override
-  State<_ConnectedDetails> createState() => _ConnectedDetailsState();
-}
-
-class _ConnectedDetailsState extends State<_ConnectedDetails> {
-  Timer? _uptimeTimer;
-  String? _externalIp;
-  bool _ipLoading = true;
-  bool _lockdownEnabled = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _uptimeTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() {});
-    });
-    _loadExternalIp();
-  }
-
-  @override
-  void didUpdateWidget(covariant _ConnectedDetails oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.connected.connectedSince != widget.connected.connectedSince) {
-      _loadExternalIp();
-    }
-  }
-
-  Future<void> _loadExternalIp() async {
-    setState(() {
-      _ipLoading = true;
-      _externalIp = null;
-      _lockdownEnabled = false;
-    });
-    final results = await Future.wait<Object?>([
-      fetchExternalIp(),
-      VpnController.instance.isLockdownEnabled(),
-    ]);
-    if (!mounted) return;
-    setState(() {
-      _externalIp = results[0] as String?;
-      _lockdownEnabled = results[1] as bool? ?? false;
-      _ipLoading = false;
-    });
-  }
-
-  @override
-  void dispose() {
-    _uptimeTimer?.cancel();
-    super.dispose();
-  }
-
-  String _formatUptime(Duration d) {
-    final h = d.inHours;
-    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    if (h > 0) {
-      return '${h.toString().padLeft(2, '0')}:$m:$s';
-    }
-    return '$m:$s';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final l = AppL10n.of(context);
-    final uptime = DateTime.now().difference(widget.connected.connectedSince);
-
-    return Column(
-      children: [
-        Text(
-          l.homeUptime(_formatUptime(uptime)),
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.outline,
-          ),
-        ),
-        const SizedBox(height: 4),
-        if (_ipLoading)
-          Text(
-            l.homeIpLoading,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.outline,
-            ),
-          )
-        else if (_externalIp != null)
-          Text(
-            l.homeIp(_externalIp!),
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          )
-        else ...[
-          Text(
-            l.homeIpUnavailable,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.error,
-            ),
-          ),
-          if (_lockdownEnabled) ...[
-            const SizedBox(height: 6),
-            Text(
-              l.homeIpLockdownHint,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.error,
-              ),
-            ),
-          ],
-        ],
-      ],
-    );
-  }
-}
-
-class _ConnectButton extends ConsumerWidget {
-  const _ConnectButton({required this.status});
-
-  final VpnStatus status;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final l = AppL10n.of(context);
-
-    late final String label;
-    late final IconData icon;
-    late final Color background;
-    late final VoidCallback? onPressed;
-
-    switch (status) {
-      case VpnDisconnected():
-        label = l.homeConnect;
-        icon = AppIcons.play;
-        background = Theme.of(context).colorScheme.primary;
-        onPressed = () => ref.read(vpnProvider.notifier).connect();
-      case VpnConnecting():
-        label = l.homeConnecting;
-        icon = AppIcons.hourglass;
-        background = Theme.of(context).colorScheme.tertiary;
-        onPressed = null;
-      case VpnConnected():
-        label = l.homeDisconnect;
-        icon = AppIcons.stop;
-        background = Theme.of(context).colorScheme.error;
-        onPressed = () => ref.read(vpnProvider.notifier).disconnect();
-      case VpnError():
-        label = l.homeConnect;
-        icon = AppIcons.refresh;
-        background = Theme.of(context).colorScheme.error;
-        onPressed = () => ref.read(vpnProvider.notifier).connect();
-    }
-
-    return SizedBox(
-      width: double.infinity,
-      height: 64,
-      child: FilledButton.icon(
-        onPressed: onPressed,
-        icon: AppIcon(icon, size: 28),
-        label: Text(label, style: Theme.of(context).textTheme.titleMedium),
-        style: FilledButton.styleFrom(
-          backgroundColor: background,
-          foregroundColor: Theme.of(context).colorScheme.onPrimary,
+            );
+          },
         ),
       ),
     );
   }
 }
 
-class _IconAction extends StatelessWidget {
-  const _IconAction({
-    required this.icon,
-    required this.label,
-    required this.onPressed,
+class _DashboardBody extends ConsumerStatefulWidget {
+  const _DashboardBody({
+    required this.status,
+    required this.maxHeight,
+    required this.serverTitle,
+    required this.serverSubtitle,
+    required this.serverFlag,
+    required this.onNestTap,
+    required this.onServerTap,
+    required this.onPlaceRefresh,
   });
 
-  final IconData icon;
-  final String label;
-  final VoidCallback? onPressed;
+  final VpnStatus status;
+  final double maxHeight;
+  final String serverTitle;
+  final String serverSubtitle;
+  final String serverFlag;
+  final Future<void> Function() onNestTap;
+  final Future<void> Function() onServerTap;
+  final Future<void> Function() onPlaceRefresh;
+
+  @override
+  ConsumerState<_DashboardBody> createState() => _DashboardBodyState();
+}
+
+class _DashboardBodyState extends ConsumerState<_DashboardBody> {
+  String? _warmingHost;
+
+  TreeState get _treeState => switch (widget.status) {
+        VpnConnecting() => TreeState.connecting,
+        VpnConnected() => TreeState.connected,
+        VpnError() => TreeState.error,
+        VpnDisconnected() => TreeState.disconnected,
+      };
+
+  Future<void> _warmGeoIfNeeded() async {
+    if (widget.status is! VpnConnected) return;
+    final vpnConfig = ref.read(vpnProvider.notifier).config;
+    final host = vpnConfig?.expectedEgressHost ??
+        vpnConfig?.singBoxConfig.primaryOutbound?.server;
+    if (host == null || host == _warmingHost) return;
+    _warmingHost = host;
+    await warmGeoCache(host);
+    if (mounted) await widget.onPlaceRefresh();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    unawaited(_warmGeoIfNeeded());
+  }
+
+  @override
+  void didUpdateWidget(covariant _DashboardBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.status != widget.status) {
+      _warmingHost = null;
+      unawaited(_warmGeoIfNeeded());
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return TextButton(
-      onPressed: onPressed,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AppIcon(icon, size: 28),
-          const SizedBox(height: 4),
-          Text(label, style: Theme.of(context).textTheme.bodySmall),
+    final theme = Theme.of(context);
+    final l = AppL10n.of(context);
+    final size = MediaQuery.sizeOf(context);
+    final status = widget.status;
+    final treeState = _treeState;
+
+    final statusLabel = switch (status) {
+      VpnDisconnected() => l.homeDisconnected,
+      VpnConnecting() => l.homeConnecting,
+      VpnConnected() => l.homeConnected,
+      VpnError() => l.homeError,
+    };
+
+    // Fit one viewport with bottom nav — no scroll on Home.
+    final nestSize = math.min(
+      260.0,
+      math.min(size.width * 0.62, widget.maxHeight * 0.36),
+    );
+
+    return Column(
+      children: [
+        Expanded(
+          child: Center(
+            child: RadialGradientGround(
+              state: treeState,
+              child: SignalNestHero(
+                state: treeState,
+                onTap: () => widget.onNestTap(),
+                size: nestSize,
+              ),
+            ),
+          ),
+        ),
+        TreeStatusLabel(
+          state: treeState,
+          label: statusLabel.toUpperCase(),
+        ),
+        if (status is VpnError) ...[
+          const SizedBox(height: 8),
+          Text(
+            l.homeErrorFriendly,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.error,
+            ),
+          ),
         ],
-      ),
+        const SizedBox(height: 16),
+        ServerCard(
+          title: widget.serverTitle,
+          subtitle: widget.serverSubtitle,
+          flagEmoji: widget.serverFlag,
+          onTap: () => widget.onServerTap(),
+        ),
+        const SizedBox(height: 12),
+        const CompactMetricsRow(),
+        const UptimeRow(),
+      ],
     );
   }
 }

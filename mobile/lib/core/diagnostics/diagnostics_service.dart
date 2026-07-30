@@ -118,7 +118,7 @@ class DiagnosticsService {
 }
 
 /// Captures Flutter framework errors for diagnostic reports.
-void installFlutterErrorHandler() {
+void installFlutterErrorHandler({void Function()? onCrashObserved}) {
   final previous = FlutterError.onError;
   FlutterError.onError = (details) {
     DiagnosticsService.lastFlutterError =
@@ -126,6 +126,11 @@ void installFlutterErrorHandler() {
     AppLogBuffer.instance.warn(
       'flutter: ${DiagnosticsService.lastFlutterError}',
     );
+    try {
+      onCrashObserved?.call();
+    } catch (_) {
+      // Never let analytics hooks break error handling.
+    }
     previous?.call(details);
   };
 }

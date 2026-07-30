@@ -63,7 +63,7 @@ import 'app_localizations_ru.dart';
 /// property.
 abstract class AppL10n {
   AppL10n(String locale)
-    : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+      : localeName = intl.Intl.canonicalizedLocale(locale.toString());
 
   final String localeName;
 
@@ -85,16 +85,16 @@ abstract class AppL10n {
   /// of delegates is preferred or required.
   static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
       <LocalizationsDelegate<dynamic>>[
-        delegate,
-        GlobalMaterialLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-      ];
+    delegate,
+    GlobalMaterialLocalizations.delegate,
+    GlobalCupertinoLocalizations.delegate,
+    GlobalWidgetsLocalizations.delegate,
+  ];
 
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[
     Locale('en'),
-    Locale('ru'),
+    Locale('ru')
   ];
 
   /// Title shown in app bar and OS task switcher
@@ -241,6 +241,24 @@ abstract class AppL10n {
   /// **'Settings'**
   String get homeSettings;
 
+  /// No description provided for @navHome.
+  ///
+  /// In en, this message translates to:
+  /// **'Home'**
+  String get navHome;
+
+  /// No description provided for @navLocations.
+  ///
+  /// In en, this message translates to:
+  /// **'Locations'**
+  String get navLocations;
+
+  /// No description provided for @navSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get navSettings;
+
   /// No description provided for @homeStatServer.
   ///
   /// In en, this message translates to:
@@ -376,14 +394,38 @@ abstract class AppL10n {
   /// No description provided for @settingsAccessEarlyTitle.
   ///
   /// In en, this message translates to:
-  /// **'Early access'**
+  /// **'Closed beta'**
   String get settingsAccessEarlyTitle;
 
   /// No description provided for @settingsAccessEarlySubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Everything is open for now, no limits.'**
+  /// **'Access is by invite.'**
   String get settingsAccessEarlySubtitle;
+
+  /// No description provided for @settingsAccessBetaTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Closed beta'**
+  String get settingsAccessBetaTitle;
+
+  /// No description provided for @settingsAccessBetaSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'By invite, no end date.'**
+  String get settingsAccessBetaSubtitle;
+
+  /// No description provided for @settingsAccessNoneTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No access'**
+  String get settingsAccessNoneTitle;
+
+  /// No description provided for @settingsAccessNoneSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'An invite code is required.'**
+  String get settingsAccessNoneSubtitle;
 
   /// No description provided for @settingsAccessActiveUntil.
   ///
@@ -412,7 +454,7 @@ abstract class AppL10n {
   /// No description provided for @settingsSubscriptionAlpha.
   ///
   /// In en, this message translates to:
-  /// **'Early access'**
+  /// **'Closed beta'**
   String get settingsSubscriptionAlpha;
 
   /// No description provided for @settingsSubscriptionExpired.
@@ -448,13 +490,13 @@ abstract class AppL10n {
   /// No description provided for @settingsKillSwitch.
   ///
   /// In en, this message translates to:
-  /// **'Kill switch'**
+  /// **'Block connections without VPN'**
   String get settingsKillSwitch;
 
   /// No description provided for @settingsKillSwitchHint.
   ///
   /// In en, this message translates to:
-  /// **'Block internet if the VPN drops'**
+  /// **'Android blocks internet access while the protected connection is unavailable.'**
   String get settingsKillSwitchHint;
 
   /// No description provided for @settingsKillSwitchHintSystem.
@@ -462,6 +504,72 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Enable Always-on VPN and Block connections without VPN in system VPN settings'**
   String get settingsKillSwitchHintSystem;
+
+  /// No description provided for @settingsKillSwitchOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Enabled in Android settings'**
+  String get settingsKillSwitchOn;
+
+  /// No description provided for @settingsKillSwitchOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off — internet may work without VPN'**
+  String get settingsKillSwitchOff;
+
+  /// No description provided for @settingsKillSwitchUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t check the Android setting'**
+  String get settingsKillSwitchUnavailable;
+
+  /// No description provided for @settingsKillSwitchChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking Android setting…'**
+  String get settingsKillSwitchChecking;
+
+  /// No description provided for @settingsKillSwitchOpenVpn.
+  ///
+  /// In en, this message translates to:
+  /// **'Open VPN settings'**
+  String get settingsKillSwitchOpenVpn;
+
+  /// No description provided for @settingsKillSwitchRisk.
+  ///
+  /// In en, this message translates to:
+  /// **'If the connection cannot recover, internet stays unavailable until you turn this off in Android settings.'**
+  String get settingsKillSwitchRisk;
+
+  /// No description provided for @settingsKillSwitchOpenFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open VPN settings. Open Settings → Network & internet → VPN.'**
+  String get settingsKillSwitchOpenFailed;
+
+  /// No description provided for @settingsKillSwitchAndroidOwned.
+  ///
+  /// In en, this message translates to:
+  /// **'Controlled by Android'**
+  String get settingsKillSwitchAndroidOwned;
+
+  /// No description provided for @settingsKillSwitchBadgeOn.
+  ///
+  /// In en, this message translates to:
+  /// **'On'**
+  String get settingsKillSwitchBadgeOn;
+
+  /// No description provided for @settingsKillSwitchBadgeOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get settingsKillSwitchBadgeOff;
+
+  /// No description provided for @settingsKillSwitchBadgeUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'—'**
+  String get settingsKillSwitchBadgeUnknown;
 
   /// No description provided for @settingsAutoReconnect.
   ///
@@ -474,6 +582,234 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Reconnect quickly if the tunnel drops'**
   String get settingsAutoReconnectHint;
+
+  /// No description provided for @settingsSplitTunnel.
+  ///
+  /// In en, this message translates to:
+  /// **'What works without VPN?'**
+  String get settingsSplitTunnel;
+
+  /// No description provided for @settingsSplitTunnelHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Sites that use a direct connection'**
+  String get settingsSplitTunnelHint;
+
+  /// No description provided for @splitTunnelSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search my sites'**
+  String get splitTunnelSearchHint;
+
+  /// No description provided for @splitTunnelBundledSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready-made list'**
+  String get splitTunnelBundledSection;
+
+  /// No description provided for @splitTunnelBundledLead.
+  ///
+  /// In en, this message translates to:
+  /// **'Built into the app — one tap to enable.'**
+  String get splitTunnelBundledLead;
+
+  /// No description provided for @splitTunnelBundledRuTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Direct access for Russia'**
+  String get splitTunnelBundledRuTitle;
+
+  /// No description provided for @splitTunnelBundledRuSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Russian sites and services\n.ru, .su and .рф domains\nIP addresses in Russia'**
+  String get splitTunnelBundledRuSubtitle;
+
+  /// No description provided for @splitTunnelBundledInfoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How it works'**
+  String get splitTunnelBundledInfoTitle;
+
+  /// No description provided for @splitTunnelBundledInfoBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This list ships inside Teremok and really changes routing.\n\nThe ready-made list includes:\n• Russian sites and services\n• all .ru, .su and .рф domains\n• IP addresses in Russia\n\nOn — this traffic bypasses the VPN.\nOff — all traffic uses the VPN.\n\nIf VPN is already connected, tap Reconnect after changing.'**
+  String get splitTunnelBundledInfoBody;
+
+  /// No description provided for @splitTunnelBundledInfoClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Got it'**
+  String get splitTunnelBundledInfoClose;
+
+  /// No description provided for @splitTunnelCustomSection.
+  ///
+  /// In en, this message translates to:
+  /// **'My sites'**
+  String get splitTunnelCustomSection;
+
+  /// No description provided for @splitTunnelCustomCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}'**
+  String splitTunnelCustomCount(int count);
+
+  /// No description provided for @splitTunnelAddSite.
+  ///
+  /// In en, this message translates to:
+  /// **'Add site'**
+  String get splitTunnelAddSite;
+
+  /// No description provided for @splitTunnelSiteNameOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Name (optional)'**
+  String get splitTunnelSiteNameOptional;
+
+  /// No description provided for @splitTunnelDomainLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Site address'**
+  String get splitTunnelDomainLabel;
+
+  /// No description provided for @splitTunnelDomainHint.
+  ///
+  /// In en, this message translates to:
+  /// **'example.com'**
+  String get splitTunnelDomainHint;
+
+  /// No description provided for @splitTunnelSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get splitTunnelSave;
+
+  /// No description provided for @splitTunnelCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get splitTunnelCancel;
+
+  /// No description provided for @splitTunnelDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get splitTunnelDelete;
+
+  /// No description provided for @splitTunnelDeleteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove this site from the list?'**
+  String get splitTunnelDeleteConfirm;
+
+  /// No description provided for @splitTunnelEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No custom sites'**
+  String get splitTunnelEmptyTitle;
+
+  /// No description provided for @splitTunnelEmptyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Add an address — it will open directly, without the VPN.'**
+  String get splitTunnelEmptyBody;
+
+  /// No description provided for @splitTunnelInvalidDomain.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter an address like example.com'**
+  String get splitTunnelInvalidDomain;
+
+  /// No description provided for @splitTunnelDuplicateDomain.
+  ///
+  /// In en, this message translates to:
+  /// **'This address is already in the list'**
+  String get splitTunnelDuplicateDomain;
+
+  /// No description provided for @splitTunnelNonAsciiUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Latin addresses only'**
+  String get splitTunnelNonAsciiUnsupported;
+
+  /// No description provided for @splitTunnelDomainLatinHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'Latin addresses only'**
+  String get splitTunnelDomainLatinHelper;
+
+  /// No description provided for @splitTunnelPendingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Changes not applied yet'**
+  String get splitTunnelPendingTitle;
+
+  /// No description provided for @splitTunnelPendingBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Changes apply after reconnecting'**
+  String get splitTunnelPendingBody;
+
+  /// No description provided for @splitTunnelReconnect.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconnect'**
+  String get splitTunnelReconnect;
+
+  /// No description provided for @splitTunnelReconnectInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconnecting…'**
+  String get splitTunnelReconnectInProgress;
+
+  /// No description provided for @splitTunnelApplied.
+  ///
+  /// In en, this message translates to:
+  /// **'Rules applied'**
+  String get splitTunnelApplied;
+
+  /// No description provided for @splitTunnelApplyFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t reconnect — try again'**
+  String get splitTunnelApplyFailed;
+
+  /// No description provided for @settingsLanguage.
+  ///
+  /// In en, this message translates to:
+  /// **'Language'**
+  String get settingsLanguage;
+
+  /// Native name for Russian — keep Cyrillic in all locales
+  ///
+  /// In en, this message translates to:
+  /// **'Русский'**
+  String get settingsLanguageRussian;
+
+  /// Native name for English — keep Latin in all locales
+  ///
+  /// In en, this message translates to:
+  /// **'English'**
+  String get settingsLanguageEnglish;
+
+  /// No description provided for @settingsComingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Coming soon — placeholder for now'**
+  String get settingsComingSoon;
+
+  /// No description provided for @settingsComingSoonBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Soon'**
+  String get settingsComingSoonBadge;
+
+  /// No description provided for @settingsPrivacyPlaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy policy'**
+  String get settingsPrivacyPlaceholder;
 
   /// No description provided for @settingsDarkTheme.
   ///
@@ -550,8 +886,20 @@ abstract class AppL10n {
   /// No description provided for @settingsReportFailed.
   ///
   /// In en, this message translates to:
-  /// **'Failed to send report: {error}'**
-  String settingsReportFailed(String error);
+  /// **'Couldn\'t send the report'**
+  String get settingsReportFailed;
+
+  /// No description provided for @settingsReportUnauthorized.
+  ///
+  /// In en, this message translates to:
+  /// **'Session expired — sign in again and retry'**
+  String get settingsReportUnauthorized;
+
+  /// No description provided for @settingsReportNetworkError.
+  ///
+  /// In en, this message translates to:
+  /// **'Can\'t reach the server — try again later'**
+  String get settingsReportNetworkError;
 
   /// No description provided for @settingsVpnNotificationTitle.
   ///
@@ -763,6 +1111,12 @@ abstract class AppL10n {
   /// **'Cannot reach API — turn off Always-on VPN (and “Block without VPN”), then reopen the region list'**
   String get regionLoadErrorAbort;
 
+  /// No description provided for @regionCachedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing a saved list — network is unstable right now'**
+  String get regionCachedHint;
+
   /// No description provided for @regionEmpty.
   ///
   /// In en, this message translates to:
@@ -870,6 +1224,174 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Later'**
   String get updateLater;
+
+  /// No description provided for @welcomeHeadline.
+  ///
+  /// In en, this message translates to:
+  /// **'A warm house on a cold internet'**
+  String get welcomeHeadline;
+
+  /// No description provided for @welcomeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Closed beta for friends. Sign in with your phone, then connect in one tap.'**
+  String get welcomeBody;
+
+  /// No description provided for @welcomeContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get welcomeContinue;
+
+  /// No description provided for @welcomeSkip.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip'**
+  String get welcomeSkip;
+
+  /// No description provided for @promoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite code'**
+  String get promoTitle;
+
+  /// No description provided for @promoHeadline.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your personal code'**
+  String get promoHeadline;
+
+  /// No description provided for @promoBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Access is by invite during the closed beta. You can retry without signing out.'**
+  String get promoBody;
+
+  /// No description provided for @promoCodeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Code'**
+  String get promoCodeLabel;
+
+  /// No description provided for @promoCodeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Your invite code'**
+  String get promoCodeHint;
+
+  /// No description provided for @promoCodeEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a code'**
+  String get promoCodeEmpty;
+
+  /// No description provided for @promoSubmit.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get promoSubmit;
+
+  /// No description provided for @promoOutcomeInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Code not found. Check it and try again.'**
+  String get promoOutcomeInvalid;
+
+  /// No description provided for @promoOutcomeExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'This code has expired.'**
+  String get promoOutcomeExpired;
+
+  /// No description provided for @promoOutcomeExhausted.
+  ///
+  /// In en, this message translates to:
+  /// **'This code has already been used.'**
+  String get promoOutcomeExhausted;
+
+  /// No description provided for @promoOutcomeRevoked.
+  ///
+  /// In en, this message translates to:
+  /// **'This code is no longer valid.'**
+  String get promoOutcomeRevoked;
+
+  /// No description provided for @promoOutcomeRateLimited.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many attempts. Please wait a minute.'**
+  String get promoOutcomeRateLimited;
+
+  /// No description provided for @promoOutcomeUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t apply the code. Try again.'**
+  String get promoOutcomeUnknown;
+
+  /// No description provided for @onboardingSkip.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip'**
+  String get onboardingSkip;
+
+  /// No description provided for @onboardingNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get onboardingNext;
+
+  /// No description provided for @onboardingDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Get started'**
+  String get onboardingDone;
+
+  /// No description provided for @onboardingConnectTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect'**
+  String get onboardingConnectTitle;
+
+  /// No description provided for @onboardingConnectBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap Connect on Home. Android will ask for VPN permission once — that’s normal.'**
+  String get onboardingConnectBody;
+
+  /// No description provided for @onboardingRegionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Region'**
+  String get onboardingRegionTitle;
+
+  /// No description provided for @onboardingRegionBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic region is recommended. You can change it later in the list.'**
+  String get onboardingRegionBody;
+
+  /// No description provided for @onboardingHelpTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Help and privacy'**
+  String get onboardingHelpTitle;
+
+  /// No description provided for @onboardingHelpBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Send a diagnostic report from Settings if something breaks. We only collect a minimal daily aggregate — no browsing history, apps list, or ad IDs.'**
+  String get onboardingHelpBody;
+
+  /// No description provided for @betaGateError.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t check access. Check your connection.'**
+  String get betaGateError;
+
+  /// No description provided for @betaGateContinueAnyway.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue anyway'**
+  String get betaGateContinueAnyway;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {
@@ -898,9 +1420,8 @@ AppL10n lookupAppL10n(Locale locale) {
   }
 
   throw FlutterError(
-    'AppL10n.delegate failed to load unsupported locale "$locale". This is likely '
-    'an issue with the localizations generation tool. Please file an issue '
-    'on GitHub with a reproducible sample app and the gen-l10n configuration '
-    'that was used.',
-  );
+      'AppL10n.delegate failed to load unsupported locale "$locale". This is likely '
+      'an issue with the localizations generation tool. Please file an issue '
+      'on GitHub with a reproducible sample app and the gen-l10n configuration '
+      'that was used.');
 }

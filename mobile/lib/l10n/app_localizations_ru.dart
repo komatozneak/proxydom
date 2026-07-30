@@ -82,6 +82,15 @@ class AppL10nRu extends AppL10n {
   String get homeSettings => 'Настройки';
 
   @override
+  String get navHome => 'Главная';
+
+  @override
+  String get navLocations => 'Локации';
+
+  @override
+  String get navSettings => 'Настройки';
+
+  @override
   String get homeStatServer => 'Сервер';
 
   @override
@@ -150,11 +159,23 @@ class AppL10nRu extends AppL10n {
   String get settingsActiveBadge => 'Активна';
 
   @override
-  String get settingsAccessEarlyTitle => 'Ранний доступ';
+  String get settingsAccessEarlyTitle => 'Закрытая бета';
 
   @override
-  String get settingsAccessEarlySubtitle =>
-      'Пока открыто всё, без ограничений.';
+  String get settingsAccessEarlySubtitle => 'Доступ по приглашению.';
+
+  @override
+  String get settingsAccessBetaTitle => 'Закрытая бета';
+
+  @override
+  String get settingsAccessBetaSubtitle =>
+      'По приглашению, без даты окончания.';
+
+  @override
+  String get settingsAccessNoneTitle => 'Нет доступа';
+
+  @override
+  String get settingsAccessNoneSubtitle => 'Нужен код приглашения.';
 
   @override
   String settingsAccessActiveUntil(String date) {
@@ -175,7 +196,7 @@ class AppL10nRu extends AppL10n {
   }
 
   @override
-  String get settingsSubscriptionAlpha => 'Ранний доступ';
+  String get settingsSubscriptionAlpha => 'Закрытая бета';
 
   @override
   String get settingsSubscriptionExpired => 'Подписка истекла';
@@ -193,20 +214,180 @@ class AppL10nRu extends AppL10n {
   String get settingsProtocolLocked => 'Сейчас доступен только VLESS + Reality';
 
   @override
-  String get settingsKillSwitch => 'Kill switch';
+  String get settingsKillSwitch => 'Блокировка без VPN';
 
   @override
-  String get settingsKillSwitchHint => 'Отключить интернет при разрыве VPN';
+  String get settingsKillSwitchHint =>
+      'Android будет блокировать интернет, если защищённое соединение не установлено.';
 
   @override
   String get settingsKillSwitchHintSystem =>
       'Включите «Всегда VPN» и «Блокировать без VPN» в системных настройках VPN';
 
   @override
+  String get settingsKillSwitchOn => 'Включено в настройках Android';
+
+  @override
+  String get settingsKillSwitchOff =>
+      'Выключено — интернет может работать без VPN';
+
+  @override
+  String get settingsKillSwitchUnavailable =>
+      'Не удалось проверить настройку Android';
+
+  @override
+  String get settingsKillSwitchChecking => 'Проверка настройки Android…';
+
+  @override
+  String get settingsKillSwitchOpenVpn => 'Открыть настройки VPN';
+
+  @override
+  String get settingsKillSwitchRisk =>
+      'Если соединение не восстановится, интернет останется недоступен, пока вы не отключите блокировку в настройках Android.';
+
+  @override
+  String get settingsKillSwitchOpenFailed =>
+      'Не удалось открыть настройки VPN. Откройте Настройки → Сеть и интернет → VPN.';
+
+  @override
+  String get settingsKillSwitchAndroidOwned => 'Управляется в Android';
+
+  @override
+  String get settingsKillSwitchBadgeOn => 'Вкл';
+
+  @override
+  String get settingsKillSwitchBadgeOff => 'Выкл';
+
+  @override
+  String get settingsKillSwitchBadgeUnknown => '—';
+
+  @override
   String get settingsAutoReconnect => 'Авто-переподключение';
 
   @override
   String get settingsAutoReconnectHint => 'Быстрое переподключение при обрыве';
+
+  @override
+  String get settingsSplitTunnel => 'Что работает без VPN?';
+
+  @override
+  String get settingsSplitTunnelHint => 'Сайты с прямым подключением';
+
+  @override
+  String get splitTunnelSearchHint => 'Поиск по моим сайтам';
+
+  @override
+  String get splitTunnelBundledSection => 'Готовый список';
+
+  @override
+  String get splitTunnelBundledLead =>
+      'Уже в приложении — включается одним касанием.';
+
+  @override
+  String get splitTunnelBundledRuTitle => 'Прямой доступ для РФ';
+
+  @override
+  String get splitTunnelBundledRuSubtitle =>
+      'Российские сайты и сервисы\nДомены .ru, .su и .рф\nIP-адреса в России';
+
+  @override
+  String get splitTunnelBundledInfoTitle => 'Как это работает';
+
+  @override
+  String get splitTunnelBundledInfoBody =>
+      'Список вшит в Теремок и реально задаёт маршруты.\n\nВ готовый список входит:\n• российские сайты и сервисы\n• все домены .ru, .su и .рф\n• IP-адреса в России\n\nВкл — этот трафик идёт мимо VPN.\nВыкл — весь трафик через VPN.\n\nЕсли VPN уже подключён, после смены нажмите «Переподключить».';
+
+  @override
+  String get splitTunnelBundledInfoClose => 'Понятно';
+
+  @override
+  String get splitTunnelCustomSection => 'Мои сайты';
+
+  @override
+  String splitTunnelCustomCount(int count) {
+    return '$count';
+  }
+
+  @override
+  String get splitTunnelAddSite => 'Добавить сайт';
+
+  @override
+  String get splitTunnelSiteNameOptional => 'Название (необязательно)';
+
+  @override
+  String get splitTunnelDomainLabel => 'Адрес сайта';
+
+  @override
+  String get splitTunnelDomainHint => 'example.com';
+
+  @override
+  String get splitTunnelSave => 'Добавить';
+
+  @override
+  String get splitTunnelCancel => 'Отмена';
+
+  @override
+  String get splitTunnelDelete => 'Удалить';
+
+  @override
+  String get splitTunnelDeleteConfirm => 'Удалить сайт из списка?';
+
+  @override
+  String get splitTunnelEmptyTitle => 'Нет своих сайтов';
+
+  @override
+  String get splitTunnelEmptyBody =>
+      'Добавьте адрес — он будет открываться напрямую, без VPN.';
+
+  @override
+  String get splitTunnelInvalidDomain => 'Введите адрес вида example.com';
+
+  @override
+  String get splitTunnelDuplicateDomain => 'Этот адрес уже в списке';
+
+  @override
+  String get splitTunnelNonAsciiUnsupported => 'Только латинские адреса';
+
+  @override
+  String get splitTunnelDomainLatinHelper => 'Только латинские адреса';
+
+  @override
+  String get splitTunnelPendingTitle => 'Изменения не применены';
+
+  @override
+  String get splitTunnelPendingBody =>
+      'Изменения применятся после переподключения';
+
+  @override
+  String get splitTunnelReconnect => 'Переподключить';
+
+  @override
+  String get splitTunnelReconnectInProgress => 'Переподключение…';
+
+  @override
+  String get splitTunnelApplied => 'Правила применены';
+
+  @override
+  String get splitTunnelApplyFailed =>
+      'Не удалось переподключить — попробуйте снова';
+
+  @override
+  String get settingsLanguage => 'Язык';
+
+  @override
+  String get settingsLanguageRussian => 'Русский';
+
+  @override
+  String get settingsLanguageEnglish => 'English';
+
+  @override
+  String get settingsComingSoon => 'Скоро — пока заглушка';
+
+  @override
+  String get settingsComingSoonBadge => 'Скоро';
+
+  @override
+  String get settingsPrivacyPlaceholder => 'Политика конфиденциальности';
 
   @override
   String get settingsDarkTheme => 'Тёмная тема';
@@ -248,9 +429,15 @@ class AppL10nRu extends AppL10n {
   String get settingsReportSent => 'Отчёт отправлен';
 
   @override
-  String settingsReportFailed(String error) {
-    return 'Не удалось отправить отчёт: $error';
-  }
+  String get settingsReportFailed => 'Не удалось отправить отчёт';
+
+  @override
+  String get settingsReportUnauthorized =>
+      'Сессия устарела — войдите снова и повторите';
+
+  @override
+  String get settingsReportNetworkError =>
+      'Нет связи с сервером — попробуйте позже';
 
   @override
   String get settingsVpnNotificationTitle => 'Уведомление в шторке';
@@ -376,6 +563,10 @@ class AppL10nRu extends AppL10n {
       'API недоступен — отключите «Всегда VPN» (и «Блокировать без VPN») в системе, затем откройте список снова';
 
   @override
+  String get regionCachedHint =>
+      'Показан сохранённый список — сеть сейчас нестабильна';
+
+  @override
   String get regionEmpty => 'Список серверов пуст';
 
   @override
@@ -439,4 +630,96 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get updateLater => 'Позже';
+
+  @override
+  String get welcomeHeadline => 'Тёплый дом в холодном интернете';
+
+  @override
+  String get welcomeBody =>
+      'Закрытая бета для друзей. Войдите по телефону — дальше один тап для подключения.';
+
+  @override
+  String get welcomeContinue => 'Продолжить';
+
+  @override
+  String get welcomeSkip => 'Пропустить';
+
+  @override
+  String get promoTitle => 'Код доступа';
+
+  @override
+  String get promoHeadline => 'Введите персональный код';
+
+  @override
+  String get promoBody =>
+      'Пока бета закрытая — доступ по приглашению. Можно повторить без выхода из аккаунта.';
+
+  @override
+  String get promoCodeLabel => 'Код';
+
+  @override
+  String get promoCodeHint => 'Ваш промокод';
+
+  @override
+  String get promoCodeEmpty => 'Введите код';
+
+  @override
+  String get promoSubmit => 'Продолжить';
+
+  @override
+  String get promoOutcomeInvalid =>
+      'Код не найден. Проверьте и попробуйте снова.';
+
+  @override
+  String get promoOutcomeExpired => 'Срок действия кода истёк.';
+
+  @override
+  String get promoOutcomeExhausted => 'Этот код уже использован.';
+
+  @override
+  String get promoOutcomeRevoked => 'Код больше не действует.';
+
+  @override
+  String get promoOutcomeRateLimited =>
+      'Слишком много попыток. Подождите минуту.';
+
+  @override
+  String get promoOutcomeUnknown =>
+      'Не удалось применить код. Попробуйте ещё раз.';
+
+  @override
+  String get onboardingSkip => 'Пропустить';
+
+  @override
+  String get onboardingNext => 'Далее';
+
+  @override
+  String get onboardingDone => 'Начать';
+
+  @override
+  String get onboardingConnectTitle => 'Подключение';
+
+  @override
+  String get onboardingConnectBody =>
+      'На главном экране нажмите «Подключиться». Android один раз спросит разрешение VPN — так и должно быть.';
+
+  @override
+  String get onboardingRegionTitle => 'Регион';
+
+  @override
+  String get onboardingRegionBody =>
+      'Рекомендуем автоматический выбор. Позже регион можно сменить в списке.';
+
+  @override
+  String get onboardingHelpTitle => 'Помощь и приватность';
+
+  @override
+  String get onboardingHelpBody =>
+      'Отчёт для отладки — в Настройках. Собираем только минимальную дневную сводку: без истории сайтов, списка приложений и рекламных ID.';
+
+  @override
+  String get betaGateError => 'Не удалось проверить доступ. Проверьте связь.';
+
+  @override
+  String get betaGateContinueAnyway => 'Продолжить всё равно';
 }

@@ -16,9 +16,15 @@ import androidx.core.app.NotificationCompat
  * Minimal: required FGS stub when user turns the shade card off in Settings.
  */
 object VpnNotificationHelper {
-    private const val CHANNEL_DETAILED = "teremok_vpn_v2"
-    private const val CHANNEL_MINIMAL = "teremok_vpn_minimal"
+    private const val CHANNEL_DETAILED = "teremok_vpn_v5"
+    private const val CHANNEL_MINIMAL = "teremok_vpn_minimal_v5"
     private const val LEGACY_CHANNEL_ID = "teremok_vpn"
+    private const val LEGACY_CHANNEL_DETAILED = "teremok_vpn_v2"
+    private const val LEGACY_CHANNEL_DETAILED_V3 = "teremok_vpn_v3"
+    private const val LEGACY_CHANNEL_DETAILED_V4 = "teremok_vpn_v4"
+    private const val LEGACY_CHANNEL_MINIMAL = "teremok_vpn_minimal"
+    private const val LEGACY_CHANNEL_MINIMAL_V3 = "teremok_vpn_minimal_v3"
+    private const val LEGACY_CHANNEL_MINIMAL_V4 = "teremok_vpn_minimal_v4"
     private const val NOTIFICATION_ID = 42_001
 
     private const val PREFS = "teremok_vpn_notification"
@@ -40,6 +46,14 @@ object VpnNotificationHelper {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val nm = context.getSystemService(NotificationManager::class.java)
         runCatching { nm.deleteNotificationChannel(LEGACY_CHANNEL_ID) }
+        runCatching { nm.deleteNotificationChannel(LEGACY_CHANNEL_DETAILED) }
+        runCatching { nm.deleteNotificationChannel(LEGACY_CHANNEL_DETAILED_V3) }
+        runCatching { nm.deleteNotificationChannel(LEGACY_CHANNEL_DETAILED_V4) }
+        runCatching { nm.deleteNotificationChannel(LEGACY_CHANNEL_MINIMAL) }
+        runCatching { nm.deleteNotificationChannel(LEGACY_CHANNEL_MINIMAL_V3) }
+        runCatching { nm.deleteNotificationChannel(LEGACY_CHANNEL_MINIMAL_V4) }
+        // Drop any stale FGS cards from previous channels / old oak largeIcon.
+        runCatching { nm.cancel(NOTIFICATION_ID) }
 
         if (nm.getNotificationChannel(CHANNEL_DETAILED) == null) {
             nm.createNotificationChannel(
@@ -136,7 +150,11 @@ object VpnNotificationHelper {
         }
 
         val builder = NotificationCompat.Builder(context, CHANNEL_DETAILED)
-            .setSmallIcon(R.drawable.ic_qs_vpn)
+            // One glyph only: status-bar + shade. Never setLargeIcon — OEMs
+            // otherwise show app/launcher avatar (old oak shield) beside smallIcon.
+            .setSmallIcon(R.drawable.ic_stat_teremok)
+            .setLargeIcon(null as android.graphics.Bitmap?)
+            .setColor(0xFFC78F29.toInt())
             .setContentTitle(title)
             .setContentText(sessionLine)
             .setContentInfo(statusLine)
@@ -162,13 +180,15 @@ object VpnNotificationHelper {
                 disconnectPending(context),
             )
         }
-        return builder.build()
+        return stripLargeIconExtras(builder.build())
     }
 
     /** Tiny FGS stub — Android still requires a notification while VPN runs. */
     private fun buildMinimal(context: Context, status: String): Notification {
-        return NotificationCompat.Builder(context, CHANNEL_MINIMAL)
-            .setSmallIcon(R.drawable.ic_qs_vpn)
+        val notification = NotificationCompat.Builder(context, CHANNEL_MINIMAL)
+            .setSmallIcon(R.drawable.ic_stat_teremok)
+            .setLargeIcon(null as android.graphics.Bitmap?)
+            .setColor(0xFFC78F29.toInt())
             .setContentTitle("Теремок VPN")
             .setContentText(status)
             .setOngoing(true)
@@ -180,6 +200,16 @@ object VpnNotificationHelper {
             .setVisibility(NotificationCompat.VISIBILITY_SECRET)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .build()
+        return stripLargeIconExtras(notification)
+    }
+
+    /** Some OEMs keep a stale largeIcon from older channel posts — clear extras. */
+    private fun stripLargeIconExtras(notification: Notification): Notification {
+        notification.extras.remove(Notification.EXTRA_LARGE_ICON)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            notification.extras.remove(Notification.EXTRA_LARGE_ICON_BIG)
+        }
+        return notification
     }
 
     private fun launchPending(context: Context): PendingIntent =

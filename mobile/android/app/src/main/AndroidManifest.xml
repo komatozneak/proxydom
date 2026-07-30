@@ -1,8 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- VPN service permissions (Шаг 11) -->
+    <!-- Network: INTERNET is prot=dangerous on Android 17 (Pixel) — MainActivity
+         also requests it at runtime. Missing grant → SocketException errno 13. -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <!-- VPN service permissions (Шаг 11) -->
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
@@ -80,6 +82,10 @@
         <intent>
             <action android:name="android.intent.action.VIEW"/>
             <data android:scheme="http"/>
+        </intent>
+        <!-- Kill switch: Settings.ACTION_VPN_SETTINGS (package visibility API 30+) -->
+        <intent>
+            <action android:name="android.settings.VPN_SETTINGS"/>
         </intent>
     </queries>
 </manifest>

@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../app.dart';
 import '../../../core/api_client.dart';
 import '../../../core/router.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../settings/application/locale_provider.dart';
 import '../application/auth_provider.dart';
 import '../domain/phone_country.dart';
 
@@ -103,7 +103,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final l = AppL10n.of(context);
-    final isRu = AppLocale.current.languageCode == 'ru';
+    final locale = ref.watch(localeProvider).valueOrNull ??
+        Localizations.localeOf(context);
+    final isRu = locale.languageCode == 'ru';
     ref.watch(authProvider);
 
     return Scaffold(
@@ -113,20 +115,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           TextButton(
             onPressed: () {
               final next = isRu ? const Locale('en') : const Locale('ru');
-              AppLocale.set(next);
-              (context as Element).findAncestorWidgetOfExactType<MaterialApp>();
-              Navigator.of(context).pop();
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const Scaffold(
-                    body: Center(child: CircularProgressIndicator()),
-                  ),
-                ),
-              );
-              Navigator.of(context).pop();
+              ref.read(localeProvider.notifier).setLocale(next);
             },
             child: Text(
-              AppLocale.current.languageCode.toUpperCase(),
+              locale.languageCode.toUpperCase(),
               style: TextStyle(
                 color: Theme.of(context).colorScheme.onPrimary,
               ),
