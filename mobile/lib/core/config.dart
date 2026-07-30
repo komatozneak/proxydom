@@ -15,6 +15,10 @@ class AppConfig {
   AppConfig._();
 
   /// Production backend — HTTPS via Caddy :8443 (Reality keeps :443).
+  ///
+  /// No trailing slash. Dio joins `baseUrl + path`, so API paths must start
+  /// with `/` (e.g. `/vpn/nodes`, `/billing/subscription`) or the `v1` segment
+  /// concatenates into the next path segment (`/api/v1billing/...`).
   static const String vpsBaseUrl =
       'https://api.teremokconnect.online:8443/api/v1';
 

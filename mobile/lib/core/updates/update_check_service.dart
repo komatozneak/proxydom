@@ -72,7 +72,8 @@ class UpdateCheckService {
   /// Network / parse failures → [UpdateCheckResult.none] (silent).
   Future<UpdateCheckResult> check({required int localBuildNumber}) async {
     try {
-      final resp = await _dio.get<Map<String, dynamic>>('app/version');
+      // Leading slash required: Dio joins as baseUrl + path (no separator).
+      final resp = await _dio.get<Map<String, dynamic>>('/app/version');
       final data = resp.data;
       if (resp.statusCode != 200 || data == null) {
         return UpdateCheckResult.none;

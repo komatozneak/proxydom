@@ -24,8 +24,10 @@ class SubscriptionStatusNotifier
   }
 
   Future<SubscriptionStatus> _fetch() async {
+    // Leading slash required: Dio joins as baseUrl + path (no separator).
+    // Without it → /api/v1billing/subscription → 404 → Settings load error.
     final resp = await ApiClient.instance.get<Map<String, dynamic>>(
-      'billing/subscription',
+      '/billing/subscription',
     );
     if (resp.statusCode == 401) {
       return SubscriptionStatus.empty;
