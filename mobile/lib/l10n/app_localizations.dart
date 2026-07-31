@@ -1234,7 +1234,7 @@ abstract class AppL10n {
   /// No description provided for @welcomeBody.
   ///
   /// In en, this message translates to:
-  /// **'Closed beta for friends. Sign in with your phone, then connect in one tap.'**
+  /// **'Sign in with your phone, then connect in one tap.'**
   String get welcomeBody;
 
   /// No description provided for @welcomeContinue.

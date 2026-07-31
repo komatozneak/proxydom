@@ -634,7 +634,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get welcomeBody =>
-      'Closed beta for friends. Sign in with your phone, then connect in one tap.';
+      'Sign in with your phone, then connect in one tap.';
 
   @override
   String get welcomeContinue => 'Continue';

@@ -636,7 +636,7 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get welcomeBody =>
-      'Закрытая бета для друзей. Войдите по телефону — дальше один тап для подключения.';
+      'Войдите по телефону — дальше один тап для подключения.';
 
   @override
   String get welcomeContinue => 'Продолжить';
