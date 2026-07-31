@@ -58,51 +58,102 @@ class TeremokVpnService : VpnService() {
          * Always-on "Block connections without VPN" — **preference / system setting**,
          * not "is the tunnel connected right now".
          *
-         * [VpnService.isLockdownEnabled] is only a positive signal: true means
-         * lockdown is active for this app. false is **not** authoritative when the
-         * service is idle / tunnel down (Always-on may keep the process alive after
-         * Nest disconnect) — that used to paint Settings as «Выкл» while Secure
-         * still had lockdown ON.
+         * [VpnService.isLockdownEnabled] is the preferred positive signal (API 29+):
+         * true means lockdown is active for this app. false is **not** authoritative
+         * when the service is idle / tunnel down (Always-on may keep the process
+         * alive after Nest disconnect).
          *
-         * [Settings.Secure] `always_on_vpn_lockdown` is the preference SoT for the
-         * tile; runtime `true` still wins when Secure lags right after Off→On.
+         * [Settings.Secure] keys `always_on_vpn_*` are @hide; on Android 12+ (S)
+         * non-system apps often get [SecurityException] ("is not readable"). Probes
+         * are best-effort only — **never throw** into VPN start / MethodChannel.
+         *
+         * @return true/false when known; null when Secure is unreadable and runtime
+         *         is not positively true (Settings tile → Unknown / open VPN settings).
          */
         fun queryAlwaysOnVpnLockdown(
             context: android.content.Context,
             service: TeremokVpnService? = currentInstance(),
-        ): Boolean {
-            val alwaysOnPkg = Settings.Secure.getString(
-                context.contentResolver,
-                "always_on_vpn_app",
-            )
-            // Another app owns Always-on — our kill-switch row is Off.
-            if (alwaysOnPkg != null && alwaysOnPkg != context.packageName) {
-                Log.i(
-                    TAG,
-                    "lockdown other alwaysOnPkg=$alwaysOnPkg pkg=${context.packageName}",
-                )
-                return false
-            }
-            val fromSecure = Settings.Secure.getInt(
-                context.contentResolver,
-                "always_on_vpn_lockdown",
-                0,
-            ) == 1
+        ): Boolean? {
             var fromRuntime: Boolean? = null
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 val svc = service ?: currentInstance()
                 if (svc != null) {
-                    fromRuntime = svc.isLockdownEnabled
+                    fromRuntime = runCatching { svc.isLockdownEnabled }
+                        .onFailure { Log.w(TAG, "VpnService.isLockdownEnabled failed", it) }
+                        .getOrNull()
                 }
             }
-            val enabled = fromSecure || fromRuntime == true
+            // Positive runtime is enough for Connect (skip excludeRoute) and the tile.
+            if (fromRuntime == true) {
+                Log.i(TAG, "lockdown runtime=true → true pkg=${context.packageName}")
+                return true
+            }
+
+            // Optional package probe — skip on S+ where @hide Secure keys are blocked.
+            var alwaysOnPkg: String? = null
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+                alwaysOnPkg = readSecureString(context, "always_on_vpn_app")
+                if (alwaysOnPkg != null && alwaysOnPkg != context.packageName) {
+                    Log.i(
+                        TAG,
+                        "lockdown other alwaysOnPkg=$alwaysOnPkg pkg=${context.packageName}",
+                    )
+                    return false
+                }
+            }
+
+            val fromSecure = readSecureIntEqualsOne(context, "always_on_vpn_lockdown")
+            if (fromSecure != null) {
+                val enabled = fromSecure || fromRuntime == true
+                Log.i(
+                    TAG,
+                    "lockdown Secure=$fromSecure runtime=$fromRuntime → $enabled " +
+                        "alwaysOnPkg=$alwaysOnPkg pkg=${context.packageName}",
+                )
+                return enabled
+            }
+
+            // Secure unreadable (typical on S+): idle/false runtime is not SoT.
             Log.i(
                 TAG,
-                "lockdown Secure=$fromSecure runtime=$fromRuntime → $enabled " +
-                    "alwaysOnPkg=$alwaysOnPkg pkg=${context.packageName}",
+                "lockdown Secure=unreadable runtime=$fromRuntime → unknown " +
+                    "pkg=${context.packageName}",
             )
-            return enabled
+            return null
         }
+
+        /** Best-effort [Settings.Secure] string; null on missing or S+ restriction. */
+        private fun readSecureString(
+            context: android.content.Context,
+            key: String,
+        ): String? =
+            try {
+                Settings.Secure.getString(context.contentResolver, key)
+            } catch (e: SecurityException) {
+                Log.w(TAG, "Settings.Secure.$key not readable: ${e.message}")
+                null
+            } catch (e: IllegalArgumentException) {
+                Log.w(TAG, "Settings.Secure.$key invalid: ${e.message}")
+                null
+            }
+
+        /**
+         * Best-effort [Settings.Secure] int == 1.
+         * @return true/false when readable; null when the key is blocked/unknown.
+         */
+        private fun readSecureIntEqualsOne(
+            context: android.content.Context,
+            key: String,
+        ): Boolean? =
+            try {
+                Settings.Secure.getInt(context.contentResolver, key, 0) == 1
+            } catch (e: SecurityException) {
+                Log.w(TAG, "Settings.Secure.$key not readable: ${e.message}")
+                null
+            } catch (e: IllegalArgumentException) {
+                Log.w(TAG, "Settings.Secure.$key invalid: ${e.message}")
+                null
+            }
 
         /** Last successful connect still marked active (Always-on / UI sync). */
         fun hasActiveSession(context: android.content.Context): Boolean =
@@ -333,9 +384,13 @@ class TeremokVpnService : VpnService() {
         startVpn(username, protocol, params)
     }
 
-    /** Prefer runtime SoT; Secure can lag right after the user toggles lockdown. */
+    /**
+     * Prefer runtime-true / readable Secure; unknown Secure (S+ @hide) must not
+     * abort Connect — treat as false so [applyBypassRoutes] can still try
+     * excludeRoute (runtime-true already returned above when lockdown is on).
+     */
     private fun isAlwaysOnVpnLockdownSetting(): Boolean =
-        queryAlwaysOnVpnLockdown(this, this)
+        queryAlwaysOnVpnLockdown(this, this) == true
 
     /**
      * Keep VLESS egress + control-plane API off the TUN so Dio/API survives a
@@ -814,7 +869,7 @@ object VpnChannelRegistry {
                     "isLockdownEnabled" -> {
                         // Preference/system lockdown — not tunnel-up. See
                         // [TeremokVpnService.queryAlwaysOnVpnLockdown].
-                        // Distinguish query failure from "off" — do not default to false.
+                        // null → Dart unavailable («Неизвестно»); never throw into Connect.
                         runCatching {
                             TeremokVpnService.queryAlwaysOnVpnLockdown(
                                 appContext,
@@ -823,11 +878,14 @@ object VpnChannelRegistry {
                         }.fold(
                             onSuccess = { result.success(it) },
                             onFailure = { e ->
-                                result.error(
-                                    "LOCKDOWN_QUERY_FAILED",
-                                    e.message,
-                                    null,
+                                Log.w(
+                                    TeremokVpnService.TAG,
+                                    "isLockdownEnabled query failed",
+                                    e,
                                 )
+                                // Still map to unavailable — do not surface Secure
+                                // exception strings as VPN / libbox errors.
+                                result.success(null)
                             },
                         )
                     }

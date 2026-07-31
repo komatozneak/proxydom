@@ -141,7 +141,7 @@
   "@settingsKillSwitchBadgeOn": {},
   "settingsKillSwitchBadgeOff": "Off",
   "@settingsKillSwitchBadgeOff": {},
-  "settingsKillSwitchBadgeUnknown": "—",
+  "settingsKillSwitchBadgeUnknown": "Unknown",
   "@settingsKillSwitchBadgeUnknown": {},
   "settingsAutoReconnect": "Auto-reconnect",
   "@settingsAutoReconnect": {},

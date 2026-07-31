@@ -191,8 +191,9 @@ class VpnController {
 
   /// Observed Android lockdown preference: enabled / disabled / unavailable.
   ///
-  /// Native SoT is Settings.Secure (+ runtime true); must stay enabled while
-  /// the Nest shows disconnected if Always-on lockdown is still ON.
+  /// Native prefers [VpnService.isLockdownEnabled] when true; readable Secure
+  /// lockdown still mirrors preference while Nest is idle. Unreadable S+ @hide
+  /// Secure keys map to [VpnLockdownState.unavailable], never abort Connect.
   Future<VpnLockdownState> queryLockdownState() async {
     try {
       final result =

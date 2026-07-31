@@ -112,8 +112,8 @@ void main() {
     });
 
     // Regression: Settings must mirror lockdown *preference*, not tunnel-up.
-    // Native queryAlwaysOnVpnLockdown ORs Secure with runtime-true so an idle
-    // Always-on service after Nest disconnect still reports enabled.
+    // Native ORs readable Secure with runtime-true; S+ @hide Secure failures
+    // map to unavailable (not Off) and must never abort Connect.
     testWidgets(
         'preference ON while tunnel down → On (not fake Off)', (tester) async {
       await tester.pumpWidget(
@@ -185,11 +185,32 @@ void main() {
         find.text("Couldn't check the Android setting"),
         findsOneWidget,
       );
+      expect(find.text('Unknown'), findsOneWidget);
       expect(
         find.text('Off — internet may work without VPN'),
         findsNothing,
       );
       expect(find.byType(Switch), findsNothing);
+    });
+
+    testWidgets('Secure unreadable → Неизвестно badge (ru)', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          locale: const Locale('ru'),
+          home: Scaffold(
+            body: KillSwitchSettingsTile(
+              queryLockdownState: () async => VpnLockdownState.unavailable,
+              openVpnSettings: () async => true,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Неизвестно'), findsOneWidget);
+      expect(find.text('Выкл'), findsNothing);
     });
 
     testWidgets('OutlinedButton opens settings; failure shows snackbar',

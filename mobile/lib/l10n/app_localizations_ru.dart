@@ -259,7 +259,7 @@ class AppL10nRu extends AppL10n {
   String get settingsKillSwitchBadgeOff => 'Выкл';
 
   @override
-  String get settingsKillSwitchBadgeUnknown => '—';
+  String get settingsKillSwitchBadgeUnknown => 'Неизвестно';
 
   @override
   String get settingsAutoReconnect => 'Авто-переподключение';

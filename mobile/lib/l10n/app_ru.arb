@@ -82,7 +82,7 @@
   "settingsKillSwitchAndroidOwned": "Управляется в Android",
   "settingsKillSwitchBadgeOn": "Вкл",
   "settingsKillSwitchBadgeOff": "Выкл",
-  "settingsKillSwitchBadgeUnknown": "—",
+  "settingsKillSwitchBadgeUnknown": "Неизвестно",
   "settingsAutoReconnect": "Авто-переподключение",
   "settingsAutoReconnectHint": "Быстрое переподключение при обрыве",
   "settingsSplitTunnel": "Что работает без VPN?",

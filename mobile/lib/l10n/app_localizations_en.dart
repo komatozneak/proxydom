@@ -258,7 +258,7 @@ class AppL10nEn extends AppL10n {
   String get settingsKillSwitchBadgeOff => 'Off';
 
   @override
-  String get settingsKillSwitchBadgeUnknown => '—';
+  String get settingsKillSwitchBadgeUnknown => 'Unknown';
 
   @override
   String get settingsAutoReconnect => 'Auto-reconnect';
@@ -633,8 +633,7 @@ class AppL10nEn extends AppL10n {
   String get welcomeHeadline => 'A warm house on a cold internet';
 
   @override
-  String get welcomeBody =>
-      'Sign in with your phone, then connect in one tap.';
+  String get welcomeBody => 'Sign in with your phone, then connect in one tap.';
 
   @override
   String get welcomeContinue => 'Continue';
