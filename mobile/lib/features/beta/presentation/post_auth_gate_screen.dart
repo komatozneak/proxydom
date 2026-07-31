@@ -48,15 +48,16 @@ class _PostAuthGateScreenState extends ConsumerState<PostAuthGateScreen> {
         userId: userId,
       );
       if (!mounted) return;
-      AppRouter.postAuthResolved = true;
       switch (dest) {
         case PostAuthDestination.promo:
-          // Promo must complete before shell; keep gate unresolved for /home.
+          // Never flip postAuthResolved true before promo — race let shell through.
           AppRouter.postAuthResolved = false;
           context.go('/promo');
         case PostAuthDestination.onboarding:
+          AppRouter.postAuthResolved = true;
           context.go('/onboarding');
         case PostAuthDestination.home:
+          AppRouter.postAuthResolved = true;
           context.go('/home');
       }
     } on DioException catch (e) {

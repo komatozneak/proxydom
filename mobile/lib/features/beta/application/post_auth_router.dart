@@ -12,18 +12,19 @@ enum PostAuthDestination {
 class PostAuthRouter {
   const PostAuthRouter._();
 
-    static PostAuthDestination resolve({
+  static PostAuthDestination resolve({
     required BetaEntitlement entitlement,
     required bool onboardingCompleted,
   }) {
-    // Soft-pass ONLY when server says gate is off. Gate ON + !hasAccess → promo.
+    // Closed beta: gate ON + no access → promo. No other path may invent access.
     if (entitlement.betaPromoGateEnabled && !entitlement.hasAccess) {
       return PostAuthDestination.promo;
     }
     if (entitlement.shouldShowPromo) {
       return PostAuthDestination.promo;
     }
-    // Gate off + no access: soft-pass (server still auto-alphas when gate false).
+    // Soft-pass ONLY when server explicitly set beta_promo_gate_enabled=false.
+    // Network errors / missing fields never reach here (gate screen retries).
     if (!entitlement.treatAsEntitled) {
       return PostAuthDestination.promo;
     }

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/router.dart';
 import '../../../core/token_storage.dart';
 import '../../home/application/vpn_provider.dart';
 import 'auth_provider.dart';
@@ -70,6 +71,8 @@ class LogoutHandler {
     // 4. Сбросить authProvider — это запустит cleanupOnLogout в VpnNotifier
     //    и через refreshListenable → GoRouter.redirect уйдёт с /home на /login.
     try {
+      // Drop gate/shell latch so next login cannot skip promo.
+      AppRouter.postAuthResolved = false;
       await _ref.read(authProvider.notifier).unauthenticated();
     } catch (e) {
       errors.add('authProvider: $e');

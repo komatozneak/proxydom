@@ -42,6 +42,34 @@ void main() {
       );
     });
 
+    test('gate on + network-style missing fields never invents entitlement', () {
+      expect(
+        () => BetaEntitlement.fromJson({'has_access': false}),
+        throwsA(isA<FormatException>()),
+      );
+      expect(
+        () => BetaEntitlement.fromJson({
+          'has_access': 'yes',
+          'beta_promo_gate_enabled': true,
+        }),
+        throwsA(isA<FormatException>()),
+      );
+      // Gate screen maps FormatException → retry UI, not soft-pass home.
+      const failedAsEntitledWouldBe = BetaEntitlement.entitledGateOff;
+      expect(failedAsEntitledWouldBe.treatAsEntitled, isTrue);
+      // Prove resolve of a gate-on empty access stays promo (no soft-pass).
+      expect(
+        PostAuthRouter.resolve(
+          entitlement: const BetaEntitlement(
+            hasAccess: false,
+            betaPromoGateEnabled: true,
+          ),
+          onboardingCompleted: true,
+        ),
+        PostAuthDestination.promo,
+      );
+    });
+
     test('gate off without access soft-passes as entitled', () {
       const entitlement = BetaEntitlement(
         hasAccess: false,

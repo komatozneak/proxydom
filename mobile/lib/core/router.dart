@@ -32,8 +32,9 @@ class AppRouter {
   /// Cached welcome flag so redirect stays sync (warmed in main / gate).
   static bool? welcomeSeenCache;
 
-  /// After [PostAuthGateScreen] finishes once per auth session.
+  /// After [PostAuthGateScreen] (or promo redeem) grants shell/onboarding.
   /// Cold restore hits /home → redirect to /gate until this is true.
+  /// MUST stay false while on /promo — never set true before destination is known.
   static bool postAuthResolved = false;
 
   /// Глобальный listenable — связан с authProvider в main.dart.
@@ -80,14 +81,15 @@ class AppRouter {
       if (goingToLogin || goingToVerify || goingToWelcome) {
         return '/gate';
       }
-      if (goingToGate || goingToPromo || goingToOnboarding) {
+      if (goingToGate || goingToPromo) {
         return null;
       }
-      // Shell only after gate has resolved this session.
-      if (inShell && !postAuthResolved) {
+      // Onboarding + shell only after entitlement (or gate-off soft-pass) resolved.
+      // Do NOT allow /onboarding without postAuthResolved — that skipped promo.
+      if ((goingToOnboarding || inShell) && !postAuthResolved) {
         return '/gate';
       }
-      if (inShell) {
+      if (goingToOnboarding || inShell) {
         return null;
       }
       return '/gate';

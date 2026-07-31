@@ -31,8 +31,15 @@ class BetaEntitlement {
         'beta_promo_gate_enabled must be bool, got ${gateRaw.runtimeType}',
       );
     }
+    // has_access must be explicit bool; missing/null/string → not entitled.
+    final accessRaw = json['has_access'];
+    if (accessRaw != null && accessRaw is! bool) {
+      throw FormatException(
+        'has_access must be bool, got ${accessRaw.runtimeType}',
+      );
+    }
     return BetaEntitlement(
-      hasAccess: json['has_access'] == true,
+      hasAccess: accessRaw == true,
       betaPromoGateEnabled: gateRaw,
       plan: json['plan'] as String?,
       isAlpha: json['is_alpha'] == true,

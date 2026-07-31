@@ -53,9 +53,17 @@ class _PromoCodeScreenState extends ConsumerState<PromoCodeScreen> {
     try {
       final result = await ref.read(betaApiProvider).redeem(code);
       if (!mounted) return;
-      if (result.outcome.isSuccess) {
+      // Require server has_access — outcome alone must not open onboarding.
+      if (result.outcome.isSuccess && result.hasAccess) {
         AppRouter.postAuthResolved = true;
         context.go('/onboarding');
+        return;
+      }
+      if (result.outcome.isSuccess && !result.hasAccess) {
+        setState(() {
+          _error = AppL10n.of(context).promoOutcomeUnknown;
+          _submitting = false;
+        });
         return;
       }
       setState(() {
