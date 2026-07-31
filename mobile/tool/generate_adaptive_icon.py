@@ -16,8 +16,10 @@ ANDROID_DRAWABLE = os.path.normpath(
     os.path.join(ROOT, "android", "app", "src", "main", "res"),
 )
 SIZE = 1024
-# Fill most of the adaptive foreground layer. Extra XML inset is small (≤8%).
-SAFE_SCALE = 0.94
+# Adaptive icon: SAFE_SCALE 0.72 + XML inset 12% (re-force inset after
+# flutter_launcher_icons overwrites mipmap-anydpi-v26/ic_launcher.xml).
+# Do NOT raise toward 0.94 — owner rejected the oversized launcher glyph.
+SAFE_SCALE = 0.72
 CROP_PAD = 0.04  # relative padding around content bbox
 
 
