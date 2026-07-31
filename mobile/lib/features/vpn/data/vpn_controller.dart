@@ -181,14 +181,18 @@ class VpnController {
     }
   }
 
-  /// Android Always-on "Block connections without VPN" — blocks excludeRoute.
+  /// Android Always-on "Block connections without VPN" preference.
   ///
+  /// Reflects the system lockdown **setting**, not whether the tunnel is up.
   /// Prefer [queryLockdownState] when OFF vs query-failure must be distinct.
   Future<bool> isLockdownEnabled() async {
     return (await queryLockdownState()) == VpnLockdownState.enabled;
   }
 
-  /// Observed Android lockdown: enabled / disabled / unavailable (query error).
+  /// Observed Android lockdown preference: enabled / disabled / unavailable.
+  ///
+  /// Native SoT is Settings.Secure (+ runtime true); must stay enabled while
+  /// the Nest shows disconnected if Always-on lockdown is still ON.
   Future<VpnLockdownState> queryLockdownState() async {
     try {
       final result =

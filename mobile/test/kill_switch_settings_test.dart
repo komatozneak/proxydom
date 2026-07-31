@@ -111,6 +111,36 @@ void main() {
       expect(openCalls, 1);
     });
 
+    // Regression: Settings must mirror lockdown *preference*, not tunnel-up.
+    // Native queryAlwaysOnVpnLockdown ORs Secure with runtime-true so an idle
+    // Always-on service after Nest disconnect still reports enabled.
+    testWidgets(
+        'preference ON while tunnel down → On (not fake Off)', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          locale: const Locale('ru'),
+          home: Scaffold(
+            body: KillSwitchSettingsTile(
+              // Simulates native result when Secure lockdown=1 and Home is idle.
+              queryLockdownState: () async => VpnLockdownState.enabled,
+              openVpnSettings: () async => true,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Вкл'), findsOneWidget);
+      expect(find.text('Включено в настройках Android'), findsOneWidget);
+      expect(find.text('Выкл'), findsNothing);
+      expect(
+        find.text('Выключено — интернет может работать без VPN'),
+        findsNothing,
+      );
+    });
+
     testWidgets('disabled → Off badge, no Switch', (tester) async {
       await tester.pumpWidget(
         MaterialApp(

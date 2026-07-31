@@ -55,41 +55,53 @@ class TeremokVpnService : VpnService() {
         fun currentInstance(): TeremokVpnService? = instance
 
         /**
-         * Always-on "Block connections without VPN".
+         * Always-on "Block connections without VPN" — **preference / system setting**,
+         * not "is the tunnel connected right now".
          *
-         * Prefer [VpnService.isLockdownEnabled] (system runtime SoT on API 29+).
-         * [Settings.Secure] `always_on_vpn_lockdown` alone can lag after Off→On.
+         * [VpnService.isLockdownEnabled] is only a positive signal: true means
+         * lockdown is active for this app. false is **not** authoritative when the
+         * service is idle / tunnel down (Always-on may keep the process alive after
+         * Nest disconnect) — that used to paint Settings as «Выкл» while Secure
+         * still had lockdown ON.
+         *
+         * [Settings.Secure] `always_on_vpn_lockdown` is the preference SoT for the
+         * tile; runtime `true` still wins when Secure lags right after Off→On.
          */
         fun queryAlwaysOnVpnLockdown(
             context: android.content.Context,
             service: TeremokVpnService? = currentInstance(),
         ): Boolean {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                val svc = service ?: currentInstance()
-                if (svc != null) {
-                    val enabled = svc.isLockdownEnabled
-                    Log.i(TAG, "lockdown VpnService.isLockdownEnabled=$enabled")
-                    return enabled
-                }
+            val alwaysOnPkg = Settings.Secure.getString(
+                context.contentResolver,
+                "always_on_vpn_app",
+            )
+            // Another app owns Always-on — our kill-switch row is Off.
+            if (alwaysOnPkg != null && alwaysOnPkg != context.packageName) {
+                Log.i(
+                    TAG,
+                    "lockdown other alwaysOnPkg=$alwaysOnPkg pkg=${context.packageName}",
+                )
+                return false
             }
             val fromSecure = Settings.Secure.getInt(
                 context.contentResolver,
                 "always_on_vpn_lockdown",
                 0,
             ) == 1
-            val alwaysOnPkg = Settings.Secure.getString(
-                context.contentResolver,
-                "always_on_vpn_app",
-            )
+            var fromRuntime: Boolean? = null
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val svc = service ?: currentInstance()
+                if (svc != null) {
+                    fromRuntime = svc.isLockdownEnabled
+                }
+            }
+            val enabled = fromSecure || fromRuntime == true
             Log.i(
                 TAG,
-                "lockdown Secure=$fromSecure alwaysOnPkg=$alwaysOnPkg pkg=${context.packageName}",
+                "lockdown Secure=$fromSecure runtime=$fromRuntime → $enabled " +
+                    "alwaysOnPkg=$alwaysOnPkg pkg=${context.packageName}",
             )
-            // If package is recorded and it isn't us, treat as off for our tile.
-            if (alwaysOnPkg != null && alwaysOnPkg != context.packageName) {
-                return false
-            }
-            return fromSecure
+            return enabled
         }
 
         /** Last successful connect still marked active (Always-on / UI sync). */
@@ -800,9 +812,9 @@ object VpnChannelRegistry {
                         result.success(VpnStatusBroadcaster.lastError())
                     }
                     "isLockdownEnabled" -> {
+                        // Preference/system lockdown — not tunnel-up. See
+                        // [TeremokVpnService.queryAlwaysOnVpnLockdown].
                         // Distinguish query failure from "off" — do not default to false.
-                        // Prefer VpnService.isLockdownEnabled (system SoT); Secure alone can
-                        // stay stale after Off→On until a later process restart.
                         runCatching {
                             TeremokVpnService.queryAlwaysOnVpnLockdown(
                                 appContext,
