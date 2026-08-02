@@ -87,6 +87,28 @@
   "settingsAutoReconnectHint": "Быстрое переподключение при обрыве",
   "settingsSplitTunnel": "Что работает без VPN?",
   "settingsSplitTunnelHint": "Сайты с прямым подключением",
+  "settingsDevices": "Устройства",
+  "settingsDevicesHint": "Зарегистрированные установки и отзыв доступа",
+  "devicesTitle": "Устройства",
+  "devicesHint": "Каждая установка приложения получает свой VPN-ключ. Можно отозвать доступ к отдельному устройству.",
+  "devicesCount": "{active} из {max}",
+  "@devicesCount": {
+    "placeholders": {
+      "active": {"type": "int"},
+      "max": {"type": "int"}
+    }
+  },
+  "devicesEmpty": "Пока нет устройств — подключите VPN, чтобы зарегистрировать это.",
+  "devicesLoadError": "Не удалось загрузить список устройств",
+  "devicesUntitled": "Устройство",
+  "devicesThisDevice": "это устройство",
+  "devicesRevoke": "Отозвать",
+  "devicesRevokeTitle": "Отозвать устройство?",
+  "devicesRevokeBody": "VPN-ключ этого устройства перестанет работать. Остальные устройства не затронуты.",
+  "devicesRevokeConfirm": "Отозвать",
+  "devicesCancel": "Отмена",
+  "devicesRevoked": "Устройство отозвано",
+  "devicesRevokeFailed": "Не удалось отозвать устройство",
   "splitTunnelSearchHint": "Поиск по моим сайтам",
   "splitTunnelBundledSection": "Готовый список",
   "splitTunnelBundledLead": "Уже в приложении — включается одним касанием.",

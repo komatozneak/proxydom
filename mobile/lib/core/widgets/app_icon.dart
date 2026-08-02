@@ -53,6 +53,7 @@ abstract final class AppIcons {
       PhosphorIconsRegular.globeHemisphereWest;
   static const IconData gauge = PhosphorIconsRegular.gauge;
   static const IconData phone = PhosphorIconsRegular.phone;
+  static const IconData devices = PhosphorIconsRegular.devices;
   static const IconData crown = PhosphorIconsRegular.crown;
   static const IconData sliders = PhosphorIconsRegular.sliders;
   static const IconData moon = PhosphorIconsRegular.moon;

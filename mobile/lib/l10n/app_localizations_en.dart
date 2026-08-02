@@ -274,6 +274,59 @@ class AppL10nEn extends AppL10n {
   String get settingsSplitTunnelHint => 'Sites that use a direct connection';
 
   @override
+  String get settingsDevices => 'Devices';
+
+  @override
+  String get settingsDevicesHint => 'Registered installs and revoke access';
+
+  @override
+  String get devicesTitle => 'Devices';
+
+  @override
+  String get devicesHint =>
+      'Each app install gets its own VPN key. You can revoke access for a single device.';
+
+  @override
+  String devicesCount(int active, int max) {
+    return '$active of $max';
+  }
+
+  @override
+  String get devicesEmpty =>
+      'No devices yet — connect VPN to register this one.';
+
+  @override
+  String get devicesLoadError => 'Could not load devices';
+
+  @override
+  String get devicesUntitled => 'Device';
+
+  @override
+  String get devicesThisDevice => 'this device';
+
+  @override
+  String get devicesRevoke => 'Revoke';
+
+  @override
+  String get devicesRevokeTitle => 'Revoke this device?';
+
+  @override
+  String get devicesRevokeBody =>
+      'This device\'s VPN key will stop working. Other devices are unaffected.';
+
+  @override
+  String get devicesRevokeConfirm => 'Revoke';
+
+  @override
+  String get devicesCancel => 'Cancel';
+
+  @override
+  String get devicesRevoked => 'Device revoked';
+
+  @override
+  String get devicesRevokeFailed => 'Could not revoke device';
+
+  @override
   String get splitTunnelSearchHint => 'Search my sites';
 
   @override

@@ -568,7 +568,7 @@ abstract class AppL10n {
   /// No description provided for @settingsKillSwitchBadgeUnknown.
   ///
   /// In en, this message translates to:
-  /// **'—'**
+  /// **'Unknown'**
   String get settingsKillSwitchBadgeUnknown;
 
   /// No description provided for @settingsAutoReconnect.
@@ -594,6 +594,102 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Sites that use a direct connection'**
   String get settingsSplitTunnelHint;
+
+  /// No description provided for @settingsDevices.
+  ///
+  /// In en, this message translates to:
+  /// **'Devices'**
+  String get settingsDevices;
+
+  /// No description provided for @settingsDevicesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Registered installs and revoke access'**
+  String get settingsDevicesHint;
+
+  /// No description provided for @devicesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Devices'**
+  String get devicesTitle;
+
+  /// No description provided for @devicesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Each app install gets its own VPN key. You can revoke access for a single device.'**
+  String get devicesHint;
+
+  /// No description provided for @devicesCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{active} of {max}'**
+  String devicesCount(int active, int max);
+
+  /// No description provided for @devicesEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No devices yet — connect VPN to register this one.'**
+  String get devicesEmpty;
+
+  /// No description provided for @devicesLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load devices'**
+  String get devicesLoadError;
+
+  /// No description provided for @devicesUntitled.
+  ///
+  /// In en, this message translates to:
+  /// **'Device'**
+  String get devicesUntitled;
+
+  /// No description provided for @devicesThisDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'this device'**
+  String get devicesThisDevice;
+
+  /// No description provided for @devicesRevoke.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke'**
+  String get devicesRevoke;
+
+  /// No description provided for @devicesRevokeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke this device?'**
+  String get devicesRevokeTitle;
+
+  /// No description provided for @devicesRevokeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This device\'s VPN key will stop working. Other devices are unaffected.'**
+  String get devicesRevokeBody;
+
+  /// No description provided for @devicesRevokeConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke'**
+  String get devicesRevokeConfirm;
+
+  /// No description provided for @devicesCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get devicesCancel;
+
+  /// No description provided for @devicesRevoked.
+  ///
+  /// In en, this message translates to:
+  /// **'Device revoked'**
+  String get devicesRevoked;
+
+  /// No description provided for @devicesRevokeFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not revoke device'**
+  String get devicesRevokeFailed;
 
   /// No description provided for @splitTunnelSearchHint.
   ///

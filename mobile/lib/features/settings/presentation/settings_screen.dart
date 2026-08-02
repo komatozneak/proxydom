@@ -410,6 +410,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 onTap: () => context.push('/settings/split-tunnel'),
               ),
               const _CardDivider(),
+              _SettingsRow(
+                icon: AppIcons.devices,
+                title: l.settingsDevices,
+                subtitle: l.settingsDevicesHint,
+                onTap: () => context.push('/settings/devices'),
+              ),
+              const _CardDivider(),
               const KillSwitchSettingsTile(),
             ],
           ),

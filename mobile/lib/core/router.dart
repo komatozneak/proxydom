@@ -13,6 +13,7 @@ import '../features/home/presentation/home_screen.dart';
 import '../features/onboarding/data/onboarding_prefs.dart';
 import '../features/onboarding/presentation/onboarding_screen.dart';
 import '../features/onboarding/presentation/welcome_screen.dart';
+import '../features/devices/presentation/devices_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/settings/presentation/split_tunnel_sites_screen.dart';
 import '../features/shell/presentation/main_shell.dart';
@@ -140,6 +141,10 @@ class AppRouter {
                   GoRoute(
                     path: 'split-tunnel',
                     builder: (c, s) => const SplitTunnelSitesScreen(),
+                  ),
+                  GoRoute(
+                    path: 'devices',
+                    builder: (c, s) => const DevicesScreen(),
                   ),
                 ],
               ),

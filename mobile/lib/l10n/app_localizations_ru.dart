@@ -274,6 +274,60 @@ class AppL10nRu extends AppL10n {
   String get settingsSplitTunnelHint => 'Сайты с прямым подключением';
 
   @override
+  String get settingsDevices => 'Устройства';
+
+  @override
+  String get settingsDevicesHint =>
+      'Зарегистрированные установки и отзыв доступа';
+
+  @override
+  String get devicesTitle => 'Устройства';
+
+  @override
+  String get devicesHint =>
+      'Каждая установка приложения получает свой VPN-ключ. Можно отозвать доступ к отдельному устройству.';
+
+  @override
+  String devicesCount(int active, int max) {
+    return '$active из $max';
+  }
+
+  @override
+  String get devicesEmpty =>
+      'Пока нет устройств — подключите VPN, чтобы зарегистрировать это.';
+
+  @override
+  String get devicesLoadError => 'Не удалось загрузить список устройств';
+
+  @override
+  String get devicesUntitled => 'Устройство';
+
+  @override
+  String get devicesThisDevice => 'это устройство';
+
+  @override
+  String get devicesRevoke => 'Отозвать';
+
+  @override
+  String get devicesRevokeTitle => 'Отозвать устройство?';
+
+  @override
+  String get devicesRevokeBody =>
+      'VPN-ключ этого устройства перестанет работать. Остальные устройства не затронуты.';
+
+  @override
+  String get devicesRevokeConfirm => 'Отозвать';
+
+  @override
+  String get devicesCancel => 'Отмена';
+
+  @override
+  String get devicesRevoked => 'Устройство отозвано';
+
+  @override
+  String get devicesRevokeFailed => 'Не удалось отозвать устройство';
+
+  @override
   String get splitTunnelSearchHint => 'Поиск по моим сайтам';
 
   @override

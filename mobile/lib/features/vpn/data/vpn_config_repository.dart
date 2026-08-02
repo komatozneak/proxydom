@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../../../core/api_client.dart';
+import 'device_envelope.dart';
 import 'vpn_config.dart';
 
 /// Repository для `GET /api/v1/vpn/config`.
@@ -8,6 +9,9 @@ import 'vpn_config.dart';
 /// Кеширует результат в памяти через [VpnConfigCache]. JWT interceptor
 /// на [ApiClient.instance] уже подключён — refresh токена происходит
 /// автоматически при 401.
+///
+/// Always sends device envelope (install id). Backend ignores it when
+/// FEATURE_DEVICE_SLOTS=false; when true, registers/uses a per-device slot.
 class VpnConfigRepository {
   VpnConfigRepository();
 
@@ -27,9 +31,11 @@ class VpnConfigRepository {
     }
 
     try {
+      final envelope = await buildDeviceEnvelope();
       final resp = await _dio.get<Map<String, dynamic>>(
         '/vpn/config',
         queryParameters: {
+          ...envelope.toQueryParameters(),
           if (nodeId != null && nodeId.isNotEmpty) 'node_id': nodeId,
         },
       );
@@ -44,9 +50,26 @@ class VpnConfigRepository {
         type: DioExceptionType.badResponse,
         error: 'Unexpected status: ${resp.statusCode}',
       );
-    } on DioException {
+    } on DioException catch (e) {
+      final code = e.response?.statusCode;
+      final detail = e.response?.data;
+      if (code == 403 && detail is Map) {
+        final err = detail['detail'];
+        if (err is Map && err['error'] is Map) {
+          final nested = err['error'] as Map;
+          if (nested['code'] == 'device_limit_reached') {
+            throw DioException(
+              requestOptions: e.requestOptions,
+              response: e.response,
+              type: DioExceptionType.badResponse,
+              error: 'device_limit_reached',
+            );
+          }
+        }
+      }
       rethrow;
     } catch (e, st) {
+      if (e is DioException) rethrow;
       throw DioException(
         requestOptions: RequestOptions(path: '/vpn/config'),
         error: e,
