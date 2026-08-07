@@ -1,20 +1,18 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/config.dart';
+import '../../../core/install_id_storage.dart';
+import '../../../core/support_contact.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
-import '../../../core/diagnostics/diagnostics_service.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../auth/application/auth_provider.dart';
-import '../../auth/application/auth_state.dart';
 import '../../auth/application/logout_handler.dart';
-import '../../beta/application/beta_usage_tracker.dart';
-import '../../home/application/vpn_provider.dart';
 import '../application/locale_provider.dart';
 import '../application/subscription_status_provider.dart';
 import '../application/theme_mode_provider.dart';
@@ -32,8 +30,8 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  bool _sending = false;
   bool _logoutInProgress = false;
+  String? _installId;
   bool? _notifEnabled;
   bool _notifLoading = false;
   bool? _autoReconnect;
@@ -50,11 +48,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final futures = <Future<void>>[
       _loadAutoReconnect(),
       _loadVersion(),
+      _loadInstallId(),
     ];
     if (VpnNotificationPrefs.isSupported) {
       futures.add(_loadNotif());
     }
     await Future.wait(futures);
+  }
+
+  Future<void> _loadInstallId() async {
+    try {
+      final id = await InstallIdStorage.instance.getOrCreate();
+      if (!mounted) return;
+      setState(() => _installId = id);
+    } catch (_) {
+      // ignore
+    }
+  }
+
+  Future<void> _copyInstallId() async {
+    final id = _installId;
+    if (id == null || id.isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: id));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(AppL10n.of(context).settingsDeviceIdCopied)),
+    );
   }
 
   Future<void> _loadVersion() async {
@@ -157,73 +176,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  Future<void> _sendReport() async {
-    final l = AppL10n.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      useRootNavigator: true,
-      builder: (ctx) => AlertDialog(
-        title: Text(l.settingsSendReport),
-        content: Text(l.settingsSendReportHint),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(l.cancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(l.settingsSendReportConfirm),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-
-    setState(() => _sending = true);
-    try {
-      final auth = ref.read(authProvider).valueOrNull;
-      if (auth is! AuthStateAuthenticated) {
-        throw StateError('not authenticated');
-      }
-      final access = auth.accessToken;
-
-      final service = DiagnosticsService();
-      final report = await service.buildReport(
-        authState: auth,
-        vpnUi: ref.read(vpnProvider),
-        cachedConfig: ref.read(vpnProvider.notifier).config,
-      );
-      await service.submit(accessToken: access, report: report);
-      ref.read(betaUsageTrackerProvider).recordDiagnosticReportSent();
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l.settingsReportSent)),
-      );
-    } on DioException catch (e) {
-      if (!mounted) return;
-      final message = switch (e.response?.statusCode) {
-        401 || 403 => l.settingsReportUnauthorized,
-        _ when e.type == DioExceptionType.connectionTimeout ||
-                e.type == DioExceptionType.sendTimeout ||
-                e.type == DioExceptionType.receiveTimeout ||
-                e.type == DioExceptionType.connectionError =>
-          l.settingsReportNetworkError,
-        _ => l.settingsReportFailed,
-      };
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l.settingsReportFailed)),
-      );
-    } finally {
-      if (mounted) setState(() => _sending = false);
-    }
-  }
-
   Future<void> _onLogoutPressed() async {
     final l = AppL10n.of(context);
     final confirmed = await showDialog<bool>(
@@ -260,7 +212,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
       );
     }
-    // GoRouter redirects to /login via refreshListenable.
+    // Anonymous: re-check entitlement → locked if unpaid (not phone login).
+    if (AppConfig.authAnonymous) {
+      context.go('/gate');
+    }
+    // Phone path: GoRouter redirects to /login via refreshListenable.
   }
 
   String _themeModeLabel(AppL10n l, ThemeMode mode) => switch (mode) {
@@ -279,6 +235,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final l = AppL10n.of(context);
     final current =
         ref.read(themeModeProvider).valueOrNull ?? ThemeMode.system;
+    // Auto → Light → Dark (ThemeMode.values is system, light, dark).
+    const options = [ThemeMode.system, ThemeMode.light, ThemeMode.dark];
     final chosen = await showModalBottomSheet<ThemeMode>(
       context: context,
       showDragHandle: true,
@@ -287,7 +245,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              for (final mode in ThemeMode.values)
+              for (final mode in options)
                 ListTile(
                   title: Text(_themeModeLabel(l, mode)),
                   trailing: mode == current
@@ -345,8 +303,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final l = AppL10n.of(context);
     final theme = Theme.of(context);
     final showNotif = VpnNotificationPrefs.isSupported;
-    final notifOn = _notifEnabled ?? true;
-    final autoOn = _autoReconnect ?? true;
+    final notifOn = _notifEnabled ?? false;
+    final autoOn = _autoReconnect ?? false;
     final subAsync = ref.watch(subscriptionStatusProvider);
     final themeMode =
         ref.watch(themeModeProvider).valueOrNull ?? ThemeMode.system;
@@ -356,14 +314,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
-      appBar: AppBar(
-        title: Text(l.settingsTitle),
-        centerTitle: true,
-        automaticallyImplyLeading: false,
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-        children: [
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+          children: [
+            Text(
+              l.settingsTitle,
+              style: theme.textTheme.displayMedium?.copyWith(
+                fontWeight: FontWeight.w900,
+                letterSpacing: -0.3,
+              ),
+            ),
+            const SizedBox(height: 20),
           _SectionLabel(l.settingsSectionAccount),
           _SettingsCard(
             children: [
@@ -385,6 +347,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                 ),
               ),
+              if (AppConfig.authAnonymous) ...[
+                const _CardDivider(),
+                _SettingsRow(
+                  icon: AppIcons.siteTelegram,
+                  title: l.settingsSupport,
+                  subtitle: l.settingsSupportHint,
+                  onTap: () => SupportContact.open(screen: 'Настройки'),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 20),
@@ -402,19 +373,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       : _onAutoReconnectChanged,
                 ),
               ),
+              if (showNotif) ...[
+                const _CardDivider(),
+                _SettingsRow(
+                  icon: AppIcons.notifications,
+                  title: l.settingsVpnNotificationTitle,
+                  subtitle: l.settingsVpnNotificationHint,
+                  trailing: Switch.adaptive(
+                    value: notifOn,
+                    onChanged: _notifLoading || _notifEnabled == null
+                        ? null
+                        : _onNotifChanged,
+                  ),
+                ),
+              ],
               const _CardDivider(),
               _SettingsRow(
                 icon: AppIcons.sliders,
                 title: l.settingsSplitTunnel,
                 subtitle: l.settingsSplitTunnelHint,
-                onTap: () => context.push('/settings/split-tunnel'),
-              ),
-              const _CardDivider(),
-              _SettingsRow(
-                icon: AppIcons.devices,
-                title: l.settingsDevices,
-                subtitle: l.settingsDevicesHint,
-                onTap: () => context.push('/settings/devices'),
+                onTap: () => context.go('/modes'),
               ),
               const _CardDivider(),
               const KillSwitchSettingsTile(),
@@ -432,38 +410,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               const _CardDivider(),
               _SettingsRow(
-                icon: AppIcons.moon,
-                title: l.settingsDarkTheme,
+                icon: AppIcons.palette,
+                title: l.settingsAppearance,
                 subtitle: _themeModeLabel(l, themeMode),
                 onTap: _pickThemeMode,
-              ),
-              if (showNotif) ...[
-                const _CardDivider(),
-                _SettingsRow(
-                  icon: AppIcons.notifications,
-                  title: l.settingsVpnNotificationTitle,
-                  subtitle: l.settingsVpnNotificationHint,
-                  trailing: Switch.adaptive(
-                    value: notifOn,
-                    onChanged: _notifLoading || _notifEnabled == null
-                        ? null
-                        : _onNotifChanged,
-                  ),
-                ),
-              ],
-              const _CardDivider(),
-              _SettingsRow(
-                icon: AppIcons.bug,
-                title: l.settingsSendReport,
-                subtitle: l.settingsSendReportHint,
-                trailing: _sending
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const AppIcon(AppIcons.chevronRight, size: 18),
-                onTap: _sending ? null : _sendReport,
               ),
             ],
           ),
@@ -487,16 +437,40 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             child: Text(l.settingsPrivacyPlaceholder),
           ),
           const SizedBox(height: 12),
-          _SettingsCard(
-            children: [
-              _LogoutRow(
-                label: l.logoutTooltip,
-                inProgress: _logoutInProgress,
-                onTap: _logoutInProgress ? null : _onLogoutPressed,
-              ),
-            ],
-          ),
+          if (AppConfig.authAnonymous)
+            _SettingsCard(
+              children: [
+                _SettingsRow(
+                  icon: AppIcons.devices,
+                  title: l.settingsDeviceId,
+                  subtitle: _installId ?? l.settingsDeviceIdHint,
+                  onTap: _installId == null ? null : _copyInstallId,
+                  trailing: _installId == null
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Icon(
+                          Icons.copy_outlined,
+                          size: 20,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                ),
+              ],
+            )
+          else
+            _SettingsCard(
+              children: [
+                _LogoutRow(
+                  label: l.logoutTooltip,
+                  inProgress: _logoutInProgress,
+                  onTap: _logoutInProgress ? null : _onLogoutPressed,
+                ),
+              ],
+            ),
         ],
+        ),
       ),
     );
   }
@@ -513,10 +487,11 @@ class _SectionLabel extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 8),
       child: Text(
-        text,
-        style: theme.textTheme.titleSmall?.copyWith(
+        text.toUpperCase(),
+        style: theme.textTheme.labelSmall?.copyWith(
           color: theme.colorScheme.onSurfaceVariant,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.6,
         ),
       ),
     );
@@ -532,8 +507,11 @@ class _SettingsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Material(
-      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
-      borderRadius: BorderRadius.circular(18),
+      color: theme.colorScheme.surfaceContainerHighest,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppBrand.radiusCard),
+        side: BorderSide(color: theme.colorScheme.outline),
+      ),
       clipBehavior: Clip.antiAlias,
       child: Column(children: children),
     );

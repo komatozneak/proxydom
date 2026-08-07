@@ -11,7 +11,7 @@ import io.nekohasekai.libbox.OutboundGroup
 import io.nekohasekai.libbox.OutboundGroupIterator
 
 /**
- * Path latency via libbox [CommandClient.urlTest] on the `proxy-latency` group.
+ * Path latency via libbox [CommandClient.urlTest] on the `proxy` urltest group.
  *
  * Dart Socket/HTTP probes while TUN is up measure local accept (~5ms) or cold
  * multi-RTT (~800ms) — not Speedtest-class idle RTT. Engine urlTest is the
@@ -23,7 +23,7 @@ class VpnPingMonitor(
 ) {
     companion object {
         private const val TAG = "VpnPingMonitor"
-        const val GROUP_TAG = "proxy-latency"
+        const val GROUP_TAG = "proxy"
 
         /** Reject TUN-local fakes and dead probes. */
         const val MIN_PLAUSIBLE_MS = 30
@@ -114,12 +114,29 @@ class VpnPingMonitor(
             .onFailure { Log.w(TAG, "disconnect: ${it.message}") }
     }
 
+    private var missingGroupLogged = false
+
     private fun triggerUrlTest() {
         val active = client ?: return
         try {
             active.urlTest(groupTag)
             Log.d(TAG, "urlTest($groupTag) scheduled")
         } catch (e: Exception) {
+            val msg = e.message.orEmpty()
+            // Avoid spamming logcat every 15s when runtime JSON omitted the group.
+            if (msg.contains("outbound group not found") ||
+                msg.contains(groupTag)
+            ) {
+                if (!missingGroupLogged) {
+                    missingGroupLogged = true
+                    Log.w(
+                        TAG,
+                        "urlTest: group '$groupTag' missing in sing-box config " +
+                            "(will not retry-log). ${e.message}",
+                    )
+                }
+                return
+            }
             Log.w(TAG, "urlTest failed: ${e.message}")
         }
     }

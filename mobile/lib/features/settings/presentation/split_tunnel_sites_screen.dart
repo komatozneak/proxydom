@@ -338,10 +338,10 @@ class _SplitTunnelSitesScreenState
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: AppBrand.accent.withValues(alpha: 0.12),
+                      color: AppBrand.inkWithOpacity(0.08),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: AppBrand.accent.withValues(alpha: 0.35),
+                        color: AppBrand.inkWithOpacity(0.22),
                       ),
                     ),
                     child: Column(

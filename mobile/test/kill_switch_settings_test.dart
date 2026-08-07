@@ -43,6 +43,36 @@ void main() {
       expect(log.single.method, 'isLockdownEnabled');
     });
 
+    test('queryLockdownState maps snapshot map lockdown+alwaysOn', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        return <String, Object?>{
+          'lockdown': false,
+          'alwaysOn': true,
+        };
+      });
+      expect(
+        await VpnController.instance.queryLockdownState(),
+        VpnLockdownState.alwaysOnOnly,
+      );
+    });
+
+    test('queryLockdownState maps null lockdown → unavailable', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        return <String, Object?>{
+          'lockdown': null,
+          'alwaysOn': null,
+          'secureLockdown': null,
+          'runtimeLockdown': null,
+        };
+      });
+      expect(
+        await VpnController.instance.queryLockdownState(),
+        VpnLockdownState.unavailable,
+      );
+    });
+
     test('queryLockdownState maps false → disabled', () async {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(channel, (call) async {
@@ -326,6 +356,8 @@ void main() {
 
   test('AutoReconnectPrefs remains independent storage', () async {
     SharedPreferences.setMockInitialValues({});
+    expect(await AutoReconnectPrefs.isEnabled(), isFalse);
+    await AutoReconnectPrefs.setEnabled(true);
     expect(await AutoReconnectPrefs.isEnabled(), isTrue);
     await AutoReconnectPrefs.setEnabled(false);
     expect(await AutoReconnectPrefs.isEnabled(), isFalse);

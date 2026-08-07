@@ -100,7 +100,7 @@ class JwtRefreshInterceptor extends QueuedInterceptor {
     RequestOptions options,
     RequestInterceptorHandler handler,
   ) async {
-    final token = await tokenStorage.readAccessToken();
+    final token = (await tokenStorage.readAccessToken())?.trim();
     if (token != null && token.isNotEmpty) {
       options.headers['Authorization'] = 'Bearer $token';
     }
@@ -178,6 +178,8 @@ class JwtRefreshInterceptor extends QueuedInterceptor {
         DioException(
           requestOptions: response.requestOptions,
           error: e,
+          message: 'jwt_retry_failed: $e',
+          type: DioExceptionType.unknown,
         ),
       );
     }

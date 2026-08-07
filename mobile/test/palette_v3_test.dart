@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:teremok_connect/core/theme.dart';
 
 int _argb(Color c) {
-  // Flutter 3.27+: toARGB32(); CI 3.24: Color.value.
   try {
     // ignore: avoid_dynamic_calls
     return (c as dynamic).toARGB32() as int;
@@ -14,18 +13,20 @@ int _argb(Color c) {
 }
 
 void main() {
-  test('v3 palette tokens exist', () {
-    expect(_argb(AppBrand.primary), 0xFF5D4037);
+  test('mono mark charcoal+zinc palette tokens', () {
+    expect(_argb(AppBrand.primary), 0xFF1A1A1A);
+    expect(_argb(AppBrand.accent), 0xFF1A1A1A);
     expect(_argb(AppBrand.secondary), 0xFF558B2F);
-    expect(_argb(AppBrand.accent), 0xFFFF8F00);
-    expect(_argb(AppBrand.surfaceLight), 0xFFFAF8F3);
-    expect(_argb(AppBrand.surfaceDark), 0xFF3E2723);
+    expect(_argb(AppBrand.surfaceLight), 0xFFF4F4F5);
+    expect(_argb(AppBrand.surfaceDark), 0xFF121212);
+    expect(_argb(AppBrand.livingHouse), 0xFFC78F29);
   });
 
-  test('v3 theme still builds', () {
+  test('mono theme still builds', () {
     final theme = AppTheme.light;
     expect(theme.brightness, Brightness.light);
     expect(theme.useMaterial3, true);
-    expect(_argb(theme.colorScheme.primary), 0xFF5D4037);
+    expect(_argb(theme.colorScheme.surface), 0xFFF4F4F5);
+    expect(_argb(theme.colorScheme.primary), 0xFF1A1A1A);
   });
 }

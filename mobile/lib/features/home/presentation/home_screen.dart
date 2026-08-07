@@ -4,13 +4,11 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:go_router/go_router.dart';
-
 import '../../../core/widgets/connect_button.dart';
 import '../../../core/widgets/signal_nest_hero.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../vpn/data/node_display.dart';
-import '../../vpn/data/vpn_node.dart';
+import '../application/home_stats_provider.dart';
 import '../application/vpn_provider.dart';
 import '../application/vpn_status.dart';
 import 'widgets/compact_metrics_row.dart';
@@ -18,7 +16,7 @@ import 'widgets/radial_gradient_ground.dart';
 import 'widgets/server_card.dart';
 import 'widgets/uptime_row.dart';
 
-/// Variant 4 Home: Nest CTA + Server card + compact metrics (hide-until-connected).
+/// Variant 4 Home: Nest CTA + Server card (read-only) + compact metrics.
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
@@ -31,8 +29,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   String _serverTitle = '…';
   String _serverSubtitle = '';
   String _serverFlag = '🌐';
-  bool _isAuto = true;
-  /// Sticky key for last good Server card (node id or egress host).
+
+  /// Sticky key for last good Server card (egress host).
   String? _placeStickyKey;
 
   @override
@@ -61,62 +59,34 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Future<void> _refreshServerCard() async {
     final l = AppL10n.of(context);
     final locale = Localizations.localeOf(context).languageCode;
-    final nodesRepo = ref.read(vpnNodesRepositoryProvider);
     try {
-      final selectedId = await nodesRepo.getSelectedNodeId();
       if (!mounted) return;
-      final isAuto = selectedId == null || selectedId == kRegionAutoId;
-      final nodes = await nodesRepo.listNodes();
-      if (!mounted) return;
+      final vpnStatus = ref.read(vpnProvider);
+      final config = ref.read(vpnProvider.notifier).config;
+      final egressHost = config?.expectedEgressHost ??
+          config?.singBoxConfig.primaryOutbound?.server;
+      final displayLabel = ref.read(vpnProvider.notifier).displayLabel;
 
-      VpnNode? node;
-      var index = 0;
-      if (isAuto) {
-        node = nodes.where((n) => n.isDefault).firstOrNull ??
-            nodes.where((n) => n.isConnected).firstOrNull;
-      } else {
-        index = nodes.indexWhere((n) => n.id == selectedId);
-        if (index >= 0) {
-          node = nodes[index];
-        } else {
-          node = nodes.where((n) => n.isDefault).firstOrNull ?? nodes.firstOrNull;
-          index = 0;
-        }
-      }
-
-      if (node == null) {
+      if (egressHost == null || egressHost.isEmpty) {
         setState(() {
-          _serverTitle = l.homeRegionAuto;
+          _serverTitle = displayLabel ?? l.homeRegionAuto;
           _serverSubtitle = l.homeStatServer;
           _serverFlag = '🌐';
-          _isAuto = true;
           _placeStickyKey = null;
         });
         return;
       }
 
-      // Prefer selected node geo; when Auto+connected, resolve actual egress.
-      final vpnStatus = ref.read(vpnProvider);
-      final config = ref.read(vpnProvider.notifier).config;
-      final egressHost = config?.expectedEgressHost ??
-          config?.singBoxConfig.primaryOutbound?.server;
-
-      late final NodePlace place;
-      late final String stickyKey;
-      if (isAuto && vpnStatus is VpnConnected && egressHost != null) {
-        stickyKey = 'egress:$egressHost';
-        place = await resolvePlaceForHost(
-          egressHost,
-          index: index,
-          fallbackLabel: vpnStatus.serverName,
-        );
-      } else {
-        stickyKey = 'node:${node.id}';
-        place = await resolvePlaceForNode(node, index: index);
-      }
+      final stickyKey = 'egress:$egressHost';
+      final place = await resolvePlaceForHost(
+        egressHost,
+        index: 0,
+        fallbackLabel: vpnStatus is VpnConnected
+            ? vpnStatus.serverName
+            : (displayLabel ?? egressHost),
+      );
       if (!mounted) return;
 
-      // Sticky last-good geo: connect refresh often misses GeoIP through TUN.
       final selectionChanged = _placeStickyKey != stickyKey;
       if (!isResolvedPlace(place) &&
           !selectionChanged &&
@@ -127,26 +97,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               flag: _serverFlag,
             ),
           )) {
-        setState(() => _isAuto = isAuto);
         return;
       }
 
       setState(() {
         _serverTitle = place.displayTitle(locale);
         final city = place.displaySubtitle(locale);
-        _serverSubtitle = isAuto
-            ? (city.isEmpty
-                ? l.homeRegionAuto
-                : '$city · ${l.homeRegionAuto}')
-            : city;
+        _serverSubtitle =
+            city.isEmpty ? l.homeRegionAuto : '$city · ${l.homeRegionAuto}';
         _serverFlag = place.flag;
-        _isAuto = isAuto;
         if (isResolvedPlace(place)) {
           _placeStickyKey = stickyKey;
         }
       });
     } catch (_) {
-      // Keep sticky card on transient list/geo failures (esp. mid-connect).
       if (!mounted) return;
       if (isResolvedPlace(
         NodePlace(
@@ -161,7 +125,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         _serverTitle = l.homeRegion;
         _serverSubtitle = l.homeStatServer;
         _serverFlag = '🌐';
-        _isAuto = true;
         _placeStickyKey = null;
       });
     }
@@ -175,7 +138,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       return;
     }
     if (status is VpnConnecting) {
-      // Cancel stuck / in-flight connect (preparing forever, permission hang).
       await notifier.disconnect();
       return;
     }
@@ -189,6 +151,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final l = AppL10n.of(context);
     final theme = Theme.of(context);
     final vpnStatus = ref.watch(vpnProvider);
+    final pingAsync = ref.watch(homePingMsProvider);
+    final pingMs =
+        vpnStatus is VpnConnected ? pingAsync.asData?.value : null;
 
     ref.listen(vpnProvider, (prev, next) {
       if (prev.runtimeType != next.runtimeType) {
@@ -198,28 +163,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
-      appBar: AppBar(
-        title: Text(l.homeTitle),
-        centerTitle: true,
-      ),
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
             return Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
               child: _DashboardBody(
                 status: vpnStatus,
                 maxHeight: constraints.maxHeight,
                 serverTitle: _serverTitle,
-                serverSubtitle: _isAuto && _serverSubtitle.isEmpty
+                serverSubtitle: _serverSubtitle.isEmpty
                     ? l.homeRegionAuto
                     : _serverSubtitle,
                 serverFlag: _serverFlag,
+                pingMs: pingMs,
                 onNestTap: _onNestTap,
                 onPlaceRefresh: _refreshServerCard,
-                onServerTap: () async {
-                  context.go('/locations');
-                },
               ),
             );
           },
@@ -236,8 +195,8 @@ class _DashboardBody extends ConsumerStatefulWidget {
     required this.serverTitle,
     required this.serverSubtitle,
     required this.serverFlag,
+    required this.pingMs,
     required this.onNestTap,
-    required this.onServerTap,
     required this.onPlaceRefresh,
   });
 
@@ -246,8 +205,8 @@ class _DashboardBody extends ConsumerStatefulWidget {
   final String serverTitle;
   final String serverSubtitle;
   final String serverFlag;
+  final int? pingMs;
   final Future<void> Function() onNestTap;
-  final Future<void> Function() onServerTap;
   final Future<void> Function() onPlaceRefresh;
 
   @override
@@ -304,11 +263,16 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
       VpnConnected() => l.homeConnected,
       VpnError() => l.homeError,
     };
+    final statusHint = switch (status) {
+      VpnDisconnected() => l.homeTapHint,
+      VpnConnecting() => l.homeConnectingHint,
+      VpnConnected() => l.homeConnectedHint,
+      VpnError() => l.homeErrorFriendly,
+    };
 
-    // Fit one viewport with bottom nav — no scroll on Home.
     final nestSize = math.min(
-      260.0,
-      math.min(size.width * 0.62, widget.maxHeight * 0.36),
+      320.0,
+      math.min(size.width * 0.78, widget.maxHeight * 0.46),
     );
 
     return Column(
@@ -327,24 +291,24 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
         ),
         TreeStatusLabel(
           state: treeState,
-          label: statusLabel.toUpperCase(),
+          label: statusLabel,
         ),
-        if (status is VpnError) ...[
-          const SizedBox(height: 8),
-          Text(
-            l.homeErrorFriendly,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.error,
-            ),
+        const SizedBox(height: 6),
+        Text(
+          statusHint,
+          textAlign: TextAlign.center,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: status is VpnError
+                ? theme.colorScheme.error
+                : theme.colorScheme.onSurfaceVariant,
           ),
-        ],
+        ),
         const SizedBox(height: 16),
         ServerCard(
           title: widget.serverTitle,
           subtitle: widget.serverSubtitle,
           flagEmoji: widget.serverFlag,
-          onTap: () => widget.onServerTap(),
+          pingMs: widget.pingMs,
         ),
         const SizedBox(height: 12),
         const CompactMetricsRow(),

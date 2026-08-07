@@ -12,7 +12,24 @@ const kRuleSetAssets = <String, String>{
   'geosite-category-ru': 'assets/rules/geosite-category-ru.srs',
   'geosite-tld-ru': 'assets/rules/geosite-tld-ru.srs',
   'geoip-ru': 'assets/rules/geoip-ru.srs',
+  'geosite-category-ads-all': 'assets/rules/geosite-category-ads-all.srs',
 };
+
+/// Tags shipped for smart-mode RU split (domain + legacy geoip asset).
+const kRuRuleSetTags = <String>{
+  'geosite-category-ru',
+  'geosite-tld-ru',
+  'geoip-ru',
+};
+
+/// Domain-only RU tags wired into route (geoip-ru dropped — CDN IP false positives).
+const kRuDomainRuleSetTags = <String>{
+  'geosite-category-ru',
+  'geosite-tld-ru',
+};
+
+/// Tag for embedded ads reject list.
+const kAdsRuleSetTag = 'geosite-category-ads-all';
 
 /// Copy APK assets into `files/sing-box/rules/` (libbox working tree).
 ///

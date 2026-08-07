@@ -55,13 +55,22 @@ class AppL10nRu extends AppL10n {
   String get homeVpnHint => 'VPN UI — в шагах 9+';
 
   @override
-  String get homeDisconnected => 'Отключено';
+  String get homeDisconnected => 'Не подключено';
 
   @override
   String get homeConnecting => 'Подключение...';
 
   @override
   String get homeConnected => 'Подключено';
+
+  @override
+  String get homeTapHint => 'Нажмите на Теремок, чтобы войти';
+
+  @override
+  String get homeConnectingHint => 'Подождите, Теремок открывает дверь…';
+
+  @override
+  String get homeConnectedHint => 'Теремок на связи';
 
   @override
   String get homeProtected => 'Защищено';
@@ -85,7 +94,110 @@ class AppL10nRu extends AppL10n {
   String get navHome => 'Главная';
 
   @override
+  String get navVpn => 'VPN';
+
+  @override
   String get navLocations => 'Локации';
+
+  @override
+  String get navModes => 'Режимы';
+
+  @override
+  String get modesTitle => 'Режим';
+
+  @override
+  String get modesSubtitle => 'Как работает VPN';
+
+  @override
+  String get modeSmartTitle => 'Умный режим';
+
+  @override
+  String get modeSmartBody =>
+      'Российские сайты — напрямую, зарубежные — через VPN.';
+
+  @override
+  String get modeSmartBadge => 'АВТО';
+
+  @override
+  String get modeFullTitle => 'Обычный VPN';
+
+  @override
+  String get modeFullBody =>
+      'Весь интернет идёт через VPN. Максимально просто и надёжно.';
+
+  @override
+  String get modeSitesTitle => 'По сайтам';
+
+  @override
+  String get modeSitesBody =>
+      'Через VPN пойдут только выбранные сайты. Остальное — напрямую.';
+
+  @override
+  String get modesVpnOffTitle => 'VPN выключен';
+
+  @override
+  String get modesVpnOffBody => 'Подключите VPN, чтобы режимы заработали';
+
+  @override
+  String get modesConfirmFullTitle => 'Точно переключить на Обычный режим?';
+
+  @override
+  String get modesConfirmFullBody =>
+      'В этом режиме весь трафик идёт через VPN. Российские сервисы — Ozon, Wildberries, банки, Госуслуги… могут перестать открываться.\n\nЧтобы они работали напрямую — используйте Умный режим.';
+
+  @override
+  String get modesConfirmFullCancel => 'Не переключать';
+
+  @override
+  String get modesConfirmFullOk => 'Переключить';
+
+  @override
+  String get modesSitesSectionSmart => 'Дополнительно напрямую';
+
+  @override
+  String get modesSitesSectionSites => 'Сайты через VPN';
+
+  @override
+  String get modesSitesCustomSection => 'Свои сайты';
+
+  @override
+  String get modesSitesCustomHint => 'например, twitch.tv';
+
+  @override
+  String get modesSitesAllowlistHint =>
+      'Через VPN пойдут только выбранные сайты — остальной трафик идёт напрямую и на полной скорости.';
+
+  @override
+  String get modesSitesMetaNote =>
+      'Instagram и Facebook принадлежат компании Meta, признанной в России экстремистской организацией и запрещённой на территории РФ.';
+
+  @override
+  String get modesLocationTitle => 'Локация';
+
+  @override
+  String get modesLocationHint => 'Сервер и страна';
+
+  @override
+  String get modesPendingTitle => 'Нужно переподключить VPN';
+
+  @override
+  String get modesPendingBody =>
+      'Изменения маршрутизации применятся после переподключения.';
+
+  @override
+  String get modesReconnect => 'Переподключить';
+
+  @override
+  String get modesReconnectingTitle => 'Переподключаем VPN…';
+
+  @override
+  String get modesReconnectingBody => 'Применяем изменения маршрутизации';
+
+  @override
+  String get modesReconnectedTitle => 'Подключено';
+
+  @override
+  String get modesReconnectFailedTitle => 'Не удалось переподключить';
 
   @override
   String get navSettings => 'Настройки';
@@ -159,13 +271,13 @@ class AppL10nRu extends AppL10n {
   String get settingsActiveBadge => 'Активна';
 
   @override
-  String get settingsAccessEarlyTitle => 'Закрытая бета';
+  String get settingsAccessEarlyTitle => 'Закрытое тестирование';
 
   @override
   String get settingsAccessEarlySubtitle => 'Доступ по приглашению.';
 
   @override
-  String get settingsAccessBetaTitle => 'Закрытая бета';
+  String get settingsAccessBetaTitle => 'Закрытое тестирование';
 
   @override
   String get settingsAccessBetaSubtitle =>
@@ -196,7 +308,7 @@ class AppL10nRu extends AppL10n {
   }
 
   @override
-  String get settingsSubscriptionAlpha => 'Закрытая бета';
+  String get settingsSubscriptionAlpha => 'Закрытое тестирование';
 
   @override
   String get settingsSubscriptionExpired => 'Подписка истекла';
@@ -228,6 +340,10 @@ class AppL10nRu extends AppL10n {
   String get settingsKillSwitchOn => 'Включено в настройках Android';
 
   @override
+  String get settingsKillSwitchAlwaysOnOnly =>
+      'Always-on включён — включите ещё «Блокировать без VPN»';
+
+  @override
   String get settingsKillSwitchOff =>
       'Выключено — интернет может работать без VPN';
 
@@ -256,6 +372,9 @@ class AppL10nRu extends AppL10n {
   String get settingsKillSwitchBadgeOn => 'Вкл';
 
   @override
+  String get settingsKillSwitchBadgePartial => 'Частично';
+
+  @override
   String get settingsKillSwitchBadgeOff => 'Выкл';
 
   @override
@@ -268,10 +387,10 @@ class AppL10nRu extends AppL10n {
   String get settingsAutoReconnectHint => 'Быстрое переподключение при обрыве';
 
   @override
-  String get settingsSplitTunnel => 'Что работает без VPN?';
+  String get settingsSplitTunnel => 'Режимы';
 
   @override
-  String get settingsSplitTunnelHint => 'Сайты с прямым подключением';
+  String get settingsSplitTunnelHint => 'Умный / обычный / по сайтам';
 
   @override
   String get settingsDevices => 'Устройства';
@@ -444,16 +563,19 @@ class AppL10nRu extends AppL10n {
   String get settingsPrivacyPlaceholder => 'Политика конфиденциальности';
 
   @override
-  String get settingsDarkTheme => 'Тёмная тема';
+  String get settingsDarkTheme => 'Оформление';
 
   @override
-  String get settingsThemeSystem => 'Как в системе';
+  String get settingsAppearance => 'Оформление';
 
   @override
-  String get settingsThemeDark => 'Всегда тёмная';
+  String get settingsThemeSystem => 'Авто';
 
   @override
-  String get settingsThemeLight => 'Светлая';
+  String get settingsThemeDark => 'Тёмное';
+
+  @override
+  String get settingsThemeLight => 'Светлое';
 
   @override
   String get settingsDiagnostics => 'Диагностика';
@@ -637,6 +759,15 @@ class AppL10nRu extends AppL10n {
   String get logoutTooltip => 'Выйти';
 
   @override
+  String get settingsDeviceId => 'ID устройства';
+
+  @override
+  String get settingsDeviceIdCopied => 'ID скопирован';
+
+  @override
+  String get settingsDeviceIdHint => 'Идентификатор установки для поддержки';
+
+  @override
   String get logoutConfirmTitle => 'Выйти из аккаунта?';
 
   @override
@@ -776,4 +907,122 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get betaGateContinueAnyway => 'Продолжить всё равно';
+
+  @override
+  String get lockedTitle => 'Активация';
+
+  @override
+  String get lockedHeadline => 'Добро пожаловать!';
+
+  @override
+  String get lockedBody =>
+      'Оформите подписку или введите промокод — и подключайтесь в один тап.';
+
+  @override
+  String get lockedCta => 'Оформить подписку или введите промокод';
+
+  @override
+  String get lockedRefreshAccess => 'Обновить доступ';
+
+  @override
+  String get settingsSupport => 'Поддержка';
+
+  @override
+  String get settingsSupportHint => 'Telegram — перенос после переустановки';
+
+  @override
+  String get lockedPay1m => 'Оплатить 1 месяц';
+
+  @override
+  String get lockedPay3m => 'Оплатить 3 месяца';
+
+  @override
+  String get lockedOrPromo => 'Или введите промокод';
+
+  @override
+  String get lockedPayFailed =>
+      'Не удалось начать оплату. Попробуйте снова или напишите в поддержку.';
+
+  @override
+  String get lockedPayReturnTitle => 'Оплата открыта';
+
+  @override
+  String get lockedPayReturnBody =>
+      'После оплаты в браузере нажмите «Проверить доступ».';
+
+  @override
+  String get lockedPayReturnCheck => 'Проверить доступ';
+
+  @override
+  String get recoveryCodeTitle => 'Код восстановления';
+
+  @override
+  String get recoveryCodeHeadline => 'Код восстановления';
+
+  @override
+  String get recoveryCodeBody =>
+      'Опционально для поддержки. Основной путь — номер платежа.';
+
+  @override
+  String get recoveryCodeCopy => 'Скопировать';
+
+  @override
+  String get recoveryCodeCopied => 'Код скопирован';
+
+  @override
+  String get recoveryCodeConfirm => 'Продолжить';
+
+  @override
+  String get recoveryCodeContinue => 'Продолжить';
+
+  @override
+  String get restoreTitle => 'Восстановить доступ';
+
+  @override
+  String get restoreHeadline => 'Введите номер платежа';
+
+  @override
+  String get restoreBody =>
+      'После переустановки вставьте ID платежа Platega из СМС банка или чека. Код сохранения не нужен.';
+
+  @override
+  String get restorePaymentLabel => 'Номер платежа';
+
+  @override
+  String get restorePaymentHint => 'UUID из чека / СМС';
+
+  @override
+  String get restorePaymentEmpty => 'Введите номер платежа';
+
+  @override
+  String get restorePaymentNotFound => 'Платёж не найден. Проверьте номер.';
+
+  @override
+  String get restorePaymentNotConfirmed => 'Этот платёж ещё не подтверждён.';
+
+  @override
+  String get restoreCodeLabel => 'Код восстановления';
+
+  @override
+  String get restoreCodeHint => 'TRM-XXXX-XXXX-XXXX';
+
+  @override
+  String get restoreCodeEmpty => 'Введите код восстановления';
+
+  @override
+  String get restoreSubmit => 'Восстановить';
+
+  @override
+  String get restoreInvalid => 'Неверный код восстановления';
+
+  @override
+  String get restoreFailed =>
+      'Не удалось восстановить доступ. Попробуйте снова.';
+
+  @override
+  String get restoreSettingsHint =>
+      'После переустановки — номер платежа из чека банка';
+
+  @override
+  String get bootstrapFailed => 'Не удалось начать сессию. Проверьте связь.';
 }

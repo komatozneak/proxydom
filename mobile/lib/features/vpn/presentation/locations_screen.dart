@@ -9,7 +9,6 @@ import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../home/application/vpn_provider.dart';
-import '../../shell/presentation/main_shell.dart';
 import '../data/node_display.dart';
 import '../data/vpn_controller.dart';
 import '../data/vpn_node.dart';
@@ -40,17 +39,18 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
   Widget build(BuildContext context) {
     final l = AppL10n.of(context);
     final theme = Theme.of(context);
-
-    ref.listen<int>(locationsTabTickProvider, (prev, next) {
-      if (prev != null && next != prev && !_loading) {
-        unawaited(_load());
-      }
-    });
+    final canPop = context.canPop();
 
     return Scaffold(
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         title: Text(l.regionTitle),
-        centerTitle: true,
+        leading: canPop
+            ? IconButton(
+                icon: const AppIcon(AppIcons.back),
+                onPressed: () => context.pop(),
+              )
+            : null,
         automaticallyImplyLeading: false,
       ),
       body: _buildBody(l, theme),
@@ -73,6 +73,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
   }
 
   Future<void> _load() async {
+    final sw = Stopwatch()..start();
     setState(() {
       _loading = true;
       _error = null;
@@ -80,28 +81,48 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       _fromCache = false;
     });
 
+    final nodesRepo = ref.read(vpnNodesRepositoryProvider);
+    var selectedId = await nodesRepo.getSelectedNodeId();
+    selectedId ??= kRegionAutoId;
+
+    // Stale-while-revalidate: never block the UI on a live /vpn/nodes hang
+    // (Dio receiveTimeout 60s × retries ≈ 2 min — Pixel repro 2026-08-07).
+    final cached = await nodesRepo.loadCachedNodes();
+    if (cached != null && cached.isNotEmpty) {
+      if (selectedId != kRegionAutoId &&
+          !cached.any((n) => n.id == selectedId)) {
+        selectedId = kRegionAutoId;
+      }
+      if (!mounted) return;
+      setState(() {
+        _nodes = cached;
+        _selectedId = selectedId;
+        _loading = false;
+        _fromCache = true;
+      });
+    }
+
     Object? lastError;
     for (var attempt = 0; attempt < 3; attempt++) {
       try {
-        final nodesRepo = ref.read(vpnNodesRepositoryProvider);
+        final attemptSw = Stopwatch()..start();
         final result = await nodesRepo.listNodesDetailed(
-          // First attempts prefer live; last attempt may use cache.
-          allowCacheFallback: attempt >= 1,
+          allowCacheFallback: true,
         );
-        var selectedId = await nodesRepo.getSelectedNodeId();
-        selectedId ??= kRegionAutoId;
-        if (selectedId != kRegionAutoId &&
-            !result.nodes.any((n) => n.id == selectedId)) {
-          selectedId = kRegionAutoId;
+        var nextSelected = await nodesRepo.getSelectedNodeId();
+        nextSelected ??= kRegionAutoId;
+        if (nextSelected != kRegionAutoId &&
+            !result.nodes.any((n) => n.id == nextSelected)) {
+          nextSelected = kRegionAutoId;
         }
         if (!mounted) return;
         setState(() {
           _nodes = result.nodes;
-          _selectedId = selectedId;
+          _selectedId = nextSelected;
           _loading = false;
           _fromCache = result.fromCache;
+          _error = null;
         });
-        // Warm GeoIP only for hosts outside the known product pool.
         for (final n in result.nodes) {
           if (placeForKnownHost(n.host) != null) continue;
           unawaited(
@@ -119,6 +140,11 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
         }
         break;
       }
+    }
+
+    // Cache already painted the list — keep it; only hard-fail if nothing shown.
+    if (_nodes != null && _nodes!.isNotEmpty) {
+      return;
     }
 
     final e = lastError ?? StateError('unknown');
@@ -141,6 +167,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
 
   Future<void> _pick(String id, String toastLabel) async {
     final l = AppL10n.of(context);
+    final pickSw = Stopwatch()..start();
     try {
       await ref.read(vpnProvider.notifier).selectNode(id);
       if (!mounted) return;
@@ -148,7 +175,11 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l.regionChanged(toastLabel))),
       );
-      context.go('/home');
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.go('/home');
+      }
     } catch (e) {
       if (!mounted) return;
       final msg = _isTransientNetwork(e)
@@ -210,7 +241,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     }
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
       children: [
         Text(
           l.regionSubtitle,
@@ -231,8 +262,12 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
         RegionTile(
           selected: selectedId == kRegionAutoId,
           leading: CircleAvatar(
-            backgroundColor: AppBrand.secondary.withValues(alpha: 0.2),
-            child: const AppIcon(AppIcons.servers, size: 22),
+            backgroundColor: AppBrand.inkWithOpacity(0.08),
+            child: const AppIcon(
+              AppIcons.servers,
+              size: 22,
+              color: AppBrand.primary,
+            ),
           ),
           title: l.regionAutoTitle,
           subtitle: l.regionAutoSubtitle,
@@ -322,20 +357,20 @@ class RegionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final border = selected
-        ? Border.all(color: AppBrand.accent, width: 1.5)
+        ? Border.all(color: AppBrand.primary, width: 1.5)
         : Border.all(color: theme.colorScheme.outlineVariant);
 
     return Material(
-      color: theme.colorScheme.surfaceContainerHighest.withValues(
-        alpha: enabled ? 0.35 : 0.15,
-      ),
-      borderRadius: BorderRadius.circular(16),
+      color: enabled
+          ? theme.colorScheme.surfaceContainerHighest
+          : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
+      borderRadius: BorderRadius.circular(AppBrand.radiusCard),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppBrand.radiusCard),
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppBrand.radiusCard),
             border: border,
           ),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -370,13 +405,13 @@ class RegionTile extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: AppBrand.accent.withValues(alpha: 0.15),
+                    color: AppBrand.inkWithOpacity(0.08),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     trailingBadge,
                     style: theme.textTheme.labelSmall?.copyWith(
-                      color: AppBrand.accent,
+                      color: theme.colorScheme.onSurface,
                       fontWeight: FontWeight.w600,
                     ),
                   ),

@@ -9,7 +9,7 @@ extension BrandColors on ColorScheme {
     return switch (status) {
       'connected' => AppBrand.success,
       'connecting' => AppBrand.warning,
-      'error' => AppBrand.error,
+      'error' => AppBrand.destructive,
       _ => outline,
     };
   }

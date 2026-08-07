@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/config.dart';
 import '../../../core/router.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../l10n/app_localizations.dart';
@@ -37,45 +38,72 @@ class _PostAuthGateScreenState extends ConsumerState<PostAuthGateScreen> {
   Future<void> _resolve() async {
     final auth = ref.read(authProvider).valueOrNull;
     if (auth is! AuthStateAuthenticated) {
-      if (mounted) context.go('/login');
+      if (!mounted) return;
+      if (AppConfig.authAnonymous) {
+        context.go('/bootstrap-failed');
+      } else {
+        context.go('/login');
+      }
       return;
     }
     final userId = jwtSubject(auth.accessToken) ?? 'unknown';
-    try {
-      final entitlement = await ref.read(betaApiProvider).fetchEntitlement();
-      final dest = await PostAuthRouter.resolveWithPrefs(
-        entitlement: entitlement,
-        userId: userId,
-      );
-      if (!mounted) return;
-      switch (dest) {
-        case PostAuthDestination.promo:
-          // Never flip postAuthResolved true before promo — race let shell through.
-          AppRouter.postAuthResolved = false;
-          context.go('/promo');
-        case PostAuthDestination.onboarding:
-          AppRouter.postAuthResolved = true;
-          context.go('/onboarding');
-        case PostAuthDestination.home:
-          AppRouter.postAuthResolved = true;
-          context.go('/home');
-      }
-    } on DioException catch (e) {
-      if (!mounted) return;
-      if (e.response?.statusCode == 401) {
-        AppRouter.postAuthResolved = false;
-        await ref.read(logoutHandlerProvider).logout();
-        if (mounted) context.go('/login');
+    Object? lastError;
+    // Activity recreate / VPN flap can abort the first entitlement call
+    // (see Pixel log: Impeller restart mid-gate → betaGateError).
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        final entitlement = await ref.read(betaApiProvider).fetchEntitlement();
+        final dest = await PostAuthRouter.resolveWithPrefs(
+          entitlement: entitlement,
+          userId: userId,
+        );
+        if (!mounted) return;
+        switch (dest) {
+          case PostAuthDestination.promo:
+            AppRouter.postAuthResolved = false;
+            context.go('/promo');
+          case PostAuthDestination.locked:
+            AppRouter.postAuthResolved = false;
+            context.go('/locked');
+          case PostAuthDestination.onboarding:
+            AppRouter.postAuthResolved = true;
+            context.go('/onboarding');
+          case PostAuthDestination.home:
+            AppRouter.postAuthResolved = true;
+            context.go('/home');
+        }
         return;
+      } on DioException catch (e) {
+        lastError = e;
+        if (e.response?.statusCode == 401) {
+          if (!mounted) return;
+          AppRouter.postAuthResolved = false;
+          if (AppConfig.authAnonymous) {
+            await ref.read(authProvider.notifier).retryBootstrap();
+            if (mounted) context.go('/gate');
+          } else {
+            await ref.read(logoutHandlerProvider).logout();
+            if (mounted) context.go('/login');
+          }
+          return;
+        }
+        final transient = e.type == DioExceptionType.connectionError ||
+            e.type == DioExceptionType.connectionTimeout ||
+            e.type == DioExceptionType.receiveTimeout ||
+            e.type == DioExceptionType.sendTimeout;
+        if (transient && attempt < 2) {
+          await Future<void>.delayed(Duration(milliseconds: 400 * (attempt + 1)));
+          continue;
+        }
+        break;
+      } catch (e) {
+        lastError = e;
+        break;
       }
-      // Socket / timeout / 5xx: stay on gate with retry. Never soft-pass.
-      AppRouter.postAuthResolved = false;
-      setState(() => _error = e.message ?? e.toString());
-    } catch (e) {
-      if (!mounted) return;
-      AppRouter.postAuthResolved = false;
-      setState(() => _error = e.toString());
     }
+    if (!mounted) return;
+    AppRouter.postAuthResolved = false;
+    setState(() => _error = lastError?.toString() ?? 'unknown');
   }
 
   @override
@@ -118,5 +146,10 @@ class _PostAuthGateScreenState extends ConsumerState<PostAuthGateScreen> {
 Future<void> markWelcomeAndGoLogin(BuildContext context) async {
   await OnboardingPrefs.markWelcomeSeen();
   AppRouter.welcomeSeenCache = true;
-  if (context.mounted) context.go('/login');
+  if (!context.mounted) return;
+  if (AppConfig.authAnonymous) {
+    context.go('/home');
+    return;
+  }
+  context.go('/login');
 }

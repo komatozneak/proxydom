@@ -57,6 +57,7 @@ abstract final class AppIcons {
   static const IconData crown = PhosphorIconsRegular.crown;
   static const IconData sliders = PhosphorIconsRegular.sliders;
   static const IconData moon = PhosphorIconsRegular.moon;
+  static const IconData palette = PhosphorIconsRegular.palette;
   static const IconData bug = PhosphorIconsRegular.bug;
   static const IconData notifications = PhosphorIconsRegular.bell;
   static const IconData chevronRight = PhosphorIconsRegular.caretRight;
@@ -73,4 +74,19 @@ abstract final class AppIcons {
   static const IconData x = PhosphorIconsRegular.x;
   static const IconData xCircle = PhosphorIconsRegular.xCircle;
   static const IconData xCircleFill = PhosphorIconsFill.xCircle;
+
+  // Modes «По сайтам» — monochrome brand logos (charcoal via theme).
+  static const IconData siteCloudflare = PhosphorIconsRegular.cloud;
+  static const IconData siteYoutube = PhosphorIconsRegular.youtubeLogo;
+  static const IconData siteTiktok = PhosphorIconsRegular.tiktokLogo;
+  static const IconData siteInstagram = PhosphorIconsRegular.instagramLogo;
+  static const IconData siteWhatsapp = PhosphorIconsRegular.whatsappLogo;
+  static const IconData siteTelegram = PhosphorIconsRegular.telegramLogo;
+  static const IconData siteDiscord = PhosphorIconsRegular.discordLogo;
+  static const IconData siteChatgpt = PhosphorIconsRegular.sparkle;
+  /// Prefer [siteClaudeAsset] in Modes UI — Phosphor robot was a stand-in.
+  static const IconData siteClaude = PhosphorIconsRegular.sparkle;
+  static const String siteClaudeAsset = 'assets/brand/sites/claude.png';
+  static const IconData siteGemini = PhosphorIconsRegular.googleLogo;
+  static const IconData siteCustom = PhosphorIconsRegular.globe;
 }

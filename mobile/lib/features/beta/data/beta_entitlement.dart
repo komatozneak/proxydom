@@ -8,12 +8,14 @@ class BetaEntitlement {
     required this.betaPromoGateEnabled,
     this.plan,
     this.isAlpha = false,
+    this.authAnonymousEnabled = false,
   });
 
   final bool hasAccess;
   final bool betaPromoGateEnabled;
   final String? plan;
   final bool isAlpha;
+  final bool authAnonymousEnabled;
 
   /// Gate advertises promo entry for authenticated users without access.
   /// When gate is ON, missing entitlement MUST show promo (no soft-pass).
@@ -43,6 +45,7 @@ class BetaEntitlement {
       betaPromoGateEnabled: gateRaw,
       plan: json['plan'] as String?,
       isAlpha: json['is_alpha'] == true,
+      authAnonymousEnabled: json['auth_anonymous_enabled'] == true,
     );
   }
 
@@ -57,6 +60,7 @@ class BetaEntitlement {
         'beta_promo_gate_enabled': betaPromoGateEnabled,
         if (plan != null) 'plan': plan,
         'is_alpha': isAlpha,
+        'auth_anonymous_enabled': authAnonymousEnabled,
       };
 
   static const BetaEntitlement entitledGateOff = BetaEntitlement(

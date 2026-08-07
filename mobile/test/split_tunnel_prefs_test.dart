@@ -59,6 +59,39 @@ void main() {
       expect((r as DomainNormalizeOk).domain, 'example.com');
     });
 
+    test('ensurePresetSites seeds full catalog and keeps customs', () async {
+      await SplitTunnelPrefs.addSite(domain: 'twitch.tv', label: 'Twitch');
+      await SplitTunnelPrefs.ensurePresetSites();
+      final sites = await SplitTunnelPrefs.loadSites();
+      expect(sites.where((s) => s.isPreset).length, kSplitTunnelPresets.length);
+      expect(sites.any((s) => s.domain == 'whatsapp.com'), isTrue);
+      expect(sites.any((s) => s.domain == 'claude.ai'), isTrue);
+      expect(sites.any((s) => s.domain == 'gemini.google.com'), isTrue);
+      expect(
+        sites.firstWhere((s) => s.domain == 'gemini.google.com').subtitle,
+        'Нейросеть',
+      );
+      expect(
+        kSplitTunnelDomainAliases['gemini.google.com'],
+        containsAll([
+          'generativelanguage.googleapis.com',
+          'google.com',
+          'gstatic.com',
+        ]),
+      );
+      expect(
+        kSplitTunnelDomainAliases['telegram.org'],
+        containsAll(['api.telegram.org', 'telegra.ph']),
+      );
+      expect(
+        kSplitTunnelProxyIpCidrs['telegram.org'],
+        contains('149.154.160.0/20'),
+      );
+      expect(sites.any((s) => s.domain == 'twitch.tv' && !s.isPreset), isTrue);
+      final ig = sites.firstWhere((s) => s.domain == 'instagram.com');
+      expect(ig.subtitle, contains('Facebook'));
+    });
+
     test('rejects scheme/path/ip/wildcard/single-label/non-ascii', () {
       expect(
         normalizeSplitTunnelDomain('https://example.com'),
@@ -107,6 +140,23 @@ void main() {
 
       await SplitTunnelPrefs.markApplied();
       expect(await SplitTunnelPrefs.hasPendingChanges(), isFalse);
+    });
+
+    test('telegram enabled expands DC ip_cidr list', () async {
+      await SplitTunnelPrefs.ensurePresetSites();
+      final sites = await SplitTunnelPrefs.loadSites();
+      final tg = sites.firstWhere((s) => s.domain == 'telegram.org');
+      await SplitTunnelPrefs.updateSite(tg.copyWith(enabled: true));
+      for (final s in await SplitTunnelPrefs.loadSites()) {
+        if (s.domain != 'telegram.org' && s.enabled) {
+          await SplitTunnelPrefs.updateSite(s.copyWith(enabled: false));
+        }
+      }
+      final cidrs = await SplitTunnelPrefs.enabledProxyIpCidrs();
+      expect(cidrs, contains('149.154.160.0/20'));
+      expect(cidrs, contains('91.108.56.0/22'));
+      final suffixes = await SplitTunnelPrefs.enabledDomainSuffixes();
+      expect(suffixes, contains('api.telegram.org'));
     });
 
     test('duplicate rejected', () async {

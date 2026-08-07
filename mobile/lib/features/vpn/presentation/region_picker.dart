@@ -4,5 +4,5 @@ import 'package:go_router/go_router.dart';
 
 /// Legacy entry: routes to the Locations tab (bottom sheet removed).
 Future<void> showRegionPicker(BuildContext context, WidgetRef ref) async {
-  context.go('/locations');
+  context.push('/locations');
 }

@@ -30,10 +30,10 @@ object VpnNotificationHelper {
     private const val PREFS = "teremok_vpn_notification"
     private const val KEY_DETAILED = "detailed_enabled"
 
-    /** User preference: show the long shade card. Default ON. */
+    /** User preference: show the long shade card. Default OFF (opt-in). */
     fun isDetailedEnabled(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getBoolean(KEY_DETAILED, true)
+            .getBoolean(KEY_DETAILED, false)
 
     fun setDetailedEnabled(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

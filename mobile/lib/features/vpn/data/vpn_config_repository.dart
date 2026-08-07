@@ -65,6 +65,14 @@ class VpnConfigRepository {
               error: 'device_limit_reached',
             );
           }
+          if (nested['code'] == 'device_revoked') {
+            throw DioException(
+              requestOptions: e.requestOptions,
+              response: e.response,
+              type: DioExceptionType.badResponse,
+              error: 'device_revoked',
+            );
+          }
         }
       }
       rethrow;

@@ -37,9 +37,12 @@ class TokenStorage implements TokenStore {
     required String accessToken,
     required String refreshToken,
   }) async {
+    // Trim — whitespace/newlines in Bearer break HTTP and can yield Caddy 400.
+    final access = accessToken.trim();
+    final refresh = refreshToken.trim();
     await Future.wait([
-      _storage.write(key: _accessKey, value: accessToken),
-      _storage.write(key: _refreshKey, value: refreshToken),
+      _storage.write(key: _accessKey, value: access),
+      _storage.write(key: _refreshKey, value: refresh),
     ]);
     if (kDebugMode) {
       final check = await readRefreshToken();

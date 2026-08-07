@@ -39,6 +39,12 @@ class InstallIdStorage {
   /// Test / logout helper — does not clear JWT tokens.
   Future<void> clearForTests() => _storage.delete(key: _key);
 
+  /// Rotate install id after self-revoke so reconnect cannot revive the slot.
+  Future<String> rotate() async {
+    await _storage.delete(key: _key);
+    return getOrCreate();
+  }
+
   static String _uuidV4() {
     final r = Random.secure();
     final bytes = List<int>.generate(16, (_) => r.nextInt(256));

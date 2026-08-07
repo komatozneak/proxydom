@@ -16,6 +16,7 @@ class VpnConfig {
     required this.expire,
     required this.singBoxConfig,
     this.nodeHost,
+    this.egressCandidates = const [],
   });
 
   final String username;
@@ -25,6 +26,9 @@ class VpnConfig {
 
   /// Egress VPS host from `GET /vpn/config` (`node_host`).
   final String? nodeHost;
+
+  /// Multi-node candidates for client urltest failover (preferred first).
+  final List<VpnEgressCandidate> egressCandidates;
 
   /// Expected public egress IP/host for E2E checks (falls back to outbound server).
   String? get expectedEgressHost {
@@ -37,11 +41,53 @@ class VpnConfig {
     return null;
   }
 
+  /// Ordered unique egress hosts for TUN bypass / direct cidr.
+  List<String> get egressHosts {
+    final resolved = resolveEgressCandidates();
+    return [
+      for (final c in resolved)
+        if (c.host.isNotEmpty && c.host != 'unknown') c.host,
+    ];
+  }
+
+  /// Prefer API `egress_candidates`; else derive unique hosts from links + primary.
+  List<VpnEgressCandidate> resolveEgressCandidates() {
+    if (egressCandidates.isNotEmpty) return egressCandidates;
+    final seen = <String>{};
+    final out = <VpnEgressCandidate>[];
+    void add(String id, String host) {
+      final h = host.trim();
+      if (h.isEmpty || h == 'unknown') return;
+      final key = h.toLowerCase();
+      if (!seen.add(key)) return;
+      out.add(VpnEgressCandidate(id: id, host: h, label: h));
+    }
+
+    final primary = singBoxConfig.primaryOutbound?.server;
+    if (primary != null) add('primary', primary);
+    for (final link in links) {
+      final host = hostFromVlessLink(link);
+      if (host != null) add(host, host);
+    }
+    return out;
+  }
+
   factory VpnConfig.fromJson(Map<String, dynamic> json) {
     final singBox = SingBoxConfig.fromJson(
       json['sing_box_config'] as Map<String, dynamic>,
     );
     final nodeHost = json['node_host'] as String?;
+    final rawCandidates = json['egress_candidates'];
+    final candidates = <VpnEgressCandidate>[];
+    if (rawCandidates is List) {
+      for (final e in rawCandidates) {
+        if (e is Map) {
+          candidates.add(
+            VpnEgressCandidate.fromJson(Map<String, dynamic>.from(e)),
+          );
+        }
+      }
+    }
     return VpnConfig(
       username: json['username'] as String,
       links: (json['links'] as List).cast<String>(),
@@ -53,6 +99,7 @@ class VpnConfig {
       nodeHost: nodeHost?.isNotEmpty == true
           ? nodeHost
           : singBox.primaryOutbound?.server,
+      egressCandidates: candidates,
     );
   }
 
@@ -62,7 +109,51 @@ class VpnConfig {
     'expire': expire.millisecondsSinceEpoch ~/ 1000,
     'sing_box_config': singBoxConfig.toJson(),
     if (nodeHost != null) 'node_host': nodeHost,
+    if (egressCandidates.isNotEmpty)
+      'egress_candidates':
+          egressCandidates.map((c) => c.toJson()).toList(),
   };
+}
+
+/// One Marzban egress hop for multi-outbound urltest.
+class VpnEgressCandidate {
+  const VpnEgressCandidate({
+    required this.id,
+    required this.host,
+    this.label = '',
+    this.vlessLink = '',
+  });
+
+  final String id;
+  final String host;
+  final String label;
+  final String vlessLink;
+
+  factory VpnEgressCandidate.fromJson(Map<String, dynamic> json) {
+    return VpnEgressCandidate(
+      id: '${json['id'] ?? json['host'] ?? ''}',
+      host: '${json['host'] ?? ''}',
+      label: '${json['label'] ?? ''}',
+      vlessLink: '${json['vless_link'] ?? ''}',
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'host': host,
+        if (label.isNotEmpty) 'label': label,
+        if (vlessLink.isNotEmpty) 'vless_link': vlessLink,
+      };
+}
+
+/// Extract host from `vless://uuid@host:port?...`.
+String? hostFromVlessLink(String link) {
+  final at = link.indexOf('@');
+  if (at < 0) return null;
+  final rest = link.substring(at + 1);
+  final end = rest.indexOf(RegExp(r'[:/?#]'));
+  final host = end < 0 ? rest : rest.substring(0, end);
+  return host.isEmpty ? null : host;
 }
 
 class SingBoxConfig {

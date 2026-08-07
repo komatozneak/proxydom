@@ -24,7 +24,7 @@ class _OnboardingCard {
   final String body;
 }
 
-/// Post-entitlement cards (Connect / region / help). Skip marks completion.
+/// Post-entitlement cards (Connect / region). Skip marks completion.
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -52,11 +52,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           icon: AppIcons.servers,
           title: l.onboardingRegionTitle,
           body: l.onboardingRegionBody,
-        ),
-        _OnboardingCard(
-          icon: AppIcons.info,
-          title: l.onboardingHelpTitle,
-          body: l.onboardingHelpBody,
         ),
       ];
 

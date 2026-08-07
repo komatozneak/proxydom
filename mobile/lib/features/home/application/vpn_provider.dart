@@ -4,6 +4,9 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../settings/data/vpn_route_mode.dart';
+
+import '../../../core/install_id_storage.dart';
 import '../../../core/retry_policy.dart';
 import '../../auth/application/auth_provider.dart';
 import '../../auth/application/auth_state.dart';
@@ -47,12 +50,19 @@ class VpnNotifier extends Notifier<VpnStatus> {
   /// Последний полученный конфиг. Доступен из UI для preview.
   VpnConfig? get config => _config;
 
+  /// Friendly region label for the active egress hop (read-only Home card).
+  String? get displayLabel => _displayLabel;
+
   StreamSubscription<VpnNativeStatus>? _statusSubscription;
   Timer? _reconnectTimer;
   Timer? _connectingWatchdog;
   Future<void>? _syncInFlight;
+  /// True while a connect() Future is in-flight (dedupe concurrent callers).
   Future<void>? _connectInFlight;
   bool _autoReconnectArmed = false;
+  /// Set after intentional stop / self-revoke — blocks [_scheduleReconnect]
+  /// and syncFromNative auto-reconnect until the next user [connect].
+  bool _suppressAutoReconnect = false;
 
   void _cancelConnectingWatchdog() {
     _connectingWatchdog?.cancel();
@@ -217,8 +227,9 @@ class VpnNotifier extends Notifier<VpnStatus> {
         // honour Settings → Auto-reconnect. Never reconnect after intentional stop
         // (native clears `active`).
         final sessionActive = await VpnController.instance.hasActiveSession();
-        final shouldReconnect =
-            sessionActive && await AutoReconnectPrefs.isEnabled();
+        final shouldReconnect = !_suppressAutoReconnect &&
+            sessionActive &&
+            await AutoReconnectPrefs.isEnabled();
         if (shouldReconnect) {
           if (_connectInFlight != null || _autoReconnectArmed) {
             // ignore: avoid_print
@@ -270,54 +281,65 @@ class VpnNotifier extends Notifier<VpnStatus> {
   /// Получить конфиг без подключения (для UI/preview).
   ///
   /// Retry на transient ошибках (5xx, network), без retry на 4xx.
-  /// When stored region is [kRegionAutoId], probes online nodes and picks fastest.
+  /// Location picker removed: always Auto → urltest among egress_candidates.
   Future<VpnConfig> fetchConfig({String? nodeId}) async {
     final nodesRepo = ref.read(vpnNodesRepositoryProvider);
-    String? selected = nodeId ?? await nodesRepo.getSelectedNodeId();
-    if (selected == null || selected.isEmpty) {
-      selected = kRegionAutoId;
-    }
-
-    String? apiNodeId = selected;
+    await nodesRepo.setSelectedNodeId(kRegionAutoId);
     _displayLabel = null;
     List<VpnNode>? catalog;
-    if (selected == kRegionAutoId) {
-      try {
-        catalog = await nodesRepo.listNodes();
-        apiNodeId = await resolveNodeIdForConfig(
-          storedId: kRegionAutoId,
-          catalog: catalog,
-        );
-        // ignore: avoid_print
-        print('[VPN] auto selected node_id=$apiNodeId');
-      } catch (e) {
-        // ignore: avoid_print
-        print('[VPN] auto pick failed, using default: $e');
-        apiNodeId = null;
-      }
+    String? apiNodeId;
+    try {
+      catalog = await nodesRepo.listNodes();
+      apiNodeId = await resolveNodeIdForConfig(
+        storedId: kRegionAutoId,
+        catalog: catalog,
+      );
+      // ignore: avoid_print
+      print('[VPN] auto selected node_id=$apiNodeId');
+    } catch (e) {
+      // ignore: avoid_print
+      print('[VPN] auto pick failed, using default: $e');
+      apiNodeId = null;
     }
 
     _displayLabel = await _labelForNodeId(apiNodeId, catalog: catalog);
 
-    return _retryPolicy.execute(
-      () => ref.read(vpnConfigRepositoryProvider).getConfig(
-            forceRefresh: nodeId != null,
-            nodeId: apiNodeId == kRegionAutoId ? null : apiNodeId,
-          ),
-      shouldRetry: (e) async {
-        if (e is DioException) {
-          // Не повторяем 4xx — авторизация/клиент; type может быть unknown.
-          final code = e.response?.statusCode ?? 0;
-          if (code >= 400 && code < 500) return false;
-          if (e.error == 'session_expired') return false;
-        }
-        return true;
-      },
-      onRetry: (attempt, e) {
+    try {
+      return await _retryPolicy.execute(
+        () => ref.read(vpnConfigRepositoryProvider).getConfig(
+              forceRefresh: true,
+              // Prefer Auto probe; backend returns full egress_candidates for urltest.
+              nodeId: apiNodeId == kRegionAutoId ? null : apiNodeId,
+            ),
+        shouldRetry: (e) async {
+          if (e is DioException) {
+            // Не повторяем 4xx — авторизация/клиент; type может быть unknown.
+            final code = e.response?.statusCode ?? 0;
+            if (code >= 400 && code < 500) return false;
+            if (e.error == 'session_expired') return false;
+            if (e.error == 'device_revoked') return false;
+            if (e.error == 'device_limit_reached') return false;
+          }
+          return true;
+        },
+        onRetry: (attempt, e) {
+          // ignore: avoid_print
+          print('[VPN] fetchConfig retry $attempt after error: $e');
+        },
+      );
+    } on DioException catch (e) {
+      if (e.error == 'device_revoked') {
         // ignore: avoid_print
-        print('[VPN] fetchConfig retry $attempt after error: $e');
-      },
-    );
+        print('[VPN] device_revoked → rotate install id and retry once');
+        await InstallIdStorage.instance.rotate();
+        ref.read(vpnConfigRepositoryProvider).clearCache();
+        return ref.read(vpnConfigRepositoryProvider).getConfig(
+              forceRefresh: true,
+              nodeId: apiNodeId == kRegionAutoId ? null : apiNodeId,
+            );
+      }
+      rethrow;
+    }
   }
 
   /// Friendly title from `/vpn/nodes` catalog (Auto pick or manual region).
@@ -373,11 +395,11 @@ class VpnNotifier extends Notifier<VpnStatus> {
     }
   }
 
-  /// Explicit stop → start so split-tunnel prefs enter the next runtime config.
+  /// Explicit stop → start so route-mode / site prefs enter the next runtime config.
   Future<bool> reconnectToApplyRouting() async {
     final wasConnected = state is VpnConnected || state is VpnConnecting;
     if (!wasConnected) {
-      await connect();
+      await connect(forceRestart: true);
       return state is VpnConnected;
     }
     _reconnectTimer?.cancel();
@@ -386,30 +408,44 @@ class VpnNotifier extends Notifier<VpnStatus> {
     try {
       await VpnController.instance.stop();
     } catch (_) {}
+    // Native status can lag behind stop(); wait so connect() doesn't no-op sync.
+    for (var i = 0; i < 25; i++) {
+      final s = await VpnController.instance.getStatus();
+      if (s != VpnNativeStatus.connected && s != VpnNativeStatus.connecting) {
+        break;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+    }
     await _clearConnectedSince();
     state = const VpnDisconnected();
-    await connect();
+    await connect(forceRestart: true);
     return state is VpnConnected;
   }
 
-  Future<void> connect() async {
+  Future<void> connect({bool forceRestart = false}) async {
     // Deduplicate concurrent connect() (auto-reconnect + nest tap).
+    _suppressAutoReconnect = false;
     if (_connectInFlight != null) return _connectInFlight!;
-    if (state is VpnConnected) return;
+    if (!forceRestart && state is VpnConnected) return;
 
-    _connectInFlight = _connectBody().whenComplete(() {
+    _connectInFlight = _connectBody(forceRestart: forceRestart).whenComplete(() {
       _connectInFlight = null;
       _autoReconnectArmed = false;
     });
     return _connectInFlight!;
   }
 
-  Future<void> _connectBody() async {
+  Future<void> _connectBody({bool forceRestart = false}) async {
     // Already up in the system tray (UI lost state after Activity recreate).
     final existing = await VpnController.instance.getStatus();
-    if (existing == VpnNativeStatus.connected) {
+    if (!forceRestart && existing == VpnNativeStatus.connected) {
       await _syncFromNative();
       return;
+    }
+    if (forceRestart && existing == VpnNativeStatus.connected) {
+      try {
+        await VpnController.instance.stop();
+      } catch (_) {}
     }
 
 // Allow retry after a stuck VpnConnecting (e.g. hung fetchConfig).
@@ -517,9 +553,18 @@ class VpnNotifier extends Notifier<VpnStatus> {
     }
   }
 
+  /// Block auto-reconnect (device self-revoke / intentional stop side-effects).
+  void suppressAutoReconnect() {
+    _suppressAutoReconnect = true;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    _autoReconnectArmed = false;
+  }
+
   Future<void> disconnect() async {
     _cancelConnectingWatchdog();
     _reconnectTimer?.cancel();
+    _suppressAutoReconnect = true;
     // Always allow cancel while UI shows connecting (incl. stuck preparing).
     final native = await VpnController.instance.getStatus();
     final uiBusy = state is VpnConnected || state is VpnConnecting;
@@ -565,6 +610,11 @@ void _recordSessionEnd() {
 
   /// Попытка автоматического переподключения через 5 сек (если включено в Settings).
   void _scheduleReconnect() {
+    if (_suppressAutoReconnect) {
+      // ignore: avoid_print
+      print('[VPN] auto-reconnect suppressed (intentional stop/revoke)');
+      return;
+    }
     _reconnectTimer?.cancel();
     try {
       ref.read(betaUsageTrackerProvider).recordReconnect();
@@ -572,6 +622,7 @@ void _recordSessionEnd() {
       // Provider disposed in tests.
     }
     _reconnectTimer = Timer(const Duration(seconds: 5), () async {
+      if (_suppressAutoReconnect) return;
       final enabled = await AutoReconnectPrefs.isEnabled();
       if (!enabled) {
         // ignore: avoid_print

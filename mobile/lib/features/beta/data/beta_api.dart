@@ -12,7 +12,9 @@ class BetaApi {
   final Dio _dio;
 
   Future<BetaEntitlement> fetchEntitlement() async {
-    final resp = await _dio.get<Map<String, dynamic>>('/beta/entitlement');
+    // Untyped get avoids Dio's post-interceptor `as Map<String,dynamic>` throw
+    // (surfaces as DioExceptionType.unknown with empty message).
+    final resp = await _dio.get<dynamic>('/beta/entitlement');
     // 401 must NOT soft-pass as gate-off (treatAsEntitled would become true).
     if (resp.statusCode == 401) {
       throw DioException(
@@ -29,7 +31,15 @@ class BetaApi {
         message: 'beta entitlement failed: ${resp.statusCode}',
       );
     }
-    return BetaEntitlement.fromJson(resp.data!);
+    final raw = resp.data;
+    if (raw is! Map) {
+      throw DioException(
+        requestOptions: resp.requestOptions,
+        response: resp,
+        message: 'beta entitlement bad body type: ${raw.runtimeType}',
+      );
+    }
+    return BetaEntitlement.fromJson(Map<String, dynamic>.from(raw));
   }
 
   Future<BetaRedeemResult> redeem(String code) async {

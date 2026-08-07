@@ -133,6 +133,7 @@ class KillSwitchSettingsTileState extends State<KillSwitchSettingsTile>
     if (_checking || _state == null) return l.settingsKillSwitchChecking;
     return switch (_state!) {
       VpnLockdownState.enabled => l.settingsKillSwitchOn,
+      VpnLockdownState.alwaysOnOnly => l.settingsKillSwitchAlwaysOnOnly,
       VpnLockdownState.disabled => l.settingsKillSwitchOff,
       VpnLockdownState.unavailable => l.settingsKillSwitchUnavailable,
     };
@@ -142,6 +143,7 @@ class KillSwitchSettingsTileState extends State<KillSwitchSettingsTile>
     if (_checking || _state == null) return null;
     return switch (_state!) {
       VpnLockdownState.enabled => l.settingsKillSwitchBadgeOn,
+      VpnLockdownState.alwaysOnOnly => l.settingsKillSwitchBadgePartial,
       VpnLockdownState.disabled => l.settingsKillSwitchBadgeOff,
       VpnLockdownState.unavailable => l.settingsKillSwitchBadgeUnknown,
     };
@@ -150,6 +152,19 @@ class KillSwitchSettingsTileState extends State<KillSwitchSettingsTile>
   Color _badgeColor(ThemeData theme) {
     if (_state == VpnLockdownState.enabled) {
       return AppBrand.success;
+    }
+    if (_state == VpnLockdownState.alwaysOnOnly) {
+      return AppBrand.caution;
+    }
+    if (_state == VpnLockdownState.unavailable) {
+      return theme.colorScheme.error;
+    }
+    return theme.colorScheme.onSurfaceVariant;
+  }
+
+  Color _statusColor(ThemeData theme) {
+    if (_state == VpnLockdownState.alwaysOnOnly) {
+      return AppBrand.caution;
     }
     if (_state == VpnLockdownState.unavailable) {
       return theme.colorScheme.error;
@@ -197,7 +212,7 @@ class KillSwitchSettingsTileState extends State<KillSwitchSettingsTile>
                     Text(
                       _statusText(l),
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                        color: _statusColor(theme),
                       ),
                     ),
                   ],

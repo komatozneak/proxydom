@@ -22,7 +22,7 @@ class SignalNestHero extends StatefulWidget {
     super.key,
     required this.state,
     this.onTap,
-    this.size = 200,
+    this.size = 280,
   });
 
   final TreeState state;

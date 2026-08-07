@@ -16,7 +16,8 @@ class VpnNotificationPrefs {
   static Future<bool> isEnabled() async {
     if (!isSupported) return false;
     final prefs = await SharedPreferences.getInstance();
-    final local = prefs.getBool(_prefsKey) ?? true;
+    // Default OFF — opt-in for new installs (must match VpnNotificationHelper).
+    final local = prefs.getBool(_prefsKey) ?? false;
     try {
       final native =
           await _channel.invokeMethod<bool>('isVpnNotificationDetailedEnabled');

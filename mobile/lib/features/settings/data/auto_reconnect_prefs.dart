@@ -8,10 +8,10 @@ class AutoReconnectPrefs {
 
   static const _key = 'auto_reconnect_enabled';
 
-  /// Default ON — friends expect tunnel to come back after a drop.
+  /// Default OFF — opt-in for new installs.
   static Future<bool> isEnabled() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_key) ?? true;
+    return prefs.getBool(_key) ?? false;
   }
 
   static Future<void> setEnabled(bool value) async {

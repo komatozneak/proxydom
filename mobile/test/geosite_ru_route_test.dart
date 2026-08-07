@@ -66,8 +66,11 @@ void main() {
       containsAll(<String>[
         'geosite-category-ru',
         'geosite-tld-ru',
-        'geoip-ru',
       ]),
+    );
+    expect(
+      ruleSets.map((e) => (e as Map)['tag']),
+      isNot(contains('geoip-ru')),
     );
     expect(
       ruleSets.every((e) => (e as Map)['type'] == 'local'),
@@ -84,9 +87,9 @@ void main() {
       containsAll(<String>[
         'geosite-category-ru',
         'geosite-tld-ru',
-        'geoip-ru',
       ]),
     );
+    expect(directRuleSets, isNot(contains('geoip-ru')));
 
     expect(route['final'], 'proxy');
     expect(jsonEncode(json).contains('githubusercontent'), isFalse);

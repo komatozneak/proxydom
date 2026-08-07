@@ -35,11 +35,13 @@ class BetaRedeemResult {
     required this.outcome,
     this.hasAccess = false,
     this.acquisitionSource,
+    this.recoveryCode,
   });
 
   final BetaRedeemOutcomeCode outcome;
   final bool hasAccess;
   final String? acquisitionSource;
+  final String? recoveryCode;
 
   factory BetaRedeemResult.fromJson(Map<String, dynamic> json) {
     final wire = (json['outcome'] ?? json['code'])?.toString();
@@ -47,6 +49,7 @@ class BetaRedeemResult {
       outcome: BetaRedeemOutcomeCode.fromWire(wire),
       hasAccess: json['has_access'] == true,
       acquisitionSource: json['acquisition_source'] as String?,
+      recoveryCode: json['recovery_code'] as String?,
     );
   }
 }

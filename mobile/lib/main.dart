@@ -40,6 +40,7 @@ void main() async {
 
   // 401 + failed refresh → full logout (tokens already cleared by interceptor).
   SessionExpiredGate.onExpired = () async {
+    if (LogoutHandler.inProgress) return;
     AppLogBuffer.instance.warn('[auth] session expired — forcing logout');
     await container.read(logoutHandlerProvider).logout();
   };

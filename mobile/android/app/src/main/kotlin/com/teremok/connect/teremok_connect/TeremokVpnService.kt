@@ -74,52 +74,72 @@ class TeremokVpnService : VpnService() {
             context: android.content.Context,
             service: TeremokVpnService? = currentInstance(),
         ): Boolean? {
+            val snap = queryAlwaysOnVpnSnapshot(context, service)
+            return snap["lockdown"] as Boolean?
+        }
+
+        /**
+         * Rich Always-on / lockdown snapshot for Settings.
+         *
+         * Keys: lockdown (Boolean?), alwaysOn (Boolean?),
+         * secureLockdown (Boolean?), runtimeLockdown (Boolean?).
+         */
+        fun queryAlwaysOnVpnSnapshot(
+            context: android.content.Context,
+            service: TeremokVpnService? = currentInstance(),
+        ): Map<String, Any?> {
             var fromRuntime: Boolean? = null
+            var alwaysOnRuntime: Boolean? = null
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 val svc = service ?: currentInstance()
                 if (svc != null) {
                     fromRuntime = runCatching { svc.isLockdownEnabled }
                         .onFailure { Log.w(TAG, "VpnService.isLockdownEnabled failed", it) }
                         .getOrNull()
-                }
-            }
-            // Positive runtime is enough for Connect (skip excludeRoute) and the tile.
-            if (fromRuntime == true) {
-                Log.i(TAG, "lockdown runtime=true → true pkg=${context.packageName}")
-                return true
-            }
-
-            // Optional package probe — skip on S+ where @hide Secure keys are blocked.
-            var alwaysOnPkg: String? = null
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-                alwaysOnPkg = readSecureString(context, "always_on_vpn_app")
-                if (alwaysOnPkg != null && alwaysOnPkg != context.packageName) {
-                    Log.i(
-                        TAG,
-                        "lockdown other alwaysOnPkg=$alwaysOnPkg pkg=${context.packageName}",
-                    )
-                    return false
+                    alwaysOnRuntime = runCatching { svc.isAlwaysOn }
+                        .onFailure { Log.w(TAG, "VpnService.isAlwaysOn failed", it) }
+                        .getOrNull()
                 }
             }
 
-            val fromSecure = readSecureIntEqualsOne(context, "always_on_vpn_lockdown")
-            if (fromSecure != null) {
-                val enabled = fromSecure || fromRuntime == true
-                Log.i(
-                    TAG,
-                    "lockdown Secure=$fromSecure runtime=$fromRuntime → $enabled " +
-                        "alwaysOnPkg=$alwaysOnPkg pkg=${context.packageName}",
-                )
-                return enabled
+            // Best-effort Secure probes. Never use getInt(…, default=0) — a missing
+            // / blocked key would look like lockdown OFF (Pixel log: Secure=false
+            // while Always-on lockdown was ON in UI → Settings tile stuck on Выкл).
+            val alwaysOnPkg = readSecureString(context, "always_on_vpn_app")
+            val fromSecure = readSecureLockdownEnabled(context)
+
+            val alwaysOnForUs = when {
+                alwaysOnRuntime == true -> true
+                alwaysOnPkg != null && alwaysOnPkg == context.packageName -> true
+                alwaysOnPkg != null && alwaysOnPkg != context.packageName -> false
+                else -> alwaysOnRuntime
             }
 
-            // Secure unreadable (typical on S+): idle/false runtime is not SoT.
+            val lockdown: Boolean? = when {
+                fromRuntime == true -> true
+                fromSecure == true -> true
+                // Explicit Secure 0 only when the key exists (not defaulted).
+                fromSecure == false -> false
+                // Runtime false is trustworthy when the service is alive.
+                fromRuntime == false -> false
+                // Idle + Secure unknown → do not claim "disabled".
+                else -> null
+            }
+
             Log.i(
                 TAG,
-                "lockdown Secure=unreadable runtime=$fromRuntime → unknown " +
-                    "pkg=${context.packageName}",
+                "lockdown snap Secure=$fromSecure runtime=$fromRuntime " +
+                    "alwaysOnRuntime=$alwaysOnRuntime alwaysOnPkg=$alwaysOnPkg " +
+                    "svc=${service != null || currentInstance() != null} " +
+                    "→ lockdown=$lockdown alwaysOn=$alwaysOnForUs pkg=${context.packageName}",
             )
-            return null
+
+            return mapOf(
+                "lockdown" to lockdown,
+                "alwaysOn" to alwaysOnForUs,
+                "secureLockdown" to fromSecure,
+                "runtimeLockdown" to fromRuntime,
+            )
         }
 
         /** Best-effort [Settings.Secure] string; null on missing or S+ restriction. */
@@ -138,15 +158,22 @@ class TeremokVpnService : VpnService() {
             }
 
         /**
-         * Best-effort [Settings.Secure] int == 1.
-         * @return true/false when readable; null when the key is blocked/unknown.
+         * Always-on lockdown flag from [Settings.Secure].
+         *
+         * @return true/false when the key is present and readable; null when
+         *         missing, blocked (S+), or otherwise unknown — never invent OFF.
          */
-        private fun readSecureIntEqualsOne(
-            context: android.content.Context,
-            key: String,
-        ): Boolean? =
-            try {
-                Settings.Secure.getInt(context.contentResolver, key, 0) == 1
+        private fun readSecureLockdownEnabled(context: android.content.Context): Boolean? {
+            val key = "always_on_vpn_lockdown"
+            return try {
+                Settings.Secure.getInt(context.contentResolver, key) == 1
+            } catch (e: Settings.SettingNotFoundException) {
+                // Fall back to string form some OEMs use; still no silent OFF.
+                when (readSecureString(context, key)?.trim()) {
+                    "1" -> true
+                    "0" -> false
+                    else -> null
+                }
             } catch (e: SecurityException) {
                 Log.w(TAG, "Settings.Secure.$key not readable: ${e.message}")
                 null
@@ -154,6 +181,7 @@ class TeremokVpnService : VpnService() {
                 Log.w(TAG, "Settings.Secure.$key invalid: ${e.message}")
                 null
             }
+        }
 
         /** Last successful connect still marked active (Always-on / UI sync). */
         fun hasActiveSession(context: android.content.Context): Boolean =
@@ -421,6 +449,13 @@ class TeremokVpnService : VpnService() {
                 hosts.add(host.trim())
             }
         }
+        @Suppress("UNCHECKED_CAST")
+        val egress = params["egressHosts"] as? List<*>
+        egress?.forEach { host ->
+            if (host is String && host.isNotBlank()) {
+                hosts.add(host.trim())
+            }
+        }
         for (host in hosts) {
             try {
                 val inet = InetAddress.getByName(host)
@@ -475,11 +510,12 @@ class TeremokVpnService : VpnService() {
         params: Map<String, Any?>,
     ) {
         if (isRunning) {
-            Log.w(TAG, "startVpn: уже запущен, пропускаем")
-            // Re-emit so Flutter UI that restarted can sync to Connected.
-            currentStatus = "connected"
-            VpnStatusBroadcaster.emit(currentStatus)
-            return
+            Log.w(TAG, "startVpn: уже запущен — stop+reapply новых params")
+            // Mode switch / reconnect must not keep the old sing-box JSON.
+            runCatching { stopVpn() }
+            // Allow immediate re-establish after intentional reconfigure.
+            lastStartAttemptMs = 0L
+            // Fall through to establish with new params.
         }
         // Note: onCreate may set currentStatus=preparing when KEY_ACTIVE (UI hint
         // for Always-on). That must NOT block a real ACTION_START — only an
@@ -571,8 +607,14 @@ class TeremokVpnService : VpnService() {
             currentStatus = "connecting"
             VpnStatusBroadcaster.emit(currentStatus)
 
-            // До TUN: underlying network должен быть известен для direct→VPS.
+            // До TUN: underlying network должен быть известен для direct→VPS
+            // и для setUnderlyingNetworks (sites allowlist / Android validation).
             DefaultNetworkMonitor.prewarm(this)
+            if (!DefaultNetworkMonitor.awaitUnderlyingNetwork(this, 5000)) {
+                Log.e(TAG, "startVpn: underlying network timeout — aborting")
+                failStart("underlying network not ready")
+                return
+            }
             ProtectGuard.reset()
             ProtectGuard.onFailure = {
                 Log.e(TAG, "startVpn: protect() failed — stopping VPN")
@@ -589,6 +631,20 @@ class TeremokVpnService : VpnService() {
                 ProtectGuard.onFailure = null
                 failStart("VPN permission denied or establish() returned null")
                 return
+            }
+
+            // Tell Android the physical network backs this VPN so split/direct
+            // (sites allowlist final=direct) still validates as having internet.
+            val underlying = DefaultNetworkMonitor.defaultNetwork
+            if (underlying != null) {
+                try {
+                    setUnderlyingNetworks(arrayOf(underlying))
+                    Log.i(TAG, "startVpn: setUnderlyingNetworks ok")
+                } catch (e: Exception) {
+                    Log.w(TAG, "startVpn: setUnderlyingNetworks failed", e)
+                }
+            } else {
+                Log.w(TAG, "startVpn: no underlying network for setUnderlyingNetworks")
             }
 
             isRunning = true
@@ -631,12 +687,6 @@ class TeremokVpnService : VpnService() {
                 return
             }
 
-            if (!DefaultNetworkMonitor.awaitUnderlyingNetwork(this, 5000)) {
-                Log.e(TAG, "startVpn: underlying network timeout — aborting")
-                failStart("underlying network not ready")
-                return
-            }
-
             val started = bridge.start(singBoxConfigJson)
             if (!started) {
                 val detail = bridge.lastErrorMessage ?: "unknown libbox error"
@@ -668,6 +718,9 @@ class TeremokVpnService : VpnService() {
         VpnStatusBroadcaster.setError(message)
         currentStatus = "error"
         VpnStatusBroadcaster.emit(currentStatus)
+        // Do not leave KEY_ACTIVE=true after a failed establish — sticky/Always-on
+        // would restore a dead session while Flutter may still paint Connected.
+        markSessionInactive()
         stopVpn()
     }
 
@@ -868,10 +921,10 @@ object VpnChannelRegistry {
                     }
                     "isLockdownEnabled" -> {
                         // Preference/system lockdown — not tunnel-up. See
-                        // [TeremokVpnService.queryAlwaysOnVpnLockdown].
-                        // null → Dart unavailable («Неизвестно»); never throw into Connect.
+                        // [TeremokVpnService.queryAlwaysOnVpnSnapshot].
+                        // Map → Dart; null lockdown → unavailable.
                         runCatching {
-                            TeremokVpnService.queryAlwaysOnVpnLockdown(
+                            TeremokVpnService.queryAlwaysOnVpnSnapshot(
                                 appContext,
                                 serviceProvider() ?: TeremokVpnService.currentInstance(),
                             )
@@ -883,8 +936,6 @@ object VpnChannelRegistry {
                                     "isLockdownEnabled query failed",
                                     e,
                                 )
-                                // Still map to unavailable — do not surface Secure
-                                // exception strings as VPN / libbox errors.
                                 result.success(null)
                             },
                         )
@@ -1055,38 +1106,63 @@ internal fun buildSingBoxJson(
     tlsPublicKey: String?,
     tlsShortId: String?,
 ): String {
-    val outbound = JSONObject().apply {
-        put("type", "vless")
-        put("tag", "proxy")
-        put("network", "tcp")
-        put("server", outboundServer)
-        put("server_port", outboundServerPort)
-        put("uuid", outboundUuid)
-        if (!outboundFlow.isNullOrEmpty()) put("flow", outboundFlow)
-        put(
-            "tls",
-            JSONObject().apply {
-                put("enabled", true)
-                if (!tlsSni.isNullOrEmpty()) put("server_name", tlsSni)
-                put(
-                    "utls",
-                    JSONObject().apply {
-                        put("enabled", true)
-                        if (!tlsFingerprint.isNullOrEmpty()) {
-                            put("fingerprint", tlsFingerprint)
-                        }
-                    },
-                )
-                put(
-                    "reality",
-                    JSONObject().apply {
-                        put("enabled", true)
-                        if (!tlsPublicKey.isNullOrEmpty()) put("public_key", tlsPublicKey)
-                        if (!tlsShortId.isNullOrEmpty()) put("short_id", tlsShortId)
-                    },
-                )
-            },
-        )
+    // Prefer multi-node egressHosts; fall back to single outboundServer.
+    val hopHosts = linkedSetOf<String>()
+    @Suppress("UNCHECKED_CAST")
+    val egress = params["egressHosts"] as? List<*>
+    egress?.forEach { host ->
+        if (host is String && host.isNotBlank() && host != "unknown") {
+            hopHosts.add(host.trim())
+        }
+    }
+    if (hopHosts.isEmpty() && outboundServer.isNotEmpty() && outboundServer != "unknown") {
+        hopHosts.add(outboundServer)
+    }
+    if (hopHosts.isEmpty()) {
+        hopHosts.add("127.0.0.1")
+    }
+
+    fun vlessChild(tag: String, server: String): JSONObject =
+        JSONObject().apply {
+            put("type", "vless")
+            put("tag", tag)
+            put("network", "tcp")
+            put("server", server)
+            put("server_port", outboundServerPort)
+            put("uuid", outboundUuid)
+            if (!outboundFlow.isNullOrEmpty()) put("flow", outboundFlow)
+            put(
+                "tls",
+                JSONObject().apply {
+                    put("enabled", true)
+                    if (!tlsSni.isNullOrEmpty()) put("server_name", tlsSni)
+                    put(
+                        "utls",
+                        JSONObject().apply {
+                            put("enabled", true)
+                            if (!tlsFingerprint.isNullOrEmpty()) {
+                                put("fingerprint", tlsFingerprint)
+                            }
+                        },
+                    )
+                    put(
+                        "reality",
+                        JSONObject().apply {
+                            put("enabled", true)
+                            if (!tlsPublicKey.isNullOrEmpty()) put("public_key", tlsPublicKey)
+                            if (!tlsShortId.isNullOrEmpty()) put("short_id", tlsShortId)
+                        },
+                    )
+                },
+            )
+        }
+
+    val childTags = mutableListOf<String>()
+    val vlessOutbounds = JSONArray()
+    hopHosts.forEachIndexed { index, host ->
+        val tag = "proxy-node-$index"
+        childTags.add(tag)
+        vlessOutbounds.put(vlessChild(tag, host))
     }
 
     val root = JSONObject().apply {
@@ -1099,42 +1175,16 @@ internal fun buildSingBoxJson(
                     JSONArray().apply {
                         put(
                             JSONObject().apply {
-                                put("type", "https")
+                                put("type", "udp")
                                 put("tag", "dns-remote")
                                 put("server", "1.1.1.1")
-                                put("server_port", 443)
-                                put("path", "/dns-query")
-                                put("detour", "proxy")
-                            },
-                        )
-                        put(
-                            JSONObject().apply {
-                                put("type", "fakeip")
-                                put("tag", "dns-fakeip")
-                                put("inet4_range", "198.18.0.0/15")
-                            },
-                        )
-                    },
-                )
-                put(
-                    "rules",
-                    JSONArray().apply {
-                        put(
-                            JSONObject().apply {
-                                put(
-                                    "query_type",
-                                    JSONArray().apply {
-                                        put("A")
-                                        put("AAAA")
-                                    },
-                                )
-                                put("server", "dns-fakeip")
+                                put("server_port", 53)
+                                put("detour", VpnPingMonitor.GROUP_TAG)
                             },
                         )
                     },
                 )
                 put("final", "dns-remote")
-                put("reverse_mapping", true)
                 put("strategy", "ipv4_only")
                 put("independent_cache", true)
             },
@@ -1162,7 +1212,22 @@ internal fun buildSingBoxJson(
             "outbounds",
             JSONArray().apply {
                 put(JSONObject().apply { put("type", "direct"); put("tag", "direct") })
-                put(outbound)
+                for (i in 0 until vlessOutbounds.length()) {
+                    put(vlessOutbounds.getJSONObject(i))
+                }
+                put(
+                    JSONObject().apply {
+                        put("type", "urltest")
+                        put("tag", VpnPingMonitor.GROUP_TAG)
+                        put(
+                            "outbounds",
+                            JSONArray().apply { childTags.forEach { put(it) } },
+                        )
+                        put("url", "http://www.gstatic.com/generate_204")
+                        put("interval", "1m")
+                        put("tolerance", 150)
+                    },
+                )
             },
         )
         put(
@@ -1189,25 +1254,18 @@ internal fun buildSingBoxJson(
                                 put("action", "hijack-dns")
                             },
                         )
-                        put(
-                            JSONObject().apply {
+                        hopHosts.forEach { host ->
+                            if (host.matches(Regex("""^(\d{1,3}\.){3}\d{1,3}$"""))) {
                                 put(
-                                    "ip_cidr",
-                                    JSONArray().apply { put("198.18.0.0/15") },
+                                    JSONObject().apply {
+                                        put(
+                                            "ip_cidr",
+                                            JSONArray().apply { put("$host/32") },
+                                        )
+                                        put("outbound", "direct")
+                                    },
                                 )
-                                put("outbound", "proxy")
-                            },
-                        )
-                        if (outboundServer.isNotEmpty() && outboundServer != "unknown") {
-                            put(
-                                JSONObject().apply {
-                                    put(
-                                        "ip_cidr",
-                                        JSONArray().apply { put("$outboundServer/32") },
-                                    )
-                                    put("outbound", "direct")
-                                },
-                            )
+                            }
                         }
                         @Suppress("UNCHECKED_CAST")
                         val controlPlane = params["controlPlaneHosts"] as? List<*>
@@ -1226,7 +1284,7 @@ internal fun buildSingBoxJson(
                         }
                     },
                 )
-                put("final", "proxy")
+                put("final", VpnPingMonitor.GROUP_TAG)
                 put("auto_detect_interface", true)
             },
         )

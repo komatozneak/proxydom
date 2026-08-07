@@ -5,25 +5,26 @@ import 'package:go_router/go_router.dart';
 import '../features/auth/application/auth_provider.dart'
     show authProvider, GoRouterRefreshNotifier;
 import '../features/auth/application/auth_state.dart';
+import '../features/auth/presentation/bootstrap_failed_screen.dart';
 import '../features/auth/presentation/login_screen.dart';
+import '../features/auth/presentation/recovery_code_screen.dart';
 import '../features/auth/presentation/verify_screen.dart';
+import '../features/beta/presentation/locked_access_screen.dart';
 import '../features/beta/presentation/post_auth_gate_screen.dart';
 import '../features/beta/presentation/promo_code_screen.dart';
 import '../features/home/presentation/home_screen.dart';
 import '../features/onboarding/data/onboarding_prefs.dart';
 import '../features/onboarding/presentation/onboarding_screen.dart';
 import '../features/onboarding/presentation/welcome_screen.dart';
-import '../features/devices/presentation/devices_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
-import '../features/settings/presentation/split_tunnel_sites_screen.dart';
 import '../features/shell/presentation/main_shell.dart';
-import '../features/vpn/presentation/locations_screen.dart';
+import '../features/vpn/presentation/modes_screen.dart';
+import 'config.dart';
 
 /// Роутер приложения.
 ///
-/// Funnel: welcome? → login → verify → /gate → promo? → onboarding? → shell.
-/// Shell: Locations | Home | Settings (StatefulShellRoute).
-/// Состояние авторизации читается из [authProvider] через Riverpod.
+/// Funnel (phone): welcome? → login → verify → /gate → promo? → onboarding? → shell.
+/// Funnel (anonymous): bootstrap → /gate → locked? → recovery? → onboarding? → shell.
 class AppRouter {
   AppRouter._();
 
@@ -37,6 +38,10 @@ class AppRouter {
   /// Cold restore hits /home → redirect to /gate until this is true.
   /// MUST stay false while on /promo — never set true before destination is known.
   static bool postAuthResolved = false;
+
+  /// Soften recovery UX: self-serve restore removed; support rebinds client_id.
+  /// /recovery kept unused (legacy plaintext code path).
+  static String? pendingRecoveryCode;
 
   /// Глобальный listenable — связан с authProvider в main.dart.
   static final GoRouterRefreshNotifier refreshNotifier =
@@ -58,20 +63,33 @@ class AppRouter {
       final goingToWelcome = loc == '/welcome';
       final goingToGate = loc == '/gate';
       final goingToPromo = loc == '/promo';
+      final goingToLocked = loc == '/locked';
+      final goingToRecovery = loc == '/recovery';
+      final goingToBootstrapFail = loc == '/bootstrap-failed';
       final goingToOnboarding = loc == '/onboarding';
       final inShell = loc == '/home' ||
-          loc == '/locations' ||
+          loc == '/modes' ||
           loc == '/settings' ||
           loc.startsWith('/settings/');
+
+      if (auth is AuthStateBootstrapFailed) {
+        if (goingToBootstrapFail) return null;
+        return '/bootstrap-failed';
+      }
 
       final isAuthed = auth is AuthStateAuthenticated;
 
       if (!isAuthed) {
         postAuthResolved = false;
+        if (AppConfig.authAnonymous) {
+          // Bootstrap runs in AuthNotifier; stay put until tokens or fail.
+          if (goingToWelcome) return null;
+          return null;
+        }
         if (goingToLogin || goingToVerify || goingToWelcome) {
           return null;
         }
-        // First launch: optional welcome before login (does not affect restore).
+        // First launch: optional welcome before login.
         if (welcomeSeenCache == false) {
           return '/welcome';
         }
@@ -79,10 +97,10 @@ class AppRouter {
       }
 
       // Authed: leave login/verify/welcome for the entitlement gate.
-      if (goingToLogin || goingToVerify || goingToWelcome) {
+      if (goingToLogin || goingToVerify || goingToWelcome || goingToBootstrapFail) {
         return '/gate';
       }
-      if (goingToGate || goingToPromo) {
+      if (goingToGate || goingToPromo || goingToLocked || goingToRecovery) {
         return null;
       }
       // Onboarding + shell only after entitlement (or gate-off soft-pass) resolved.
@@ -106,6 +124,17 @@ class AppRouter {
       ),
       GoRoute(path: '/gate', builder: (c, s) => const PostAuthGateScreen()),
       GoRoute(path: '/promo', builder: (c, s) => const PromoCodeScreen()),
+      GoRoute(path: '/locked', builder: (c, s) => const LockedAccessScreen()),
+      GoRoute(
+        path: '/recovery',
+        builder: (c, s) => RecoveryCodeScreen(
+          code: s.uri.queryParameters['code'] ?? pendingRecoveryCode,
+        ),
+      ),
+      GoRoute(
+        path: '/bootstrap-failed',
+        builder: (c, s) => const BootstrapFailedScreen(),
+      ),
       GoRoute(
         path: '/onboarding',
         builder: (c, s) => const OnboardingScreen(),
@@ -115,12 +144,12 @@ class AppRouter {
           return MainShell(navigationShell: navigationShell);
         },
         branches: [
-          // Order matches bottom nav: Locations | Home | Settings.
+          // Order matches bottom nav: Modes | Home | Settings.
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/locations',
-                builder: (c, s) => const LocationsScreen(),
+                path: '/modes',
+                builder: (c, s) => const ModesScreen(),
               ),
             ],
           ),
@@ -140,11 +169,7 @@ class AppRouter {
                 routes: [
                   GoRoute(
                     path: 'split-tunnel',
-                    builder: (c, s) => const SplitTunnelSitesScreen(),
-                  ),
-                  GoRoute(
-                    path: 'devices',
-                    builder: (c, s) => const DevicesScreen(),
+                    redirect: (c, s) => '/modes',
                   ),
                 ],
               ),

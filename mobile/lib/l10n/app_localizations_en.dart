@@ -54,13 +54,22 @@ class AppL10nEn extends AppL10n {
   String get homeVpnHint => 'VPN UI — comes in step 9+';
 
   @override
-  String get homeDisconnected => 'Disconnected';
+  String get homeDisconnected => 'Not connected';
 
   @override
   String get homeConnecting => 'Connecting...';
 
   @override
   String get homeConnected => 'Connected';
+
+  @override
+  String get homeTapHint => 'Tap Teremok to connect';
+
+  @override
+  String get homeConnectingHint => 'Hold on — Teremok is opening the door…';
+
+  @override
+  String get homeConnectedHint => 'Teremok is online';
 
   @override
   String get homeProtected => 'Protected';
@@ -84,7 +93,109 @@ class AppL10nEn extends AppL10n {
   String get navHome => 'Home';
 
   @override
+  String get navVpn => 'VPN';
+
+  @override
   String get navLocations => 'Locations';
+
+  @override
+  String get navModes => 'Modes';
+
+  @override
+  String get modesTitle => 'Mode';
+
+  @override
+  String get modesSubtitle => 'How VPN works';
+
+  @override
+  String get modeSmartTitle => 'Smart mode';
+
+  @override
+  String get modeSmartBody =>
+      'Russian sites — direct, foreign sites — through VPN.';
+
+  @override
+  String get modeSmartBadge => 'AUTO';
+
+  @override
+  String get modeFullTitle => 'Full VPN';
+
+  @override
+  String get modeFullBody =>
+      'All traffic goes through VPN. Simple and reliable.';
+
+  @override
+  String get modeSitesTitle => 'By site';
+
+  @override
+  String get modeSitesBody =>
+      'Only selected sites go through VPN. Everything else is direct.';
+
+  @override
+  String get modesVpnOffTitle => 'VPN is off';
+
+  @override
+  String get modesVpnOffBody => 'Connect VPN so modes can take effect';
+
+  @override
+  String get modesConfirmFullTitle => 'Switch to Full VPN mode?';
+
+  @override
+  String get modesConfirmFullBody =>
+      'In this mode all traffic goes through VPN. Russian services — Ozon, Wildberries, banks, Gosuslugi… may stop opening.\n\nTo keep them direct — use Smart mode.';
+
+  @override
+  String get modesConfirmFullCancel => 'Don\'t switch';
+
+  @override
+  String get modesConfirmFullOk => 'Switch';
+
+  @override
+  String get modesSitesSectionSmart => 'Also direct';
+
+  @override
+  String get modesSitesSectionSites => 'Sites through VPN';
+
+  @override
+  String get modesSitesCustomSection => 'Your sites';
+
+  @override
+  String get modesSitesCustomHint => 'e.g. twitch.tv';
+
+  @override
+  String get modesSitesAllowlistHint =>
+      'Only selected sites go through VPN — everything else goes direct at full speed.';
+
+  @override
+  String get modesSitesMetaNote =>
+      'Instagram and Facebook belong to Meta, recognized in Russia as an extremist organization and banned in the Russian Federation.';
+
+  @override
+  String get modesLocationTitle => 'Location';
+
+  @override
+  String get modesLocationHint => 'Server and country';
+
+  @override
+  String get modesPendingTitle => 'Reconnect VPN required';
+
+  @override
+  String get modesPendingBody => 'Routing changes apply after you reconnect.';
+
+  @override
+  String get modesReconnect => 'Reconnect';
+
+  @override
+  String get modesReconnectingTitle => 'Reconnecting VPN…';
+
+  @override
+  String get modesReconnectingBody => 'Applying routing changes';
+
+  @override
+  String get modesReconnectedTitle => 'Connected';
+
+  @override
+  String get modesReconnectFailedTitle => 'Reconnect failed';
 
   @override
   String get navSettings => 'Settings';
@@ -159,13 +270,13 @@ class AppL10nEn extends AppL10n {
   String get settingsActiveBadge => 'Active';
 
   @override
-  String get settingsAccessEarlyTitle => 'Closed beta';
+  String get settingsAccessEarlyTitle => 'Closed testing';
 
   @override
   String get settingsAccessEarlySubtitle => 'Access is by invite.';
 
   @override
-  String get settingsAccessBetaTitle => 'Closed beta';
+  String get settingsAccessBetaTitle => 'Closed testing';
 
   @override
   String get settingsAccessBetaSubtitle => 'By invite, no end date.';
@@ -195,7 +306,7 @@ class AppL10nEn extends AppL10n {
   }
 
   @override
-  String get settingsSubscriptionAlpha => 'Closed beta';
+  String get settingsSubscriptionAlpha => 'Closed testing';
 
   @override
   String get settingsSubscriptionExpired => 'Subscription expired';
@@ -228,6 +339,10 @@ class AppL10nEn extends AppL10n {
   String get settingsKillSwitchOn => 'Enabled in Android settings';
 
   @override
+  String get settingsKillSwitchAlwaysOnOnly =>
+      'Always-on is on — also enable “Block connections without VPN”';
+
+  @override
   String get settingsKillSwitchOff => 'Off — internet may work without VPN';
 
   @override
@@ -255,6 +370,9 @@ class AppL10nEn extends AppL10n {
   String get settingsKillSwitchBadgeOn => 'On';
 
   @override
+  String get settingsKillSwitchBadgePartial => 'Partial';
+
+  @override
   String get settingsKillSwitchBadgeOff => 'Off';
 
   @override
@@ -268,10 +386,10 @@ class AppL10nEn extends AppL10n {
       'Reconnect quickly if the tunnel drops';
 
   @override
-  String get settingsSplitTunnel => 'What works without VPN?';
+  String get settingsSplitTunnel => 'Modes';
 
   @override
-  String get settingsSplitTunnelHint => 'Sites that use a direct connection';
+  String get settingsSplitTunnelHint => 'Smart / full / by site';
 
   @override
   String get settingsDevices => 'Devices';
@@ -442,13 +560,16 @@ class AppL10nEn extends AppL10n {
   String get settingsPrivacyPlaceholder => 'Privacy policy';
 
   @override
-  String get settingsDarkTheme => 'Dark theme';
+  String get settingsDarkTheme => 'Appearance';
 
   @override
-  String get settingsThemeSystem => 'Match system';
+  String get settingsAppearance => 'Appearance';
 
   @override
-  String get settingsThemeDark => 'Always dark';
+  String get settingsThemeSystem => 'Auto';
+
+  @override
+  String get settingsThemeDark => 'Dark';
 
   @override
   String get settingsThemeLight => 'Light';
@@ -634,6 +755,15 @@ class AppL10nEn extends AppL10n {
   String get logoutTooltip => 'Sign out';
 
   @override
+  String get settingsDeviceId => 'Device ID';
+
+  @override
+  String get settingsDeviceIdCopied => 'Device ID copied';
+
+  @override
+  String get settingsDeviceIdHint => 'Install identifier for support';
+
+  @override
   String get logoutConfirmTitle => 'Sign out?';
 
   @override
@@ -770,4 +900,122 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get betaGateContinueAnyway => 'Continue anyway';
+
+  @override
+  String get lockedTitle => 'Activation';
+
+  @override
+  String get lockedHeadline => 'Welcome!';
+
+  @override
+  String get lockedBody =>
+      'Get a subscription or enter a promo code — then connect in one tap.';
+
+  @override
+  String get lockedCta => 'Get a subscription or enter a promo code';
+
+  @override
+  String get lockedRefreshAccess => 'Refresh access';
+
+  @override
+  String get settingsSupport => 'Support';
+
+  @override
+  String get settingsSupportHint => 'Telegram — transfer after reinstall';
+
+  @override
+  String get lockedPay1m => 'Pay 1 month';
+
+  @override
+  String get lockedPay3m => 'Pay 3 months';
+
+  @override
+  String get lockedOrPromo => 'Or enter a promo code';
+
+  @override
+  String get lockedPayFailed =>
+      'Couldn’t start payment. Try again or contact support.';
+
+  @override
+  String get lockedPayReturnTitle => 'Payment opened';
+
+  @override
+  String get lockedPayReturnBody =>
+      'After you finish paying in the browser, tap Check access.';
+
+  @override
+  String get lockedPayReturnCheck => 'Check access';
+
+  @override
+  String get recoveryCodeTitle => 'Recovery code';
+
+  @override
+  String get recoveryCodeHeadline => 'Recovery code';
+
+  @override
+  String get recoveryCodeBody =>
+      'Optional support fallback. Prefer restore by payment ID.';
+
+  @override
+  String get recoveryCodeCopy => 'Copy code';
+
+  @override
+  String get recoveryCodeCopied => 'Code copied';
+
+  @override
+  String get recoveryCodeConfirm => 'Continue';
+
+  @override
+  String get recoveryCodeContinue => 'Continue';
+
+  @override
+  String get restoreTitle => 'Restore access';
+
+  @override
+  String get restoreHeadline => 'Enter your payment ID';
+
+  @override
+  String get restoreBody =>
+      'After reinstall, paste the Platega payment ID from your bank SMS or receipt. No backup code needed.';
+
+  @override
+  String get restorePaymentLabel => 'Payment ID';
+
+  @override
+  String get restorePaymentHint => 'UUID from the payment receipt';
+
+  @override
+  String get restorePaymentEmpty => 'Enter the payment ID';
+
+  @override
+  String get restorePaymentNotFound => 'Payment not found. Check the ID.';
+
+  @override
+  String get restorePaymentNotConfirmed => 'This payment is not confirmed yet.';
+
+  @override
+  String get restoreCodeLabel => 'Recovery code';
+
+  @override
+  String get restoreCodeHint => 'TRM-XXXX-XXXX-XXXX';
+
+  @override
+  String get restoreCodeEmpty => 'Enter your recovery code';
+
+  @override
+  String get restoreSubmit => 'Restore';
+
+  @override
+  String get restoreInvalid => 'Invalid recovery code';
+
+  @override
+  String get restoreFailed => 'Couldn’t restore access. Try again.';
+
+  @override
+  String get restoreSettingsHint =>
+      'After reinstall — payment ID from bank receipt';
+
+  @override
+  String get bootstrapFailed =>
+      'Couldn’t start the session. Check your connection.';
 }

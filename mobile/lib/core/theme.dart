@@ -1,222 +1,254 @@
 import 'package:flutter/material.dart';
 
-/// Бренд-цвета Teremok Connect — palette v3 «Дуб и мох» (2026-07-11).
+/// Teremok VPN — monochrome mark harmony (charcoal + white + zinc).
 ///
 /// Hex values live only here. Widget code must use [AppBrand] or
 /// `Theme.of(context).colorScheme.*`, never raw `Color(0xFF…)`.
+///
+/// [livingHouse] is Nest/glyph only — not UI chrome.
 class AppBrand {
   AppBrand._();
 
-  /// Oak — AppBar, primary CTA, active toggle.
-  static const Color primary = Color(0xFF5D4037);
+  /// Charcoal — primary chrome / mark circle (#1A1A1A).
+  static const Color primary = Color(0xFF1A1A1A);
 
-  /// Oak light — M3 primary containers.
-  static const Color primaryContainer = Color(0xFF8D6E63);
+  static const Color primaryContainer = Color(0xFF2A2A2E);
 
-  /// Moss — secondary accent, progress, active states.
+  /// Moss — success / «работает» (semantic, not chrome accent).
   static const Color secondary = Color(0xFF558B2F);
 
-  /// Honey amber — brand highlight (light / transient).
-  static const Color accent = Color(0xFFFF8F00);
+  /// Chrome accent = charcoal (matches mono mark).
+  static const Color accent = Color(0xFF1A1A1A);
 
-  /// Living House mustard (S1 mascot body) — glyph only, not UI chrome.
+  /// Living House mustard — Nest glyph only.
   static const Color livingHouse = Color(0xFFC78F29);
 
-  /// Brightened honey for dark surfaces (WCAG AA on OLED).
-  static const Color accentOnDark = Color(0xFFFFB300);
+  /// Accent on dark surfaces — near-white.
+  static const Color accentOnDark = Color(0xFFF5F5F5);
 
-  /// Soft orange-50 wash behind Nest while connecting (not honey — avoids double-glow).
-  static const Color connectingAura = Color(0xFFFFE0B2);
+  /// Soft charcoal wash (selected / connecting aura).
+  static const Color connectingAura = Color(0x261A1A1A);
 
-  /// Sage — connected / success.
-  static const Color success = Color(0xFF2E7D32);
+  static const Color honeySurface = Color(0xFFECECED);
 
-  /// Oak (not red) — disconnected / soft error (anti-pattern fix).
-  static const Color error = Color(0xFF5D4037);
+  static const Color success = Color(0xFF558B2F);
 
-  /// Destructive actions (logout) — Telegram-style red, not soft oak error.
+  static const Color error = Color(0xFF1A1A1A);
+
   static const Color destructive = Color(0xFFE53935);
 
-  /// Honey — connecting / warning.
-  static const Color warning = Color(0xFFFF8F00);
+  /// Connecting / in-progress — muted zinc (mono chrome).
+  static const Color warning = Color(0xFF6B6B73);
 
-  /// Cream parchment — light theme surface.
-  static const Color surfaceLight = Color(0xFFFAF8F3);
+  /// Caution / partial setup — Living House mustard (Nest glyph family).
+  static const Color caution = livingHouse;
 
-  /// Oak dark — dark theme surface.
-  static const Color surfaceDark = Color(0xFF3E2723);
+  static const Color surfaceLight = Color(0xFFF4F4F5);
 
-  /// Mid oak — dark cards / surface variant (lighter than surface for contrast).
-  static const Color surfaceVariantDark = Color(0xFF5D4037);
+  static const Color surfaceDark = Color(0xFF121212);
 
-  /// Forest — info chips (v3 token).
-  static const Color info = Color(0xFF33691E);
+  /// Dark elevated — near mark charcoal family.
+  static const Color surfaceVariantDark = Color(0xFF1C1C1E);
 
-  /// Readable subtitle / secondary text on dark oak surfaces.
-  static const Color onSurfaceVariantDark = Color(0xFFE8DED6);
+  static const Color surfaceElevatedLight = Color(0xFFFFFFFF);
+
+  static const Color inkLight = Color(0xFF1A1A1A);
+  static const Color inkMutedLight = Color(0xFF6B6B73);
+  static const Color lineLight = Color(0xFFE4E4E7);
+
+  static const Color inkDark = Color(0xFFF5F5F5);
+  static const Color inkMutedDark = Color(0xFFA1A1AA);
+  static const Color lineDark = Color(0xFF2A2A2E);
+
+  static const Color info = Color(0xFF558B2F);
+
+  static const Color onSurfaceVariantDark = Color(0xFFA1A1AA);
+
+  static const double radiusCard = 16;
+  static const double radiusPill = 27;
+  static const double radiusNavPill = 999;
 
   static Color oakWithOpacity(double opacity) =>
-      Color.fromRGBO(93, 64, 55, opacity);
+      Color.fromRGBO(26, 26, 26, opacity);
 
   static Color mossWithOpacity(double opacity) =>
       Color.fromRGBO(85, 139, 47, opacity);
+
+  /// Soft charcoal wash (legacy name kept for call sites).
+  static Color honeyWithOpacity(double opacity) =>
+      Color.fromRGBO(26, 26, 26, opacity);
+
+  static Color inkWithOpacity(double opacity) =>
+      Color.fromRGBO(26, 26, 26, opacity);
 }
 
 class AppTheme {
   AppTheme._();
 
-  /// Светлая тема — Material 3, oak+moss.
   static final ThemeData light = _build(brightness: Brightness.light);
-
-  /// Тёмная тема — Material 3, oak+moss.
   static final ThemeData dark = _build(brightness: Brightness.dark);
 
   static ThemeData _build({required Brightness brightness}) {
     final isDark = brightness == Brightness.dark;
-    final surface = isDark ? AppBrand.surfaceDark : AppBrand.surfaceLight;
-    final onSurface = isDark ? AppBrand.surfaceLight : AppBrand.surfaceDark;
+    final bg = isDark ? AppBrand.surfaceDark : AppBrand.surfaceLight;
+    final elevated =
+        isDark ? AppBrand.surfaceVariantDark : AppBrand.surfaceElevatedLight;
+    final onSurface = isDark ? AppBrand.inkDark : AppBrand.inkLight;
+    final muted = isDark ? AppBrand.inkMutedDark : AppBrand.inkMutedLight;
+    final line = isDark ? AppBrand.lineDark : AppBrand.lineLight;
+    final chrome = isDark ? AppBrand.accentOnDark : AppBrand.primary;
 
-    // Explicit brand overrides so ColorScheme.primary matches AppBrand.primary
-    // (fromSeed alone shifts the tonal palette away from the seed hex).
-    final scheme = ColorScheme.fromSeed(
-      seedColor: AppBrand.primary,
+    final scheme = ColorScheme(
       brightness: brightness,
-      primary: AppBrand.primary,
-      onPrimary: AppBrand.surfaceLight,
-      primaryContainer: AppBrand.primaryContainer,
-      onPrimaryContainer: AppBrand.surfaceDark,
+      primary: chrome,
+      onPrimary: isDark ? AppBrand.primary : AppBrand.surfaceElevatedLight,
+      primaryContainer:
+          isDark ? AppBrand.primaryContainer : AppBrand.honeySurface,
+      onPrimaryContainer: AppBrand.primary,
       secondary: AppBrand.secondary,
-      onSecondary: AppBrand.surfaceLight,
-      // Dark: accentOnDark so connecting honey stays ≥4.5:1 on OLED.
-      tertiary: isDark ? AppBrand.accentOnDark : AppBrand.accent,
-      onTertiary: AppBrand.surfaceDark,
-      error: AppBrand.error,
-      onError: AppBrand.surfaceLight,
-      surface: surface,
+      onSecondary: AppBrand.surfaceElevatedLight,
+      tertiary: chrome,
+      onTertiary: isDark ? AppBrand.primary : AppBrand.surfaceElevatedLight,
+      error: AppBrand.destructive,
+      onError: AppBrand.surfaceElevatedLight,
+      surface: bg,
       onSurface: onSurface,
-    ).copyWith(
-      // Map AppBrand.info onto inversePrimary for info chips / badges.
+      surfaceContainerHighest: elevated,
+      onSurfaceVariant: muted,
+      outline: line,
+      outlineVariant: line,
       inversePrimary: AppBrand.info,
-      surfaceContainerHighest:
-          isDark ? AppBrand.surfaceVariantDark : AppBrand.primaryContainer,
-      // Dark mode: warm light gray so Settings subtitles / card labels stay readable.
-      onSurfaceVariant: isDark
-          ? AppBrand.onSurfaceVariantDark
-          : const Color(0xFF6D4C41),
+      shadow: Colors.black.withValues(alpha: 0.08),
+      scrim: Colors.black54,
+      inverseSurface: onSurface,
+      onInverseSurface: bg,
     );
 
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
       colorScheme: scheme,
-      scaffoldBackgroundColor: surface,
+      scaffoldBackgroundColor: bg,
       iconTheme: IconThemeData(color: onSurface, size: 24),
-
-      // === Typography ===
       textTheme: _buildTextTheme(scheme),
-
-      // === AppBar ===
       appBarTheme: AppBarTheme(
-        backgroundColor: scheme.primary,
-        foregroundColor: scheme.onPrimary,
+        backgroundColor: bg,
+        foregroundColor: onSurface,
         elevation: 0,
-        scrolledUnderElevation: 4,
+        scrolledUnderElevation: 0,
         centerTitle: false,
         titleTextStyle: TextStyle(
-          color: scheme.onPrimary,
-          fontSize: 22,
-          fontWeight: FontWeight.w500,
+          color: onSurface,
+          fontSize: 28,
+          fontWeight: FontWeight.w800,
+          letterSpacing: -0.3,
         ),
-        iconTheme: IconThemeData(color: scheme.onPrimary),
+        iconTheme: IconThemeData(color: onSurface),
       ),
-
-      // === FilledButton ===
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: elevated,
+        indicatorColor: AppBrand.inkWithOpacity(0.08),
+        elevation: 0,
+        height: 72,
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return TextStyle(
+            fontSize: 11,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+            color: selected ? onSurface : muted,
+          );
+        }),
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return IconThemeData(
+            size: 20,
+            color: selected ? onSurface : muted,
+          );
+        }),
+      ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
+          backgroundColor: chrome,
+          foregroundColor:
+              isDark ? AppBrand.primary : AppBrand.surfaceElevatedLight,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
+          shape: const StadiumBorder(),
           textStyle: const TextStyle(
             fontSize: 16,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ),
-
-      // === OutlinedButton ===
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          side: BorderSide(color: scheme.outline, width: 1.5),
+          shape: const StadiumBorder(),
+          side: BorderSide(color: line, width: 1),
         ),
       ),
-
-      // === TextButton ===
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
+          foregroundColor: onSurface,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          shape: const StadiumBorder(),
         ),
       ),
-
-      // === Card ===
-      // CardThemeData: required on Flutter 3.27+ (local 3.41 / CI bump).
-      cardTheme: const CardThemeData(
-        elevation: 2,
-        margin: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      cardTheme: CardThemeData(
+        color: elevated,
+        elevation: 0,
+        margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(16)),
+          borderRadius: BorderRadius.circular(AppBrand.radiusCard),
+          side: BorderSide(color: line),
         ),
       ),
-
-      // === InputDecoration (TextField) ===
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith(
+          (s) => AppBrand.surfaceElevatedLight,
+        ),
+        trackColor: WidgetStateProperty.resolveWith((s) {
+          if (s.contains(WidgetState.selected)) return chrome;
+          return line;
+        }),
+      ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        // withOpacity: CI Flutter 3.24; withValues is 3.27+.
-        fillColor: scheme.surfaceContainerHighest.withOpacity(0.3),
+        fillColor: isDark ? AppBrand.surfaceVariantDark : AppBrand.surfaceLight,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: scheme.outline),
+          borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: scheme.outline),
+          borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: scheme.primary, width: 2),
+          borderSide: BorderSide(color: chrome, width: 1.5),
         ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
-          vertical: 16,
+          vertical: 12,
         ),
       ),
-
-      // === ProgressIndicator ===
       progressIndicatorTheme: ProgressIndicatorThemeData(
-        color: scheme.primary,
-        linearTrackColor: scheme.surfaceContainerHighest,
+        color: chrome,
+        linearTrackColor: line,
       ),
-
-      // === SnackBar ===
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(12),
         ),
       ),
-
-      // === Divider ===
       dividerTheme: DividerThemeData(
-        color: scheme.outlineVariant,
+        color: line,
         thickness: 1,
-        space: 16,
+        space: 1,
+      ),
+      listTileTheme: ListTileThemeData(
+        iconColor: muted,
+        textColor: onSurface,
       ),
     );
   }
@@ -225,33 +257,33 @@ class AppTheme {
     return TextTheme(
       displayLarge: TextStyle(
         fontSize: 32,
-        fontWeight: FontWeight.w300,
+        fontWeight: FontWeight.w800,
         letterSpacing: -0.5,
         color: scheme.onSurface,
       ),
       displayMedium: TextStyle(
         fontSize: 28,
-        fontWeight: FontWeight.w400,
+        fontWeight: FontWeight.w800,
         color: scheme.onSurface,
       ),
       headlineLarge: TextStyle(
         fontSize: 24,
-        fontWeight: FontWeight.w600,
+        fontWeight: FontWeight.w700,
         color: scheme.onSurface,
       ),
       headlineMedium: TextStyle(
         fontSize: 20,
-        fontWeight: FontWeight.w500,
+        fontWeight: FontWeight.w700,
         color: scheme.onSurface,
       ),
       titleLarge: TextStyle(
         fontSize: 18,
-        fontWeight: FontWeight.w600,
+        fontWeight: FontWeight.w700,
         color: scheme.onSurface,
       ),
       titleMedium: TextStyle(
         fontSize: 16,
-        fontWeight: FontWeight.w500,
+        fontWeight: FontWeight.w600,
         color: scheme.onSurface,
       ),
       bodyLarge: TextStyle(
@@ -273,7 +305,7 @@ class AppTheme {
       ),
       labelSmall: TextStyle(
         fontSize: 11,
-        fontWeight: FontWeight.w400,
+        fontWeight: FontWeight.w600,
         color: scheme.onSurfaceVariant,
       ),
     );

@@ -17,6 +17,8 @@ import 'package:teremok_connect/features/auth/application/auth_state.dart';
 import 'package:teremok_connect/features/auth/application/logout_handler.dart';
 import 'package:teremok_connect/features/auth/domain/phone_country.dart';
 import 'package:teremok_connect/features/home/application/vpn_provider.dart';
+import 'package:teremok_connect/features/home/presentation/home_screen.dart';
+import 'package:teremok_connect/features/home/presentation/widgets/server_card.dart';
 import 'package:teremok_connect/features/vpn/data/vpn_config.dart';
 import 'package:teremok_connect/features/vpn/data/vpn_controller.dart';
 import 'package:teremok_connect/features/vpn/data/vpn_node.dart';
@@ -120,17 +122,6 @@ void main() {
   });
 
   testWidgets('Home screen shows Connect button when not connected', (tester) async {
-    // authenticated() writes flutter_secure_storage — without a mock the
-    // platform channel never completes and the test hits the 10m timeout.
-    const secureChannel =
-        MethodChannel('plugins.it_nomads.com/flutter_secure_storage');
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(secureChannel, (call) async => null);
-    addTearDown(() {
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(secureChannel, null);
-    });
-
     const vpnChannel = MethodChannel('teremok/vpn');
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(vpnChannel, (call) async {
@@ -153,34 +144,26 @@ void main() {
     );
     addTearDown(container.dispose);
 
-    await container.read(authProvider.notifier).authenticated(
-          accessToken: 'fake',
-          refreshToken: 'fake',
-        );
-    AppRouter.postAuthResolved = true;
-    AppRouter.refreshNotifier.notifyAuthChanged();
-
+    // Pump Home directly — full TeremokApp + anonymous bootstrap races in tests
+    // (HttpClient mocked to 400) and redirects away from /home.
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
-        child: const TeremokApp(),
+        child: MaterialApp(
+          locale: const Locale('ru'),
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          home: const HomeScreen(),
+        ),
       ),
     );
-    // Avoid pumpAndSettle — CircularProgressIndicator / timers never settle.
     await tester.pump();
-    AppRouter.config.go('/home');
-    await tester.pump();
-    // VpnNotifier syncFromNative uses staggered Future.delayed retries.
-    await tester.pump(const Duration(seconds: 5));
+    await tester.pump(const Duration(seconds: 2));
 
-    expect(find.text('ОТКЛЮЧЕНО'), findsOneWidget);
-    // Shell nav labels; some also appear as section/AppBar titles.
-    expect(find.text('Главная'), findsAtLeastNWidgets(1));
-    expect(find.text('Локации'), findsAtLeastNWidgets(1));
-    expect(find.text('Настройки'), findsAtLeastNWidgets(1));
-    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.text('Не подключено'), findsOneWidget);
+    // Server card is read-only (no location picker).
+    expect(find.byType(ServerCard), findsOneWidget);
 
-    // Nest uses repeating AnimationControllers — dispose before timer check.
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 1));
   });
@@ -541,7 +524,8 @@ void main() {
       expect(map['outboundServer'], 's');
       expect(map['outboundServerPort'], 443);
       expect(map['outboundUuid'], 'u');
-      expect(map['controlPlaneHosts'], contains('204.11.2.216'));
+      expect(map['controlPlaneHosts'], contains('130.49.149.182'));
+      expect(map['egressHosts'], ['s']);
     });
   });
 
@@ -551,14 +535,14 @@ void main() {
     expect(AppConfig.baseUrl, AppConfig.vpsBaseUrl);
   });
 
-  test('AppConfig.vpsBaseUrl points to Yottasrc VPS prod backend', () {
+  test('AppConfig.vpsBaseUrl points to RF control-plane prod backend', () {
     expect(
       AppConfig.vpsBaseUrl,
       'https://api.teremokconnect.online:8443/api/v1',
     );
     expect(AppConfig.vpsBaseUrl, startsWith('https://'));
     expect(AppConfig.vpsBaseUrl, contains('/api/v1'));
-    expect(AppConfig.vpsIpv4, '204.11.2.216');
+    expect(AppConfig.vpsIpv4, '130.49.149.182');
   });
 
   test('AppConfig dev switch via APP_ENV=dev dart-define', () {
@@ -592,11 +576,12 @@ void main() {
     });
 
     test('AppBrand constants заданы', () {
-      // Palette v3 oak+moss — expectations updated with hex migration.
-      expect(AppBrand.primary, const Color(0xFF5D4037));
-      expect(AppBrand.success, const Color(0xFF2E7D32));
-      expect(AppBrand.warning, const Color(0xFFFF8F00));
-      expect(AppBrand.error, const Color(0xFF5D4037));
+      // Mono mark charcoal + zinc.
+      expect(AppBrand.primary, const Color(0xFF1A1A1A));
+      expect(AppBrand.success, const Color(0xFF558B2F));
+      expect(AppBrand.warning, const Color(0xFF6B6B73));
+      expect(AppBrand.accent, const Color(0xFF1A1A1A));
+      expect(AppBrand.error, const Color(0xFF1A1A1A));
     });
 
     test('textTheme настроен для всех уровней', () {
@@ -610,9 +595,9 @@ void main() {
 
     test('component themes заданы (AppBar/FilledButton/Card)', () {
       expect(AppTheme.light.appBarTheme.backgroundColor,
-          AppTheme.light.colorScheme.primary);
+          AppTheme.light.colorScheme.surface);
       expect(AppTheme.light.filledButtonTheme.style, isNotNull);
-      expect(AppTheme.light.cardTheme.elevation, 2);
+      expect(AppTheme.light.cardTheme.elevation, 0);
       expect(AppTheme.light.cardTheme.shape, isA<RoundedRectangleBorder>());
     });
 
@@ -620,7 +605,7 @@ void main() {
       final scheme = AppTheme.light.colorScheme;
       expect(scheme.vpnStatusColor('connected'), AppBrand.success);
       expect(scheme.vpnStatusColor('connecting'), AppBrand.warning);
-      expect(scheme.vpnStatusColor('error'), AppBrand.error);
+      expect(scheme.vpnStatusColor('error'), AppBrand.destructive);
       expect(scheme.vpnStatusColor('unknown'), scheme.outline);
     });
   });

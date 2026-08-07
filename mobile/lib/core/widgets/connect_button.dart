@@ -448,17 +448,19 @@ class TreeStatusLabel extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final color = switch (state) {
       TreeState.connected => AppBrand.secondary,
-      TreeState.connecting => Theme.of(context).colorScheme.tertiary,
-      TreeState.disconnected => cs.onSurfaceVariant,
-      TreeState.error => AppBrand.error,
+      TreeState.connecting => AppBrand.warning,
+      TreeState.disconnected => cs.onSurface,
+      TreeState.error => AppBrand.destructive,
     };
 
     return Text(
       label,
-      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+      textAlign: TextAlign.center,
+      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
             color: color,
-            letterSpacing: 1.5,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.2,
+            height: 1.15,
           ),
     );
   }

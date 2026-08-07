@@ -3,31 +3,37 @@ import 'dart:math';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// One custom site that should use `direct` when enabled.
+/// One site in the Modes «По сайтам» pool (preset or custom).
 class SplitTunnelSite {
   const SplitTunnelSite({
     required this.id,
     required this.domain,
     required this.enabled,
     this.label = '',
+    this.subtitle = '',
   });
 
   final String id;
   final String domain;
   final bool enabled;
   final String label;
+  final String subtitle;
+
+  bool get isPreset => id.startsWith('preset_');
 
   SplitTunnelSite copyWith({
     String? id,
     String? domain,
     bool? enabled,
     String? label,
+    String? subtitle,
   }) {
     return SplitTunnelSite(
       id: id ?? this.id,
       domain: domain ?? this.domain,
       enabled: enabled ?? this.enabled,
       label: label ?? this.label,
+      subtitle: subtitle ?? this.subtitle,
     );
   }
 
@@ -36,6 +42,7 @@ class SplitTunnelSite {
         'domain': domain,
         'enabled': enabled,
         'label': label,
+        'subtitle': subtitle,
       };
 
   factory SplitTunnelSite.fromJson(Map<String, dynamic> json) {
@@ -44,6 +51,7 @@ class SplitTunnelSite {
       domain: '${json['domain'] ?? ''}',
       enabled: json['enabled'] as bool? ?? true,
       label: '${json['label'] ?? ''}',
+      subtitle: '${json['subtitle'] ?? ''}',
     );
   }
 }
@@ -217,10 +225,27 @@ class SplitTunnelPrefs {
     await saveSites(sites.where((s) => s.id != id).toList());
   }
 
-  /// Enabled custom domains for sing-box `domain_suffix` rules.
+  /// Enabled domains for routing, with CDN aliases expanded (YouTube → googlevideo…).
   static Future<List<String>> enabledDomainSuffixes() async {
     final sites = await loadSites();
-    return sites.where((s) => s.enabled).map((s) => s.domain).toList();
+    final out = <String>{};
+    for (final s in sites.where((s) => s.enabled)) {
+      out.add(s.domain);
+      final aliases = kSplitTunnelDomainAliases[s.domain];
+      if (aliases != null) out.addAll(aliases);
+    }
+    return out.toList()..sort();
+  }
+
+  /// DC / CDN IP ranges for presets that bypass DNS (Telegram apps hit IPs directly).
+  static Future<List<String>> enabledProxyIpCidrs() async {
+    final sites = await loadSites();
+    final out = <String>{};
+    for (final s in sites.where((s) => s.enabled)) {
+      final cidrs = kSplitTunnelProxyIpCidrs[s.domain];
+      if (cidrs != null) out.addAll(cidrs);
+    }
+    return out.toList()..sort();
   }
 
   static Future<bool> hasPendingChanges() async {
@@ -237,8 +262,228 @@ class SplitTunnelPrefs {
     await prefs.setInt(_appliedRevKey, draft);
   }
 
+  /// Exposed so [VpnRouteModePrefs] can share the pending-reconnect counter.
+  static Future<void> bumpDraftRev() async {
+    final prefs = await SharedPreferences.getInstance();
+    await _bumpDraft(prefs);
+  }
+
   static Future<void> _bumpDraft(SharedPreferences prefs) async {
     final draft = (prefs.getInt(_draftRevKey) ?? 0) + 1;
     await prefs.setInt(_draftRevKey, draft);
   }
+
+  /// Seed curated presets (and refresh labels/subtitles) without wiping customs.
+  static Future<void> ensurePresetSites() async {
+    final existing = await loadSites();
+    final byDomain = {for (final s in existing) s.domain: s};
+    final presetDomains = {for (final p in kSplitTunnelPresets) p.domain};
+    var changed = false;
+    final next = <SplitTunnelSite>[];
+
+    for (final preset in kSplitTunnelPresets) {
+      final prev = byDomain[preset.domain];
+      if (prev == null) {
+        next.add(
+          SplitTunnelSite(
+            id: 'preset_${preset.domain.replaceAll('.', '_')}',
+            domain: preset.domain,
+            label: preset.label,
+            subtitle: preset.subtitle,
+            enabled: preset.defaultEnabled,
+          ),
+        );
+        changed = true;
+        continue;
+      }
+      final presetId = 'preset_${preset.domain.replaceAll('.', '_')}';
+      final refreshed = prev.copyWith(
+        id: prev.isPreset ? prev.id : presetId,
+        label: preset.label,
+        subtitle: preset.subtitle,
+      );
+      if (refreshed.label != prev.label ||
+          refreshed.subtitle != prev.subtitle ||
+          refreshed.id != prev.id) {
+        changed = true;
+      }
+      next.add(refreshed);
+    }
+
+    for (final s in existing) {
+      if (presetDomains.contains(s.domain)) continue;
+      next.add(s);
+    }
+
+    if (changed || next.length != existing.length) {
+      await saveSites(next);
+    }
+  }
 }
+
+/// Curated domain suffixes shown on Modes (local seed, no remote API).
+class SplitTunnelPreset {
+  const SplitTunnelPreset({
+    required this.domain,
+    required this.label,
+    this.subtitle = '',
+    this.defaultEnabled = true,
+  });
+
+  final String domain;
+  final String label;
+  final String subtitle;
+  final bool defaultEnabled;
+}
+
+const kSplitTunnelPresets = <SplitTunnelPreset>[
+  SplitTunnelPreset(
+    domain: 'cloudflare.com',
+    label: 'Cloudflare',
+    subtitle: 'Большинство неработающих сайтов',
+  ),
+  SplitTunnelPreset(
+    domain: 'youtube.com',
+    label: 'YouTube',
+    subtitle: 'YouTube и сервисы Google',
+  ),
+  SplitTunnelPreset(
+    domain: 'tiktok.com',
+    label: 'TikTok',
+    subtitle: 'Короткие видео',
+  ),
+  SplitTunnelPreset(
+    domain: 'instagram.com',
+    label: 'Instagram',
+    subtitle: 'Instagram, Facebook',
+  ),
+  SplitTunnelPreset(
+    domain: 'whatsapp.com',
+    label: 'WhatsApp',
+    subtitle: 'Звонки и сообщения',
+  ),
+  SplitTunnelPreset(
+    domain: 'telegram.org',
+    label: 'Telegram',
+    subtitle: 'Каналы, звонки, медиа',
+  ),
+  SplitTunnelPreset(
+    domain: 'discord.com',
+    label: 'Discord',
+    subtitle: 'Голос и сообщества',
+  ),
+  SplitTunnelPreset(
+    domain: 'chatgpt.com',
+    label: 'ChatGPT',
+    subtitle: 'Нейросеть',
+  ),
+  SplitTunnelPreset(
+    domain: 'claude.ai',
+    label: 'Claude',
+    subtitle: 'Нейросеть',
+  ),
+  SplitTunnelPreset(
+    domain: 'gemini.google.com',
+    label: 'Gemini',
+    subtitle: 'Нейросеть',
+  ),
+];
+
+/// Extra suffixes applied when the primary preset domain is enabled.
+const kSplitTunnelDomainAliases = <String, List<String>>{
+  'youtube.com': [
+    'youtu.be',
+    'googlevideo.com',
+    'ytimg.com',
+    'ggpht.com',
+    'googleapis.com',
+    'gvt1.com',
+  ],
+  'tiktok.com': [
+    'tiktokv.com',
+    'tiktokcdn.com',
+    'musical.ly',
+    'byteoversea.com',
+  ],
+  'instagram.com': [
+    'cdninstagram.com',
+    'instagram.net',
+    'facebook.com',
+    'fb.com',
+    'fbcdn.net',
+    'messenger.com',
+  ],
+  'cloudflare.com': [
+    'cloudflare-dns.com',
+  ],
+  'whatsapp.com': [
+    'wa.me',
+    'whatsapp.net',
+    'cdn.whatsapp.net',
+  ],
+  'telegram.org': [
+    't.me',
+    'tx.me',
+    'telegram.me',
+    'telegram.dog',
+    'telegram.space',
+    'tdesktop.com',
+    'telegra.ph',
+    'telesco.pe',
+    'api.telegram.org',
+    'core.telegram.org',
+    'desktop.telegram.org',
+    'telegram-cdn.org',
+    'cdn-telegram.org',
+  ],
+  'discord.com': [
+    'discord.gg',
+    'discordapp.com',
+    'discord.media',
+    'discordcdn.com',
+  ],
+  'chatgpt.com': [
+    'openai.com',
+    'chat.openai.com',
+    'oaiusercontent.com',
+  ],
+  'claude.ai': [
+    'anthropic.com',
+  ],
+  'gemini.google.com': [
+    // Web / app surfaces
+    'aistudio.google.com',
+    'notebooklm.google.com',
+    'deepmind.google',
+    'bard.google.com',
+    // API / RPC
+    'generativelanguage.googleapis.com',
+    'alkalimakersuite-pa.clients6.google.com',
+    'clients6.google.com',
+    'googleapis.com',
+    // Static / media / auth — Gemini breaks without these (SNIFF miss → direct).
+    'google.com',
+    'gstatic.com',
+    'googleusercontent.com',
+    'ggpht.com',
+    'accounts.google.com',
+    'withgoogle.com',
+  ],
+};
+
+/// IP CIDRs routed to proxy when the matching preset is enabled (sites mode).
+///
+/// Telegram clients often skip SNI/DNS and dial DC IPs — domain_suffix alone
+/// leaves them on `final=direct`.
+const kSplitTunnelProxyIpCidrs = <String, List<String>>{
+  'telegram.org': [
+    '91.108.4.0/22',
+    '91.108.8.0/22',
+    '91.108.12.0/22',
+    '91.108.16.0/22',
+    '91.108.20.0/22',
+    '91.108.56.0/22',
+    '149.154.160.0/20',
+    '185.76.151.0/24',
+  ],
+};

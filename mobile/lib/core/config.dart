@@ -22,9 +22,9 @@ class AppConfig {
   static const String vpsBaseUrl =
       'https://api.teremokconnect.online:8443/api/v1';
 
-  /// Known A-record for [vpsBaseUrl] host — used for TUN exclude / sing-box
-  /// direct CIDR (hostname/32 is invalid).
-  static const String vpsIpv4 = '204.11.2.216';
+  /// A-record for [vpsBaseUrl] host (RF control-plane) — TUN exclude / sing-box
+  /// direct CIDR (hostname/32 is invalid). Reality egress stays on DE nodes.
+  static const String vpsIpv4 = '130.49.149.182';
 
   /// Базовый URL API (с /api/v1 на конце) — dev defaults.
   static const String androidBaseUrl = 'http://10.0.2.2:8000/api/v1';
@@ -54,4 +54,19 @@ class AppConfig {
   /// Длиннее для /auth/flash-call/* (Zvonok API на backend может отвечать 15–30 с).
   static const Duration authConnectTimeout = Duration(seconds: 45);
   static const Duration authReceiveTimeout = Duration(seconds: 90);
+
+  /// Anonymous UUID cold start (no Flash Call). Pair with backend
+  /// `FEATURE_AUTH_ANONYMOUS=true`. Override: `--dart-define=AUTH_ANONYMOUS=false`
+  /// for legacy phone alpha builds.
+  static const bool authAnonymous = bool.fromEnvironment(
+    'AUTH_ANONYMOUS',
+    defaultValue: true,
+  );
+
+  /// Owner support Telegram username (no @). Prefill via [SupportContact].
+  static const String supportTelegramUsername = 'deathnkomatoz';
+
+  /// Bare chat link (no prefill). Prefer [SupportContact.open].
+  static const String supportTelegramUrl =
+      'https://t.me/$supportTelegramUsername';
 }

@@ -11,7 +11,7 @@ import '../../application/vpn_status.dart';
 
 enum MetricsDisplayState { hidden, shimmer, live }
 
-/// Compact ↓ / ↑ / ping row — ping from libbox urlTest (no Dart Socket probe).
+/// Compact ↓ / ↑ row. Ping lives only on [ServerCard] (auto server).
 class CompactMetricsRow extends ConsumerWidget {
   const CompactMetricsRow({super.key});
 
@@ -19,21 +19,17 @@ class CompactMetricsRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final status = ref.watch(vpnProvider);
     final trafficAsync = ref.watch(trafficStatsProvider);
-    final pingAsync = ref.watch(homePingMsProvider);
     final isRu = Localizations.localeOf(context).languageCode == 'ru';
 
     final MetricsDisplayState display;
     if (status is! VpnConnected) {
       display = MetricsDisplayState.hidden;
     } else {
-      final hasTraffic = trafficAsync.hasValue;
-      final hasPing = pingAsync.asData?.value != null;
-      display = (hasTraffic || hasPing)
+      display = trafficAsync.hasValue
           ? MetricsDisplayState.live
           : MetricsDisplayState.shimmer;
     }
 
-    final pingLabel = formatPingMs(pingAsync.asData?.value, russian: isRu);
     final down = trafficAsync.asData?.value;
     final up = trafficAsync.asData?.value;
 
@@ -55,7 +51,6 @@ class CompactMetricsRow extends ConsumerWidget {
                   MetricsDisplayState.hidden => const SizedBox.shrink(),
                   MetricsDisplayState.shimmer => const _ShimmerDots(),
                   MetricsDisplayState.live => _LiveMetrics(
-                      ping: pingLabel,
                       download: down != null
                           ? formatBytesPerSec(down.downlinkBps, russian: isRu)
                           : null,
@@ -75,12 +70,10 @@ class CompactMetricsRow extends ConsumerWidget {
 
 class _LiveMetrics extends StatelessWidget {
   const _LiveMetrics({
-    required this.ping,
     required this.download,
     required this.upload,
   });
 
-  final String? ping;
   final String? download;
   final String? upload;
 
@@ -131,7 +124,6 @@ class _LiveMetrics extends StatelessWidget {
 
     return Row(
       children: [
-        if (ping != null) cell(AppIcons.gauge, ping, l.homeStatPing),
         if (download != null)
           cell(AppIcons.download, download, l.homeStatDownload),
         if (upload != null) cell(AppIcons.upload, upload, l.homeStatUpload),

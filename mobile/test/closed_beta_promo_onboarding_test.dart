@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:teremok_connect/core/config.dart';
 import 'package:teremok_connect/features/beta/application/post_auth_router.dart';
 import 'package:teremok_connect/features/beta/data/beta_entitlement.dart';
 import 'package:teremok_connect/features/beta/data/beta_usage_aggregate_store.dart';
@@ -42,6 +43,21 @@ void main() {
       );
     });
 
+    test('server auth_anonymous_enabled routes to locked paywall', () {
+      const entitlement = BetaEntitlement(
+        hasAccess: false,
+        betaPromoGateEnabled: true,
+        authAnonymousEnabled: true,
+      );
+      expect(
+        PostAuthRouter.resolve(
+          entitlement: entitlement,
+          onboardingCompleted: false,
+        ),
+        PostAuthDestination.locked,
+      );
+    });
+
     test('gate on + network-style missing fields never invents entitlement', () {
       expect(
         () => BetaEntitlement.fromJson({'has_access': false}),
@@ -70,7 +86,26 @@ void main() {
       );
     });
 
-    test('gate off without access soft-passes as entitled', () {
+    test('anonymous never soft-passes without access even if gate is off', () {
+      // Requires AUTH_ANONYMOUS=true at compile time (app default).
+      // CI runs with AUTH_ANONYMOUS=false — skip when phone-mode.
+      if (!AppConfig.authAnonymous) return;
+      const entitlement = BetaEntitlement(
+        hasAccess: false,
+        betaPromoGateEnabled: false,
+        authAnonymousEnabled: true,
+      );
+      expect(
+        PostAuthRouter.resolve(
+          entitlement: entitlement,
+          onboardingCompleted: true,
+        ),
+        PostAuthDestination.locked,
+      );
+    });
+
+    test('gate off without access soft-passes as entitled (phone mode)', () {
+      if (AppConfig.authAnonymous) return;
       const entitlement = BetaEntitlement(
         hasAccess: false,
         betaPromoGateEnabled: false,

@@ -3,11 +3,14 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 
 import 'vpn_config.dart';
+import 'vpn_config_constructor.dart';
+import 'vpn_route_policy.dart';
 import 'vpn_rule_sets.dart';
 import 'vpn_service_config.dart';
-import 'sing_box_runtime_config.dart';
+import 'vpn_session_inputs.dart';
 import 'vpn_session_meta.dart';
 import '../../settings/data/split_tunnel_prefs.dart';
+import '../../settings/data/vpn_route_mode.dart';
 
 /// Контроллер VPN-сессии — мост между Flutter UI и Android VpnService.
 ///
@@ -52,30 +55,44 @@ class VpnController {
       // Bundled .srs — never download from GitHub at connect time (RF blocks).
       Map<String, String> localRules = const {};
       var ruRulesLoaded = false;
-      final includeBundledRu = await SplitTunnelPrefs.isBundledRuEnabled();
-      final customSuffixes = await SplitTunnelPrefs.enabledDomainSuffixes();
+      final routeMode = await VpnRouteModePrefs.getMode();
+      final wantBundledRu =
+          routeMode == VpnRouteMode.smart && kSmartRuSplitEnabled;
+      final siteSuffixes = await SplitTunnelPrefs.enabledDomainSuffixes();
+      final siteProxyCidrs = await SplitTunnelPrefs.enabledProxyIpCidrs();
       try {
-        if (includeBundledRu) {
+        if (wantBundledRu || kAdsBlockEnabled) {
           localRules = await prepareLocalRuleSetPaths();
-          ruRulesLoaded = localRules.length == kRuleSetAssets.length;
+          ruRulesLoaded = kRuDomainRuleSetTags.every(localRules.containsKey);
         }
       } catch (e) {
-        // Unit tests lack path_provider; connect still works without RU split.
+        // Unit tests lack path_provider; connect still works without RU/ads split.
         // ignore: avoid_print
         print('[VPN] local rule-sets skipped: $e');
       }
       await VpnSessionMeta.saveConnectMeta(
         ruRulesLoaded: ruRulesLoaded,
-        ruRuleTags: localRules.keys.toList(),
+        ruRuleTags: localRules.keys
+            .where((t) => kRuDomainRuleSetTags.contains(t))
+            .toList(),
         expectedEgressHost: config.expectedEgressHost,
       );
-      final singBoxConfigJson = buildRuntimeSingBoxJson(
+      final inputs = VpnSessionInputs.fromVpnConfig(
         config: config,
         service: serviceConfig,
-        localRulePaths: localRules,
-        includeBundledRuRuleSets: includeBundledRu,
-        customDirectDomainSuffixes: customSuffixes,
+        route: RoutePolicy(
+          mode: routeMode,
+          includeAdsBlock: kAdsBlockEnabled,
+          includeGeoipRu: kGeoipRuEnabled,
+          includeBundledRuRuleSets: wantBundledRu,
+          proxyDomainSuffixes:
+              routeMode == VpnRouteMode.sites ? siteSuffixes : const [],
+          proxyIpCidrs:
+              routeMode == VpnRouteMode.sites ? siteProxyCidrs : const [],
+          localRulePaths: localRules,
+        ),
       );
+      final singBoxConfigJson = VpnConfigConstructor.build(inputs);
       final paramsJson = serviceConfig.toJsonStringWithSingBox(singBoxConfigJson);
 
       final result = await _methodChannel
@@ -191,20 +208,37 @@ class VpnController {
 
   /// Observed Android lockdown preference: enabled / disabled / unavailable.
   ///
-  /// Native prefers [VpnService.isLockdownEnabled] when true; readable Secure
-  /// lockdown still mirrors preference while Nest is idle. Unreadable S+ @hide
-  /// Secure keys map to [VpnLockdownState.unavailable], never abort Connect.
+  /// Native returns a map `{lockdown, alwaysOn, …}` (or legacy bool). Lockdown
+  /// true → [VpnLockdownState.enabled]; always-on without lockdown →
+  /// [VpnLockdownState.alwaysOnOnly]; Secure unreadable → unavailable.
   Future<VpnLockdownState> queryLockdownState() async {
     try {
-      final result =
-          await _methodChannel.invokeMethod<bool>('isLockdownEnabled');
-      if (result == null) return VpnLockdownState.unavailable;
-      return result ? VpnLockdownState.enabled : VpnLockdownState.disabled;
+      final raw = await _methodChannel.invokeMethod<dynamic>('isLockdownEnabled');
+      return _mapLockdownNative(raw);
     } on PlatformException {
       return VpnLockdownState.unavailable;
     } on MissingPluginException {
       return VpnLockdownState.unavailable;
     }
+  }
+
+  static VpnLockdownState _mapLockdownNative(dynamic raw) {
+    if (raw == null) return VpnLockdownState.unavailable;
+    if (raw is bool) {
+      return raw ? VpnLockdownState.enabled : VpnLockdownState.disabled;
+    }
+    if (raw is Map) {
+      final lockdown = raw['lockdown'];
+      final alwaysOn = raw['alwaysOn'];
+      if (lockdown == true) return VpnLockdownState.enabled;
+      if (lockdown == false && alwaysOn == true) {
+        return VpnLockdownState.alwaysOnOnly;
+      }
+      if (lockdown == false) return VpnLockdownState.disabled;
+      if (alwaysOn == true) return VpnLockdownState.alwaysOnOnly;
+      return VpnLockdownState.unavailable;
+    }
+    return VpnLockdownState.unavailable;
   }
 
   /// Opens system VPN settings (`Settings.ACTION_VPN_SETTINGS`). Returns false
@@ -280,18 +314,18 @@ class VpnController {
     _pingStream ??= _pingEventChannel
         .receiveBroadcastStream()
         .map((event) {
+          int? parsed;
           if (event is Map) {
             final ms = event['delayMs'];
             if (ms is num) {
               final v = ms.toInt();
-              if (v >= 30 && v <= 5000) return v;
+              if (v >= 30 && v <= 5000) parsed = v;
             }
-          }
-          if (event is num) {
+          } else if (event is num) {
             final v = event.toInt();
-            if (v >= 30 && v <= 5000) return v;
+            if (v >= 30 && v <= 5000) parsed = v;
           }
-          return null;
+          return parsed;
         })
         .handleError((_) => null);
     return _pingStream!;
@@ -316,7 +350,12 @@ class VpnController {
 ///
 /// [unavailable] means the platform query failed — never treat as [disabled].
 enum VpnLockdownState {
+  /// "Block connections without VPN" is on.
   enabled,
+
+  /// Always-on VPN for Teremok without the block-without-VPN toggle.
+  alwaysOnOnly,
+
   disabled,
   unavailable,
 }

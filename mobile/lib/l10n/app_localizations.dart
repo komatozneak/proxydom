@@ -190,7 +190,7 @@ abstract class AppL10n {
   /// No description provided for @homeDisconnected.
   ///
   /// In en, this message translates to:
-  /// **'Disconnected'**
+  /// **'Not connected'**
   String get homeDisconnected;
 
   /// No description provided for @homeConnecting.
@@ -204,6 +204,24 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Connected'**
   String get homeConnected;
+
+  /// No description provided for @homeTapHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap Teremok to connect'**
+  String get homeTapHint;
+
+  /// No description provided for @homeConnectingHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Hold on — Teremok is opening the door…'**
+  String get homeConnectingHint;
+
+  /// No description provided for @homeConnectedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Teremok is online'**
+  String get homeConnectedHint;
 
   /// No description provided for @homeProtected.
   ///
@@ -247,11 +265,203 @@ abstract class AppL10n {
   /// **'Home'**
   String get navHome;
 
+  /// No description provided for @navVpn.
+  ///
+  /// In en, this message translates to:
+  /// **'VPN'**
+  String get navVpn;
+
   /// No description provided for @navLocations.
   ///
   /// In en, this message translates to:
   /// **'Locations'**
   String get navLocations;
+
+  /// No description provided for @navModes.
+  ///
+  /// In en, this message translates to:
+  /// **'Modes'**
+  String get navModes;
+
+  /// No description provided for @modesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Mode'**
+  String get modesTitle;
+
+  /// No description provided for @modesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How VPN works'**
+  String get modesSubtitle;
+
+  /// No description provided for @modeSmartTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Smart mode'**
+  String get modeSmartTitle;
+
+  /// No description provided for @modeSmartBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Russian sites — direct, foreign sites — through VPN.'**
+  String get modeSmartBody;
+
+  /// No description provided for @modeSmartBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'AUTO'**
+  String get modeSmartBadge;
+
+  /// No description provided for @modeFullTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Full VPN'**
+  String get modeFullTitle;
+
+  /// No description provided for @modeFullBody.
+  ///
+  /// In en, this message translates to:
+  /// **'All traffic goes through VPN. Simple and reliable.'**
+  String get modeFullBody;
+
+  /// No description provided for @modeSitesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'By site'**
+  String get modeSitesTitle;
+
+  /// No description provided for @modeSitesBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Only selected sites go through VPN. Everything else is direct.'**
+  String get modeSitesBody;
+
+  /// No description provided for @modesVpnOffTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'VPN is off'**
+  String get modesVpnOffTitle;
+
+  /// No description provided for @modesVpnOffBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect VPN so modes can take effect'**
+  String get modesVpnOffBody;
+
+  /// No description provided for @modesConfirmFullTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to Full VPN mode?'**
+  String get modesConfirmFullTitle;
+
+  /// No description provided for @modesConfirmFullBody.
+  ///
+  /// In en, this message translates to:
+  /// **'In this mode all traffic goes through VPN. Russian services — Ozon, Wildberries, banks, Gosuslugi… may stop opening.\n\nTo keep them direct — use Smart mode.'**
+  String get modesConfirmFullBody;
+
+  /// No description provided for @modesConfirmFullCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Don\'t switch'**
+  String get modesConfirmFullCancel;
+
+  /// No description provided for @modesConfirmFullOk.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch'**
+  String get modesConfirmFullOk;
+
+  /// No description provided for @modesSitesSectionSmart.
+  ///
+  /// In en, this message translates to:
+  /// **'Also direct'**
+  String get modesSitesSectionSmart;
+
+  /// No description provided for @modesSitesSectionSites.
+  ///
+  /// In en, this message translates to:
+  /// **'Sites through VPN'**
+  String get modesSitesSectionSites;
+
+  /// No description provided for @modesSitesCustomSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Your sites'**
+  String get modesSitesCustomSection;
+
+  /// No description provided for @modesSitesCustomHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. twitch.tv'**
+  String get modesSitesCustomHint;
+
+  /// No description provided for @modesSitesAllowlistHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Only selected sites go through VPN — everything else goes direct at full speed.'**
+  String get modesSitesAllowlistHint;
+
+  /// No description provided for @modesSitesMetaNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Instagram and Facebook belong to Meta, recognized in Russia as an extremist organization and banned in the Russian Federation.'**
+  String get modesSitesMetaNote;
+
+  /// No description provided for @modesLocationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Location'**
+  String get modesLocationTitle;
+
+  /// No description provided for @modesLocationHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Server and country'**
+  String get modesLocationHint;
+
+  /// No description provided for @modesPendingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconnect VPN required'**
+  String get modesPendingTitle;
+
+  /// No description provided for @modesPendingBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Routing changes apply after you reconnect.'**
+  String get modesPendingBody;
+
+  /// No description provided for @modesReconnect.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconnect'**
+  String get modesReconnect;
+
+  /// No description provided for @modesReconnectingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconnecting VPN…'**
+  String get modesReconnectingTitle;
+
+  /// No description provided for @modesReconnectingBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Applying routing changes'**
+  String get modesReconnectingBody;
+
+  /// No description provided for @modesReconnectedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected'**
+  String get modesReconnectedTitle;
+
+  /// No description provided for @modesReconnectFailedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconnect failed'**
+  String get modesReconnectFailedTitle;
 
   /// No description provided for @navSettings.
   ///
@@ -394,7 +604,7 @@ abstract class AppL10n {
   /// No description provided for @settingsAccessEarlyTitle.
   ///
   /// In en, this message translates to:
-  /// **'Closed beta'**
+  /// **'Closed testing'**
   String get settingsAccessEarlyTitle;
 
   /// No description provided for @settingsAccessEarlySubtitle.
@@ -406,7 +616,7 @@ abstract class AppL10n {
   /// No description provided for @settingsAccessBetaTitle.
   ///
   /// In en, this message translates to:
-  /// **'Closed beta'**
+  /// **'Closed testing'**
   String get settingsAccessBetaTitle;
 
   /// No description provided for @settingsAccessBetaSubtitle.
@@ -454,7 +664,7 @@ abstract class AppL10n {
   /// No description provided for @settingsSubscriptionAlpha.
   ///
   /// In en, this message translates to:
-  /// **'Closed beta'**
+  /// **'Closed testing'**
   String get settingsSubscriptionAlpha;
 
   /// No description provided for @settingsSubscriptionExpired.
@@ -511,6 +721,12 @@ abstract class AppL10n {
   /// **'Enabled in Android settings'**
   String get settingsKillSwitchOn;
 
+  /// No description provided for @settingsKillSwitchAlwaysOnOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Always-on is on — also enable “Block connections without VPN”'**
+  String get settingsKillSwitchAlwaysOnOnly;
+
   /// No description provided for @settingsKillSwitchOff.
   ///
   /// In en, this message translates to:
@@ -559,6 +775,12 @@ abstract class AppL10n {
   /// **'On'**
   String get settingsKillSwitchBadgeOn;
 
+  /// No description provided for @settingsKillSwitchBadgePartial.
+  ///
+  /// In en, this message translates to:
+  /// **'Partial'**
+  String get settingsKillSwitchBadgePartial;
+
   /// No description provided for @settingsKillSwitchBadgeOff.
   ///
   /// In en, this message translates to:
@@ -586,13 +808,13 @@ abstract class AppL10n {
   /// No description provided for @settingsSplitTunnel.
   ///
   /// In en, this message translates to:
-  /// **'What works without VPN?'**
+  /// **'Modes'**
   String get settingsSplitTunnel;
 
   /// No description provided for @settingsSplitTunnelHint.
   ///
   /// In en, this message translates to:
-  /// **'Sites that use a direct connection'**
+  /// **'Smart / full / by site'**
   String get settingsSplitTunnelHint;
 
   /// No description provided for @settingsDevices.
@@ -910,19 +1132,25 @@ abstract class AppL10n {
   /// No description provided for @settingsDarkTheme.
   ///
   /// In en, this message translates to:
-  /// **'Dark theme'**
+  /// **'Appearance'**
   String get settingsDarkTheme;
+
+  /// No description provided for @settingsAppearance.
+  ///
+  /// In en, this message translates to:
+  /// **'Appearance'**
+  String get settingsAppearance;
 
   /// No description provided for @settingsThemeSystem.
   ///
   /// In en, this message translates to:
-  /// **'Match system'**
+  /// **'Auto'**
   String get settingsThemeSystem;
 
   /// No description provided for @settingsThemeDark.
   ///
   /// In en, this message translates to:
-  /// **'Always dark'**
+  /// **'Dark'**
   String get settingsThemeDark;
 
   /// No description provided for @settingsThemeLight.
@@ -1237,6 +1465,24 @@ abstract class AppL10n {
   /// **'Sign out'**
   String get logoutTooltip;
 
+  /// No description provided for @settingsDeviceId.
+  ///
+  /// In en, this message translates to:
+  /// **'Device ID'**
+  String get settingsDeviceId;
+
+  /// No description provided for @settingsDeviceIdCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Device ID copied'**
+  String get settingsDeviceIdCopied;
+
+  /// No description provided for @settingsDeviceIdHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Install identifier for support'**
+  String get settingsDeviceIdHint;
+
   /// No description provided for @logoutConfirmTitle.
   ///
   /// In en, this message translates to:
@@ -1488,6 +1734,228 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Continue anyway'**
   String get betaGateContinueAnyway;
+
+  /// No description provided for @lockedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Activation'**
+  String get lockedTitle;
+
+  /// No description provided for @lockedHeadline.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome!'**
+  String get lockedHeadline;
+
+  /// No description provided for @lockedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Get a subscription or enter a promo code — then connect in one tap.'**
+  String get lockedBody;
+
+  /// No description provided for @lockedCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Get a subscription or enter a promo code'**
+  String get lockedCta;
+
+  /// No description provided for @lockedRefreshAccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh access'**
+  String get lockedRefreshAccess;
+
+  /// No description provided for @settingsSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'Support'**
+  String get settingsSupport;
+
+  /// No description provided for @settingsSupportHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Telegram — transfer after reinstall'**
+  String get settingsSupportHint;
+
+  /// No description provided for @lockedPay1m.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay 1 month'**
+  String get lockedPay1m;
+
+  /// No description provided for @lockedPay3m.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay 3 months'**
+  String get lockedPay3m;
+
+  /// No description provided for @lockedOrPromo.
+  ///
+  /// In en, this message translates to:
+  /// **'Or enter a promo code'**
+  String get lockedOrPromo;
+
+  /// No description provided for @lockedPayFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t start payment. Try again or contact support.'**
+  String get lockedPayFailed;
+
+  /// No description provided for @lockedPayReturnTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment opened'**
+  String get lockedPayReturnTitle;
+
+  /// No description provided for @lockedPayReturnBody.
+  ///
+  /// In en, this message translates to:
+  /// **'After you finish paying in the browser, tap Check access.'**
+  String get lockedPayReturnBody;
+
+  /// No description provided for @lockedPayReturnCheck.
+  ///
+  /// In en, this message translates to:
+  /// **'Check access'**
+  String get lockedPayReturnCheck;
+
+  /// No description provided for @recoveryCodeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recovery code'**
+  String get recoveryCodeTitle;
+
+  /// No description provided for @recoveryCodeHeadline.
+  ///
+  /// In en, this message translates to:
+  /// **'Recovery code'**
+  String get recoveryCodeHeadline;
+
+  /// No description provided for @recoveryCodeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional support fallback. Prefer restore by payment ID.'**
+  String get recoveryCodeBody;
+
+  /// No description provided for @recoveryCodeCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy code'**
+  String get recoveryCodeCopy;
+
+  /// No description provided for @recoveryCodeCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Code copied'**
+  String get recoveryCodeCopied;
+
+  /// No description provided for @recoveryCodeConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get recoveryCodeConfirm;
+
+  /// No description provided for @recoveryCodeContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get recoveryCodeContinue;
+
+  /// No description provided for @restoreTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore access'**
+  String get restoreTitle;
+
+  /// No description provided for @restoreHeadline.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your payment ID'**
+  String get restoreHeadline;
+
+  /// No description provided for @restoreBody.
+  ///
+  /// In en, this message translates to:
+  /// **'After reinstall, paste the Platega payment ID from your bank SMS or receipt. No backup code needed.'**
+  String get restoreBody;
+
+  /// No description provided for @restorePaymentLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment ID'**
+  String get restorePaymentLabel;
+
+  /// No description provided for @restorePaymentHint.
+  ///
+  /// In en, this message translates to:
+  /// **'UUID from the payment receipt'**
+  String get restorePaymentHint;
+
+  /// No description provided for @restorePaymentEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the payment ID'**
+  String get restorePaymentEmpty;
+
+  /// No description provided for @restorePaymentNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment not found. Check the ID.'**
+  String get restorePaymentNotFound;
+
+  /// No description provided for @restorePaymentNotConfirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'This payment is not confirmed yet.'**
+  String get restorePaymentNotConfirmed;
+
+  /// No description provided for @restoreCodeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Recovery code'**
+  String get restoreCodeLabel;
+
+  /// No description provided for @restoreCodeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'TRM-XXXX-XXXX-XXXX'**
+  String get restoreCodeHint;
+
+  /// No description provided for @restoreCodeEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your recovery code'**
+  String get restoreCodeEmpty;
+
+  /// No description provided for @restoreSubmit.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore'**
+  String get restoreSubmit;
+
+  /// No description provided for @restoreInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid recovery code'**
+  String get restoreInvalid;
+
+  /// No description provided for @restoreFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t restore access. Try again.'**
+  String get restoreFailed;
+
+  /// No description provided for @restoreSettingsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'After reinstall — payment ID from bank receipt'**
+  String get restoreSettingsHint;
+
+  /// No description provided for @bootstrapFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t start the session. Check your connection.'**
+  String get bootstrapFailed;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

@@ -107,6 +107,7 @@ class VpnServiceConfig {
     required this.outboundTlsSni,
     required this.outboundTlsPublicKey,
     required this.outboundTlsShortId,
+    this.egressHosts = const [],
   });
 
   /// Имя сессии для системного [VpnService.Builder.setSession] (без Marzban id).
@@ -153,6 +154,9 @@ class VpnServiceConfig {
   /// Reality short ID (hex).
   final String? outboundTlsShortId;
 
+  /// All multi-node egress IPs for TUN [excludeRoute] (urltest children).
+  final List<String> egressHosts;
+
   /// Hosts that must stay off TUN (prod API, etc.) via Android [excludeRoute].
   ///
   /// Without this, Dio to `baseUrl` goes into a broken tunnel →
@@ -197,6 +201,7 @@ class VpnServiceConfig {
       'outboundTlsPublicKey': outboundTlsPublicKey,
       'outboundTlsShortId': outboundTlsShortId,
       'controlPlaneHosts': controlPlaneHosts,
+      'egressHosts': egressHosts,
     };
   }
 
@@ -204,7 +209,7 @@ class VpnServiceConfig {
   /// передавать через Bundle, чем вложенный Map).
   String toJsonString() => jsonEncode(toMap());
 
-  /// JSON с полным sing-box config для libbox (см. [buildRuntimeSingBoxJson]).
+  /// JSON с полным sing-box config для libbox (см. [VpnConfigConstructor]).
   String toJsonStringWithSingBox(String singBoxConfigJson) =>
       jsonEncode({...toMap(), 'singBoxConfigJson': singBoxConfigJson});
 
@@ -275,6 +280,7 @@ class VpnServiceConfig {
       outboundTlsSni: tls?.serverName,
       outboundTlsPublicKey: tls?.publicKey,
       outboundTlsShortId: tls?.shortId,
+      egressHosts: config.egressHosts,
     );
   }
 }

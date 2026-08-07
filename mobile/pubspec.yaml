@@ -39,12 +39,14 @@ flutter:
   uses-material-design: true
   generate: true
   assets:
-    # Brand / onboarding (palette v3 oak+moss).
+    # Brand / onboarding (Figma zinc+honey).
     # Directory entries are NOT recursive — nest paths must be listed.
     - assets/brand/
     - assets/brand/connect/s1-flat-launcher.png
+    - assets/brand/sites/claude.png
     - assets/icon/mono_teremok.png
     - assets/icon/nav_vpn_teremok.png
+    - assets/icon/logo_mark_nav.png
     - assets/rive/signal_nest_connect.riv
     # PR #35 textures/empty_states intentionally NOT bundled (see
     # assets/brand/DEPRECATED-PR35.md — FLUX Klein 9B non-commercial).
@@ -52,6 +54,7 @@ flutter:
     - assets/rules/geosite-category-ru.srs
     - assets/rules/geosite-tld-ru.srs
     - assets/rules/geoip-ru.srs
+    - assets/rules/geosite-category-ads-all.srs
 
 # Android 13+ themed icons: background + foreground + monochrome.
 # Regenerate:
