@@ -103,6 +103,53 @@ class AppL10nRu extends AppL10n {
   String get navModes => 'Режимы';
 
   @override
+  String get navSubscription => 'Подписка';
+
+  @override
+  String get navPremium => 'Премиум';
+
+  @override
+  String get homeTrafficRemainder => 'Остаток трафика';
+
+  @override
+  String get homeNoVpnRow => 'Что работает без VPN?';
+
+  @override
+  String get premiumHeadline => 'YouTube без рекламы';
+
+  @override
+  String get premiumBody =>
+      'Премиум открывает ноды без рекламы YouTube и снимает лимит 5 ГБ.';
+
+  @override
+  String get premiumFeatureYt => 'Локации YouTube без mid-roll рекламы';
+
+  @override
+  String get premiumFeatureSpeed => 'Приоритетные выходы для стриминга';
+
+  @override
+  String get premiumUnlimitedTraffic => 'Безлимитный трафик';
+
+  @override
+  String get premiumCta => 'Оформить Премиум';
+
+  @override
+  String get premiumOpenLocations => 'Открыть локации';
+
+  @override
+  String get subscriptionTabHint =>
+      'Тарифы и промокоды. Премиум открывает YouTube-локации.';
+
+  @override
+  String get locationsPremiumLocked => 'Премиум';
+
+  @override
+  String get settingsNoVpn => 'Что работает без VPN?';
+
+  @override
+  String get settingsNoVpnHint => 'Эти адреса открываются напрямую, мимо VPN';
+
+  @override
   String get modesTitle => 'Режим';
 
   @override
@@ -715,6 +762,18 @@ class AppL10nRu extends AppL10n {
   String get regionSectionServers => 'Серверы';
 
   @override
+  String get regionSectionGeneral => 'Основные';
+
+  @override
+  String get regionSectionYoutube => 'YouTube — без рекламы';
+
+  @override
+  String get regionComingSoon => 'Скоро появится';
+
+  @override
+  String get regionComingSoonBadge => 'Скоро';
+
+  @override
   String get regionSectionOffline => 'Недоступные серверы';
 
   @override
@@ -1020,8 +1079,39 @@ class AppL10nRu extends AppL10n {
       'Не удалось восстановить доступ. Попробуйте снова.';
 
   @override
-  String get restoreSettingsHint =>
-      'После переустановки — номер платежа из чека банка';
+  String get restoreSettingsHint => 'После переустановки — код восстановления';
+
+  @override
+  String get restoreHeadlineCode => 'Введите код восстановления';
+
+  @override
+  String get restoreBodyCode =>
+      'После переустановки введите код, показанный при первом запуске.';
+
+  @override
+  String get settingsInviteDevice => 'Пригласить устройство';
+
+  @override
+  String get settingsInviteDeviceHint => 'Создать короткий код места';
+
+  @override
+  String get settingsAcceptSeat => 'Ввести код места';
+
+  @override
+  String get settingsAcceptSeatHint => 'Присоединиться к аккаунту';
+
+  @override
+  String get settingsSeatCodeTitle => 'Код места';
+
+  @override
+  String get settingsSeatCodeCopied => 'Код скопирован';
+
+  @override
+  String get settingsRecoverAccess => 'Восстановить доступ';
+
+  @override
+  String get settingsRecoverAccessHint =>
+      'Код восстановления после переустановки';
 
   @override
   String get bootstrapFailed => 'Не удалось начать сессию. Проверьте связь.';

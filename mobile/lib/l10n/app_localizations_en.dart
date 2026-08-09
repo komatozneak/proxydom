@@ -102,6 +102,54 @@ class AppL10nEn extends AppL10n {
   String get navModes => 'Modes';
 
   @override
+  String get navSubscription => 'Subscription';
+
+  @override
+  String get navPremium => 'Premium';
+
+  @override
+  String get homeTrafficRemainder => 'Data left';
+
+  @override
+  String get homeNoVpnRow => 'What works without VPN?';
+
+  @override
+  String get premiumHeadline => 'YouTube without ads';
+
+  @override
+  String get premiumBody =>
+      'Premium unlocks no-AdSense exits and removes the free 5 GB cap.';
+
+  @override
+  String get premiumFeatureYt => 'YouTube locations without mid-roll ads';
+
+  @override
+  String get premiumFeatureSpeed => 'Priority exits for streaming';
+
+  @override
+  String get premiumUnlimitedTraffic => 'Unlimited traffic';
+
+  @override
+  String get premiumCta => 'Get Premium';
+
+  @override
+  String get premiumOpenLocations => 'Open locations';
+
+  @override
+  String get subscriptionTabHint =>
+      'Manage plans and promo codes. Premium unlocks YouTube locations.';
+
+  @override
+  String get locationsPremiumLocked => 'Premium';
+
+  @override
+  String get settingsNoVpn => 'What works without VPN?';
+
+  @override
+  String get settingsNoVpnHint =>
+      'These addresses open directly, bypassing the VPN';
+
+  @override
   String get modesTitle => 'Mode';
 
   @override
@@ -711,6 +759,18 @@ class AppL10nEn extends AppL10n {
   String get regionSectionServers => 'Servers';
 
   @override
+  String get regionSectionGeneral => 'General';
+
+  @override
+  String get regionSectionYoutube => 'YouTube — no ads';
+
+  @override
+  String get regionComingSoon => 'Coming soon';
+
+  @override
+  String get regionComingSoonBadge => 'Soon';
+
+  @override
   String get regionSectionOffline => 'Unavailable servers';
 
   @override
@@ -1013,7 +1073,38 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get restoreSettingsHint =>
-      'After reinstall — payment ID from bank receipt';
+      'After reinstall — enter your recovery code';
+
+  @override
+  String get restoreHeadlineCode => 'Enter recovery code';
+
+  @override
+  String get restoreBodyCode =>
+      'After reinstall, enter the recovery code shown when you first opened the app.';
+
+  @override
+  String get settingsInviteDevice => 'Invite another device';
+
+  @override
+  String get settingsInviteDeviceHint => 'Create a short seat code';
+
+  @override
+  String get settingsAcceptSeat => 'Enter seat code';
+
+  @override
+  String get settingsAcceptSeatHint => 'Join another account';
+
+  @override
+  String get settingsSeatCodeTitle => 'Seat code';
+
+  @override
+  String get settingsSeatCodeCopied => 'Code copied';
+
+  @override
+  String get settingsRecoverAccess => 'Restore access';
+
+  @override
+  String get settingsRecoverAccessHint => 'Use recovery code after reinstall';
 
   @override
   String get bootstrapFailed =>

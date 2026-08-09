@@ -8,17 +8,21 @@ import '../features/auth/application/auth_state.dart';
 import '../features/auth/presentation/bootstrap_failed_screen.dart';
 import '../features/auth/presentation/login_screen.dart';
 import '../features/auth/presentation/recovery_code_screen.dart';
+import '../features/auth/presentation/restore_access_screen.dart';
 import '../features/auth/presentation/verify_screen.dart';
 import '../features/beta/presentation/locked_access_screen.dart';
 import '../features/beta/presentation/post_auth_gate_screen.dart';
 import '../features/beta/presentation/promo_code_screen.dart';
+import '../features/billing/presentation/premium_tab_screen.dart';
+import '../features/billing/presentation/subscription_tab_screen.dart';
 import '../features/home/presentation/home_screen.dart';
 import '../features/onboarding/data/onboarding_prefs.dart';
 import '../features/onboarding/presentation/onboarding_screen.dart';
 import '../features/onboarding/presentation/welcome_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
+import '../features/settings/presentation/split_tunnel_sites_screen.dart';
 import '../features/shell/presentation/main_shell.dart';
-import '../features/vpn/presentation/modes_screen.dart';
+import '../features/vpn/presentation/locations_screen.dart';
 import 'config.dart';
 
 /// Роутер приложения.
@@ -39,8 +43,7 @@ class AppRouter {
   /// MUST stay false while on /promo — never set true before destination is known.
   static bool postAuthResolved = false;
 
-  /// Soften recovery UX: self-serve restore removed; support rebinds client_id.
-  /// /recovery kept unused (legacy plaintext code path).
+  /// Soften recovery UX: one-shot code after register; Settings can recover.
   static String? pendingRecoveryCode;
 
   /// Глобальный listenable — связан с authProvider в main.dart.
@@ -65,12 +68,15 @@ class AppRouter {
       final goingToPromo = loc == '/promo';
       final goingToLocked = loc == '/locked';
       final goingToRecovery = loc == '/recovery';
+      final goingToRestore = loc == '/restore';
       final goingToBootstrapFail = loc == '/bootstrap-failed';
       final goingToOnboarding = loc == '/onboarding';
       final inShell = loc == '/home' ||
-          loc == '/modes' ||
+          loc == '/locations' ||
           loc == '/settings' ||
-          loc.startsWith('/settings/');
+          loc.startsWith('/settings/') ||
+          loc == '/subscription' ||
+          loc == '/premium';
 
       if (auth is AuthStateBootstrapFailed) {
         if (goingToBootstrapFail) return null;
@@ -82,8 +88,10 @@ class AppRouter {
       if (!isAuthed) {
         postAuthResolved = false;
         if (AppConfig.authAnonymous) {
-          // Bootstrap runs in AuthNotifier; stay put until tokens or fail.
-          if (goingToWelcome) return null;
+          // Register runs in AuthNotifier; allow restore while waiting / failed.
+          if (goingToWelcome || goingToRestore || goingToBootstrapFail) {
+            return null;
+          }
           return null;
         }
         if (goingToLogin || goingToVerify || goingToWelcome) {
@@ -100,7 +108,7 @@ class AppRouter {
       if (goingToLogin || goingToVerify || goingToWelcome || goingToBootstrapFail) {
         return '/gate';
       }
-      if (goingToGate || goingToPromo || goingToLocked || goingToRecovery) {
+      if (goingToGate || goingToPromo || goingToLocked || goingToRecovery || goingToRestore) {
         return null;
       }
       // Onboarding + shell only after entitlement (or gate-off soft-pass) resolved.
@@ -132,6 +140,10 @@ class AppRouter {
         ),
       ),
       GoRoute(
+        path: '/restore',
+        builder: (c, s) => const RestoreAccessScreen(),
+      ),
+      GoRoute(
         path: '/bootstrap-failed',
         builder: (c, s) => const BootstrapFailedScreen(),
       ),
@@ -144,12 +156,20 @@ class AppRouter {
           return MainShell(navigationShell: navigationShell);
         },
         branches: [
-          // Order matches bottom nav: Modes | Home | Settings.
+          // Огонь order: Подписка | Премиум | VPN | Локации | Настройки
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/modes',
-                builder: (c, s) => const ModesScreen(),
+                path: '/subscription',
+                builder: (c, s) => const SubscriptionTabScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/premium',
+                builder: (c, s) => const PremiumTabScreen(),
               ),
             ],
           ),
@@ -164,12 +184,28 @@ class AppRouter {
           StatefulShellBranch(
             routes: [
               GoRoute(
+                path: '/locations',
+                builder: (c, s) => const LocationsScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
                 path: '/settings',
                 builder: (c, s) => const SettingsScreen(),
                 routes: [
                   GoRoute(
+                    path: 'no-vpn',
+                    builder: (c, s) => const SplitTunnelSitesScreen(),
+                  ),
+                  GoRoute(
                     path: 'split-tunnel',
-                    redirect: (c, s) => '/modes',
+                    redirect: (c, s) => '/settings/no-vpn',
+                  ),
+                  GoRoute(
+                    path: 'modes',
+                    redirect: (c, s) => '/settings/no-vpn',
                   ),
                 ],
               ),

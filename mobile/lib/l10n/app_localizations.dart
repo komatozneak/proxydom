@@ -283,6 +283,96 @@ abstract class AppL10n {
   /// **'Modes'**
   String get navModes;
 
+  /// No description provided for @navSubscription.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscription'**
+  String get navSubscription;
+
+  /// No description provided for @navPremium.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium'**
+  String get navPremium;
+
+  /// No description provided for @homeTrafficRemainder.
+  ///
+  /// In en, this message translates to:
+  /// **'Data left'**
+  String get homeTrafficRemainder;
+
+  /// No description provided for @homeNoVpnRow.
+  ///
+  /// In en, this message translates to:
+  /// **'What works without VPN?'**
+  String get homeNoVpnRow;
+
+  /// No description provided for @premiumHeadline.
+  ///
+  /// In en, this message translates to:
+  /// **'YouTube without ads'**
+  String get premiumHeadline;
+
+  /// No description provided for @premiumBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium unlocks no-AdSense exits and removes the free 5 GB cap.'**
+  String get premiumBody;
+
+  /// No description provided for @premiumFeatureYt.
+  ///
+  /// In en, this message translates to:
+  /// **'YouTube locations without mid-roll ads'**
+  String get premiumFeatureYt;
+
+  /// No description provided for @premiumFeatureSpeed.
+  ///
+  /// In en, this message translates to:
+  /// **'Priority exits for streaming'**
+  String get premiumFeatureSpeed;
+
+  /// No description provided for @premiumUnlimitedTraffic.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlimited traffic'**
+  String get premiumUnlimitedTraffic;
+
+  /// No description provided for @premiumCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Get Premium'**
+  String get premiumCta;
+
+  /// No description provided for @premiumOpenLocations.
+  ///
+  /// In en, this message translates to:
+  /// **'Open locations'**
+  String get premiumOpenLocations;
+
+  /// No description provided for @subscriptionTabHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage plans and promo codes. Premium unlocks YouTube locations.'**
+  String get subscriptionTabHint;
+
+  /// No description provided for @locationsPremiumLocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium'**
+  String get locationsPremiumLocked;
+
+  /// No description provided for @settingsNoVpn.
+  ///
+  /// In en, this message translates to:
+  /// **'What works without VPN?'**
+  String get settingsNoVpn;
+
+  /// No description provided for @settingsNoVpnHint.
+  ///
+  /// In en, this message translates to:
+  /// **'These addresses open directly, bypassing the VPN'**
+  String get settingsNoVpnHint;
+
   /// No description provided for @modesTitle.
   ///
   /// In en, this message translates to:
@@ -1393,6 +1483,30 @@ abstract class AppL10n {
   /// **'Servers'**
   String get regionSectionServers;
 
+  /// No description provided for @regionSectionGeneral.
+  ///
+  /// In en, this message translates to:
+  /// **'General'**
+  String get regionSectionGeneral;
+
+  /// No description provided for @regionSectionYoutube.
+  ///
+  /// In en, this message translates to:
+  /// **'YouTube — no ads'**
+  String get regionSectionYoutube;
+
+  /// No description provided for @regionComingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Coming soon'**
+  String get regionComingSoon;
+
+  /// No description provided for @regionComingSoonBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Soon'**
+  String get regionComingSoonBadge;
+
   /// No description provided for @regionSectionOffline.
   ///
   /// In en, this message translates to:
@@ -1948,8 +2062,68 @@ abstract class AppL10n {
   /// No description provided for @restoreSettingsHint.
   ///
   /// In en, this message translates to:
-  /// **'After reinstall — payment ID from bank receipt'**
+  /// **'After reinstall — enter your recovery code'**
   String get restoreSettingsHint;
+
+  /// No description provided for @restoreHeadlineCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter recovery code'**
+  String get restoreHeadlineCode;
+
+  /// No description provided for @restoreBodyCode.
+  ///
+  /// In en, this message translates to:
+  /// **'After reinstall, enter the recovery code shown when you first opened the app.'**
+  String get restoreBodyCode;
+
+  /// No description provided for @settingsInviteDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite another device'**
+  String get settingsInviteDevice;
+
+  /// No description provided for @settingsInviteDeviceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a short seat code'**
+  String get settingsInviteDeviceHint;
+
+  /// No description provided for @settingsAcceptSeat.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter seat code'**
+  String get settingsAcceptSeat;
+
+  /// No description provided for @settingsAcceptSeatHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Join another account'**
+  String get settingsAcceptSeatHint;
+
+  /// No description provided for @settingsSeatCodeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Seat code'**
+  String get settingsSeatCodeTitle;
+
+  /// No description provided for @settingsSeatCodeCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Code copied'**
+  String get settingsSeatCodeCopied;
+
+  /// No description provided for @settingsRecoverAccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore access'**
+  String get settingsRecoverAccess;
+
+  /// No description provided for @settingsRecoverAccessHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Use recovery code after reinstall'**
+  String get settingsRecoverAccessHint;
 
   /// No description provided for @bootstrapFailed.
   ///
