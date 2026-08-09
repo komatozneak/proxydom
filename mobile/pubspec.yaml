@@ -16,6 +16,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   go_router: ^14.6.2
   dio: ^5.7.0
+  crypto: ^3.0.6
   flutter_secure_storage: ^9.2.2
   flutter_riverpod: ^2.6.1
   path_provider: ^2.1.5
@@ -48,14 +49,10 @@ flutter:
     - assets/icon/nav_vpn_teremok.png
     - assets/icon/logo_mark_nav.png
     - assets/rive/signal_nest_connect.riv
+    # DedProxy-style Google/YouTube force-proxy CIDRs (public goog.json).
+    - assets/rules/youtube-google.cidr
     # PR #35 textures/empty_states intentionally NOT bundled (see
     # assets/brand/DEPRECATED-PR35.md — FLUX Klein 9B non-commercial).
-    # Offline copies of sing-box rule-sets (runtime still uses remote URLs).
-    - assets/rules/geosite-category-ru.srs
-    - assets/rules/geosite-tld-ru.srs
-    - assets/rules/geoip-ru.srs
-    - assets/rules/geosite-category-ads-all.srs
-
 # Android 13+ themed icons: background + foreground + monochrome.
 # Regenerate:
 #   python tool/generate_adaptive_icon.py

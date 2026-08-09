@@ -4,20 +4,31 @@ import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
 
 import 'config.dart';
+import 'hmac_interceptor.dart';
 import 'jwt_interceptor.dart';
 import 'token_storage.dart';
+import 'v2_path_interceptor.dart';
 
 /// Единый экземпляр Dio с предустановленными интерсепторами.
 class ApiClient {
   ApiClient._();
 
   static final Dio instance = _build();
+  static Dio? _refreshClient;
 
   static bool isControlPlaneHost(String host) {
     final h = host.trim().toLowerCase();
     return h == 'api.teremokconnect.online' ||
+        h == 'api2.teremokconnect.online' ||
         h == 'teremokconnect.online' ||
         h.endsWith('.teremokconnect.online');
+  }
+
+  /// Discovery failover: switch Dio base to `{origin}/v2` (or legacy `/api/v1`).
+  static void setBaseOrigin(String origin) {
+    final base = AppConfig.baseUrlForOrigin(origin);
+    instance.options.baseUrl = base;
+    _refreshClient?.options.baseUrl = base;
   }
 
   static Dio _build() {
@@ -31,6 +42,7 @@ class ApiClient {
         validateStatus: (status) => status != null && status < 500,
       ),
     );
+    _refreshClient = refreshClient;
     _pinControlPlaneDns(refreshClient);
 
     final dio = Dio(
@@ -45,6 +57,9 @@ class ApiClient {
       ),
     );
     _pinControlPlaneDns(dio);
+
+    dio.interceptors.add(V2PathInterceptor());
+    dio.interceptors.add(HmacSignatureInterceptor());
 
     dio.interceptors.add(
       JwtRefreshInterceptor(

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rive/rive.dart';
 
 import 'app.dart';
+import 'core/api_discovery.dart';
 import 'core/config.dart';
 import 'core/diagnostics/app_log_buffer.dart';
 import 'core/diagnostics/diagnostics_service.dart';
@@ -17,6 +18,14 @@ void main() async {
   // Required before flutter_secure_storage / path_provider on cold start.
   WidgetsFlutterBinding.ensureInitialized();
   await RiveNative.init();
+
+  // ADR 009: probe discovery hosts before auth/register.
+  try {
+    await ApiDiscovery.instance.refreshAndSelect();
+  } catch (e) {
+    // ignore: avoid_print
+    print('[api.discovery] skipped: $e');
+  }
 
   final container = ProviderContainer();
   installFlutterErrorHandler(
