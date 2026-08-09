@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/api_secret_storage.dart';
 import '../../../core/config.dart';
 import '../../../core/router.dart';
 import '../../../core/token_storage.dart';
@@ -55,6 +56,12 @@ class LogoutHandler {
         await TokenStorage.instance.clear();
       } catch (e) {
         errors.add('TokenStorage.clear: $e');
+      }
+
+      try {
+        await ApiSecretStorage.instance.clear();
+      } catch (e) {
+        errors.add('ApiSecretStorage.clear: $e');
       }
 
       AppRouter.postAuthResolved = false;
