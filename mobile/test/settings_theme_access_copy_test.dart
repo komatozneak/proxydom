@@ -17,8 +17,8 @@ void main() {
       expect(accessCopyKind(s), AccessCopyKind.closedBeta);
     });
 
-    test('empty status maps to none', () {
-      expect(accessCopyKind(SubscriptionStatus.empty), AccessCopyKind.none);
+    test('empty status maps to free', () {
+      expect(accessCopyKind(SubscriptionStatus.empty), AccessCopyKind.free);
     });
 
     test('paid active maps to paidOrTrial', () {

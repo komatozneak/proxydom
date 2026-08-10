@@ -87,5 +87,10 @@
         <intent>
             <action android:name="android.settings.VPN_SETTINGS"/>
         </intent>
+        <!-- Split-tunnel Apps tab: launcher inventory without QUERY_ALL_PACKAGES -->
+        <intent>
+            <action android:name="android.intent.action.MAIN"/>
+            <category android:name="android.intent.category.LAUNCHER"/>
+        </intent>
     </queries>
 </manifest>

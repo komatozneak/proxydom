@@ -316,7 +316,7 @@ abstract class AppL10n {
   /// No description provided for @premiumBody.
   ///
   /// In en, this message translates to:
-  /// **'Premium unlocks no-AdSense exits and removes the free 5 GB cap.'**
+  /// **'Premium unlocks no-AdSense exits, up to 5 devices, and removes the free 4.20 GB cap.'**
   String get premiumBody;
 
   /// No description provided for @premiumFeatureYt.
@@ -625,6 +625,30 @@ abstract class AppL10n {
   /// **'Couldn’t connect. Please try again.'**
   String get homeErrorFriendly;
 
+  /// No description provided for @homeVpnConflictTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Another VPN is blocking'**
+  String get homeVpnConflictTitle;
+
+  /// No description provided for @homeVpnConflictHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn off the other VPN or Always-on in Android settings, then connect again.'**
+  String get homeVpnConflictHint;
+
+  /// No description provided for @homeVpnConflictHintNamed.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn off “{app}” (or Always-on) in Android settings, then connect again.'**
+  String homeVpnConflictHintNamed(String app);
+
+  /// No description provided for @homeVpnPermissionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow the VPN in the Android system prompt, then tap connect again.'**
+  String get homeVpnPermissionHint;
+
   /// No description provided for @homeConfigErrorFriendly.
   ///
   /// In en, this message translates to:
@@ -726,6 +750,18 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'An invite code is required.'**
   String get settingsAccessNoneSubtitle;
+
+  /// No description provided for @settingsAccessFreeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Free'**
+  String get settingsAccessFreeTitle;
+
+  /// No description provided for @settingsAccessFreeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'1 device · up to 4.20 GB per month.'**
+  String get settingsAccessFreeSubtitle;
 
   /// No description provided for @settingsAccessActiveUntil.
   ///
@@ -895,18 +931,6 @@ abstract class AppL10n {
   /// **'Reconnect quickly if the tunnel drops'**
   String get settingsAutoReconnectHint;
 
-  /// No description provided for @settingsSplitTunnel.
-  ///
-  /// In en, this message translates to:
-  /// **'Modes'**
-  String get settingsSplitTunnel;
-
-  /// No description provided for @settingsSplitTunnelHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Smart / full / by site'**
-  String get settingsSplitTunnelHint;
-
   /// No description provided for @settingsDevices.
   ///
   /// In en, this message translates to:
@@ -1002,6 +1026,48 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Could not revoke device'**
   String get devicesRevokeFailed;
+
+  /// No description provided for @devicesLeave.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave account'**
+  String get devicesLeave;
+
+  /// No description provided for @devicesLeaveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave shared account?'**
+  String get devicesLeaveTitle;
+
+  /// No description provided for @devicesLeaveBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This install becomes its own account. Subscription stays on the old account. Save any new recovery code if shown.'**
+  String get devicesLeaveBody;
+
+  /// No description provided for @devicesLeaveConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave'**
+  String get devicesLeaveConfirm;
+
+  /// No description provided for @devicesLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Device left the account'**
+  String get devicesLeft;
+
+  /// No description provided for @devicesLeaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not leave the account'**
+  String get devicesLeaveFailed;
+
+  /// No description provided for @devicesLimitOpenManage.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage devices'**
+  String get devicesLimitOpenManage;
 
   /// No description provided for @splitTunnelSearchHint.
   ///
@@ -1492,8 +1558,20 @@ abstract class AppL10n {
   /// No description provided for @regionSectionYoutube.
   ///
   /// In en, this message translates to:
-  /// **'YouTube — no ads'**
+  /// **'Premium'**
   String get regionSectionYoutube;
+
+  /// No description provided for @regionSectionEurope.
+  ///
+  /// In en, this message translates to:
+  /// **'Europe'**
+  String get regionSectionEurope;
+
+  /// No description provided for @regionSectionUsa.
+  ///
+  /// In en, this message translates to:
+  /// **'USA'**
+  String get regionSectionUsa;
 
   /// No description provided for @regionComingSoon.
   ///
@@ -1573,6 +1651,30 @@ abstract class AppL10n {
   /// **'Failed to change region: {error}'**
   String regionChangeFailed(String error);
 
+  /// No description provided for @regionSwitchingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Switching location…'**
+  String get regionSwitchingTitle;
+
+  /// No description provided for @regionSwitchingBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting to the selected server'**
+  String get regionSwitchingBody;
+
+  /// No description provided for @regionSwitchedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get regionSwitchedTitle;
+
+  /// No description provided for @regionSwitchFailedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not switch location'**
+  String get regionSwitchFailedTitle;
+
   /// No description provided for @logoutTooltip.
   ///
   /// In en, this message translates to:
@@ -1620,6 +1722,12 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Cancel'**
   String get cancel;
+
+  /// No description provided for @navBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get navBack;
 
   /// No description provided for @verifyTitle.
   ///
@@ -2112,6 +2220,48 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Code copied'**
   String get settingsSeatCodeCopied;
+
+  /// No description provided for @settingsSeatInviteFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t create a seat code'**
+  String get settingsSeatInviteFailed;
+
+  /// No description provided for @settingsAcceptSeatOk.
+  ///
+  /// In en, this message translates to:
+  /// **'Device joined the account'**
+  String get settingsAcceptSeatOk;
+
+  /// No description provided for @settingsSeatPremiumRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Inviting devices requires Premium'**
+  String get settingsSeatPremiumRequired;
+
+  /// No description provided for @settingsSeatCodeNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Code not found or expired'**
+  String get settingsSeatCodeNotFound;
+
+  /// No description provided for @settingsSeatDeviceLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Device limit reached for this account'**
+  String get settingsSeatDeviceLimit;
+
+  /// No description provided for @settingsSeatOwnCode.
+  ///
+  /// In en, this message translates to:
+  /// **'You can’t accept your own code — enter it on another device'**
+  String get settingsSeatOwnCode;
+
+  /// No description provided for @settingsSeatAcceptFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t accept the seat code'**
+  String get settingsSeatAcceptFailed;
 
   /// No description provided for @settingsRecoverAccess.
   ///

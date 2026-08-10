@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/support_contact.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../l10n/app_localizations.dart';
 import '../application/auth_provider.dart';
 
-/// Shown when AUTH_ANONYMOUS bootstrap fails (network / server).
+/// Shown when AUTH_ANONYMOUS bootstrap fails (network / server / VPN lockdown).
 class BootstrapFailedScreen extends ConsumerWidget {
   const BootstrapFailedScreen({super.key});
 
@@ -32,6 +33,11 @@ class BootstrapFailedScreen extends ConsumerWidget {
               FilledButton(
                 onPressed: () => ref.read(authProvider.notifier).retryBootstrap(),
                 child: Text(l.homeRetry),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton(
+                onPressed: () => context.go('/restore'),
+                child: Text(l.settingsRecoverAccess),
               ),
               const SizedBox(height: 12),
               TextButton(

@@ -6,7 +6,11 @@ import '../../../core/router.dart';
 import '../../../core/token_storage.dart';
 import '../data/auth_api.dart';
 import '../data/recovery_code_storage.dart';
+import '../data/seat_invite_local_store.dart';
+import '../data/seat_outcome.dart';
 import 'auth_state.dart';
+
+export '../data/seat_outcome.dart';
 
 /// AsyncNotifier<AuthState>: secure storage restore + device register.
 class AuthNotifier extends AsyncNotifier<AuthState> {
@@ -129,17 +133,31 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
     }
   }
 
-  Future<String?> makeSeatCode() async {
+  Future<SeatMakeOutcome> makeSeatCode() async {
     try {
       final result = await AuthApi().makeSeatCode();
-      return result.code;
+      final code = result.code.trim();
+      if (code.isEmpty) return const SeatMakeFailed();
+      await SeatInviteLocalStore.instance.rememberMinted(code);
+      return SeatMakeOk(code);
+    } on SeatApiException catch (e, st) {
+      debugPrint('auth.seat_make_failed: $e\n$st');
+      if (detailLooksLikePremiumRequired(e.detail, errorCode: e.errorCode)) {
+        return const SeatMakePremiumRequired();
+      }
+      return const SeatMakeFailed();
     } catch (e, st) {
       debugPrint('auth.seat_make_failed: $e\n$st');
-      return null;
+      return const SeatMakeFailed();
     }
   }
 
-  Future<bool> acceptSeatCode(String code) async {
+  Future<SeatAcceptOutcome> acceptSeatCode(String code) async {
+    // Local guard: works even if prod API is older than own_seat_code.
+    if (await SeatInviteLocalStore.instance.wasMintedHere(code)) {
+      debugPrint('auth.seat_accept_blocked: own code minted on this install');
+      return SeatAcceptOutcome.ownCode;
+    }
     try {
       final result = await AuthApi().acceptSeatCode(code: code);
       await TokenStorage.instance.saveTokens(
@@ -153,10 +171,28 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
           refreshToken: result.refreshToken,
         ),
       );
-      return true;
+      return SeatAcceptOutcome.ok;
+    } on SeatApiException catch (e, st) {
+      debugPrint('auth.seat_accept_failed: $e\n$st');
+      if (e.statusCode == 404) return SeatAcceptOutcome.notFound;
+      if (detailLooksLikePremiumRequired(e.detail, errorCode: e.errorCode)) {
+        return SeatAcceptOutcome.premiumRequired;
+      }
+      if (e.statusCode == 403 || detailLooksLikeDeviceLimit(e.detail)) {
+        return SeatAcceptOutcome.limit;
+      }
+      if (e.statusCode == 400 &&
+          detailLooksLikeOwnSeatCode(e.detail, errorCode: e.errorCode)) {
+        return SeatAcceptOutcome.ownCode;
+      }
+      // Older API may return plain 400 string — still treat as own when clear.
+      if (e.statusCode == 400 && detailLooksLikeOwnSeatCode(e.detail)) {
+        return SeatAcceptOutcome.ownCode;
+      }
+      return SeatAcceptOutcome.failed;
     } catch (e, st) {
       debugPrint('auth.seat_accept_failed: $e\n$st');
-      return false;
+      return SeatAcceptOutcome.failed;
     }
   }
 }

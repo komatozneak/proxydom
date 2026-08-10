@@ -46,15 +46,20 @@ abstract final class AppIcons {
   static const IconData question = PhosphorIconsRegular.question;
   static const IconData logout = PhosphorIconsRegular.signOut;
   static const IconData back = PhosphorIconsRegular.arrowLeft;
+  static const IconData backBold = PhosphorIconsBold.arrowLeft;
   static const IconData download = PhosphorIconsRegular.cloudArrowDown;
   static const IconData upload = PhosphorIconsRegular.cloudArrowUp;
   static const IconData globe = PhosphorIconsRegular.globe;
   static const IconData globeHemisphereWest =
       PhosphorIconsRegular.globeHemisphereWest;
+  static const IconData globeHemisphereEast =
+      PhosphorIconsRegular.globeHemisphereEast;
   static const IconData gauge = PhosphorIconsRegular.gauge;
   static const IconData phone = PhosphorIconsRegular.phone;
   static const IconData devices = PhosphorIconsRegular.devices;
   static const IconData crown = PhosphorIconsRegular.crown;
+  static const IconData creditCard = PhosphorIconsRegular.creditCard;
+  static const IconData mapPin = PhosphorIconsRegular.mapPin;
   static const IconData sliders = PhosphorIconsRegular.sliders;
   static const IconData moon = PhosphorIconsRegular.moon;
   static const IconData palette = PhosphorIconsRegular.palette;
@@ -89,4 +94,12 @@ abstract final class AppIcons {
   static const String siteClaudeAsset = 'assets/brand/sites/claude.png';
   static const IconData siteGemini = PhosphorIconsRegular.googleLogo;
   static const IconData siteCustom = PhosphorIconsRegular.globe;
+
+  // NoVPN Sites → «Основные» (VK uses launcher PNG, not these).
+  static const IconData osnovnyeRu = PhosphorIconsRegular.globeHemisphereEast;
+  static const IconData osnovnyeGov = PhosphorIconsRegular.buildings;
+  static const IconData osnovnyeTiktok = siteTiktok;
+  static const IconData osnovnyeYandex = PhosphorIconsRegular.magnifyingGlass;
+  static const IconData osnovnyeOzon = PhosphorIconsRegular.package;
+  static const IconData osnovnyeWb = PhosphorIconsRegular.shoppingBag;
 }

@@ -10,9 +10,16 @@
 -keep class android.net.VpnService { *; }
 -keep class com.teremok.connect.teremok_connect.** { *; }
 
-# libbox JNI (sing-box v1.13.14 via gomobile) — CLI binaries removed in v0.2.0
--keep class io.nekohasekai.libbox.** { *; }
+# libXray JNI (Xray-core via gomobile) — ADR 005
+-keep class libXray.** { *; }
 -keep class go.** { *; }
+
+# TrustTunnel native client — ADR 006
+-keep class com.adguard.trusttunnel.** { *; }
+-keep class ch.qos.** { *; }
+-keep class org.slf4j.** { *; }
+-keepattributes *Annotation*
+-dontwarn ch.qos.logback.core.net.*
 
 # JSON serialization annotations (для будущих моделей)
 -keepclassmembers class * {

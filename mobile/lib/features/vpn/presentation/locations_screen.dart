@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/busy/busy_overlay.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../l10n/app_localizations.dart';
@@ -40,6 +41,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     final l = AppL10n.of(context);
     final theme = Theme.of(context);
     final canPop = context.canPop();
+    final busy = ref.watch(busyOverlayProvider).isBusy;
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
@@ -48,7 +50,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
         leading: canPop
             ? IconButton(
                 icon: const AppIcon(AppIcons.back),
-                onPressed: () => context.pop(),
+                onPressed: busy ? null : () => context.pop(),
               )
             : null,
         automaticallyImplyLeading: false,
@@ -73,7 +75,6 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
   }
 
   Future<void> _load() async {
-    final sw = Stopwatch()..start();
     setState(() {
       _loading = true;
       _error = null;
@@ -105,7 +106,6 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     Object? lastError;
     for (var attempt = 0; attempt < 3; attempt++) {
       try {
-        final attemptSw = Stopwatch()..start();
         final result = await nodesRepo.listNodesDetailed(
           allowCacheFallback: true,
         );
@@ -165,21 +165,27 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     });
   }
 
-  Future<void> _pick(String id, String toastLabel) async {
+  Future<void> _pick(String id) async {
+    if (ref.read(busyOverlayProvider).isBusy) return;
+
+    // Already selected — just return Home without reconnect churn.
+    if (id == (_selectedId ?? kRegionAutoId)) {
+      context.go('/home');
+      return;
+    }
+
     final l = AppL10n.of(context);
-    final pickSw = Stopwatch()..start();
     try {
-      await ref.read(vpnProvider.notifier).selectNode(id);
+      await ref.read(busyOverlayProvider.notifier).run(
+            () => ref.read(vpnProvider.notifier).selectNode(id),
+            workingTitle: l.regionSwitchingTitle,
+            workingBody: l.regionSwitchingBody,
+            successTitle: l.regionSwitchedTitle,
+            failedTitle: l.regionSwitchFailedTitle,
+            successHold: const Duration(milliseconds: 350),
+          );
       if (!mounted) return;
       setState(() => _selectedId = id);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l.regionChanged(toastLabel))),
-      );
-      if (context.canPop()) {
-        context.pop();
-      } else {
-        context.go('/home');
-      }
     } catch (e) {
       if (!mounted) return;
       final msg = _isTransientNetwork(e)
@@ -231,13 +237,63 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     }
 
     // Product pool: only show reachable egress (hide Marzban offline workers).
-    final online = nodes.where((n) => n.isConnected || n.isDefault).toList()
-      ..sort((a, b) => a.host.compareTo(b.host));
+    final online = nodes.where((n) => n.isConnected || n.isDefault).toList();
+    final sections = groupNodesByLocationSection(online);
 
     var selectedId = _selectedId ?? kRegionAutoId;
     if (selectedId != kRegionAutoId &&
         !online.any((n) => n.id == selectedId)) {
       selectedId = kRegionAutoId;
+    }
+
+    final locale = Localizations.localeOf(context).languageCode;
+
+    Widget sectionHeader(String title) => Padding(
+          padding: const EdgeInsets.only(top: 12, bottom: 8),
+          child: Text(
+            title,
+            style: theme.textTheme.titleSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        );
+
+    List<Widget> sectionTiles(List<VpnNode> list) {
+      final out = <Widget>[];
+      for (var i = 0; i < list.length; i++) {
+        final node = list[i];
+        final place = placeForNode(node, index: i);
+        final selected = selectedId == node.id;
+        final city = place.displaySubtitle(locale).trim();
+        final subtitle = city.isEmpty
+            ? l.regionOnline
+            : '$city · ${l.regionOnline}';
+        out.add(
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: RegionTile(
+              selected: selected,
+              enabled: true,
+              leading: CircleAvatar(
+                backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                child: Text(
+                  place.flag,
+                  style: const TextStyle(fontSize: 22),
+                ),
+              ),
+              title: place.displayTitle(locale),
+              subtitle: subtitle,
+              trailingBadge: node.isYoutube || node.requiresPremium
+                  ? l.locationsPremiumLocked
+                  : l.regionFree,
+              showBadge: selected,
+              signalGood: true,
+              onTap: () => _pick(node.id),
+            ),
+          ),
+        );
+      }
+      return out;
     }
 
     return ListView(
@@ -273,46 +329,24 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
           subtitle: l.regionAutoSubtitle,
           trailingBadge: l.regionSelected,
           showBadge: selectedId == kRegionAutoId,
-          onTap: () => _pick(kRegionAutoId, l.regionAutoTitle),
+          onTap: () => _pick(kRegionAutoId),
         ),
-        const SizedBox(height: 12),
-        Text(
-          l.regionSectionServers,
-          style: theme.textTheme.titleSmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 8),
-        for (var i = 0; i < online.length; i++)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Builder(
-              builder: (_) {
-                final node = online[i];
-                final locale = Localizations.localeOf(context).languageCode;
-                final place = placeForNode(node, index: i);
-                final selected = selectedId == node.id;
-                final city = place.displaySubtitle(locale);
-                return RegionTile(
-                  selected: selected,
-                  enabled: true,
-                  leading: CircleAvatar(
-                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                    child: Text(
-                      place.flag,
-                      style: const TextStyle(fontSize: 22),
-                    ),
-                  ),
-                  title: place.displayTitle(locale),
-                  subtitle: '$city · ${l.regionOnline}',
-                  trailingBadge: l.regionFree,
-                  showBadge: selected,
-                  signalGood: true,
-                  onTap: () => _pick(node.id, place.displayTitle(locale)),
-                );
-              },
-            ),
-          ),
+        if (sections[LocationSection.premium]!.isNotEmpty) ...[
+          sectionHeader(l.regionSectionYoutube),
+          ...sectionTiles(sections[LocationSection.premium]!),
+        ],
+        if (sections[LocationSection.europe]!.isNotEmpty) ...[
+          sectionHeader(l.regionSectionEurope),
+          ...sectionTiles(sections[LocationSection.europe]!),
+        ],
+        if (sections[LocationSection.usa]!.isNotEmpty) ...[
+          sectionHeader(l.regionSectionUsa),
+          ...sectionTiles(sections[LocationSection.usa]!),
+        ],
+        if (sections[LocationSection.other]!.isNotEmpty) ...[
+          sectionHeader(l.regionSectionServers),
+          ...sectionTiles(sections[LocationSection.other]!),
+        ],
         if (online.isEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 8),

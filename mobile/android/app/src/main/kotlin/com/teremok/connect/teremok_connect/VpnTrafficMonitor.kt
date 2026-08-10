@@ -4,19 +4,15 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import io.nekohasekai.libbox.CommandClient
-import io.nekohasekai.libbox.CommandClientHandler
-import io.nekohasekai.libbox.CommandClientOptions
-import io.nekohasekai.libbox.Libbox
-import io.nekohasekai.libbox.StatusMessage
 
 /**
- * Subscribes to libbox [CommandClient] status stream for live uplink/downlink speeds.
+ * Traffic monitor stub (libbox CommandClient removed with ADR 005).
  *
- * [onSpeeds] receives raw bytes/s plus formatted strings for the shade notification.
+ * Emits zeros so Flutter EventChannel / shade notification stay alive without
+ * crashing. Real Xray/TT counters are a follow-up.
  */
 class VpnTrafficMonitor(
-    private val context: Context,
+    @Suppress("UNUSED_PARAMETER") private val context: Context,
     private val onSpeeds: (
         downlinkBps: Long,
         uplinkBps: Long,
@@ -26,8 +22,6 @@ class VpnTrafficMonitor(
 ) {
     companion object {
         private const val TAG = "VpnTrafficMonitor"
-        /** Status interval in nanoseconds (1 s). */
-        private const val STATUS_INTERVAL_NS = 1_000_000_000L
 
         fun formatSpeed(bytesPerSecond: Long): String {
             if (bytesPerSecond <= 0) return "0 B/s"
@@ -42,61 +36,18 @@ class VpnTrafficMonitor(
     }
 
     private val mainHandler = Handler(Looper.getMainLooper())
-    private var client: CommandClient? = null
-
-    private val handler = object : CommandClientHandler {
-        override fun clearLogs() {}
-
-        override fun connected() {
-            Log.i(TAG, "CommandClient connected")
-        }
-
-        override fun disconnected(message: String?) {
-            Log.w(TAG, "CommandClient disconnected: $message")
-        }
-
-        override fun initializeClashMode(p0: io.nekohasekai.libbox.StringIterator?, p1: String?) {}
-
-        override fun setDefaultLogLevel(level: Int) {}
-
-        override fun updateClashMode(mode: String?) {}
-
-        override fun writeConnectionEvents(p0: io.nekohasekai.libbox.ConnectionEvents?) {}
-
-        override fun writeGroups(p0: io.nekohasekai.libbox.OutboundGroupIterator?) {}
-
-        override fun writeLogs(p0: io.nekohasekai.libbox.LogIterator?) {}
-
-        override fun writeStatus(status: StatusMessage?) {
-            if (status == null || !status.trafficAvailable) return
-            val downBps = status.downlink
-            val upBps = status.uplink
-            val down = formatSpeed(downBps)
-            val up = formatSpeed(upBps)
-            mainHandler.post { onSpeeds(downBps, upBps, down, up) }
-        }
-    }
+    private var running = false
 
     fun start() {
         stop()
-        try {
-            val options = CommandClientOptions().apply {
-                setStatusInterval(STATUS_INTERVAL_NS)
-                addCommand(Libbox.CommandStatus)
-            }
-            val commandClient = Libbox.newCommandClient(handler, options)
-            commandClient.connect()
-            client = commandClient
-            Log.i(TAG, "traffic monitor started")
-        } catch (e: Exception) {
-            Log.e(TAG, "traffic monitor start failed", e)
+        running = true
+        Log.i(TAG, "traffic monitor stub started (zeros until Xray/TT counters)")
+        mainHandler.post {
+            if (running) onSpeeds(0L, 0L, formatSpeed(0), formatSpeed(0))
         }
     }
 
     fun stop() {
-        val active = client ?: return
-        client = null
-        runCatching { active.disconnect() }
-            .onFailure { Log.w(TAG, "disconnect: ${it.message}") }
+        running = false
     }
 }

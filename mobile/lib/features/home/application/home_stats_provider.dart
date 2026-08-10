@@ -9,23 +9,24 @@ final trafficStatsProvider = StreamProvider<VpnTrafficStats>((ref) {
   return VpnController.instance.trafficStream;
 });
 
-/// Path RTT (ms) from libbox `CommandClient.urlTest` via EventChannel.
+/// Ping EventChannel source — overridable in tests without a platform channel.
+final vpnPingStreamProvider = Provider<Stream<int?>>((ref) {
+  return VpnController.instance.pingStream;
+});
+
+/// Path RTT (ms) from native VPN ping monitor via EventChannel.
 ///
-/// Null while disconnected or until the first plausible sample arrives.
+/// Null while disconnected, until the first plausible sample, or after native
+/// clears a stale sample (consecutive probe failures → `delayMs: null`).
 /// Rejects are done natively (30–5000 ms). No Dart Socket/HTTP while TUN up.
-final homePingMsProvider = StreamProvider.autoDispose<int?>((ref) async* {
+///
+/// Important: do **not** `ref.read`/`ref.watch` after an `await` here — when
+/// [vpnProvider] flips, Riverpod rebuilds this provider and cancels the
+/// subscription. Reading mid-stream caused `!_didChangeDependency` (Nest desync).
+final homePingMsProvider = StreamProvider.autoDispose<int?>((ref) {
   final status = ref.watch(vpnProvider);
   if (status is! VpnConnected) {
-    yield null;
-    return;
+    return Stream<int?>.value(null);
   }
-
-  yield null;
-  await for (final ms in VpnController.instance.pingStream) {
-    if (ref.read(vpnProvider) is! VpnConnected) {
-      yield null;
-      return;
-    }
-    yield ms;
-  }
+  return ref.watch(vpnPingStreamProvider);
 });

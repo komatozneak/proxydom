@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api_secret_storage.dart';
-import '../../../core/config.dart';
 import '../../../core/router.dart';
 import '../../../core/token_storage.dart';
 import '../../home/application/vpn_provider.dart';

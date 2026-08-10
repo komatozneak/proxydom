@@ -1,21 +1,23 @@
 import 'dart:async';
+import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/diagnostics/agent_debug_log.dart';
+import '../../settings/data/split_tunnel_prefs.dart';
 import 'vpn_config.dart';
-import 'vpn_config_constructor.dart';
 import 'vpn_route_policy.dart';
-import 'vpn_rule_sets.dart';
 import 'vpn_service_config.dart';
 import 'vpn_session_inputs.dart';
 import 'vpn_session_meta.dart';
-import '../../settings/data/split_tunnel_prefs.dart';
-import '../../settings/data/vpn_route_mode.dart';
+import 'xray_config_builder.dart';
+import 'youtube_google_cidrs.dart';
 
-/// Контроллер VPN-сессии — мост между Flutter UI и Android VpnService.
+/// Bridge between Flutter UI and Android VpnService (Xray / TrustTunnel).
 ///
-/// Использует [MethodChannel] `teremok/vpn` для команд и [EventChannel]
-/// `teremok/vpn/status` для live-обновлений статуса от нативного кода.
+/// Uses [MethodChannel] `teremok/vpn` for commands and [EventChannel]
+/// `teremok/vpn/status` for live status updates from native code.
 class VpnController {
   VpnController._();
   static final VpnController instance = VpnController._();
@@ -25,75 +27,70 @@ class VpnController {
   static const _trafficEventChannel = EventChannel('teremok/vpn/traffic');
   static const _pingEventChannel = EventChannel('teremok/vpn/ping');
 
-  /// Таймаут на start (Шаг 16): 10 сек.
-  static const Duration startTimeout = Duration(seconds: 10);
+  /// Xray start can take longer than sing-box (asset load + Reality handshake).
+  static const Duration startTimeout = Duration(seconds: 45);
 
-  /// Таймаут на stop (Шаг 16): 5 сек.
   static const Duration stopTimeout = Duration(seconds: 5);
 
   Stream<VpnNativeStatus>? _statusStream;
   Stream<VpnTrafficStats>? _trafficStream;
   Stream<int?>? _pingStream;
 
-  /// Подключиться к VPN с переданным конфигом.
-  ///
-  /// Преобразует [VpnConfig] в [VpnServiceConfig] (с дефолтами для dev)
-  /// и передаёт как JSON-строку в нативный код через MethodChannel.
-  ///
-  /// [displayLabel] — явная подпись региона/ноды (например после Авто-пика).
+  /// Start Xray VPN with [VpnConfig.xrayProfile] candidates (sequential failover).
   Future<bool> start(VpnConfig config, {String? displayLabel}) async {
     try {
-      final outbound = config.singBoxConfig.primaryOutbound;
-      if (outbound == null) {
-        throw VpnControllerException('sing-box config has no outbounds');
+      if (config.xrayProfile.candidates.isEmpty) {
+        throw VpnControllerException('xray_profile has no candidates');
       }
 
       final serviceConfig = VpnServiceConfig.fromVpnConfig(
         config,
         displayLabel: displayLabel,
       );
-      // Bundled .srs — never download from GitHub at connect time (RF blocks).
-      Map<String, String> localRules = const {};
-      var ruRulesLoaded = false;
-      final routeMode = await VpnRouteModePrefs.getMode();
-      final wantBundledRu =
-          routeMode == VpnRouteMode.smart && kSmartRuSplitEnabled;
+      // Always smart-style directs (Modes UI removed). Gated by prefs toggles.
+      final bundledRu =
+          kSmartRuSplitEnabled && await SplitTunnelPrefs.isBundledRuEnabled();
+      final govRu =
+          kSmartRuSplitEnabled && await SplitTunnelPrefs.isGovRuEnabled();
       final siteSuffixes = await SplitTunnelPrefs.enabledDomainSuffixes();
-      final siteProxyCidrs = await SplitTunnelPrefs.enabledProxyIpCidrs();
+      final siteCidrs = await SplitTunnelPrefs.enabledProxyIpCidrs();
+      final disallowedApps =
+          (await SplitTunnelPrefs.loadDisallowedPackages()).toList()..sort();
+      var ytCidrs = const <String>[];
       try {
-        if (wantBundledRu || kAdsBlockEnabled) {
-          localRules = await prepareLocalRuleSetPaths();
-          ruRulesLoaded = kRuDomainRuleSetTags.every(localRules.containsKey);
-        }
+        ytCidrs = await loadYoutubeGoogleCidrs();
       } catch (e) {
-        // Unit tests lack path_provider; connect still works without RU/ads split.
         // ignore: avoid_print
-        print('[VPN] local rule-sets skipped: $e');
+        print('[VPN] youtube-google.cidr skipped: $e');
       }
+
       await VpnSessionMeta.saveConnectMeta(
-        ruRulesLoaded: ruRulesLoaded,
-        ruRuleTags: localRules.keys
-            .where((t) => kRuDomainRuleSetTags.contains(t))
-            .toList(),
+        ruRulesLoaded: bundledRu,
+        ruRuleTags: const [],
         expectedEgressHost: config.expectedEgressHost,
       );
+
       final inputs = VpnSessionInputs.fromVpnConfig(
         config: config,
         service: serviceConfig,
         route: RoutePolicy(
-          mode: routeMode,
-          includeAdsBlock: kAdsBlockEnabled,
+          includeAdsBlock: kXrayAdsBlockEnabled,
+          includeOgonAdsAll: kXrayOgonAdsAllEnabled,
           includeGeoipRu: kGeoipRuEnabled,
-          includeBundledRuRuleSets: wantBundledRu,
-          proxyDomainSuffixes:
-              routeMode == VpnRouteMode.sites ? siteSuffixes : const [],
-          proxyIpCidrs:
-              routeMode == VpnRouteMode.sites ? siteProxyCidrs : const [],
-          localRulePaths: localRules,
+          includeBundledRuRuleSets: bundledRu,
+          includeGovRuRuleSets: govRu,
+          useHevTunBridge: kUseHevTunBridge,
+          adsBlockDomains: kXrayAdsBlockDomains,
+          proxyIpCidrs: ytCidrs,
+          directDomainSuffixes: siteSuffixes,
+          directIpCidrs: siteCidrs,
         ),
       );
-      final singBoxConfigJson = VpnConfigConstructor.build(inputs);
-      final paramsJson = serviceConfig.toJsonStringWithSingBox(singBoxConfigJson);
+      final candidates = XrayConfigBuilder.buildCandidateConfigs(inputs);
+      final paramsJson = serviceConfig.toJsonStringWithXrayCandidates(
+        candidates,
+        disallowedApplications: disallowedApps,
+      );
 
       final result = await _methodChannel
           .invokeMethod<bool>('start', {'paramsJson': paramsJson})
@@ -116,7 +113,69 @@ class VpnController {
     }
   }
 
-  /// Отключиться от VPN.
+  /// Start TrustTunnel core (ADR 006 dual-core).
+  Future<bool> startTrustTunnel(
+    TrustTunnelProfile profile, {
+    String? displayLabel,
+  }) async {
+    try {
+      final disallowedApps =
+          (await SplitTunnelPrefs.loadDisallowedPackages()).toList()..sort();
+      final paramsJson = jsonEncode({
+        'schemaVersion': 2,
+        'vpnCore': 'trusttunnel',
+        'sessionName': kVpnBrandSessionName,
+        'displayLabel': (displayLabel?.trim().isNotEmpty == true)
+            ? displayLabel!.trim()
+            : 'TrustTunnel · ${profile.hostname}',
+        'outboundType': 'trusttunnel',
+        'trusttunnelToml': profile.toml,
+        'trusttunnelHost': profile.hostname,
+        'trusttunnelNodeId': profile.nodeId,
+        'controlPlaneHosts': VpnServiceConfig.controlPlaneHostsOf(),
+        if (disallowedApps.isNotEmpty)
+          'disallowedApplications': disallowedApps,
+      });
+
+      await agentDebugLog(
+        hypothesisId: 'TT1',
+        location: 'vpn_controller.dart:startTrustTunnel',
+        message: 'tt start enqueued',
+        runId: 'trusttunnel',
+        data: {
+          'nodeId': profile.nodeId,
+          'host': profile.hostname,
+          'upstream': profile.upstreamProtocol,
+          'fallback': profile.upstreamFallbackProtocol,
+          'antiDpi': profile.antiDpi,
+          'dnsUpstreams': profile.dnsUpstreams.length,
+          'tomlLen': profile.toml.length,
+        },
+      );
+
+      final result = await _methodChannel
+          .invokeMethod<bool>('start', {'paramsJson': paramsJson})
+          .timeout(
+            startTimeout,
+            onTimeout: () {
+              throw VpnControllerException(
+                'start timeout after ${startTimeout.inSeconds}s',
+              );
+            },
+          );
+      if (result == true) {
+        await SplitTunnelPrefs.markApplied();
+      }
+      return result ?? false;
+    } on TimeoutException catch (e) {
+      throw VpnControllerException('trusttunnel start timeout: $e');
+    } on PlatformException catch (e) {
+      throw VpnControllerException(
+        'trusttunnel start failed: ${e.code} ${e.message}',
+      );
+    }
+  }
+
   Future<bool> stop() async {
     try {
       final result = await _methodChannel
@@ -137,7 +196,6 @@ class VpnController {
     }
   }
 
-  /// Текущий статус (синхронный запрос к нативному коду).
   Future<VpnNativeStatus> getStatus() async {
     try {
       final result = await _methodChannel.invokeMethod<String>('getStatus');
@@ -150,7 +208,6 @@ class VpnController {
     }
   }
 
-  /// Native session flag (`active=true`) — set on connect, cleared on intentional stop.
   Future<bool> hasActiveSession() async {
     try {
       final result = await _methodChannel.invokeMethod<bool>('hasActiveSession');
@@ -162,7 +219,6 @@ class VpnController {
     }
   }
 
-  /// Последнее сообщение об ошибке от libbox/VpnService (если status == error).
   Future<String?> getLastError() async {
     try {
       return await _methodChannel.invokeMethod<String>('getLastError');
@@ -171,8 +227,8 @@ class VpnController {
     }
   }
 
-  /// Last N lines of sing-box stderr log (Android libbox working dir).
-  Future<String?> getSingBoxStderrTail({int maxLines = 30}) async {
+  /// Last N lines of VPN core stderr (Xray / legacy sing-box working dir).
+  Future<String?> getVpnCoreStderrTail({int maxLines = 30}) async {
     try {
       return await _methodChannel.invokeMethod<String>(
         'getSingBoxStderrTail',
@@ -185,7 +241,10 @@ class VpnController {
     }
   }
 
-  /// Underlying cellular/Wi‑Fi interface name while VPN is up (Android).
+  /// Compat alias for diagnostics / older call sites.
+  Future<String?> getSingBoxStderrTail({int maxLines = 30}) =>
+      getVpnCoreStderrTail(maxLines: maxLines);
+
   Future<String?> getUnderlyingNetworkInterface() async {
     try {
       return await _methodChannel.invokeMethod<String>(
@@ -198,22 +257,14 @@ class VpnController {
     }
   }
 
-  /// Android Always-on "Block connections without VPN" preference.
-  ///
-  /// Reflects the system lockdown **setting**, not whether the tunnel is up.
-  /// Prefer [queryLockdownState] when OFF vs query-failure must be distinct.
   Future<bool> isLockdownEnabled() async {
     return (await queryLockdownState()) == VpnLockdownState.enabled;
   }
 
-  /// Observed Android lockdown preference: enabled / disabled / unavailable.
-  ///
-  /// Native returns a map `{lockdown, alwaysOn, …}` (or legacy bool). Lockdown
-  /// true → [VpnLockdownState.enabled]; always-on without lockdown →
-  /// [VpnLockdownState.alwaysOnOnly]; Secure unreadable → unavailable.
   Future<VpnLockdownState> queryLockdownState() async {
     try {
-      final raw = await _methodChannel.invokeMethod<dynamic>('isLockdownEnabled');
+      final raw =
+          await _methodChannel.invokeMethod<dynamic>('isLockdownEnabled');
       return _mapLockdownNative(raw);
     } on PlatformException {
       return VpnLockdownState.unavailable;
@@ -241,8 +292,6 @@ class VpnController {
     return VpnLockdownState.unavailable;
   }
 
-  /// Opens system VPN settings (`Settings.ACTION_VPN_SETTINGS`). Returns false
-  /// if the OEM has no matching activity or the launch fails.
   Future<bool> openVpnSettings() async {
     try {
       final result =
@@ -255,11 +304,23 @@ class VpnController {
     }
   }
 
-  /// Android 13+: ask for POST_NOTIFICATIONS so VPN shade card is visible.
+  /// Detect Always-on VPN held by another app (Android only).
+  Future<VpnConflictInfo> queryVpnConflict() async {
+    try {
+      final raw =
+          await _methodChannel.invokeMethod<dynamic>('getVpnConflict');
+      return VpnConflictInfo.fromNative(raw);
+    } on PlatformException {
+      return VpnConflictInfo.none;
+    } on MissingPluginException {
+      return VpnConflictInfo.none;
+    }
+  }
+
   Future<bool> requestNotificationPermission() async {
     try {
-      final result =
-          await _methodChannel.invokeMethod<bool>('requestNotificationPermission');
+      final result = await _methodChannel
+          .invokeMethod<bool>('requestNotificationPermission');
       return result ?? true;
     } on PlatformException {
       return false;
@@ -268,7 +329,6 @@ class VpnController {
     }
   }
 
-  /// Live-обновления статуса от нативного кода через EventChannel.
   Stream<VpnNativeStatus> get statusStream {
     _statusStream ??= _eventChannel
         .receiveBroadcastStream()
@@ -282,14 +342,11 @@ class VpnController {
           return VpnNativeStatus.unknown;
         })
         .handleError((_) {
-          // Если EventChannel не зарегистрирован (debug без сервиса) —
-          // тихо проглатываем ошибку, статус можно узнать через getStatus().
           return VpnNativeStatus.unknown;
         });
     return _statusStream!;
   }
 
-  /// Live ↓/↑ from Android libbox (~1 Hz). Empty/zeros when disconnected or iOS.
   Stream<VpnTrafficStats> get trafficStream {
     _trafficStream ??= _trafficEventChannel
         .receiveBroadcastStream()
@@ -308,32 +365,14 @@ class VpnController {
     return _trafficStream!;
   }
 
-  /// Live path RTT (ms) from libbox urlTest. Nulls filtered; invalid samples
-  /// never leave the native monitor.
   Stream<int?> get pingStream {
     _pingStream ??= _pingEventChannel
         .receiveBroadcastStream()
-        .map((event) {
-          int? parsed;
-          if (event is Map) {
-            final ms = event['delayMs'];
-            if (ms is num) {
-              final v = ms.toInt();
-              if (v >= 30 && v <= 5000) parsed = v;
-            }
-          } else if (event is num) {
-            final v = event.toInt();
-            if (v >= 30 && v <= 5000) parsed = v;
-          }
-          return parsed;
-        })
+        .map(parsePingEventMs)
         .handleError((_) => null);
     return _pingStream!;
   }
 
-  /// Проверить/запросить VPN permission. На Android покажет системный диалог.
-  ///
-  /// Возвращает true если permission уже есть (или был только что выдан).
   Future<bool> requestPermission() async {
     try {
       final result =
@@ -345,23 +384,35 @@ class VpnController {
   }
 }
 
-/// Статусы, возвращаемые нативным кодом через EventChannel `teremok/vpn/status`.
-/// Observed Android "Block connections without VPN" (Always-on lockdown).
+/// Parses EventChannel `teremok/vpn/ping` payloads.
 ///
-/// [unavailable] means the platform query failed — never treat as [disabled].
+/// Explicit `delayMs: null` clears a stale RTT (native consecutive probe fail).
+@visibleForTesting
+int? parsePingEventMs(dynamic event) {
+  if (event is Map) {
+    if (!event.containsKey('delayMs')) return null;
+    final ms = event['delayMs'];
+    if (ms == null) return null;
+    if (ms is num) {
+      final v = ms.toInt();
+      if (v >= 30 && v <= 5000) return v;
+    }
+    return null;
+  }
+  if (event is num) {
+    final v = event.toInt();
+    if (v >= 30 && v <= 5000) return v;
+  }
+  return null;
+}
+
 enum VpnLockdownState {
-  /// "Block connections without VPN" is on.
   enabled,
-
-  /// Always-on VPN for Teremok without the block-without-VPN toggle.
   alwaysOnOnly,
-
   disabled,
   unavailable,
 }
 
-/// Имена совпадают со строковыми значениями в [VpnStatusBroadcaster] на Kotlin
-/// (см. TeremokVpnService.kt).
 enum VpnNativeStatus {
   unknown,
   idle,
@@ -373,7 +424,6 @@ enum VpnNativeStatus {
   error,
 }
 
-/// Live traffic rates from Android libbox (bytes per second).
 final class VpnTrafficStats {
   const VpnTrafficStats({
     required this.downlinkBps,
@@ -387,7 +437,6 @@ final class VpnTrafficStats {
   final int downlinkBps;
   final int uplinkBps;
 
-  /// Compact tile label (matches shade units: B/s · KiB/s · MiB/s).
   static String formatSpeed(int bytesPerSecond) {
     if (bytesPerSecond <= 0) return '0 B/s';
     const kib = 1024.0;
@@ -409,3 +458,48 @@ class VpnControllerException implements Exception {
   @override
   String toString() => 'VpnControllerException: $message';
 }
+
+/// Snapshot from Android `getVpnConflict` (foreign Always-on holder).
+final class VpnConflictInfo {
+  const VpnConflictInfo({
+    required this.foreignAlwaysOn,
+    this.packageName,
+    this.appLabel,
+    this.lockdown,
+  });
+
+  static const none = VpnConflictInfo(foreignAlwaysOn: false);
+
+  final bool foreignAlwaysOn;
+  final String? packageName;
+  final String? appLabel;
+  final bool? lockdown;
+
+  /// Prefer resolved label; fall back to package name.
+  String get displayName {
+    final label = appLabel?.trim();
+    if (label != null && label.isNotEmpty) return label;
+    final pkg = packageName?.trim();
+    if (pkg != null && pkg.isNotEmpty) return pkg;
+    return 'VPN';
+  }
+
+  factory VpnConflictInfo.fromNative(dynamic raw) {
+    if (raw is! Map) return VpnConflictInfo.none;
+    final map = Map<Object?, Object?>.from(raw);
+    final foreign = map['foreignAlwaysOn'] == true;
+    final lockdownRaw = map['lockdown'];
+    final lockdown = lockdownRaw is bool ? lockdownRaw : null;
+    // Android 12+ may hide always_on_vpn_app while lockdown=1 is still visible.
+    // Treat lockdown-without-readable-pkg as a blocking conflict for UX.
+    final blocking = foreign || lockdown == true;
+    if (!blocking) return VpnConflictInfo.none;
+    return VpnConflictInfo(
+      foreignAlwaysOn: true,
+      packageName: map['packageName']?.toString(),
+      appLabel: map['appLabel']?.toString(),
+      lockdown: lockdown,
+    );
+  }
+}
+

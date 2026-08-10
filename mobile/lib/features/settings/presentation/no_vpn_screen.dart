@@ -1,0 +1,665 @@
+import 'dart:typed_data';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../core/theme.dart';
+import '../../../core/widgets/app_icon.dart';
+import '../../../l10n/app_localizations.dart';
+import '../../home/application/vpn_provider.dart';
+import '../../home/application/vpn_status.dart';
+import '../data/installed_apps_channel.dart';
+import '../data/split_tunnel_prefs.dart';
+
+/// Огонь IA: Приложения (default) | Сайты, under «Что работает без VPN?».
+class NoVpnScreen extends ConsumerStatefulWidget {
+  const NoVpnScreen({super.key});
+
+  @override
+  ConsumerState<NoVpnScreen> createState() => _NoVpnScreenState();
+}
+
+class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabs;
+  final _search = TextEditingController();
+  String _query = '';
+
+  bool _loading = true;
+  bool _pending = false;
+  bool _reconnecting = false;
+  bool _osnovnyeExpanded = true;
+
+  Map<String, bool> _osnovnye = {
+    for (final c in kOsnovnyeCategories) c.id: c.defaultEnabled,
+  };
+  List<SplitTunnelSite> _sites = const [];
+  List<LauncherAppInfo> _apps = const [];
+  Set<String> _disallowed = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _tabs = TabController(length: 2, vsync: this);
+    _search.addListener(() {
+      setState(() => _query = _search.text.trim().toLowerCase());
+    });
+    _reload();
+  }
+
+  @override
+  void dispose() {
+    _tabs.dispose();
+    _search.dispose();
+    super.dispose();
+  }
+
+  Future<void> _reload() async {
+    await SplitTunnelPrefs.purgePresetSites();
+    final cats = await SplitTunnelPrefs.loadOsnovnyeEnabled();
+    final sites = await SplitTunnelPrefs.loadSites();
+    final pending = await SplitTunnelPrefs.hasPendingChanges();
+    final disallowed = await SplitTunnelPrefs.loadDisallowedPackages();
+    final apps = await InstalledAppsChannel.listLauncherApps();
+    if (!mounted) return;
+    setState(() {
+      _osnovnye = cats;
+      _sites = sites.where((s) => !s.isPreset).toList();
+      _pending = pending;
+      _disallowed = disallowed;
+      _apps = apps;
+      _loading = false;
+    });
+  }
+
+  Future<void> _afterMutation() async {
+    final vpn = ref.read(vpnProvider);
+    final pending = vpn is VpnConnected || vpn is VpnConnecting
+        ? await SplitTunnelPrefs.hasPendingChanges()
+        : false;
+    final cats = await SplitTunnelPrefs.loadOsnovnyeEnabled();
+    final sites = await SplitTunnelPrefs.loadSites();
+    final disallowed = await SplitTunnelPrefs.loadDisallowedPackages();
+    if (!mounted) return;
+    setState(() {
+      _osnovnye = cats;
+      _sites = sites.where((s) => !s.isPreset).toList();
+      _disallowed = disallowed;
+      _pending = pending;
+    });
+  }
+
+  Future<void> _reconnect() async {
+    setState(() => _reconnecting = true);
+    final l = AppL10n.of(context);
+    try {
+      final ok = await ref.read(vpnProvider.notifier).reconnectToApplyRouting();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(ok ? l.splitTunnelApplied : l.splitTunnelApplyFailed),
+        ),
+      );
+      await _afterMutation();
+    } finally {
+      if (mounted) setState(() => _reconnecting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppL10n.of(context);
+    final theme = Theme.of(context);
+    final lang = Localizations.localeOf(context).languageCode;
+    final appsLabel = lang == 'en' ? 'Apps' : 'Приложения';
+    final sitesLabel = lang == 'en' ? 'Sites' : 'Сайты';
+    final osnovnyeLabel = lang == 'en' ? 'Main' : 'Основные';
+    final createListLabel =
+        lang == 'en' ? 'Create a new list' : 'Создать новый список';
+    final appsSection = lang == 'en' ? 'Apps' : 'Приложения';
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(l.settingsNoVpn),
+        leading: IconButton(
+          icon: const AppIcon(AppIcons.back),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/settings');
+            }
+          },
+        ),
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  child: TextField(
+                    controller: _search,
+                    decoration: InputDecoration(
+                      hintText: lang == 'en' ? 'Search' : 'Поиск',
+                      prefixIcon: const AppIcon(AppIcons.search),
+                      border: OutlineInputBorder(
+                        borderRadius:
+                            BorderRadius.circular(AppBrand.radiusPill),
+                      ),
+                      isDense: true,
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerHighest,
+                      borderRadius:
+                          BorderRadius.circular(AppBrand.radiusNavPill),
+                    ),
+                    child: TabBar(
+                      controller: _tabs,
+                      dividerColor: Colors.transparent,
+                      indicatorSize: TabBarIndicatorSize.tab,
+                      indicator: BoxDecoration(
+                        color: theme.colorScheme.surface,
+                        borderRadius:
+                            BorderRadius.circular(AppBrand.radiusNavPill),
+                        border: Border.all(color: AppBrand.primary),
+                      ),
+                      labelColor: AppBrand.primary,
+                      unselectedLabelColor:
+                          theme.colorScheme.onSurfaceVariant,
+                      tabs: [
+                        Tab(text: appsLabel),
+                        Tab(text: sitesLabel),
+                      ],
+                    ),
+                  ),
+                ),
+                if (_pending)
+                  Material(
+                    color: theme.colorScheme.tertiaryContainer,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              l.splitTunnelPendingBody,
+                              style: theme.textTheme.bodySmall,
+                            ),
+                          ),
+                          FilledButton(
+                            onPressed: _reconnecting ? null : _reconnect,
+                            child: Text(
+                              _reconnecting
+                                  ? l.splitTunnelReconnectInProgress
+                                  : l.splitTunnelReconnect,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabs,
+                    children: [
+                      _AppsTab(
+                        apps: _filteredApps,
+                        disallowed: _disallowed,
+                        sectionLabel: appsSection,
+                        onToggle: (pkg, bypass) async {
+                          await SplitTunnelPrefs.setDisallowedPackage(
+                            pkg,
+                            bypass,
+                          );
+                          await _afterMutation();
+                        },
+                      ),
+                      _SitesTab(
+                        osnovnye: _osnovnye,
+                        osnovnyeExpanded: _osnovnyeExpanded,
+                        osnovnyeLabel: osnovnyeLabel,
+                        createListLabel: createListLabel,
+                        sites: _filteredSites,
+                        lang: lang,
+                        iconsByPackage: {
+                          for (final a in _apps)
+                            if (a.iconPng != null && a.iconPng!.isNotEmpty)
+                              a.packageName: a.iconPng!,
+                        },
+                        onToggleOsnovnye: (id, v) async {
+                          await SplitTunnelPrefs.setOsnovnyeEnabled(id, v);
+                          await _afterMutation();
+                        },
+                        onExpandOsnovnye: () {
+                          setState(
+                            () => _osnovnyeExpanded = !_osnovnyeExpanded,
+                          );
+                        },
+                        onToggleSite: (site, enabled) async {
+                          await SplitTunnelPrefs.updateSite(
+                            site.copyWith(enabled: enabled),
+                          );
+                          await _afterMutation();
+                        },
+                        onDeleteSite: _deleteSite,
+                        onAddSite: _showAddSite,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+
+  List<LauncherAppInfo> get _filteredApps {
+    if (_query.isEmpty) return _apps;
+    return _apps
+        .where(
+          (a) =>
+              a.label.toLowerCase().contains(_query) ||
+              a.packageName.toLowerCase().contains(_query),
+        )
+        .toList();
+  }
+
+  List<SplitTunnelSite> get _filteredSites {
+    if (_query.isEmpty) return _sites;
+    return _sites
+        .where(
+          (s) =>
+              s.domain.contains(_query) ||
+              s.label.toLowerCase().contains(_query),
+        )
+        .toList();
+  }
+
+  Future<void> _deleteSite(SplitTunnelSite site) async {
+    final l = AppL10n.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      useRootNavigator: true,
+      builder: (ctx) => AlertDialog(
+        title: Text(l.splitTunnelDelete),
+        content: Text(l.splitTunnelDeleteConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(l.splitTunnelCancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(l.splitTunnelDelete),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    await SplitTunnelPrefs.deleteSite(site.id);
+    await _afterMutation();
+  }
+
+  Future<void> _showAddSite() async {
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      useRootNavigator: true,
+      builder: (ctx) => const _AddSiteSheet(),
+    );
+    if (!mounted) return;
+    if (saved == true) await _afterMutation();
+  }
+}
+
+class _AppsTab extends StatelessWidget {
+  const _AppsTab({
+    required this.apps,
+    required this.disallowed,
+    required this.sectionLabel,
+    required this.onToggle,
+  });
+
+  final List<LauncherAppInfo> apps;
+  final Set<String> disallowed;
+  final String sectionLabel;
+  final Future<void> Function(String packageName, bool bypass) onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final enabled = apps.where((a) => disallowed.contains(a.packageName)).length;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      children: [
+        Row(
+          children: [
+            Text('• $sectionLabel', style: theme.textTheme.titleSmall),
+            const Spacer(),
+            Text(
+              '$enabled / ${apps.length}',
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (apps.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 24),
+            child: Text(
+              Localizations.localeOf(context).languageCode == 'en'
+                  ? 'No apps found on this device.'
+                  : 'На устройстве не найдено приложений.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          )
+        else
+          for (final app in apps)
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              secondary: _AppIconAvatar(
+                iconPng: app.iconPng,
+                fallbackLetter:
+                    app.label.isNotEmpty ? app.label[0].toUpperCase() : '?',
+              ),
+              title: Text(app.label),
+              value: disallowed.contains(app.packageName),
+              onChanged: (v) => onToggle(app.packageName, v),
+            ),
+      ],
+    );
+  }
+}
+
+class _AppIconAvatar extends StatelessWidget {
+  const _AppIconAvatar({
+    this.iconPng,
+    this.iconData,
+    required this.fallbackLetter,
+    this.badgeFallback,
+  });
+
+  final Uint8List? iconPng;
+  final IconData? iconData;
+  final String fallbackLetter;
+  final String? badgeFallback;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final bytes = iconPng;
+    if (bytes != null && bytes.isNotEmpty) {
+      return ClipOval(
+        child: Image.memory(
+          bytes,
+          width: 40,
+          height: 40,
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          errorBuilder: (_, __, ___) => _glyphOrLetter(theme),
+        ),
+      );
+    }
+    return _glyphOrLetter(theme);
+  }
+
+  Widget _glyphOrLetter(ThemeData theme) {
+    final glyph = iconData;
+    if (glyph != null) {
+      return CircleAvatar(
+        backgroundColor: theme.colorScheme.surfaceContainerHighest,
+        child: AppIcon(glyph, size: 22),
+      );
+    }
+    final text = badgeFallback ?? fallbackLetter;
+    return CircleAvatar(
+      backgroundColor: theme.colorScheme.surfaceContainerHighest,
+      child: Text(
+        text,
+        style: theme.textTheme.labelSmall?.copyWith(
+          fontWeight: FontWeight.w800,
+          fontSize: badgeFallback != null ? 10 : null,
+        ),
+      ),
+    );
+  }
+}
+
+class _SitesTab extends StatelessWidget {
+  const _SitesTab({
+    required this.osnovnye,
+    required this.osnovnyeExpanded,
+    required this.osnovnyeLabel,
+    required this.createListLabel,
+    required this.sites,
+    required this.lang,
+    required this.iconsByPackage,
+    required this.onToggleOsnovnye,
+    required this.onExpandOsnovnye,
+    required this.onToggleSite,
+    required this.onDeleteSite,
+    required this.onAddSite,
+  });
+
+  final Map<String, bool> osnovnye;
+  final bool osnovnyeExpanded;
+  final String osnovnyeLabel;
+  final String createListLabel;
+  final List<SplitTunnelSite> sites;
+  final String lang;
+  final Map<String, Uint8List> iconsByPackage;
+  final Future<void> Function(String id, bool value) onToggleOsnovnye;
+  final VoidCallback onExpandOsnovnye;
+  final Future<void> Function(SplitTunnelSite site, bool enabled) onToggleSite;
+  final Future<void> Function(SplitTunnelSite site) onDeleteSite;
+  final VoidCallback onAddSite;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final l = AppL10n.of(context);
+    final enabledCount =
+        osnovnye.values.where((v) => v).length;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      children: [
+        InkWell(
+          onTap: onExpandOsnovnye,
+          child: Row(
+            children: [
+              Text('• $osnovnyeLabel', style: theme.textTheme.titleSmall),
+              const Spacer(),
+              Text(
+                '$enabledCount / ${kOsnovnyeCategories.length}',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              Icon(
+                osnovnyeExpanded
+                    ? Icons.expand_less
+                    : Icons.expand_more,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
+        if (osnovnyeExpanded) ...[
+          const SizedBox(height: 4),
+          for (final cat in kOsnovnyeCategories)
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              secondary: _AppIconAvatar(
+                iconPng: iconForOsnovnyeCategory(cat.id, iconsByPackage),
+                iconData: osnovnyeCategoryIcon(cat.id),
+                fallbackLetter: cat.badge.isNotEmpty ? cat.badge[0] : '?',
+                badgeFallback: cat.badge,
+              ),
+              title: Text(cat.label(lang)),
+              value: osnovnye[cat.id] ?? cat.defaultEnabled,
+              onChanged: (v) => onToggleOsnovnye(cat.id, v),
+            ),
+        ],
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Text(
+              '• ${l.splitTunnelCustomSection}',
+              style: theme.textTheme.titleSmall,
+            ),
+            const Spacer(),
+            Text(
+              '${sites.where((s) => s.enabled).length} / ${sites.length}',
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        if (sites.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Text(
+              l.splitTunnelEmptyBody,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          )
+        else
+          for (final site in sites)
+            Dismissible(
+              key: ValueKey(site.id),
+              direction: DismissDirection.endToStart,
+              onDismissed: (_) => onDeleteSite(site),
+              background: Container(
+                alignment: Alignment.centerRight,
+                padding: const EdgeInsets.only(right: 16),
+                color: theme.colorScheme.errorContainer,
+                child: Text(l.splitTunnelDelete),
+              ),
+              child: SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                title: Text(
+                  site.label.isNotEmpty ? site.label : site.domain,
+                ),
+                subtitle: site.label.isNotEmpty ? Text(site.domain) : null,
+                value: site.enabled,
+                onChanged: (v) => onToggleSite(site, v),
+              ),
+            ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: onAddSite,
+          icon: const AppIcon(AppIcons.plus),
+          label: Text(createListLabel),
+        ),
+      ],
+    );
+  }
+}
+
+class _AddSiteSheet extends StatefulWidget {
+  const _AddSiteSheet();
+
+  @override
+  State<_AddSiteSheet> createState() => _AddSiteSheetState();
+}
+
+class _AddSiteSheetState extends State<_AddSiteSheet> {
+  final _domain = TextEditingController();
+  final _label = TextEditingController();
+  String? _error;
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _domain.dispose();
+    _label.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final l = AppL10n.of(context);
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    final result = await SplitTunnelPrefs.addSite(
+      domain: _domain.text,
+      label: _label.text,
+    );
+    if (!mounted) return;
+    if (result is DomainNormalizeOk) {
+      Navigator.pop(context, true);
+      return;
+    }
+    final err = result as DomainNormalizeErr;
+    setState(() {
+      _saving = false;
+      _error = switch (err.kind) {
+        DomainNormalizeErrorKind.duplicate => l.splitTunnelDuplicateDomain,
+        DomainNormalizeErrorKind.nonAscii => l.splitTunnelNonAsciiUnsupported,
+        _ => l.splitTunnelInvalidDomain,
+      };
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppL10n.of(context);
+    final bottom = MediaQuery.viewInsetsOf(context).bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 8, 20, 20 + bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(l.splitTunnelAddSite, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _label,
+            decoration: InputDecoration(
+              labelText: l.splitTunnelSiteNameOptional,
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _domain,
+            autofocus: true,
+            decoration: InputDecoration(
+              labelText: l.splitTunnelDomainLabel,
+              hintText: l.splitTunnelDomainHint,
+              helperText: l.splitTunnelDomainLatinHelper,
+              errorText: _error,
+            ),
+            onSubmitted: (_) => _save(),
+          ),
+          const SizedBox(height: 16),
+          FilledButton(
+            onPressed: _saving ? null : _save,
+            child: Text(l.splitTunnelSave),
+          ),
+        ],
+      ),
+    );
+  }
+}

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../features/auth/application/auth_provider.dart'
     show authProvider, GoRouterRefreshNotifier;
 import '../features/auth/application/auth_state.dart';
+import '../features/auth/data/recovery_code_storage.dart';
 import '../features/auth/presentation/bootstrap_failed_screen.dart';
 import '../features/auth/presentation/login_screen.dart';
 import '../features/auth/presentation/recovery_code_screen.dart';
@@ -19,8 +20,9 @@ import '../features/home/presentation/home_screen.dart';
 import '../features/onboarding/data/onboarding_prefs.dart';
 import '../features/onboarding/presentation/onboarding_screen.dart';
 import '../features/onboarding/presentation/welcome_screen.dart';
+import '../features/settings/presentation/devices_screen.dart';
+import '../features/settings/presentation/no_vpn_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
-import '../features/settings/presentation/split_tunnel_sites_screen.dart';
 import '../features/shell/presentation/main_shell.dart';
 import '../features/vpn/presentation/locations_screen.dart';
 import 'config.dart';
@@ -45,6 +47,36 @@ class AppRouter {
 
   /// Soften recovery UX: one-shot code after register; Settings can recover.
   static String? pendingRecoveryCode;
+
+  /// After entitlement unlock: show one-shot recovery screen if needed.
+  ///
+  /// Keeps [postAuthResolved] false until [RecoveryCodeScreen] confirms; otherwise
+  /// sets it true and navigates to [destination] (`/home` or `/onboarding`).
+  static Future<void> goAfterEntitlement(
+    BuildContext context,
+    String destination,
+  ) async {
+    var code = pendingRecoveryCode?.trim();
+    if (code == null || code.isEmpty) {
+      final shown = await RecoveryCodeStorage.instance.wasShown();
+      if (!shown) {
+        final archived = await RecoveryCodeStorage.instance.readArchived();
+        final trimmed = archived?.trim();
+        if (trimmed != null && trimmed.isNotEmpty) {
+          code = trimmed;
+          pendingRecoveryCode = trimmed;
+        }
+      }
+    }
+    if (!context.mounted) return;
+    if (code != null && code.isNotEmpty) {
+      postAuthResolved = false;
+      context.go('/recovery');
+      return;
+    }
+    postAuthResolved = true;
+    context.go(destination);
+  }
 
   /// Глобальный listenable — связан с authProvider в main.dart.
   static final GoRouterRefreshNotifier refreshNotifier =
@@ -74,12 +106,12 @@ class AppRouter {
       final inShell = loc == '/home' ||
           loc == '/locations' ||
           loc == '/settings' ||
-          loc.startsWith('/settings/') ||
-          loc == '/subscription' ||
-          loc == '/premium';
+          loc.startsWith('/settings/');
+      // /subscription + /premium parked outside shell — still require auth gate.
+      final goingToBillingTabs = loc == '/subscription' || loc == '/premium';
 
       if (auth is AuthStateBootstrapFailed) {
-        if (goingToBootstrapFail) return null;
+        if (goingToBootstrapFail || goingToRestore) return null;
         return '/bootstrap-failed';
       }
 
@@ -113,10 +145,11 @@ class AppRouter {
       }
       // Onboarding + shell only after entitlement (or gate-off soft-pass) resolved.
       // Do NOT allow /onboarding without postAuthResolved — that skipped promo.
-      if ((goingToOnboarding || inShell) && !postAuthResolved) {
+      if ((goingToOnboarding || inShell || goingToBillingTabs) &&
+          !postAuthResolved) {
         return '/gate';
       }
-      if (goingToOnboarding || inShell) {
+      if (goingToOnboarding || inShell || goingToBillingTabs) {
         return null;
       }
       return '/gate';
@@ -151,25 +184,26 @@ class AppRouter {
         path: '/onboarding',
         builder: (c, s) => const OnboardingScreen(),
       ),
+      // Parked for later (not in bottom nav).
+      GoRoute(
+        path: '/subscription',
+        builder: (c, s) => const SubscriptionTabScreen(),
+      ),
+      GoRoute(
+        path: '/premium',
+        builder: (c, s) => const PremiumTabScreen(),
+      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
           return MainShell(navigationShell: navigationShell);
         },
         branches: [
-          // Огонь order: Подписка | Премиум | VPN | Локации | Настройки
+          // Locations | Home (center) | Settings
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/subscription',
-                builder: (c, s) => const SubscriptionTabScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/premium',
-                builder: (c, s) => const PremiumTabScreen(),
+                path: '/locations',
+                builder: (c, s) => const LocationsScreen(),
               ),
             ],
           ),
@@ -184,20 +218,16 @@ class AppRouter {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/locations',
-                builder: (c, s) => const LocationsScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
                 path: '/settings',
                 builder: (c, s) => const SettingsScreen(),
                 routes: [
                   GoRoute(
+                    path: 'devices',
+                    builder: (c, s) => const DevicesScreen(),
+                  ),
+                  GoRoute(
                     path: 'no-vpn',
-                    builder: (c, s) => const SplitTunnelSitesScreen(),
+                    builder: (c, s) => const NoVpnScreen(),
                   ),
                   GoRoute(
                     path: 'split-tunnel',

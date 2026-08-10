@@ -144,17 +144,89 @@ class SplitTunnelPrefs {
   static const _sitesKey = 'split_tunnel_custom_sites_v1';
   static const _appliedRevKey = 'split_tunnel_applied_rev_v1';
   static const _draftRevKey = 'split_tunnel_draft_rev_v1';
+  static const _osnovnyeKey = 'split_tunnel_osnovnye_v1';
+  static const _disallowedAppsKey = 'split_tunnel_disallowed_apps_v1';
 
   /// Default ON — preserves existing RU `.srs` direct behavior.
   static Future<bool> isBundledRuEnabled() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_bundledRuKey) ?? true;
+    final map = await loadOsnovnyeEnabled();
+    return map['ru'] ?? true;
   }
 
   static Future<void> setBundledRuEnabled(bool value) async {
+    await setOsnovnyeEnabled('ru', value);
+  }
+
+  /// Огонь «Основные» toggles. Defaults: ru+gov ON.
+  static Future<Map<String, bool>> loadOsnovnyeEnabled() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_bundledRuKey, value);
+    final raw = prefs.getString(_osnovnyeKey);
+    final out = <String, bool>{
+      for (final c in kOsnovnyeCategories) c.id: c.defaultEnabled,
+    };
+    // Migrate legacy bundled RU key once.
+    if (raw == null || raw.isEmpty) {
+      if (prefs.containsKey(_bundledRuKey)) {
+        out['ru'] = prefs.getBool(_bundledRuKey) ?? true;
+      }
+      return out;
+    }
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) {
+        for (final e in decoded.entries) {
+          final id = '${e.key}';
+          if (out.containsKey(id)) {
+            out[id] = e.value == true;
+          }
+        }
+      }
+    } catch (_) {}
+    return out;
+  }
+
+  static Future<void> setOsnovnyeEnabled(String id, bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    final map = await loadOsnovnyeEnabled();
+    if (!map.containsKey(id)) return;
+    map[id] = value;
+    await prefs.setString(_osnovnyeKey, jsonEncode(map));
+    // Keep legacy key in sync for older readers.
+    if (id == 'ru') {
+      await prefs.setBool(_bundledRuKey, value);
+    }
     await _bumpDraft(prefs);
+  }
+
+  static Future<int> osnovnyeEnabledCount() async {
+    final map = await loadOsnovnyeEnabled();
+    return map.values.where((v) => v).length;
+  }
+
+  /// Packages excluded from VPN TUN (bypass).
+  static Future<Set<String>> loadDisallowedPackages() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getStringList(_disallowedAppsKey) ?? const [];
+    return raw.where((p) => p.trim().isNotEmpty).toSet();
+  }
+
+  static Future<void> setDisallowedPackage(String packageName, bool bypass) async {
+    final prefs = await SharedPreferences.getInstance();
+    final set = await loadDisallowedPackages();
+    final pkg = packageName.trim();
+    if (pkg.isEmpty) return;
+    if (bypass) {
+      set.add(pkg);
+    } else {
+      set.remove(pkg);
+    }
+    await prefs.setStringList(_disallowedAppsKey, set.toList()..sort());
+    await _bumpDraft(prefs);
+  }
+
+  static Future<bool> isGovRuEnabled() async {
+    final map = await loadOsnovnyeEnabled();
+    return map['gov'] ?? true;
   }
 
   static Future<List<SplitTunnelSite>> loadSites() async {
@@ -225,23 +297,29 @@ class SplitTunnelPrefs {
     await saveSites(sites.where((s) => s.id != id).toList());
   }
 
-  /// Enabled domains for routing, with CDN aliases expanded (YouTube → googlevideo…).
+  /// Enabled domains for routing: custom (non-preset) sites + Основные.
   static Future<List<String>> enabledDomainSuffixes() async {
     final sites = await loadSites();
     final out = <String>{};
-    for (final s in sites.where((s) => s.enabled)) {
+    for (final s in sites.where((s) => s.enabled && !s.isPreset)) {
       out.add(s.domain);
       final aliases = kSplitTunnelDomainAliases[s.domain];
       if (aliases != null) out.addAll(aliases);
     }
+    final cats = await loadOsnovnyeEnabled();
+    for (final c in kOsnovnyeCategories) {
+      if (cats[c.id] != true) continue;
+      if (c.kind != OsnovnyeKind.domains) continue;
+      out.addAll(c.domains);
+    }
     return out.toList()..sort();
   }
 
-  /// DC / CDN IP ranges for presets that bypass DNS (Telegram apps hit IPs directly).
+  /// DC / CDN IP ranges when user adds matching custom domains (e.g. telegram.org).
   static Future<List<String>> enabledProxyIpCidrs() async {
     final sites = await loadSites();
     final out = <String>{};
-    for (final s in sites.where((s) => s.enabled)) {
+    for (final s in sites.where((s) => s.enabled && !s.isPreset)) {
       final cidrs = kSplitTunnelProxyIpCidrs[s.domain];
       if (cidrs != null) out.addAll(cidrs);
     }
@@ -262,7 +340,6 @@ class SplitTunnelPrefs {
     await prefs.setInt(_appliedRevKey, draft);
   }
 
-  /// Exposed so [VpnRouteModePrefs] can share the pending-reconnect counter.
   static Future<void> bumpDraftRev() async {
     final prefs = await SharedPreferences.getInstance();
     await _bumpDraft(prefs);
@@ -273,123 +350,133 @@ class SplitTunnelPrefs {
     await prefs.setInt(_draftRevKey, draft);
   }
 
-  /// Seed curated presets (and refresh labels/subtitles) without wiping customs.
-  static Future<void> ensurePresetSites() async {
-    final existing = await loadSites();
-    final byDomain = {for (final s in existing) s.domain: s};
-    final presetDomains = {for (final p in kSplitTunnelPresets) p.domain};
-    var changed = false;
-    final next = <SplitTunnelSite>[];
-
-    for (final preset in kSplitTunnelPresets) {
-      final prev = byDomain[preset.domain];
-      if (prev == null) {
-        next.add(
-          SplitTunnelSite(
-            id: 'preset_${preset.domain.replaceAll('.', '_')}',
-            domain: preset.domain,
-            label: preset.label,
-            subtitle: preset.subtitle,
-            enabled: preset.defaultEnabled,
-          ),
-        );
-        changed = true;
-        continue;
-      }
-      final presetId = 'preset_${preset.domain.replaceAll('.', '_')}';
-      final refreshed = prev.copyWith(
-        id: prev.isPreset ? prev.id : presetId,
-        label: preset.label,
-        subtitle: preset.subtitle,
-      );
-      if (refreshed.label != prev.label ||
-          refreshed.subtitle != prev.subtitle ||
-          refreshed.id != prev.id) {
-        changed = true;
-      }
-      next.add(refreshed);
-    }
-
-    for (final s in existing) {
-      if (presetDomains.contains(s.domain)) continue;
-      next.add(s);
-    }
-
-    if (changed || next.length != existing.length) {
-      await saveSites(next);
-    }
+  /// Drop legacy Modes `preset_*` rows from disk (once per session / reload).
+  static Future<int> purgePresetSites() async {
+    final sites = await loadSites();
+    final customs = sites.where((s) => !s.isPreset).toList();
+    if (customs.length == sites.length) return 0;
+    // Persist without bumping draft — migration, not a user edit.
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _sitesKey,
+      jsonEncode(customs.map((s) => s.toJson()).toList()),
+    );
+    return sites.length - customs.length;
   }
 }
 
-/// Curated domain suffixes shown on Modes (local seed, no remote API).
-class SplitTunnelPreset {
-  const SplitTunnelPreset({
-    required this.domain,
-    required this.label,
-    this.subtitle = '',
-    this.defaultEnabled = true,
+/// Огонь «Основные» category kind.
+enum OsnovnyeKind { geositeRu, geositeGov, domains }
+
+/// One row under Sites → Основные.
+class OsnovnyeCategory {
+  const OsnovnyeCategory({
+    required this.id,
+    required this.labelRu,
+    required this.labelEn,
+    required this.badge,
+    required this.kind,
+    this.domains = const [],
+    this.defaultEnabled = false,
   });
 
-  final String domain;
-  final String label;
-  final String subtitle;
+  final String id;
+  final String labelRu;
+  final String labelEn;
+  final String badge;
+  final OsnovnyeKind kind;
+  final List<String> domains;
   final bool defaultEnabled;
+
+  String label(String languageCode) =>
+      languageCode == 'en' ? labelEn : labelRu;
 }
 
-const kSplitTunnelPresets = <SplitTunnelPreset>[
-  SplitTunnelPreset(
-    domain: 'cloudflare.com',
-    label: 'Cloudflare',
-    subtitle: 'Большинство неработающих сайтов',
+/// Fixed 7 categories matching Огонь «Основные» (counter N/7).
+const kOsnovnyeCategories = <OsnovnyeCategory>[
+  OsnovnyeCategory(
+    id: 'ru',
+    labelRu: 'Российские сайты',
+    labelEn: 'Russian sites',
+    badge: 'RU',
+    kind: OsnovnyeKind.geositeRu,
+    defaultEnabled: true,
   ),
-  SplitTunnelPreset(
-    domain: 'youtube.com',
-    label: 'YouTube',
-    subtitle: 'YouTube и сервисы Google',
+  OsnovnyeCategory(
+    id: 'gov',
+    labelRu: 'Сайты госорганов РФ',
+    labelEn: 'RF government sites',
+    badge: 'GOV',
+    kind: OsnovnyeKind.geositeGov,
+    defaultEnabled: true,
   ),
-  SplitTunnelPreset(
-    domain: 'tiktok.com',
-    label: 'TikTok',
-    subtitle: 'Короткие видео',
+  OsnovnyeCategory(
+    id: 'vk',
+    labelRu: 'VK',
+    labelEn: 'VK',
+    badge: 'VK',
+    kind: OsnovnyeKind.domains,
+    domains: [
+      'vk.com',
+      'vk.ru',
+      'vk.me',
+      'vkontakte.ru',
+      'userapi.com',
+      'vkuseraudio.net',
+      'vkuserphoto.ru',
+    ],
   ),
-  SplitTunnelPreset(
-    domain: 'instagram.com',
-    label: 'Instagram',
-    subtitle: 'Instagram, Facebook',
+  OsnovnyeCategory(
+    id: 'tiktok',
+    labelRu: 'TikTok',
+    labelEn: 'TikTok',
+    badge: 'TT',
+    kind: OsnovnyeKind.domains,
+    domains: [
+      'tiktok.com',
+      'tiktokv.com',
+      'tiktokcdn.com',
+      'musical.ly',
+      'byteoversea.com',
+    ],
   ),
-  SplitTunnelPreset(
-    domain: 'whatsapp.com',
-    label: 'WhatsApp',
-    subtitle: 'Звонки и сообщения',
+  OsnovnyeCategory(
+    id: 'yandex',
+    labelRu: 'Сервисы Яндекса',
+    labelEn: 'Yandex services',
+    badge: 'YA',
+    kind: OsnovnyeKind.domains,
+    domains: [
+      'yandex.ru',
+      'yandex.com',
+      'yandex.net',
+      'ya.ru',
+      'yandex.by',
+      'yandex.kz',
+      'yandex.uz',
+      'yandexcloud.net',
+      'yastatic.net',
+    ],
   ),
-  SplitTunnelPreset(
-    domain: 'telegram.org',
-    label: 'Telegram',
-    subtitle: 'Каналы, звонки, медиа',
+  OsnovnyeCategory(
+    id: 'ozon',
+    labelRu: 'Ozon',
+    labelEn: 'Ozon',
+    badge: 'OZ',
+    kind: OsnovnyeKind.domains,
+    domains: ['ozon.ru', 'ozon.com', 'ozonusercontent.com'],
   ),
-  SplitTunnelPreset(
-    domain: 'discord.com',
-    label: 'Discord',
-    subtitle: 'Голос и сообщества',
-  ),
-  SplitTunnelPreset(
-    domain: 'chatgpt.com',
-    label: 'ChatGPT',
-    subtitle: 'Нейросеть',
-  ),
-  SplitTunnelPreset(
-    domain: 'claude.ai',
-    label: 'Claude',
-    subtitle: 'Нейросеть',
-  ),
-  SplitTunnelPreset(
-    domain: 'gemini.google.com',
-    label: 'Gemini',
-    subtitle: 'Нейросеть',
+  OsnovnyeCategory(
+    id: 'wb',
+    labelRu: 'Wildberries',
+    labelEn: 'Wildberries',
+    badge: 'WB',
+    kind: OsnovnyeKind.domains,
+    domains: ['wildberries.ru', 'wb.ru', 'wbbasket.ru'],
   ),
 ];
 
-/// Extra suffixes applied when the primary preset domain is enabled.
+/// Extra suffixes applied when a matching custom domain is enabled.
 const kSplitTunnelDomainAliases = <String, List<String>>{
   'youtube.com': [
     'youtu.be',

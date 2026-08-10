@@ -1,20 +1,42 @@
-/// Single source of truth for runtime route feature flags.
-///
-/// Pixel 2026-08: ads geosite reject blackholes browsing while urlTest is
-/// healthy; geoip-ru misclassifies Google/YouTube CDN → direct → RF DPI death.
-/// Keep both OFF in production; tests may override via [RoutePolicy].
-const bool kAdsBlockEnabled = false;
+// Single source of truth for runtime route feature flags (Xray-core / ADR 005).
+//
+// Ads policy: curated auction hosts via TLS sniff when [kXrayAdsBlockEnabled]
+// is true. Огонь `geosite:category-ads-all` stays experimental
+// ([kXrayOgonAdsAllEnabled]). Mid-roll SSAI on `googlevideo.com` is not
+// removable via VPN routing. Default both OFF during speed benches; tests may
+// force ON via RoutePolicy.
 
-/// geoip-ru asset may ship in APK but must not enter route rules while OFF.
-const bool kGeoipRuEnabled = false;
+/// Curated-list ads reject (no FakeDNS). OFF by default — sniffing collateral.
+const bool kXrayAdsBlockEnabled = false;
 
-/// Smart-mode RU geosite → direct. Re-enabled after H-RU rejected (no-ru
-/// full-proxy still left YT video spinning — RU was not the video blocker).
+/// Legacy alias for callers still using the sing-box-era name.
+const bool kAdsBlockEnabled = kXrayAdsBlockEnabled;
+
+/// Огонь FakeDNS + `geosite:category-ads-all`. Prod stays OFF.
+const bool kXrayOgonAdsAllEnabled = false;
+
+/// Exact/suffix hosts eligible for `ads-reject` when [kXrayAdsBlockEnabled] is true.
+/// Auction/tracker only — never video CDN (`googlevideo.com`, `gvt1.com`, …).
+const kXrayAdsBlockDomains = <String>[
+  'doubleclick.net',
+  'googleadservices.com',
+  'googlesyndication.com',
+  'adservice.google.com',
+  'ads.youtube.com',
+  'pagead2.googlesyndication.com',
+];
+
+/// geoip:ru → direct (nest home-speed). Domain geosite alone misses IP-literals.
+const bool kGeoipRuEnabled = true;
+
+/// Smart-mode RU geosite → direct («Что работает без VPN?» bundle).
 const bool kSmartRuSplitEnabled = true;
 
-/// Domains that must use proxy in smart mode **before** RU geosite directs.
-/// Includes media/CDN hosts so UI+previews work but Onesie/video can still
-/// hang if any edge slips to direct under RF DPI.
+/// Hev → SOCKS bridge A/B. Default gVisor `protocol:tun` + setTunFd.
+const bool kUseHevTunBridge = false;
+
+/// Domains that must use proxy **before** RU geosite directs.
+/// Media CDN (`googlevideo`, `gvt*`) must stay here for playback under RF DPI.
 const kSmartProxyForceSuffixes = <String>[
   'youtube.com',
   'youtu.be',
@@ -31,6 +53,8 @@ const kSmartProxyForceSuffixes = <String>[
   'gvt3.com',
   'video.google.com',
   'play.google.com',
+  'widevine.com',
+  'withyoutube.com',
   'google.com',
 ];
 

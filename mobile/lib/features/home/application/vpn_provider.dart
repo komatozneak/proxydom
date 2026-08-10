@@ -4,8 +4,6 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../settings/data/vpn_route_mode.dart';
-
 import '../../../core/install_id_storage.dart';
 import '../../../core/retry_policy.dart';
 import '../../auth/application/auth_provider.dart';
@@ -40,12 +38,19 @@ final _retryPolicy = RetryPolicy(
 
 const _connectedSinceKey = 'vpn_connected_since_ms';
 
+/// Home + analytics: another app holds Always-on / lockdown.
+const kVpnConflictErrorCode = 'vpn_conflict';
+
 /// VPN-контроллер. Шаг 16: retry/reconnect логика поверх VpnController + native.
 class VpnNotifier extends Notifier<VpnStatus> {
   VpnConfig? _config;
 
   /// Label from catalog after Auto/manual pick (overrides generic host fallback).
   String? _displayLabel;
+
+  /// Protocol of the catalog node chosen at fetchConfig / selectNode time
+  /// (`kVpnNodeProtocolTrusttunnel` → start TrustTunnel core, ADR 006).
+  String? _selectedNodeProtocol;
 
   /// Последний полученный конфиг. Доступен из UI для preview.
   VpnConfig? get config => _config;
@@ -56,6 +61,8 @@ class VpnNotifier extends Notifier<VpnStatus> {
   StreamSubscription<VpnNativeStatus>? _statusSubscription;
   Timer? _reconnectTimer;
   Timer? _connectingWatchdog;
+  Timer? _connectingPoll;
+  Timer? _disconnectWatchdog;
   Future<void>? _syncInFlight;
   /// True while a connect() Future is in-flight (dedupe concurrent callers).
   Future<void>? _connectInFlight;
@@ -67,11 +74,69 @@ class VpnNotifier extends Notifier<VpnStatus> {
   void _cancelConnectingWatchdog() {
     _connectingWatchdog?.cancel();
     _connectingWatchdog = null;
+    _connectingPoll?.cancel();
+    _connectingPoll = null;
+  }
+
+  void _cancelDisconnectWatchdog() {
+    _disconnectWatchdog?.cancel();
+    _disconnectWatchdog = null;
+  }
+
+  /// Align UI with native without auto-reconnect side effects.
+  ///
+  /// Fixes stuck Nest `VpnConnecting` when the tunnel is already up (foreign VPN
+  /// churn / hung `stop` / missed EventChannel).
+  Future<void> reconcileWithNative() async {
+    final native = await VpnController.instance.getStatus();
+    // ignore: avoid_print
+    print('[VPN] reconcileWithNative native=$native ui=$state');
+    switch (native) {
+      case VpnNativeStatus.connected:
+        if (state is! VpnConnected) {
+          try {
+            _config ??= await fetchConfig();
+          } catch (e) {
+            // ignore: avoid_print
+            print('[VPN] reconcile fetchConfig soft-fail: $e');
+          }
+          await _enterConnected(freshSession: state is VpnConnecting);
+        }
+      case VpnNativeStatus.connecting:
+      case VpnNativeStatus.preparing:
+        if (state is VpnDisconnected || state is VpnError) {
+          state = const VpnConnecting(progress: 0.5);
+          _armConnectingWatchdog();
+        }
+      case VpnNativeStatus.idle:
+      case VpnNativeStatus.unknown:
+        if (state is VpnConnecting && _connectInFlight == null) {
+          await _clearConnectedSince();
+          state = const VpnDisconnected();
+        } else if (state is VpnConnected) {
+          await _confirmIdleDrop();
+        }
+      case VpnNativeStatus.error:
+        if (state is! VpnError) {
+          state = VpnError(message: await _nativeErrorMessage());
+        }
+      case VpnNativeStatus.disconnecting:
+        break;
+      case VpnNativeStatus.revoked:
+        if (state is VpnConnected || state is VpnConnecting) {
+          await _clearConnectedSince();
+          state = const VpnError(message: 'VPN was revoked by system');
+        }
+    }
   }
 
   /// Escape hatch: native can stick on preparing/connecting (Always-on race).
+  /// Also polls every 1.5s so we don't wait the full timeout when already up.
   void _armConnectingWatchdog({Duration timeout = const Duration(seconds: 20)}) {
     _cancelConnectingWatchdog();
+    _connectingPoll = Timer.periodic(const Duration(milliseconds: 1500), (_) {
+      unawaited(_pollConnectingNative());
+    });
     _connectingWatchdog = Timer(timeout, () async {
       if (state is! VpnConnecting) return;
       final native = await VpnController.instance.getStatus();
@@ -98,12 +163,58 @@ class VpnNotifier extends Notifier<VpnStatus> {
     });
   }
 
+  Future<void> _pollConnectingNative() async {
+    if (state is! VpnConnecting) {
+      _connectingPoll?.cancel();
+      _connectingPoll = null;
+      return;
+    }
+    final native = await VpnController.instance.getStatus();
+    if (native == VpnNativeStatus.connected) {
+      await _enterConnected(freshSession: true);
+    }
+  }
+
   Future<String> _nativeErrorMessage() async {
     final detail = await VpnController.instance.getLastError();
     if (detail != null && detail.isNotEmpty) {
-      return 'libbox: $detail';
+      return 'vpn: $detail';
     }
     return 'Native VPN error';
+  }
+
+  /// After prepare denial: foreign Always-on / lockdown → [vpn_conflict], else permission.
+  Future<VpnError> _errorForPermissionFailure() async {
+    final conflict = await VpnController.instance.queryVpnConflict();
+    if (conflict.foreignAlwaysOn) {
+      final label = conflict.appLabel?.trim();
+      return VpnError(
+        message: (label != null && label.isNotEmpty) ? label : 'vpn_conflict',
+        code: kVpnConflictErrorCode,
+      );
+    }
+    return const VpnError(
+      message: 'VPN permission denied',
+      code: 'permission_denied',
+    );
+  }
+
+  /// When [VpnController.start] returns false — often establish blocked by another VPN.
+  Future<VpnError> _errorForStartFailure() async {
+    final conflict = await VpnController.instance.queryVpnConflict();
+    if (conflict.foreignAlwaysOn) {
+      final label = conflict.appLabel?.trim();
+      return VpnError(
+        message: (label != null && label.isNotEmpty) ? label : 'vpn_conflict',
+        code: kVpnConflictErrorCode,
+      );
+    }
+    final detail = await VpnController.instance.getLastError();
+    if (detail != null &&
+        detail.toLowerCase().contains('permission denied')) {
+      return _errorForPermissionFailure();
+    }
+    return const VpnError(message: 'Failed to start VPN service');
   }
 
   /// Keep uptime across UI restarts while the same VpnService session lives.
@@ -134,9 +245,13 @@ class VpnNotifier extends Notifier<VpnStatus> {
     final serverName = config != null
         ? resolveVpnDisplayLabel(config, displayLabel: _displayLabel)
         : kVpnBrandSessionName;
-    final protocol = friendlyProtocolLabel(
-      config?.singBoxConfig.primaryOutbound?.type,
-    );
+    final protocol = _selectedNodeProtocol == kVpnNodeProtocolTrusttunnel
+        ? 'TRUSTTUNNEL'
+        : friendlyProtocolLabel(
+            config?.xrayProfile.candidates.isNotEmpty == true
+                ? config!.primaryCandidate.protocol
+                : 'vless',
+          );
     final since = await _resolveConnectedSince(freshSession: freshSession);
     state = VpnConnected(
       serverName: serverName,
@@ -168,6 +283,9 @@ class VpnNotifier extends Notifier<VpnStatus> {
     Future.microtask(_syncFromNative);
     return const VpnDisconnected();
   }
+
+  /// True while [connect] is in-flight (dedupe + Nest cancel UX).
+  bool get isConnectInFlight => _connectInFlight != null;
 
   /// Align UI with native VpnService after cold start / Activity recreate.
   Future<void> syncFromNative() => _syncFromNative();
@@ -256,11 +374,13 @@ class VpnNotifier extends Notifier<VpnStatus> {
 
   Future<void> _cleanupOnLogout() async {
     _cancelConnectingWatchdog();
+    _cancelDisconnectWatchdog();
     if (state is! VpnDisconnected) {
       state = const VpnDisconnected();
     }
     _config = null;
     _displayLabel = null;
+    _selectedNodeProtocol = null;
     _statusSubscription?.cancel();
     _statusSubscription = null;
     _reconnectTimer?.cancel();
@@ -281,25 +401,51 @@ class VpnNotifier extends Notifier<VpnStatus> {
   /// Получить конфиг без подключения (для UI/preview).
   ///
   /// Retry на transient ошибках (5xx, network), без retry на 4xx.
-  /// Location picker removed: always Auto → urltest among egress_candidates.
+  /// Respects persisted region selection; Auto → resolveNodeIdForConfig.
   Future<VpnConfig> fetchConfig({String? nodeId}) async {
     final nodesRepo = ref.read(vpnNodesRepositoryProvider);
-    await nodesRepo.setSelectedNodeId(kRegionAutoId);
+    final stored = nodeId ?? await nodesRepo.getSelectedNodeId();
+    final useAuto =
+        stored == null || stored.isEmpty || stored == kRegionAutoId;
+    if (useAuto) {
+      await nodesRepo.setSelectedNodeId(kRegionAutoId);
+    }
     _displayLabel = null;
+    _selectedNodeProtocol = null;
     List<VpnNode>? catalog;
     String? apiNodeId;
     try {
-      catalog = await nodesRepo.listNodes();
-      apiNodeId = await resolveNodeIdForConfig(
-        storedId: kRegionAutoId,
-        catalog: catalog,
-      );
+      if (useAuto) {
+        // Auto needs a live (or fallback) catalog to pick the best node.
+        catalog = await nodesRepo.listNodes();
+        apiNodeId = await resolveNodeIdForConfig(
+          storedId: kRegionAutoId,
+          catalog: catalog,
+        );
+      } else {
+        // Concrete region: prefer disk cache to avoid /vpn/nodes on every switch.
+        catalog = await nodesRepo.loadCachedNodes();
+        final cachedHasNode =
+            catalog != null && catalog.any((n) => n.id == stored);
+        if (!cachedHasNode) {
+          catalog = await nodesRepo.listNodes();
+        }
+        apiNodeId = stored;
+      }
       // ignore: avoid_print
-      print('[VPN] auto selected node_id=$apiNodeId');
+      print('[VPN] selected node_id=$apiNodeId auto=$useAuto');
+      if (apiNodeId != null && catalog != null) {
+        for (final n in catalog) {
+          if (n.id == apiNodeId) {
+            _selectedNodeProtocol = n.protocol;
+            break;
+          }
+        }
+      }
     } catch (e) {
       // ignore: avoid_print
-      print('[VPN] auto pick failed, using default: $e');
-      apiNodeId = null;
+      print('[VPN] node pick failed, using default: $e');
+      apiNodeId = useAuto ? null : stored;
     }
 
     _displayLabel = await _labelForNodeId(apiNodeId, catalog: catalog);
@@ -308,10 +454,10 @@ class VpnNotifier extends Notifier<VpnStatus> {
       return await _retryPolicy.execute(
         () => ref.read(vpnConfigRepositoryProvider).getConfig(
               forceRefresh: true,
-              // Prefer Auto probe; backend returns full egress_candidates for urltest.
               nodeId: apiNodeId == kRegionAutoId ? null : apiNodeId,
             ),
         shouldRetry: (e) async {
+          if (e is FormatException || e is TypeError) return false;
           if (e is DioException) {
             // Не повторяем 4xx — авторизация/клиент; type может быть unknown.
             final code = e.response?.statusCode ?? 0;
@@ -319,6 +465,9 @@ class VpnNotifier extends Notifier<VpnStatus> {
             if (e.error == 'session_expired') return false;
             if (e.error == 'device_revoked') return false;
             if (e.error == 'device_limit_reached') return false;
+            if (e.error is FormatException || e.error is TypeError) {
+              return false;
+            }
           }
           return true;
         },
@@ -351,7 +500,9 @@ class VpnNotifier extends Notifier<VpnStatus> {
       return null;
     }
     try {
-      final nodes = catalog ?? await ref.read(vpnNodesRepositoryProvider).listNodes();
+      final nodes = catalog ??
+          await ref.read(vpnNodesRepositoryProvider).loadCachedNodes() ??
+          await ref.read(vpnNodesRepositoryProvider).listNodes();
       final index = nodes.indexWhere((n) => n.id == nodeId);
       if (index < 0) return null;
       final place = await resolvePlaceForNode(nodes[index], index: index);
@@ -391,7 +542,8 @@ class VpnNotifier extends Notifier<VpnStatus> {
     }
     _config = await fetchConfig(nodeId: useAuto ? null : nodeId);
     if (wasConnected) {
-      await connect();
+      // Config already fetched above — skip a second /vpn/config + nodes round-trip.
+      await connect(reuseConfig: true);
     }
   }
 
@@ -422,20 +574,29 @@ class VpnNotifier extends Notifier<VpnStatus> {
     return state is VpnConnected;
   }
 
-  Future<void> connect({bool forceRestart = false}) async {
+  Future<void> connect({
+    bool forceRestart = false,
+    bool reuseConfig = false,
+  }) async {
     // Deduplicate concurrent connect() (auto-reconnect + nest tap).
     _suppressAutoReconnect = false;
     if (_connectInFlight != null) return _connectInFlight!;
     if (!forceRestart && state is VpnConnected) return;
 
-    _connectInFlight = _connectBody(forceRestart: forceRestart).whenComplete(() {
+    _connectInFlight = _connectBody(
+      forceRestart: forceRestart,
+      reuseConfig: reuseConfig,
+    ).whenComplete(() {
       _connectInFlight = null;
       _autoReconnectArmed = false;
     });
     return _connectInFlight!;
   }
 
-  Future<void> _connectBody({bool forceRestart = false}) async {
+  Future<void> _connectBody({
+    bool forceRestart = false,
+    bool reuseConfig = false,
+  }) async {
     // Already up in the system tray (UI lost state after Activity recreate).
     final existing = await VpnController.instance.getStatus();
     if (!forceRestart && existing == VpnNativeStatus.connected) {
@@ -459,30 +620,42 @@ class VpnNotifier extends Notifier<VpnStatus> {
     _armConnectingWatchdog(timeout: const Duration(seconds: 45));
 
     try {
-      // 1. Получаем конфиг с retry
-      // ignore: avoid_print
-      print('[VPN] connect: fetchConfig…');
-      _config = await fetchConfig();
-      // ignore: avoid_print
-      print('[VPN] connect: fetchConfig ok');
+      // 1. Config — reuse when selectNode already fetched for this switch.
+      if (reuseConfig && _config != null) {
+        // ignore: avoid_print
+        print('[VPN] connect: reuseConfig');
+      } else {
+        // ignore: avoid_print
+        print('[VPN] connect: fetchConfig…');
+        _config = await fetchConfig();
+        // ignore: avoid_print
+        print('[VPN] connect: fetchConfig ok');
+      }
       state = const VpnConnecting(progress: 0.3);
 
       // 2. Проверяем permission (на Android открывает системный диалог)
       final hasPermission = await VpnController.instance.requestPermission();
       if (!hasPermission) {
-        state = const VpnError(message: 'VPN permission denied');
+        state = await _errorForPermissionFailure();
         return;
       }
       // Android 13+: without this the Amnezia-style VPN card stays hidden.
       await VpnController.instance.requestNotificationPermission();
       state = const VpnConnecting(progress: 0.5);
 
-      // 3. Стартуем VpnService (через MethodChannel) с retry на transient
+      // 3. Start VpnService — TrustTunnel when catalog node asks for it (ADR 006).
+      final useTrustTunnel = _selectedNodeProtocol == kVpnNodeProtocolTrusttunnel &&
+          _config?.trusttunnelProfile != null;
       final started = await _retryPolicy.execute(
-        () => VpnController.instance.start(
-          _config!,
-          displayLabel: _displayLabel,
-        ),
+        () => useTrustTunnel
+            ? VpnController.instance.startTrustTunnel(
+                _config!.trusttunnelProfile!,
+                displayLabel: _displayLabel,
+              )
+            : VpnController.instance.start(
+                _config!,
+                displayLabel: _displayLabel,
+              ),
         shouldRetry: (e) async => e is! VpnControllerException,
         onRetry: (attempt, e) {
           // ignore: avoid_print
@@ -490,7 +663,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
         },
       );
       if (!started) {
-        state = const VpnError(message: 'Failed to start VPN service');
+        state = await _errorForStartFailure();
         return;
       }
       state = const VpnConnecting(progress: 0.8);
@@ -511,7 +684,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
         if (nativeStatus == VpnNativeStatus.idle) {
           final detail = await VpnController.instance.getLastError();
           if (detail != null && detail.isNotEmpty) {
-            state = VpnError(message: 'libbox: $detail');
+            state = VpnError(message: 'vpn: $detail');
             return;
           }
         }
@@ -529,6 +702,13 @@ class VpnNotifier extends Notifier<VpnStatus> {
       print('[VPN] connect failed: $e\n$st');
       if (e is DioException) {
         final code = e.response?.statusCode ?? 0;
+        if (e.error == 'device_limit_reached') {
+          state = const VpnError(
+            message: 'device_limit_reached',
+            code: 'device_limit_reached',
+          );
+          return;
+        }
         if (code == 401 || e.error == 'session_expired') {
           state = const VpnError(
             message: 'Сессия истекла — войдите снова',
@@ -553,6 +733,11 @@ class VpnNotifier extends Notifier<VpnStatus> {
     }
   }
 
+  /// Call from Home [AppLifecycleState.resumed] (sync native status).
+  Future<void> onAppResumed() async {
+    await syncFromNative();
+  }
+
   /// Block auto-reconnect (device self-revoke / intentional stop side-effects).
   void suppressAutoReconnect() {
     _suppressAutoReconnect = true;
@@ -575,24 +760,50 @@ class VpnNotifier extends Notifier<VpnStatus> {
       state = const VpnDisconnected();
       return;
     }
-_recordSessionEnd();
+    _recordSessionEnd();
     if (state is VpnConnecting || state is VpnConnected) {
       state = const VpnConnecting(progress: 0.5); // disconnecting affordance
     }
 
+    // If stop() hangs, don't leave Nest spinning forever.
+    _cancelDisconnectWatchdog();
+    _disconnectWatchdog = Timer(const Duration(seconds: 10), () async {
+      // ignore: avoid_print
+      print('[VPN] disconnect watchdog fired ui=$state');
+      _connectInFlight = null;
+      final still = await VpnController.instance.getStatus();
+      if (still == VpnNativeStatus.connected) {
+        await _enterConnected(freshSession: false);
+      } else if (state is VpnConnecting) {
+        await _clearConnectedSince();
+        state = const VpnDisconnected();
+      }
+    });
+
     try {
-      await VpnController.instance.stop();
+      await VpnController.instance.stop().timeout(const Duration(seconds: 10));
+    } on TimeoutException catch (e) {
+      // ignore: avoid_print
+      print('[VPN] disconnect stop timeout: $e');
     } catch (e) {
       // ignore: avoid_print
       print('[VPN] disconnect error: $e');
     } finally {
+      _cancelDisconnectWatchdog();
       _statusSubscription?.cancel();
       _statusSubscription = null;
-      await _clearConnectedSince();
       _autoReconnectArmed = false;
       _connectInFlight = null;
-      _subscribeToStatus();
-      state = const VpnDisconnected();
+      final after = await VpnController.instance.getStatus();
+      if (after == VpnNativeStatus.connected) {
+        // stop did not tear down — stay honest with native.
+        _subscribeToStatus();
+        await _enterConnected(freshSession: false);
+      } else {
+        await _clearConnectedSince();
+        _subscribeToStatus();
+        state = const VpnDisconnected();
+      }
     }
   }
 

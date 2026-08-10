@@ -31,8 +31,8 @@ Do **not** bulk-generate AI PNGs without commercial license + owner go (Visual A
 ## Stack
 
 - Flutter + Riverpod + go_router + Dio
-- VPN core: sing-box (native), MethodChannel `teremok/vpn`
-- minSdk **23** (hard requirement — do not roll back)
+- VPN core: libXray (gVisor TUN) + TrustTunnel dual-core (ADR 005/006), MethodChannel `teremok/vpn`
+- minSdk **26** (hard requirement — do not roll back; TrustTunnel / dual-core)
 
 ## Tests
 

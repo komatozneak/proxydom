@@ -8,6 +8,17 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Invalid stub flutter_build.d (no ": ") crashes FlutterTaskHelper.readDependencies.
+run {
+    val dep = file("${rootProject.projectDir}/../build/app/intermediates/flutter/debug/flutter_build.d")
+    if (dep.exists()) {
+        val text = runCatching { dep.readText() }.getOrElse { "" }
+        if (!text.contains(": ")) {
+            dep.delete()
+        }
+    }
+}
+
 val keystoreProperties = Properties().apply {
     val f = rootProject.file("key.properties")
     if (f.exists()) {
@@ -15,10 +26,10 @@ val keystoreProperties = Properties().apply {
     }
 }
 
-// libbox.aar (sing-box JNI) declares minSdk 23; VpnService.Builder.establish
-// also requires it. Flutter tooling rewrites the literal in defaultConfig back
-// to flutter.minSdkVersion (21), so the real enforcement is finalizeDsl below.
-val requiredMinSdk = 23
+// TrustTunnel adapter + libXray require minSdk 26 (ADR 006). Flutter tooling
+// may rewrite the literal in defaultConfig back to flutter.minSdkVersion, so
+// the real enforcement is finalizeDsl below.
+val requiredMinSdk = 26
 
 android {
     namespace = "com.teremok.connect.teremok_connect"
@@ -36,7 +47,7 @@ android {
 
     defaultConfig {
         applicationId = "com.teremok.connect.teremok_connect"
-        // Placeholder only — finalizeDsl ниже поднимает до requiredMinSdk (23).
+        // Placeholder only — finalizeDsl ниже поднимает до requiredMinSdk (26).
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -75,8 +86,7 @@ android {
         }
     }
 
-    // ABI splits — отдельные APK на архитектуру (Шаг 19).
-    // Уменьшает размер APK на 60-70% (вместо 175 MB sing-box binaries — только нужный ABI).
+    // ABI splits — отдельные APK на архитектуру.
     splits {
         abi {
             isEnable = true
@@ -92,8 +102,7 @@ flutter {
 }
 
 // AGP 8 locks the android DSL right after project evaluation, so a plain
-// afterEvaluate override is too late for the manifest merger (CI failed with
-// "minSdkVersion 21 cannot be smaller than 23 declared in libbox.aar").
+// afterEvaluate override is too late for the manifest merger.
 // finalizeDsl is the AGP-sanctioned last-write hook and survives Flutter's
 // build.gradle.kts rewrites because it never touches the literal above.
 androidComponents {
@@ -106,7 +115,21 @@ androidComponents {
 }
 
 dependencies {
-    implementation(files("libs/libbox.aar"))
+    // Xray-core via libXray (gomobile). Replaces libbox/sing-box — ADR 005.
+    implementation(files("libs/libXray.aar"))
+    // TrustTunnel client adapter (ADR 006 dual-core). Vendored AAR — fetch via
+    // mobile/scripts/fetch-trusttunnel-aar.ps1 (GitHub Packages, needs GPR_KEY).
+    // Transitive deps below mirror the adapter's lib/build.gradle.kts because
+    // a raw AAR carries no POM.
+    implementation(files("libs/trusttunnel-client-android.aar"))
+    implementation("com.akuleshov7:ktoml-core:0.7.0")
+    implementation("org.slf4j:slf4j-api:1.7.25")
+    implementation("com.github.tony19:logback-android:2.0.0")
+    implementation("io.reactivex.rxjava3:rxandroid:3.0.0")
+    implementation("io.reactivex.rxjava3:rxjava:3.1.8")
+    implementation("androidx.appcompat:appcompat:1.7.0")
+    implementation("com.google.android.material:material:1.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     implementation("androidx.core:core-ktx:1.15.0")
+    testImplementation("junit:junit:4.13.2")
 }

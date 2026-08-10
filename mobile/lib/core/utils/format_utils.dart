@@ -29,7 +29,7 @@ String? formatPingMs(int? ms, {bool russian = true}) {
   return russian ? '$ms мс' : '$ms ms';
 }
 
-/// Relative age of last libbox status / traffic heartbeat for Home link cell.
+/// Relative age of last VPN status / traffic heartbeat for Home link cell.
 String formatLinkAge(DateTime? lastSeenAt, {required bool russian}) {
   if (lastSeenAt == null) return russian ? 'сейчас' : 'just now';
   final sec = DateTime.now().difference(lastSeenAt).inSeconds;

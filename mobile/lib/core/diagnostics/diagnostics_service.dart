@@ -33,7 +33,7 @@ class DiagnosticsService {
     final nativeStatus = await VpnController.instance.getStatus();
     final nativeError = await VpnController.instance.getLastError();
     final lockdown = await VpnController.instance.isLockdownEnabled();
-    final stderrTail = await VpnController.instance.getSingBoxStderrTail();
+    final stderrTail = await VpnController.instance.getVpnCoreStderrTail();
     final underlying = await VpnController.instance.getUnderlyingNetworkInterface();
 
     final sessionMeta = await VpnSessionMeta.load();
@@ -70,7 +70,7 @@ class DiagnosticsService {
         'ru_rules_paths: ${sessionMeta.ruRuleTags.isEmpty ? '(none)' : sessionMeta.ruRuleTags.join(', ')}',
       )
       ..writeln('underlying_network: ${underlying ?? '(unsupported)'}')
-      ..writeln('singbox_stderr_tail:')
+      ..writeln('vpn_stderr_tail:')
       ..writeln(stderrTail ?? '(unsupported)')
       ..writeln('last_vpn_error: $lastVpnError')
       ..writeln('last_flutter_error: ${lastFlutterError ?? '(none)'}')

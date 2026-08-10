@@ -1,33 +1,48 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme.dart';
+import '../../../../core/widgets/app_icon.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../application/vpn_provider.dart';
+import '../../application/vpn_status.dart';
 
-/// Read-only server pill (active hop label + optional RTT). No location picker.
-class ServerCard extends StatelessWidget {
+/// Server pill: region left | session+ms column right. Tappable → Locations.
+class ServerCard extends ConsumerWidget {
   const ServerCard({
     super.key,
     required this.title,
     required this.subtitle,
     required this.flagEmoji,
     this.pingMs,
+    this.onTap,
   });
 
   final String title;
   final String subtitle;
   final String flagEmoji;
 
-  /// Live urltest RTT when connected; null when unknown / disconnected.
+  /// Live path RTT when connected; null when unknown / disconnected.
   final int? pingMs;
 
+  final VoidCallback? onTap;
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final l = AppL10n.of(context);
     final elevated = theme.colorScheme.surfaceContainerHighest;
     final line = theme.colorScheme.outline;
-    final ping = pingMs;
-    final trailing = ping != null ? '${ping} ms' : null;
+    final connected = ref.watch(vpnProvider) is VpnConnected;
+
+    final String? pingLabel;
+    if (connected) {
+      pingLabel = pingMs != null ? '$pingMs ms' : '— ms';
+    } else {
+      pingLabel = null;
+    }
 
     return Material(
       color: elevated,
@@ -35,62 +50,185 @@ class ServerCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppBrand.radiusPill),
         side: BorderSide(color: line),
       ),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 54),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          child: Row(
-            children: [
-              Container(
-                width: 28,
-                height: 28,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: AppBrand.primary,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(flagEmoji, style: const TextStyle(fontSize: 14)),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: theme.colorScheme.onSurface,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppBrand.radiusPill),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: connected ? 80 : 60),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Left: flag + place
+                Expanded(
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surface,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: theme.colorScheme.outline.withValues(
+                              alpha: 0.35,
+                            ),
+                          ),
+                        ),
+                        child: Text(
+                          flagEmoji,
+                          style: const TextStyle(fontSize: 28, height: 1.0),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle.isEmpty ? l.homeStatServer : subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontSize: 11,
-                        color: theme.colorScheme.onSurfaceVariant,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: theme.colorScheme.onSurface,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              subtitle.isEmpty ? l.homeStatServer : subtitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontSize: 13,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              if (trailing != null)
-                Text(
-                  trailing,
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w600,
+                    ],
                   ),
                 ),
-            ],
+                // Right: session above ms (connected only)
+                if (connected) ...[
+                  const SizedBox(width: 12),
+                  SizedBox(
+                    width: 108,
+                    child: _SessionPingColumn(pingLabel: pingLabel!),
+                  ),
+                ],
+                if (onTap != null) ...[
+                  const SizedBox(width: 4),
+                  AppIcon(
+                    AppIcons.chevronRight,
+                    size: 20,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
       ),
     );
+  }
+}
+
+/// Right column: СЕССИЯ + timer on top, ms below.
+class _SessionPingColumn extends ConsumerStatefulWidget {
+  const _SessionPingColumn({required this.pingLabel});
+
+  final String pingLabel;
+
+  @override
+  ConsumerState<_SessionPingColumn> createState() => _SessionPingColumnState();
+}
+
+class _SessionPingColumnState extends ConsumerState<_SessionPingColumn> {
+  Timer? _timer;
+  Duration _elapsed = Duration.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    _sync();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) => _sync());
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _sync() {
+    final status = ref.read(vpnProvider);
+    if (status is! VpnConnected) {
+      if (_elapsed != Duration.zero && mounted) {
+        setState(() => _elapsed = Duration.zero);
+      }
+      return;
+    }
+    final next = DateTime.now().difference(status.connectedSince);
+    if (mounted) setState(() => _elapsed = next);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppL10n.of(context);
+    final theme = Theme.of(context);
+    final time = _formatUptime(_elapsed);
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(
+          l.homeSessionLabel.toUpperCase(),
+          style: theme.textTheme.labelSmall?.copyWith(
+            fontSize: 10,
+            letterSpacing: 1.1,
+            fontWeight: FontWeight.w600,
+            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.55),
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          time,
+          textAlign: TextAlign.right,
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontFeatures: const [FontFeature.tabularFigures()],
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.6,
+            height: 1.05,
+            color: AppBrand.secondary.withValues(alpha: 0.92),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          widget.pingLabel,
+          textAlign: TextAlign.right,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontFeatures: const [FontFeature.tabularFigures()],
+            fontWeight: FontWeight.w600,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+
+  static String _formatUptime(Duration d) {
+    final h = d.inHours;
+    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    if (h > 0) {
+      return '${h.toString().padLeft(2, '0')}:$m:$s';
+    }
+    return '$m:$s';
   }
 }

@@ -21,11 +21,9 @@ class PostAuthRouter {
     final anonymous =
         AppConfig.authAnonymous || entitlement.authAnonymousEnabled;
 
-    // Anonymous: never soft-pass. No entitlement → locked paywall.
+    // Free cold auth (ADR 010): anonymous without Premium still enters the app.
+    // Seats / premium nodes stay gated by entitlement; VPN uses free quota.
     if (anonymous) {
-      if (!entitlement.hasAccess) {
-        return PostAuthDestination.locked;
-      }
       if (!onboardingCompleted) {
         return PostAuthDestination.onboarding;
       }

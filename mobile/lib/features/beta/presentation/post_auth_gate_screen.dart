@@ -11,6 +11,7 @@ import '../../auth/application/auth_provider.dart';
 import '../../auth/application/auth_state.dart';
 import '../../auth/application/logout_handler.dart';
 import '../../onboarding/data/onboarding_prefs.dart';
+import '../../vpn/data/vpn_controller.dart';
 import '../application/beta_providers.dart';
 import '../application/post_auth_router.dart';
 import '../data/jwt_subject.dart';
@@ -19,6 +20,9 @@ import '../data/jwt_subject.dart';
 ///
 /// Network / Dio failures MUST NOT soft-pass into the shell. Closed-beta gates
 /// stay authoritative; unreachable API → retry UI, not home with VPN.
+///
+/// When another VPN / Always-on blocks the network, show conflict UX with a
+/// deep-link to Android VPN settings (same path as Home Nest Connect).
 class PostAuthGateScreen extends ConsumerStatefulWidget {
   const PostAuthGateScreen({super.key});
 
@@ -27,7 +31,14 @@ class PostAuthGateScreen extends ConsumerStatefulWidget {
 }
 
 class _PostAuthGateScreenState extends ConsumerState<PostAuthGateScreen> {
+  /// Non-null when entitlement failed for a non-conflict reason.
   String? _error;
+
+  /// True when [queryVpnConflict] reports a blocking foreign Always-on / lockdown.
+  bool _vpnConflict = false;
+
+  /// Optional label of the conflicting app (may be empty on Android 12+).
+  String? _conflictAppLabel;
 
   @override
   void initState() {
@@ -66,11 +77,9 @@ class _PostAuthGateScreenState extends ConsumerState<PostAuthGateScreen> {
             AppRouter.postAuthResolved = false;
             context.go('/locked');
           case PostAuthDestination.onboarding:
-            AppRouter.postAuthResolved = true;
-            context.go('/onboarding');
+            await AppRouter.goAfterEntitlement(context, '/onboarding');
           case PostAuthDestination.home:
-            AppRouter.postAuthResolved = true;
-            context.go('/home');
+            await AppRouter.goAfterEntitlement(context, '/home');
         }
         return;
       } on DioException catch (e) {
@@ -103,16 +112,45 @@ class _PostAuthGateScreenState extends ConsumerState<PostAuthGateScreen> {
     }
     if (!mounted) return;
     AppRouter.postAuthResolved = false;
-    setState(() => _error = lastError?.toString() ?? 'unknown');
+
+    final conflict = await VpnController.instance.queryVpnConflict();
+    if (!mounted) return;
+    if (conflict.foreignAlwaysOn) {
+      final label = conflict.appLabel?.trim();
+      setState(() {
+        _vpnConflict = true;
+        _conflictAppLabel =
+            (label != null && label.isNotEmpty) ? label : null;
+        _error = lastError?.toString() ?? 'vpn_conflict';
+      });
+      return;
+    }
+
+    setState(() {
+      _vpnConflict = false;
+      _conflictAppLabel = null;
+      _error = lastError?.toString() ?? 'unknown';
+    });
+  }
+
+  void _retry() {
+    setState(() {
+      _error = null;
+      _vpnConflict = false;
+      _conflictAppLabel = null;
+    });
+    _resolve();
   }
 
   @override
   Widget build(BuildContext context) {
     final l = AppL10n.of(context);
     final theme = Theme.of(context);
+    final loading = _error == null && !_vpnConflict;
+
     return Scaffold(
       body: Center(
-        child: _error == null
+        child: loading
             ? const CircularProgressIndicator()
             : Padding(
                 padding: const EdgeInsets.all(24),
@@ -121,17 +159,49 @@ class _PostAuthGateScreenState extends ConsumerState<PostAuthGateScreen> {
                   children: [
                     const AppIcon(AppIcons.warning, size: 48),
                     const SizedBox(height: 16),
-                    Text(
-                      l.betaGateError,
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.bodyLarge,
-                    ),
-                    const SizedBox(height: 16),
+                    if (_vpnConflict) ...[
+                      Text(
+                        l.homeVpnConflictTitle,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _conflictAppLabel != null
+                            ? l.homeVpnConflictHintNamed(_conflictAppLabel!)
+                            : l.homeVpnConflictHint,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyLarge,
+                      ),
+                      const SizedBox(height: 16),
+                      FilledButton.tonal(
+                        onPressed: () async {
+                          final opened =
+                              await VpnController.instance.openVpnSettings();
+                          if (!context.mounted) return;
+                          if (!opened) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(l.settingsKillSwitchOpenFailed),
+                              ),
+                            );
+                          }
+                        },
+                        child: Text(l.settingsKillSwitchOpenVpn),
+                      ),
+                      const SizedBox(height: 12),
+                    ] else ...[
+                      Text(
+                        l.betaGateError,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyLarge,
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                     FilledButton(
-                      onPressed: () {
-                        setState(() => _error = null);
-                        _resolve();
-                      },
+                      onPressed: _retry,
                       child: Text(l.homeRetry),
                     ),
                   ],

@@ -55,8 +55,7 @@ class _PromoCodeScreenState extends ConsumerState<PromoCodeScreen> {
       if (!mounted) return;
       // Require server has_access — outcome alone must not open onboarding.
       if (result.outcome.isSuccess && result.hasAccess) {
-        AppRouter.postAuthResolved = true;
-        context.go('/onboarding');
+        await AppRouter.goAfterEntitlement(context, '/onboarding');
         return;
       }
       if (result.outcome.isSuccess && !result.hasAccess) {

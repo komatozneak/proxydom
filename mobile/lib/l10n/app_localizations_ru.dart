@@ -119,7 +119,7 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get premiumBody =>
-      'Премиум открывает ноды без рекламы YouTube и снимает лимит 5 ГБ.';
+      'Премиум открывает ноды без рекламы YouTube, до 5 устройств и снимает лимит 4,20 ГБ.';
 
   @override
   String get premiumFeatureYt => 'Локации YouTube без mid-roll рекламы';
@@ -283,6 +283,22 @@ class AppL10nRu extends AppL10n {
   String get homeErrorFriendly => 'Не удалось подключиться. Попробуйте снова.';
 
   @override
+  String get homeVpnConflictTitle => 'Мешает другой VPN';
+
+  @override
+  String get homeVpnConflictHint =>
+      'Отключите другой VPN или «Всегда включён» в настройках Android, затем подключитесь снова.';
+
+  @override
+  String homeVpnConflictHintNamed(String app) {
+    return 'Отключите «$app» (или «Всегда включён») в настройках Android, затем подключитесь снова.';
+  }
+
+  @override
+  String get homeVpnPermissionHint =>
+      'Разрешите VPN в системном запросе Android, затем нажмите подключение снова.';
+
+  @override
   String get homeConfigErrorFriendly =>
       'Не удалось получить конфиг. Проверьте связь и попробуйте снова.';
 
@@ -335,6 +351,12 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get settingsAccessNoneSubtitle => 'Нужен код приглашения.';
+
+  @override
+  String get settingsAccessFreeTitle => 'Бесплатный';
+
+  @override
+  String get settingsAccessFreeSubtitle => '1 устройство · до 4,20 ГБ в месяц.';
 
   @override
   String settingsAccessActiveUntil(String date) {
@@ -434,12 +456,6 @@ class AppL10nRu extends AppL10n {
   String get settingsAutoReconnectHint => 'Быстрое переподключение при обрыве';
 
   @override
-  String get settingsSplitTunnel => 'Режимы';
-
-  @override
-  String get settingsSplitTunnelHint => 'Умный / обычный / по сайтам';
-
-  @override
   String get settingsDevices => 'Устройства';
 
   @override
@@ -492,6 +508,28 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get devicesRevokeFailed => 'Не удалось отозвать устройство';
+
+  @override
+  String get devicesLeave => 'Покинуть аккаунт';
+
+  @override
+  String get devicesLeaveTitle => 'Покинуть общий аккаунт?';
+
+  @override
+  String get devicesLeaveBody =>
+      'Это устройство станет отдельным аккаунтом. Подписка останется на старом аккаунте. Сохраните новый код восстановления, если он появится.';
+
+  @override
+  String get devicesLeaveConfirm => 'Покинуть';
+
+  @override
+  String get devicesLeft => 'Устройство отвязано от аккаунта';
+
+  @override
+  String get devicesLeaveFailed => 'Не удалось покинуть аккаунт';
+
+  @override
+  String get devicesLimitOpenManage => 'Управление устройствами';
 
   @override
   String get splitTunnelSearchHint => 'Поиск по моим сайтам';
@@ -765,7 +803,13 @@ class AppL10nRu extends AppL10n {
   String get regionSectionGeneral => 'Основные';
 
   @override
-  String get regionSectionYoutube => 'YouTube — без рекламы';
+  String get regionSectionYoutube => 'Премиум';
+
+  @override
+  String get regionSectionEurope => 'Европа';
+
+  @override
+  String get regionSectionUsa => 'США';
 
   @override
   String get regionComingSoon => 'Скоро появится';
@@ -815,6 +859,18 @@ class AppL10nRu extends AppL10n {
   }
 
   @override
+  String get regionSwitchingTitle => 'Меняем локацию…';
+
+  @override
+  String get regionSwitchingBody => 'Подключаем выбранный сервер';
+
+  @override
+  String get regionSwitchedTitle => 'Готово';
+
+  @override
+  String get regionSwitchFailedTitle => 'Не удалось сменить локацию';
+
+  @override
   String get logoutTooltip => 'Выйти';
 
   @override
@@ -838,6 +894,9 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get cancel => 'Отмена';
+
+  @override
+  String get navBack => 'Назад';
 
   @override
   String get verifyTitle => 'Код из звонка';
@@ -1105,6 +1164,29 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get settingsSeatCodeCopied => 'Код скопирован';
+
+  @override
+  String get settingsSeatInviteFailed => 'Не удалось создать код места';
+
+  @override
+  String get settingsAcceptSeatOk => 'Устройство присоединено к аккаунту';
+
+  @override
+  String get settingsSeatPremiumRequired =>
+      'Приглашение устройств доступно в Premium';
+
+  @override
+  String get settingsSeatCodeNotFound => 'Код не найден или истёк';
+
+  @override
+  String get settingsSeatDeviceLimit => 'Достигнут лимит устройств на аккаунте';
+
+  @override
+  String get settingsSeatOwnCode =>
+      'Нельзя принять свой код — введите его на другом устройстве';
+
+  @override
+  String get settingsSeatAcceptFailed => 'Не удалось принять код места';
 
   @override
   String get settingsRecoverAccess => 'Восстановить доступ';

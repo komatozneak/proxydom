@@ -10,9 +10,18 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.ParcelFileDescriptor
+import android.os.SystemClock
 import android.provider.Settings
+import android.system.OsConstants
 import android.util.Log
 import java.net.InetAddress
+import java.net.InetSocketAddress
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import com.adguard.trusttunnel.VpnClient
+import com.adguard.trusttunnel.VpnState
+import com.adguard.trusttunnel.VpnServiceConfig as TtVpnServiceConfig
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
@@ -20,12 +29,9 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Android VpnService с libbox JNI (sing-box tun2socks).
- *
- * Lifecycle:
- * - establish TUN через Builder
- * - TunForwarder → SingBoxBridge.setTunFd
- * - SingBoxBridge.start(config) → libbox CommandServer
+ * Android VpnService with dual-core runtime (ADR 005 / ADR 006):
+ * - Xray: VpnService TUN → libXray setTunFd (gVisor) → VLESS
+ * - TrustTunnel: VpnService TUN → TrustTunnelBridge / VpnClient
  */
 class TeremokVpnService : VpnService() {
 
@@ -36,6 +42,16 @@ class TeremokVpnService : VpnService() {
         const val EXTRA_USERNAME = "username"
         const val EXTRA_PROTOCOL = "protocol"
         const val EXTRA_PARAMS_JSON = "paramsJson"
+
+        /** Session payload schema from Flutter VpnServiceConfig / VpnController. */
+        const val SESSION_SCHEMA_VERSION = 2
+
+        /** paramsJson["vpnCore"] values — dual-core switch (ADR 006). */
+        const val VPN_CORE_XRAY = "xray"
+        const val VPN_CORE_TRUSTTUNNEL = "trusttunnel"
+
+        /** TT native CONNECTED wait budget. */
+        private const val TT_CONNECT_TIMEOUT_MS = 20_000L
 
         /** Минимальный интервал между попытками start (debounce reconnect storm). */
         private const val START_DEBOUNCE_MS = 2000L
@@ -142,6 +158,61 @@ class TeremokVpnService : VpnService() {
             )
         }
 
+        /**
+         * Detect Always-on held by **another** VPN app (blocks Teremok Connect).
+         *
+         * Keys: foreignAlwaysOn (Boolean), packageName (String?),
+         * appLabel (String?), lockdown (Boolean?).
+         */
+        fun queryVpnConflict(context: android.content.Context): Map<String, Any?> {
+            val alwaysOnPkg = readSecureString(context, "always_on_vpn_app")?.trim()
+                ?.takeIf { it.isNotEmpty() }
+            val lockdown = readSecureLockdownEnabled(context)
+            // VpnService.isAlwaysOn is only true while OUR service holds Always-on.
+            val oursAlwaysOn = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                currentInstance()?.let { svc ->
+                    runCatching { svc.isAlwaysOn }.getOrNull()
+                } == true
+            } else {
+                false
+            }
+            // Android 12+ often blocks Settings.Secure.always_on_vpn_app for
+            // non-system apps (Pixel: "is not readable") while still exposing
+            // always_on_vpn_lockdown=1. Treat lockdown-without-our-Always-on as
+            // a foreign block so gate UX is not «check your connection».
+            val foreign = when {
+                alwaysOnPkg != null -> alwaysOnPkg != context.packageName
+                lockdown == true && !oursAlwaysOn -> true
+                else -> false
+            }
+            val label = if (foreign && alwaysOnPkg != null) {
+                resolveAppLabel(context, alwaysOnPkg)
+            } else {
+                null
+            }
+            Log.i(
+                TAG,
+                "vpnConflict foreign=$foreign pkg=$alwaysOnPkg label=$label " +
+                    "lockdown=$lockdown oursAlwaysOn=$oursAlwaysOn",
+            )
+            return mapOf(
+                "foreignAlwaysOn" to foreign,
+                "packageName" to if (foreign) alwaysOnPkg else null,
+                "appLabel" to label,
+                "lockdown" to lockdown,
+            )
+        }
+
+        private fun resolveAppLabel(context: android.content.Context, packageName: String): String {
+            return try {
+                val pm = context.packageManager
+                val info = pm.getApplicationInfo(packageName, 0)
+                pm.getApplicationLabel(info).toString().ifBlank { packageName }
+            } catch (_: Exception) {
+                packageName
+            }
+        }
+
         /** Best-effort [Settings.Secure] string; null on missing or S+ restriction. */
         private fun readSecureString(
             context: android.content.Context,
@@ -220,13 +291,17 @@ class TeremokVpnService : VpnService() {
             return VpnService.prepare(context)
         }
 
+        /**
+         * MethodChannel alias kept for Dart; returns Xray work-dir log tail when
+         * present, otherwise empty string (libbox stderr removed).
+         */
         fun readSingBoxStderrTail(context: android.content.Context, maxLines: Int): String {
-            val file = java.io.File(context.filesDir, "sing-box/stderr.log")
-            if (!file.exists()) return "(none)"
+            val file = java.io.File(context.filesDir, "xray/stderr.log")
+            if (!file.exists()) return ""
             return runCatching {
                 val lines = file.readLines()
-                if (lines.isEmpty()) "(empty)" else lines.takeLast(maxLines).joinToString("\n")
-            }.getOrElse { "(read error: ${it.message})" }
+                if (lines.isEmpty()) "" else lines.takeLast(maxLines).joinToString("\n")
+            }.getOrDefault("")
         }
 
         fun sessionPrefs(context: android.content.Context) =
@@ -280,10 +355,9 @@ class TeremokVpnService : VpnService() {
 
     private var tunInterface: ParcelFileDescriptor? = null
     private var isRunning = false
-    /** True only while [startVpn] is establishing TUN/libbox (not onCreate hint). */
+    /** True only while [startVpn] is establishing TUN/core (not onCreate hint). */
     @Volatile
     private var establishInProgress = false
-    private var tunForwarder: TunForwarder? = null
     private var trafficMonitor: VpnTrafficMonitor? = null
     private var pingMonitor: VpnPingMonitor? = null
     private var notificationSessionLine: String = "Теремок VPN"
@@ -472,6 +546,25 @@ class TeremokVpnService : VpnService() {
         }
     }
 
+    /** Self + user «Что работает без VPN?» apps stay off the TUN. */
+    private fun applyDisallowedApplications(
+        builder: Builder,
+        params: Map<String, Any?>,
+    ) {
+        runCatching { builder.addDisallowedApplication(packageName) }
+            .onFailure { Log.w(TAG, "addDisallowedApplication(self) failed", it) }
+        @Suppress("UNCHECKED_CAST")
+        val apps = params["disallowedApplications"] as? List<*> ?: return
+        for (raw in apps) {
+            val pkg = (raw as? String)?.trim().orEmpty()
+            if (pkg.isEmpty() || pkg == packageName) continue
+            runCatching { builder.addDisallowedApplication(pkg) }
+                .onFailure {
+                    Log.w(TAG, "addDisallowedApplication($pkg) failed", it)
+                }
+        }
+    }
+
     /**
      * User-facing notification subtitle: region/node label, optional protocol.
      * Never Marzban username (`u_3`) or `UNKNOWN`.
@@ -499,10 +592,7 @@ class TeremokVpnService : VpnService() {
     }
 
     /**
-     * Создаёт TUN-интерфейс через Builder.establish() на основе распарсенных
-     * параметров из sing-box config (см. [VpnServiceConfig.toJsonString] в Dart).
-     *
-     * Пока не подключаем к sing-box — это будет в Шаге 14+.
+     * Creates TUN and starts Xray (gVisor) or TrustTunnel based on paramsJson.
      */
     private fun startVpn(
         username: String,
@@ -510,23 +600,17 @@ class TeremokVpnService : VpnService() {
         params: Map<String, Any?>,
     ) {
         if (isRunning) {
-            Log.w(TAG, "startVpn: уже запущен — stop+reapply новых params")
-            // Mode switch / reconnect must not keep the old sing-box JSON.
+            Log.w(TAG, "startVpn: already running — stop+reapply new params")
             runCatching { stopVpn() }
-            // Allow immediate re-establish after intentional reconfigure.
             lastStartAttemptMs = 0L
-            // Fall through to establish with new params.
         }
-        // Note: onCreate may set currentStatus=preparing when KEY_ACTIVE (UI hint
-        // for Always-on). That must NOT block a real ACTION_START — only an
-        // in-flight establish / debounce should.
         if (establishInProgress) {
-            Log.w(TAG, "startVpn: establish already in progress, пропускаем")
+            Log.w(TAG, "startVpn: establish already in progress, skip")
             return
         }
         val now = System.currentTimeMillis()
         if (now - lastStartAttemptMs < START_DEBOUNCE_MS) {
-            Log.w(TAG, "startVpn: debounce (${now - lastStartAttemptMs}ms), пропускаем")
+            Log.w(TAG, "startVpn: debounce (${now - lastStartAttemptMs}ms), skip")
             return
         }
         lastStartAttemptMs = now
@@ -543,174 +627,406 @@ class TeremokVpnService : VpnService() {
             currentStatus = "preparing"
             VpnStatusBroadcaster.emit(currentStatus)
 
-            val sessionName = (params["sessionName"] as? String)
-                ?.takeIf { it.isNotBlank() }
-                ?: "Теремок VPN"
-            val mtu = (params["mtu"] as? Number)?.toInt() ?: 1500
-            val address = (params["address"] as? String) ?: "10.255.255.1"
-            val addressPrefix = (params["addressPrefix"] as? Number)?.toInt() ?: 30
-            @Suppress("UNCHECKED_CAST")
-            val routes = (params["routes"] as? List<String>) ?: listOf("0.0.0.0/0")
-            @Suppress("UNCHECKED_CAST")
-            val dnsServers = (params["dnsServers"] as? List<String>)
-                ?: listOf(tunDnsPeerAddress(address, addressPrefix))
-            val outboundServer = (params["outboundServer"] as? String) ?: "unknown"
-            val outboundServerPort = (params["outboundServerPort"] as? Number)?.toInt() ?: 443
-            val outboundUuid = (params["outboundUuid"] as? String) ?: ""
-            val outboundFlow = params["outboundFlow"] as? String
-            val tlsFingerprint = params["outboundTlsFingerprint"] as? String
-            val tlsSni = params["outboundTlsSni"] as? String
-            val tlsPublicKey = params["outboundTlsPublicKey"] as? String
-            val tlsShortId = params["outboundTlsShortId"] as? String
-
-            Log.i(TAG, "startVpn: $sessionName (mtu=$mtu)")
-            Log.i(TAG, "  tunnel: $address/$addressPrefix, routes=$routes, dns=$dnsServers")
-            Log.i(
-                TAG,
-                "  outbound: $outboundServer:$outboundServerPort flow=$outboundFlow",
-            )
-            Log.i(
-                TAG,
-                "  tls: sni=$tlsSni fp=$tlsFingerprint pk=$tlsPublicKey sid=$tlsShortId",
-            )
-
-            val builder = Builder()
-                .setSession(sessionName)
-                .setMtu(mtu)
-                .addAddress(address, addressPrefix)
-
-            for (route in routes) {
-                val parts = route.split("/")
-                if (parts.size == 2) {
-                    // IPv6 default route без v6-адреса на TUN ломает connectivity на Android.
-                    if (parts[0].contains(":")) {
-                        Log.w(TAG, "  skip IPv6 route '$route' (no inet6 on TUN)")
-                        continue
-                    }
-                    try {
-                        builder.addRoute(parts[0], parts[1].toInt())
-                        Log.i(TAG, "  added route: $route")
-                    } catch (e: Exception) {
-                        Log.w(TAG, "  invalid route '$route', skipping")
-                    }
-                } else {
-                    Log.w(TAG, "  invalid route '$route' (expected addr/prefix), skipping")
-                }
-            }
-
-            for (dns in dnsServers) {
-                builder.addDnsServer(dns)
-            }
-
-            applyBypassRoutes(builder, outboundServer, params)
-
-            currentStatus = "connecting"
-            VpnStatusBroadcaster.emit(currentStatus)
-
-            // До TUN: underlying network должен быть известен для direct→VPS
-            // и для setUnderlyingNetworks (sites allowlist / Android validation).
-            DefaultNetworkMonitor.prewarm(this)
-            if (!DefaultNetworkMonitor.awaitUnderlyingNetwork(this, 5000)) {
-                Log.e(TAG, "startVpn: underlying network timeout — aborting")
-                failStart("underlying network not ready")
-                return
-            }
-            ProtectGuard.reset()
-            ProtectGuard.onFailure = {
-                Log.e(TAG, "startVpn: protect() failed — stopping VPN")
-                Handler(Looper.getMainLooper()).post {
-                    if (isRunning) {
-                        failStart("VpnService.protect() failed")
-                    }
-                }
-            }
-
-            tunInterface = builder.establish()
-
-            if (tunInterface == null) {
-                ProtectGuard.onFailure = null
-                failStart("VPN permission denied or establish() returned null")
-                return
-            }
-
-            // Tell Android the physical network backs this VPN so split/direct
-            // (sites allowlist final=direct) still validates as having internet.
-            val underlying = DefaultNetworkMonitor.defaultNetwork
-            if (underlying != null) {
-                try {
-                    setUnderlyingNetworks(arrayOf(underlying))
-                    Log.i(TAG, "startVpn: setUnderlyingNetworks ok")
-                } catch (e: Exception) {
-                    Log.w(TAG, "startVpn: setUnderlyingNetworks failed", e)
-                }
-            } else {
-                Log.w(TAG, "startVpn: no underlying network for setUnderlyingNetworks")
-            }
-
-            isRunning = true
-
-            val singBoxConfigJson = (params["singBoxConfigJson"] as? String)
-                ?.takeIf { it.isNotBlank() }
-                ?: buildSingBoxJson(
-                    params = params,
-                    address = address,
-                    addressPrefix = addressPrefix,
-                    mtu = mtu,
-                    outboundServer = outboundServer,
-                    outboundServerPort = outboundServerPort,
-                    outboundUuid = outboundUuid,
-                    outboundFlow = outboundFlow,
-                    tlsFingerprint = tlsFingerprint,
-                    tlsSni = tlsSni,
-                    tlsPublicKey = tlsPublicKey,
-                    tlsShortId = tlsShortId,
+            if (!validateRuntimeParams(params)) {
+                failStart(
+                    "invalid session: need schemaVersion=$SESSION_SCHEMA_VERSION " +
+                        "with xrayCandidateConfigs or trusttunnelToml " +
+                        "(legacy singBoxConfigJson rejected)",
                 )
-            Log.i(TAG, "startVpn: sing-box config (${singBoxConfigJson.length} chars)")
-
-            val bridge = SingBoxBridge.instance
-            bridge.bind(this)
-            if (!bridge.loadLibrary()) {
-                Log.e(TAG, "startVpn: libbox init failed")
-                failStart("libbox init failed")
                 return
             }
 
-            val activeTun = tunInterface
-            if (activeTun != null) {
-                tunForwarder = TunForwarder(activeTun, bridge) {
-                    Log.i(TAG, "TunForwarder: TUN fd wired to libbox")
-                }
-                tunForwarder?.start()
-            } else {
-                Log.e(TAG, "startVpn: tunInterface is null")
-                failStart("TUN interface is null")
+            if (isTrustTunnelCore(params)) {
+                startTrustTunnelOnWorker(username, protocol, params)
                 return
             }
 
-            val started = bridge.start(singBoxConfigJson)
-            if (!started) {
-                val detail = bridge.lastErrorMessage ?: "unknown libbox error"
-                Log.e(TAG, "startVpn: libbox не запустился: $detail")
-                failStart(detail)
-                return
-            }
-
-            if (ProtectGuard.hasFailed()) {
-                Log.e(TAG, "startVpn: protect() failed during libbox start — aborting")
-                failStart("VpnService.protect() failed")
-                return
-            }
-
-            establishInProgress = false
-            currentStatus = "connected"
-            VpnStatusBroadcaster.emit(currentStatus)
-            showConnectedNotification()
-            startTrafficMonitor()
-            Log.i(TAG, "startVpn: TUN interface established (protocol=$protocol)")
+            startXrayOnWorker(username, protocol, params)
         } catch (e: Exception) {
             Log.e(TAG, "startVpn: failed", e)
             failStart(e.message ?: e.toString())
         }
+    }
+
+    private fun validateRuntimeParams(params: Map<String, Any?>): Boolean {
+        if ((params["schemaVersion"] as? Number)?.toInt() != SESSION_SCHEMA_VERSION) {
+            return false
+        }
+        if (isTrustTunnelCore(params)) {
+            return !((params["trusttunnelToml"] as? String).isNullOrBlank())
+        }
+        return runtimeCandidates(params).isNotEmpty()
+    }
+
+    private fun startXrayOnWorker(
+        username: String,
+        protocol: String,
+        params: Map<String, Any?>,
+    ) {
+        val candidates = runtimeCandidates(params)
+        val autoSelect = (params["autoSelect"] as? Boolean) == true
+        val ordered = candidateProbeOrder(candidates, autoSelect = autoSelect)
+        val selected = ordered.firstOrNull()
+        if (selected == null) {
+            failStart("xrayCandidateConfigs empty after probe order")
+            return
+        }
+
+        val sessionName = (params["sessionName"] as? String)
+            ?.takeIf { it.isNotBlank() }
+            ?: "Теремок VPN"
+        val mtu = (params["mtu"] as? Number)?.toInt() ?: 1500
+        val address = (params["address"] as? String) ?: "10.255.255.1"
+        val addressPrefix = (params["addressPrefix"] as? Number)?.toInt() ?: 30
+        @Suppress("UNCHECKED_CAST")
+        val routes = (params["routes"] as? List<String>) ?: listOf("0.0.0.0/0")
+        @Suppress("UNCHECKED_CAST")
+        val dnsServers = (params["dnsServers"] as? List<String>)
+            ?: listOf(tunDnsPeerAddress(address, addressPrefix))
+        val outboundServer = (params["outboundServer"] as? String)
+            ?.takeIf { it.isNotBlank() }
+            ?: selected.host
+
+        Log.i(TAG, "startVpn: Xray $sessionName candidate=${selected.id}@${selected.host}")
+        Log.i(TAG, "  tunnel: $address/$addressPrefix routes=$routes dns=$dnsServers")
+
+        val builder = Builder()
+            .setSession(sessionName)
+            .setMtu(mtu)
+            .addAddress(address, addressPrefix)
+
+        for (route in routes) {
+            val parts = route.split("/")
+            if (parts.size == 2) {
+                if (parts[0].contains(":")) {
+                    Log.w(TAG, "  skip IPv6 route '$route' (no inet6 on TUN)")
+                    continue
+                }
+                try {
+                    builder.addRoute(parts[0], parts[1].toInt())
+                    Log.i(TAG, "  added route: $route")
+                } catch (_: Exception) {
+                    Log.w(TAG, "  invalid route '$route', skipping")
+                }
+            } else {
+                Log.w(TAG, "  invalid route '$route', skipping")
+            }
+        }
+
+        for (dns in dnsServers) {
+            builder.addDnsServer(dns)
+        }
+
+        applyBypassRoutes(builder, outboundServer, params)
+        applyDisallowedApplications(builder, params)
+
+        currentStatus = "connecting"
+        VpnStatusBroadcaster.emit(currentStatus)
+
+        DefaultNetworkMonitor.prewarm(this)
+        if (!DefaultNetworkMonitor.awaitUnderlyingNetwork(this, 5000)) {
+            failStart("underlying network not ready")
+            return
+        }
+        ProtectGuard.reset()
+        ProtectGuard.onFailure = {
+            Log.e(TAG, "startVpn: protect() failed — stopping VPN")
+            Handler(Looper.getMainLooper()).post {
+                if (isRunning || establishInProgress) {
+                    failStart("VpnService.protect() failed")
+                }
+            }
+        }
+
+        tunInterface = builder.establish()
+        val activeTun = tunInterface
+        if (activeTun == null) {
+            ProtectGuard.onFailure = null
+            failStart("VPN permission denied or establish() returned null")
+            return
+        }
+
+        DefaultNetworkMonitor.defaultNetwork?.let { network ->
+            runCatching { setUnderlyingNetworks(arrayOf(network)) }
+                .onFailure { Log.w(TAG, "setUnderlyingNetworks failed", it) }
+        }
+
+        val bridge = XrayBridge.instance
+        bridge.bind(this)
+        if (!bridge.loadLibrary()) {
+            failStart("Xray init failed")
+            return
+        }
+
+        Log.i(
+            TAG,
+            "candidate ${selected.id}@${selected.host}: starting Xray+gVisor tunFd=${activeTun.fd}",
+        )
+        if (!bridge.start(selected.configJson, tunFd = activeTun.fd)) {
+            val detail = bridge.lastErrorMessage ?: "Xray start failed"
+            failStart("${selected.id}@${selected.host}: $detail")
+            return
+        }
+        if (ProtectGuard.hasFailed()) {
+            failStart("VpnService.protect() failed during Xray start")
+            return
+        }
+
+        // Hard SOCKS HTTPS gate: CONNECT-only can look healthy while Europe XHTTP
+        // data-plane is dead (cp.cloudflare.com generate_204 hang). Refuse connected.
+        if (!probeSocksHttps(selected)) {
+            failStart(
+                "${selected.id}@${selected.host}: SOCKS HTTPS probe failed",
+            )
+            return
+        }
+
+        isRunning = true
+        establishInProgress = false
+        currentStatus = "connected"
+        VpnStatusBroadcaster.emit(currentStatus)
+        showConnectedNotification()
+        startTrafficMonitor()
+        Log.i(
+            TAG,
+            "startVpn: TUN+gVisor+Xray established candidate=" +
+                "${selected.id}@${selected.host} user=$username protocol=$protocol",
+        )
+    }
+
+    /**
+     * TrustTunnel core (ADR 006): native VpnClient owns the tunnel fd after start.
+     */
+    private fun startTrustTunnelOnWorker(
+        username: String,
+        protocol: String,
+        params: Map<String, Any?>,
+    ) {
+        val toml = (params["trusttunnelToml"] as? String)?.trim().orEmpty()
+        if (toml.isEmpty()) {
+            failStart("trusttunnelToml missing")
+            return
+        }
+        val ttHost = (params["trusttunnelHost"] as? String)?.trim().orEmpty()
+        val ttConfig = runCatching { TtVpnServiceConfig.parseToml(toml) }.getOrNull()
+
+        DefaultNetworkMonitor.prewarm(this)
+        if (!DefaultNetworkMonitor.awaitUnderlyingNetwork(this, 5000)) {
+            failStart("underlying network not ready")
+            return
+        }
+        ProtectGuard.reset()
+        ProtectGuard.onFailure = {
+            Log.e(TAG, "TrustTunnel: protect() failed — stopping VPN")
+            Handler(Looper.getMainLooper()).post {
+                if (isRunning || establishInProgress) {
+                    failStart("VpnService.protect() failed")
+                }
+            }
+        }
+
+        val sessionName = (params["sessionName"] as? String)
+            ?.takeIf { it.isNotBlank() }
+            ?: "Теремок VPN"
+        val mtu = ttConfig?.listener?.tun?.mtuSize?.toInt()?.takeIf { it > 0 } ?: 1500
+        val builder = Builder()
+            .setSession(sessionName)
+            .setMtu(mtu)
+            .addAddress(TrustTunnelBridge.TUN_ADDRESS, TrustTunnelBridge.TUN_ADDRESS_PREFIX)
+        builder.allowFamily(OsConstants.AF_INET)
+        applyDisallowedApplications(builder, params)
+
+        val hasDnsUpstreams = ttConfig?.endpoint?.dnsUpstreams?.isNotEmpty() == true ||
+            toml.contains("dns_upstreams")
+        if (hasDnsUpstreams) {
+            builder.addDnsServer(TrustTunnelBridge.FAKE_DNS_SERVER)
+        } else {
+            builder.addDnsServer("1.1.1.1")
+            builder.addDnsServer("8.8.8.8")
+        }
+
+        val included = ttConfig?.listener?.tun?.includedRoutes
+            ?.takeIf { it.isNotEmpty() }
+            ?: listOf("0.0.0.0/0")
+        val excluded = (ttConfig?.listener?.tun?.excludedRoutes ?: emptyList()) +
+            listOf("0.0.0.0/8", "224.0.0.0/3")
+        val routes = try {
+            VpnClient.excludeCidr(included, excluded)
+        } catch (e: Exception) {
+            Log.w(TAG, "excludeCidr failed, using full default route", e)
+            listOf("0.0.0.0/0")
+        } ?: listOf("0.0.0.0/0")
+
+        for (route in routes) {
+            val parts = route.split("/")
+            if (parts.size == 2 && !parts[0].contains(":")) {
+                try {
+                    builder.addRoute(parts[0], parts[1].toInt())
+                } catch (_: Exception) {
+                    Log.w(TAG, "  invalid TT route '$route', skipping")
+                }
+            }
+        }
+
+        currentStatus = "connecting"
+        VpnStatusBroadcaster.emit(currentStatus)
+
+        val tun = builder.establish()
+        if (tun == null) {
+            ProtectGuard.onFailure = null
+            failStart("VPN permission denied or establish() returned null")
+            return
+        }
+        tunInterface = tun
+        DefaultNetworkMonitor.defaultNetwork?.let { network ->
+            runCatching { setUnderlyingNetworks(arrayOf(network)) }
+        }
+
+        val bridge = TrustTunnelBridge.instance
+        bridge.bind(this)
+        val connectedLatch = CountDownLatch(1)
+        val droppedBeforeConnect = AtomicBoolean(false)
+        val host = object : TrustTunnelBridge.Host {
+            override fun onTrustTunnelState(state: VpnState) {
+                when (state) {
+                    VpnState.CONNECTED -> connectedLatch.countDown()
+                    VpnState.DISCONNECTED -> {
+                        if (connectedLatch.count > 0L) {
+                            droppedBeforeConnect.set(true)
+                            connectedLatch.countDown()
+                        } else if (isRunning) {
+                            Log.e(TAG, "TrustTunnel dropped post-connect — stopping")
+                            Handler(Looper.getMainLooper()).post {
+                                markSessionInactive()
+                                stopVpn()
+                            }
+                        }
+                    }
+                    else -> Unit
+                }
+            }
+        }
+
+        if (!bridge.start(toml, tun, host)) {
+            val detail = bridge.lastErrorMessage ?: "TrustTunnel start failed"
+            failStart(detail)
+            return
+        }
+        // VpnClient.start takes ownership of the TUN fd.
+        tunInterface = null
+
+        if (ProtectGuard.hasFailed()) {
+            failStart("VpnService.protect() failed during TrustTunnel start")
+            return
+        }
+
+        val connected = try {
+            connectedLatch.await(TT_CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+        } catch (_: InterruptedException) {
+            false
+        }
+        if (!connected || droppedBeforeConnect.get()) {
+            failStart(
+                if (droppedBeforeConnect.get()) {
+                    "TrustTunnel handshake dropped (auth/endpoint unreachable)"
+                } else {
+                    "TrustTunnel CONNECTED timeout (${TT_CONNECT_TIMEOUT_MS}ms)"
+                },
+            )
+            return
+        }
+
+        isRunning = true
+        establishInProgress = false
+        currentStatus = "connected"
+        VpnStatusBroadcaster.emit(currentStatus)
+        showConnectedNotification()
+        startTrafficMonitor()
+        Log.i(
+            TAG,
+            "startVpn: TrustTunnel established host=$ttHost user=$username protocol=$protocol",
+        )
+    }
+
+    /**
+     * SOCKS HTTPS generate_204 through local Xray SOCKS — must pass before
+     * `connected`. Runs off the main thread (SOCKS5 + TLS sockets).
+     */
+    private fun probeSocksHttps(selected: XrayRuntimeCandidate): Boolean {
+        val okFlag = AtomicBoolean(false)
+        val done = CountDownLatch(1)
+        Thread(
+            {
+                try {
+                    // Poll SOCKS accept readiness instead of a blind sleep(500).
+                    val warmupDeadline =
+                        SystemClock.elapsedRealtime() + XRAY_SOCKS_WARMUP_BUDGET_MS
+                    while (SystemClock.elapsedRealtime() < warmupDeadline) {
+                        if (VpnPingMonitor.isSocksReachable(
+                                timeoutMs = XRAY_SOCKS_WARMUP_POLL_MS,
+                            )
+                        ) {
+                            break
+                        }
+                        Thread.sleep(50)
+                    }
+                    for (attempt in 1..XRAY_SOCKS_PROBE_ATTEMPTS) {
+                        if (!VpnPingMonitor.isSocksReachable(timeoutMs = 800)) {
+                            Log.w(
+                                TAG,
+                                "SOCKS not reachable yet candidate=" +
+                                    "${selected.id}@${selected.host} " +
+                                    "attempt=$attempt/$XRAY_SOCKS_PROBE_ATTEMPTS",
+                            )
+                            Thread.sleep(XRAY_SOCKS_PROBE_RETRY_SLEEP_MS)
+                            continue
+                        }
+                        val outcome = VpnPingMonitor.socksHttpsProbe(
+                            timeoutMs = XRAY_SOCKS_PROBE_TIMEOUT_MS,
+                        )
+                        if (outcome is VpnPingMonitor.SocksHttpsResult.Ok) {
+                            Log.i(
+                                TAG,
+                                "SOCKS HTTP ${outcome.code} ok candidate=" +
+                                    "${selected.id}@${selected.host} attempt=$attempt",
+                            )
+                            okFlag.set(true)
+                            return@Thread
+                        }
+                        Log.w(
+                            TAG,
+                            "SOCKS HTTPS probe fail candidate=" +
+                                "${selected.id}@${selected.host} " +
+                                "attempt=$attempt/$XRAY_SOCKS_PROBE_ATTEMPTS " +
+                                "err=${outcome.detail}",
+                        )
+                        Thread.sleep(XRAY_SOCKS_PROBE_RETRY_SLEEP_MS)
+                    }
+                } catch (e: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                } finally {
+                    done.countDown()
+                }
+            },
+            "teremok-socks-probe",
+        ).apply { isDaemon = true }.start()
+
+        val budgetMs =
+            XRAY_SOCKS_WARMUP_BUDGET_MS +
+                XRAY_SOCKS_PROBE_ATTEMPTS *
+                (XRAY_SOCKS_PROBE_TIMEOUT_MS + XRAY_SOCKS_PROBE_RETRY_SLEEP_MS + 800L)
+        val finished = try {
+            done.await(budgetMs, TimeUnit.MILLISECONDS)
+        } catch (_: InterruptedException) {
+            false
+        }
+        if (!finished) {
+            Log.w(
+                TAG,
+                "SOCKS HTTPS probe timeout candidate=${selected.id}@${selected.host}",
+            )
+        }
+        return okFlag.get()
     }
 
     private fun failStart(message: String) {
@@ -718,39 +1034,37 @@ class TeremokVpnService : VpnService() {
         VpnStatusBroadcaster.setError(message)
         currentStatus = "error"
         VpnStatusBroadcaster.emit(currentStatus)
-        // Do not leave KEY_ACTIVE=true after a failed establish — sticky/Always-on
-        // would restore a dead session while Flutter may still paint Connected.
         markSessionInactive()
         stopVpn()
     }
 
     private fun stopVpn() {
-        if (!isRunning) {
-            establishInProgress = false
-            currentStatus = "idle"
-            VpnStatusBroadcaster.emit(currentStatus)
-            Log.w(TAG, "stopVpn: не запущен, пропускаем")
-            return
-        }
+        val shouldAnnounce = isRunning ||
+            establishInProgress ||
+            currentStatus == "connecting" ||
+            currentStatus == "preparing" ||
+            currentStatus == "error"
         try {
-            currentStatus = "disconnecting"
-            VpnStatusBroadcaster.emit(currentStatus)
+            if (shouldAnnounce && currentStatus != "revoked") {
+                currentStatus = "disconnecting"
+                VpnStatusBroadcaster.emit(currentStatus)
+            }
             stopTrafficMonitor()
-            // Сначала останавливаем sing-box, потом forwarder, потом закрываем TUN
-            SingBoxBridge.instance.stop()
-            tunForwarder?.stop()
-            tunForwarder = null
+            TrustTunnelBridge.instance.stop()
+            XrayBridge.instance.stop()
             tunInterface?.close()
-            Log.i(TAG, "stopVpn: TUN interface closed")
+            Log.i(TAG, "stopVpn: cores stopped, TUN closed if any")
         } catch (e: Exception) {
-            Log.e(TAG, "stopVpn: error closing tunInterface", e)
+            Log.e(TAG, "stopVpn: error", e)
         } finally {
             ProtectGuard.onFailure = null
             tunInterface = null
             isRunning = false
             establishInProgress = false
-            currentStatus = "idle"
-            VpnStatusBroadcaster.emit(currentStatus)
+            if (currentStatus != "revoked") {
+                currentStatus = "idle"
+                VpnStatusBroadcaster.emit(currentStatus)
+            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 stopForeground(STOP_FOREGROUND_REMOVE)
             } else {
@@ -862,6 +1176,69 @@ object VpnChannelRegistry {
     const val TRAFFIC_EVENT_CHANNEL = "teremok/vpn/traffic"
     const val PING_EVENT_CHANNEL = "teremok/vpn/ping"
 
+    /** Launcher apps for «Что работает без VPN?» → Приложения (no QUERY_ALL_PACKAGES). */
+    private fun listLauncherApps(
+        context: android.content.Context,
+        includeIcons: Boolean,
+    ): List<Map<String, Any?>> {
+        val pm = context.packageManager
+        val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        val resolves = pm.queryIntentActivities(intent, 0)
+        val self = context.packageName
+        val out = ArrayList<Map<String, Any?>>(resolves.size)
+        val seen = HashSet<String>()
+        for (ri in resolves) {
+            val pkg = ri.activityInfo?.packageName?.trim().orEmpty()
+            if (pkg.isEmpty() || pkg == self || !seen.add(pkg)) continue
+            val label = try {
+                ri.loadLabel(pm)?.toString()?.trim().orEmpty()
+            } catch (_: Exception) {
+                pkg
+            }
+            val row = HashMap<String, Any?>(3)
+            row["packageName"] = pkg
+            row["label"] = label.ifBlank { pkg }
+            if (includeIcons) {
+                val png = runCatching {
+                    val drawable = ri.loadIcon(pm) ?: return@runCatching null
+                    drawableToPngBytes(drawable, maxSide = 96)
+                }.getOrNull()
+                if (png != null) {
+                    row["iconPng"] = png
+                }
+            }
+            out.add(row)
+        }
+        out.sortBy { (it["label"] as? String)?.lowercase() ?: "" }
+        return out
+    }
+
+    private fun drawableToPngBytes(
+        drawable: android.graphics.drawable.Drawable,
+        maxSide: Int,
+    ): ByteArray? {
+        val w = drawable.intrinsicWidth.coerceAtLeast(1)
+        val h = drawable.intrinsicHeight.coerceAtLeast(1)
+        val scale = maxSide.toFloat() / maxOf(w, h).toFloat()
+        val tw = (w * scale).toInt().coerceAtLeast(1).coerceAtMost(maxSide)
+        val th = (h * scale).toInt().coerceAtLeast(1).coerceAtMost(maxSide)
+        val bitmap = android.graphics.Bitmap.createBitmap(
+            tw,
+            th,
+            android.graphics.Bitmap.Config.ARGB_8888,
+        )
+        val canvas = android.graphics.Canvas(bitmap)
+        drawable.setBounds(0, 0, tw, th)
+        drawable.draw(canvas)
+        val stream = java.io.ByteArrayOutputStream()
+        if (!bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 90, stream)) {
+            bitmap.recycle()
+            return null
+        }
+        bitmap.recycle()
+        return stream.toByteArray()
+    }
+
     fun register(
         engine: FlutterEngine,
         appContext: android.content.Context,
@@ -940,6 +1317,28 @@ object VpnChannelRegistry {
                             },
                         )
                     }
+                    "getVpnConflict" -> {
+                        runCatching {
+                            TeremokVpnService.queryVpnConflict(appContext)
+                        }.fold(
+                            onSuccess = { result.success(it) },
+                            onFailure = { e ->
+                                Log.w(
+                                    TeremokVpnService.TAG,
+                                    "getVpnConflict failed",
+                                    e,
+                                )
+                                result.success(
+                                    mapOf(
+                                        "foreignAlwaysOn" to false,
+                                        "packageName" to null,
+                                        "appLabel" to null,
+                                        "lockdown" to null,
+                                    ),
+                                )
+                            },
+                        )
+                    }
                     "openVpnSettings" -> {
                         // Prefer Activity context; fall back to app + NEW_TASK.
                         // Do not treat resolveActivity==null as hard fail before
@@ -996,6 +1395,10 @@ object VpnChannelRegistry {
                         svc?.onNotificationStyleChanged()
                         result.success(true)
                     }
+                    "listLauncherApps" -> {
+                        val includeIcons = call.argument<Boolean>("includeIcons") ?: true
+                        result.success(listLauncherApps(appContext, includeIcons))
+                    }
                     else -> result.notImplemented()
                 }
             }
@@ -1024,7 +1427,7 @@ object VpnChannelRegistry {
                 }
             })
 
-        // EventChannel — libbox urlTest delay (ms) for Home ping
+        // EventChannel — path latency (ms) for Home ping (stub without libbox)
         EventChannel(engine.dartExecutor.binaryMessenger, PING_EVENT_CHANNEL)
             .setStreamHandler(object : EventChannel.StreamHandler {
                 override fun onListen(arguments: Any?, events: EventChannel.EventSink) {
@@ -1036,6 +1439,27 @@ object VpnChannelRegistry {
                 }
             })
     }
+}
+
+/**
+ * Peer DNS address inside the TUN /30 (or similar) for Android Builder.addDnsServer.
+ */
+internal fun tunDnsPeerAddress(address: String, prefixLength: Int): String {
+    val octets = address.split(".").mapNotNull { it.toIntOrNull() }
+    if (octets.size != 4) return "172.19.0.2"
+
+    val ip = (octets[0] shl 24) or (octets[1] shl 16) or (octets[2] shl 8) or octets[3]
+    val mask = if (prefixLength == 0) 0 else (-1 shl (32 - prefixLength))
+    val network = ip and mask
+    val broadcast = network or mask.inv()
+    val host1 = network + 1
+    val host2 = broadcast - 1
+    val peer = when (ip) {
+        host1 -> host2
+        host2 -> host1
+        else -> host2
+    }
+    return "${(peer shr 24) and 0xff}.${(peer shr 16) and 0xff}.${(peer shr 8) and 0xff}.${peer and 0xff}"
 }
 
 /**
@@ -1066,230 +1490,6 @@ internal fun jsonArrayToList(arr: JSONArray): List<Any?> {
             else -> value
         }
     }
-}
-
-/**
- * Собирает sing-box config JSON для libbox [CommandServer].
- */
-internal fun tunDnsPeerAddress(address: String, prefixLength: Int): String {
-    val octets = address.split(".").mapNotNull { it.toIntOrNull() }
-    if (octets.size != 4) return "172.19.0.2"
-
-    val ip = (octets[0] shl 24) or (octets[1] shl 16) or (octets[2] shl 8) or octets[3]
-    val mask = if (prefixLength == 0) 0 else (-1 shl (32 - prefixLength))
-    val network = ip and mask
-    val broadcast = network or mask.inv()
-    val host1 = network + 1
-    val host2 = broadcast - 1
-    val peer = when (ip) {
-        host1 -> host2
-        host2 -> host1
-        else -> host2
-    }
-    return "${(peer shr 24) and 0xff}.${(peer shr 16) and 0xff}.${(peer shr 8) and 0xff}.${peer and 0xff}"
-}
-
-/**
- * Собирает sing-box config JSON для libbox [CommandServer].
- */
-internal fun buildSingBoxJson(
-    params: Map<String, Any?>,
-    address: String,
-    addressPrefix: Int,
-    mtu: Int,
-    outboundServer: String,
-    outboundServerPort: Int,
-    outboundUuid: String,
-    outboundFlow: String?,
-    tlsFingerprint: String?,
-    tlsSni: String?,
-    tlsPublicKey: String?,
-    tlsShortId: String?,
-): String {
-    // Prefer multi-node egressHosts; fall back to single outboundServer.
-    val hopHosts = linkedSetOf<String>()
-    @Suppress("UNCHECKED_CAST")
-    val egress = params["egressHosts"] as? List<*>
-    egress?.forEach { host ->
-        if (host is String && host.isNotBlank() && host != "unknown") {
-            hopHosts.add(host.trim())
-        }
-    }
-    if (hopHosts.isEmpty() && outboundServer.isNotEmpty() && outboundServer != "unknown") {
-        hopHosts.add(outboundServer)
-    }
-    if (hopHosts.isEmpty()) {
-        hopHosts.add("127.0.0.1")
-    }
-
-    fun vlessChild(tag: String, server: String): JSONObject =
-        JSONObject().apply {
-            put("type", "vless")
-            put("tag", tag)
-            put("network", "tcp")
-            put("server", server)
-            put("server_port", outboundServerPort)
-            put("uuid", outboundUuid)
-            if (!outboundFlow.isNullOrEmpty()) put("flow", outboundFlow)
-            put(
-                "tls",
-                JSONObject().apply {
-                    put("enabled", true)
-                    if (!tlsSni.isNullOrEmpty()) put("server_name", tlsSni)
-                    put(
-                        "utls",
-                        JSONObject().apply {
-                            put("enabled", true)
-                            if (!tlsFingerprint.isNullOrEmpty()) {
-                                put("fingerprint", tlsFingerprint)
-                            }
-                        },
-                    )
-                    put(
-                        "reality",
-                        JSONObject().apply {
-                            put("enabled", true)
-                            if (!tlsPublicKey.isNullOrEmpty()) put("public_key", tlsPublicKey)
-                            if (!tlsShortId.isNullOrEmpty()) put("short_id", tlsShortId)
-                        },
-                    )
-                },
-            )
-        }
-
-    val childTags = mutableListOf<String>()
-    val vlessOutbounds = JSONArray()
-    hopHosts.forEachIndexed { index, host ->
-        val tag = "proxy-node-$index"
-        childTags.add(tag)
-        vlessOutbounds.put(vlessChild(tag, host))
-    }
-
-    val root = JSONObject().apply {
-        put("log", JSONObject().apply { put("level", "debug") })
-        put(
-            "dns",
-            JSONObject().apply {
-                put(
-                    "servers",
-                    JSONArray().apply {
-                        put(
-                            JSONObject().apply {
-                                put("type", "udp")
-                                put("tag", "dns-remote")
-                                put("server", "1.1.1.1")
-                                put("server_port", 53)
-                                put("detour", VpnPingMonitor.GROUP_TAG)
-                            },
-                        )
-                    },
-                )
-                put("final", "dns-remote")
-                put("strategy", "ipv4_only")
-                put("independent_cache", true)
-            },
-        )
-        put(
-            "inbounds",
-            JSONArray().apply {
-                put(
-                    JSONObject().apply {
-                        put("type", "tun")
-                        put("tag", "tun-in")
-                        put("interface_name", "tun0")
-                        put("mtu", mtu)
-                        put(
-                            "address",
-                            JSONArray().apply { put("$address/$addressPrefix") },
-                        )
-                        put("auto_route", false)
-                        put("stack", "system")
-                    },
-                )
-            },
-        )
-        put(
-            "outbounds",
-            JSONArray().apply {
-                put(JSONObject().apply { put("type", "direct"); put("tag", "direct") })
-                for (i in 0 until vlessOutbounds.length()) {
-                    put(vlessOutbounds.getJSONObject(i))
-                }
-                put(
-                    JSONObject().apply {
-                        put("type", "urltest")
-                        put("tag", VpnPingMonitor.GROUP_TAG)
-                        put(
-                            "outbounds",
-                            JSONArray().apply { childTags.forEach { put(it) } },
-                        )
-                        put("url", "http://www.gstatic.com/generate_204")
-                        put("interval", "1m")
-                        put("tolerance", 150)
-                    },
-                )
-            },
-        )
-        put(
-            "route",
-            JSONObject().apply {
-                put(
-                    "rules",
-                    JSONArray().apply {
-                        put(
-                            JSONObject().apply {
-                                put("inbound", "tun-in")
-                                put("action", "sniff")
-                            },
-                        )
-                        put(
-                            JSONObject().apply {
-                                put("port", JSONArray().apply { put(53) })
-                                put("action", "hijack-dns")
-                            },
-                        )
-                        put(
-                            JSONObject().apply {
-                                put("protocol", "dns")
-                                put("action", "hijack-dns")
-                            },
-                        )
-                        hopHosts.forEach { host ->
-                            if (host.matches(Regex("""^(\d{1,3}\.){3}\d{1,3}$"""))) {
-                                put(
-                                    JSONObject().apply {
-                                        put(
-                                            "ip_cidr",
-                                            JSONArray().apply { put("$host/32") },
-                                        )
-                                        put("outbound", "direct")
-                                    },
-                                )
-                            }
-                        }
-                        @Suppress("UNCHECKED_CAST")
-                        val controlPlane = params["controlPlaneHosts"] as? List<*>
-                        controlPlane?.forEach { host ->
-                            if (host is String && host.isNotBlank()) {
-                                put(
-                                    JSONObject().apply {
-                                        put(
-                                            "ip_cidr",
-                                            JSONArray().apply { put("${host.trim()}/32") },
-                                        )
-                                        put("outbound", "direct")
-                                    },
-                                )
-                            }
-                        }
-                    },
-                )
-                put("final", VpnPingMonitor.GROUP_TAG)
-                put("auto_detect_interface", true)
-            },
-        )
-    }
-    return root.toString()
 }
 
 /**
@@ -1362,7 +1562,7 @@ object VpnStatusBroadcaster {
 }
 
 /**
- * Broadcasts libbox downlink/uplink rates to Flutter EventChannel `teremok/vpn/traffic`.
+ * Broadcasts downlink/uplink rates to Flutter EventChannel `teremok/vpn/traffic`.
  */
 object VpnTrafficBroadcaster {
     @Volatile
@@ -1436,7 +1636,10 @@ object VpnTrafficBroadcaster {
 }
 
 /**
- * Broadcasts libbox urlTest delay (ms) to Flutter EventChannel `teremok/vpn/ping`.
+ * Broadcasts path latency (ms) to Flutter EventChannel `teremok/vpn/ping`.
+ *
+ * [emit] with null clears the last sample so Home shows `— ms` instead of a
+ * stale RTT after the data-plane dies.
  */
 object VpnPingBroadcaster {
     @Volatile
@@ -1451,13 +1654,13 @@ object VpnPingBroadcaster {
     fun register(sink: EventChannel.EventSink) {
         this.sink = sink
         val replay = lastDelayMs
-        if (replay != null) {
-            mainHandler.post {
-                try {
-                    sink.success(mapOf("delayMs" to replay))
-                } catch (e: Exception) {
-                    Log.w(TeremokVpnService.TAG, "VpnPingBroadcaster.replay failed: ${e.message}")
-                }
+        mainHandler.post {
+            try {
+                // Always push current state (including null) so listeners do not
+                // keep a previous AsyncData from an older session.
+                sink.success(mapOf("delayMs" to replay))
+            } catch (e: Exception) {
+                Log.w(TeremokVpnService.TAG, "VpnPingBroadcaster.replay failed: ${e.message}")
             }
         }
     }
@@ -1468,9 +1671,19 @@ object VpnPingBroadcaster {
 
     fun clear() {
         lastDelayMs = null
+        mainHandler.post {
+            val current = sink
+            if (current != null) {
+                try {
+                    current.success(mapOf("delayMs" to null))
+                } catch (e: Exception) {
+                    Log.w(TeremokVpnService.TAG, "VpnPingBroadcaster.clear emit failed: ${e.message}")
+                }
+            }
+        }
     }
 
-    fun emit(delayMs: Int) {
+    fun emit(delayMs: Int?) {
         lastDelayMs = delayMs
         val payload = mapOf("delayMs" to delayMs)
         mainHandler.post {

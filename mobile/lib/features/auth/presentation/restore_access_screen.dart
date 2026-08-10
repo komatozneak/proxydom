@@ -5,8 +5,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/router.dart';
 import '../../../core/theme.dart';
+import '../../../core/widgets/app_icon.dart';
 import '../../../l10n/app_localizations.dart';
 import '../application/auth_provider.dart';
+import '../application/auth_state.dart';
 
 /// Self-serve recover after reinstall (ADR 008).
 class RestoreAccessScreen extends ConsumerStatefulWidget {
@@ -25,6 +27,21 @@ class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  void _goBack() {
+    if (context.canPop()) {
+      context.pop();
+      return;
+    }
+    final auth = ref.read(authProvider).valueOrNull;
+    if (auth is AuthStateBootstrapFailed) {
+      context.go('/bootstrap-failed');
+    } else if (auth is AuthStateAuthenticated) {
+      context.go('/settings');
+    } else {
+      context.go('/home');
+    }
   }
 
   Future<void> _submit() async {
@@ -55,7 +72,19 @@ class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
     final l = AppL10n.of(context);
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(l.restoreTitle)),
+      appBar: AppBar(
+        title: Text(l.restoreTitle),
+        leading: IconButton(
+          tooltip: l.navBack,
+          icon: AppIcon(
+            AppIcons.backBold,
+            size: 28,
+            color: theme.colorScheme.onSurface,
+          ),
+          onPressed: _busy ? null : _goBack,
+        ),
+        automaticallyImplyLeading: false,
+      ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24),

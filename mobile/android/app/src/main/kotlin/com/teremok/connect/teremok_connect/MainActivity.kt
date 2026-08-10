@@ -150,7 +150,11 @@ class MainActivity : FlutterActivity() {
         if (requestCode != REQUEST_VPN_PERMISSION) return
 
         val granted = resultCode == Activity.RESULT_OK && VpnService.prepare(this) == null
-        Log.i(TAG, "VPN permission resultCode=$resultCode, granted=$granted")
+        val conflict = TeremokVpnService.queryVpnConflict(this)
+        Log.i(
+            TAG,
+            "VPN permission resultCode=$resultCode, granted=$granted, conflict=$conflict",
+        )
         pendingPermissionResult?.success(granted)
         pendingPermissionResult = null
     }

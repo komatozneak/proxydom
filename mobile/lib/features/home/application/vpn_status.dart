@@ -34,7 +34,13 @@ final class VpnConnected extends VpnStatus {
 
 /// Ошибка подключения. Показываем сообщение + кнопку "повторить".
 final class VpnError extends VpnStatus {
-  const VpnError({required this.message});
+  const VpnError({
+    required this.message,
+    this.code,
+  });
 
   final String message;
+
+  /// Machine-readable code, e.g. `permission_denied`.
+  final String? code;
 }

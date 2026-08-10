@@ -118,7 +118,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get premiumBody =>
-      'Premium unlocks no-AdSense exits and removes the free 5 GB cap.';
+      'Premium unlocks no-AdSense exits, up to 5 devices, and removes the free 4.20 GB cap.';
 
   @override
   String get premiumFeatureYt => 'YouTube locations without mid-roll ads';
@@ -282,6 +282,22 @@ class AppL10nEn extends AppL10n {
   String get homeErrorFriendly => 'Couldn’t connect. Please try again.';
 
   @override
+  String get homeVpnConflictTitle => 'Another VPN is blocking';
+
+  @override
+  String get homeVpnConflictHint =>
+      'Turn off the other VPN or Always-on in Android settings, then connect again.';
+
+  @override
+  String homeVpnConflictHintNamed(String app) {
+    return 'Turn off “$app” (or Always-on) in Android settings, then connect again.';
+  }
+
+  @override
+  String get homeVpnPermissionHint =>
+      'Allow the VPN in the Android system prompt, then tap connect again.';
+
+  @override
   String get homeConfigErrorFriendly =>
       'Couldn’t fetch config. Check your connection and try again.';
 
@@ -334,6 +350,13 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get settingsAccessNoneSubtitle => 'An invite code is required.';
+
+  @override
+  String get settingsAccessFreeTitle => 'Free';
+
+  @override
+  String get settingsAccessFreeSubtitle =>
+      '1 device · up to 4.20 GB per month.';
 
   @override
   String settingsAccessActiveUntil(String date) {
@@ -434,12 +457,6 @@ class AppL10nEn extends AppL10n {
       'Reconnect quickly if the tunnel drops';
 
   @override
-  String get settingsSplitTunnel => 'Modes';
-
-  @override
-  String get settingsSplitTunnelHint => 'Smart / full / by site';
-
-  @override
   String get settingsDevices => 'Devices';
 
   @override
@@ -491,6 +508,28 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get devicesRevokeFailed => 'Could not revoke device';
+
+  @override
+  String get devicesLeave => 'Leave account';
+
+  @override
+  String get devicesLeaveTitle => 'Leave shared account?';
+
+  @override
+  String get devicesLeaveBody =>
+      'This install becomes its own account. Subscription stays on the old account. Save any new recovery code if shown.';
+
+  @override
+  String get devicesLeaveConfirm => 'Leave';
+
+  @override
+  String get devicesLeft => 'Device left the account';
+
+  @override
+  String get devicesLeaveFailed => 'Could not leave the account';
+
+  @override
+  String get devicesLimitOpenManage => 'Manage devices';
 
   @override
   String get splitTunnelSearchHint => 'Search my sites';
@@ -762,7 +801,13 @@ class AppL10nEn extends AppL10n {
   String get regionSectionGeneral => 'General';
 
   @override
-  String get regionSectionYoutube => 'YouTube — no ads';
+  String get regionSectionYoutube => 'Premium';
+
+  @override
+  String get regionSectionEurope => 'Europe';
+
+  @override
+  String get regionSectionUsa => 'USA';
 
   @override
   String get regionComingSoon => 'Coming soon';
@@ -812,6 +857,18 @@ class AppL10nEn extends AppL10n {
   }
 
   @override
+  String get regionSwitchingTitle => 'Switching location…';
+
+  @override
+  String get regionSwitchingBody => 'Connecting to the selected server';
+
+  @override
+  String get regionSwitchedTitle => 'Done';
+
+  @override
+  String get regionSwitchFailedTitle => 'Could not switch location';
+
+  @override
   String get logoutTooltip => 'Sign out';
 
   @override
@@ -835,6 +892,9 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get cancel => 'Cancel';
+
+  @override
+  String get navBack => 'Back';
 
   @override
   String get verifyTitle => 'Enter code';
@@ -1099,6 +1159,28 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get settingsSeatCodeCopied => 'Code copied';
+
+  @override
+  String get settingsSeatInviteFailed => 'Couldn’t create a seat code';
+
+  @override
+  String get settingsAcceptSeatOk => 'Device joined the account';
+
+  @override
+  String get settingsSeatPremiumRequired => 'Inviting devices requires Premium';
+
+  @override
+  String get settingsSeatCodeNotFound => 'Code not found or expired';
+
+  @override
+  String get settingsSeatDeviceLimit => 'Device limit reached for this account';
+
+  @override
+  String get settingsSeatOwnCode =>
+      'You can’t accept your own code — enter it on another device';
+
+  @override
+  String get settingsSeatAcceptFailed => 'Couldn’t accept the seat code';
 
   @override
   String get settingsRecoverAccess => 'Restore access';

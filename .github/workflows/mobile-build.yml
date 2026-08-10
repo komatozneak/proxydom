@@ -23,7 +23,7 @@ env:
   # rive_native 0.1.x needs SemanticsRole / isRequired (post-3.29).
   FLUTTER_VERSION: "3.35.1"
   JAVA_VERSION: "17"
-  MIN_SDK: "23"
+  MIN_SDK: "26"
 
 jobs:
   analyze-test:
@@ -66,11 +66,12 @@ jobs:
         working-directory: mobile
         run: flutter test --reporter expanded --dart-define=AUTH_ANONYMOUS=false
 
-      - name: Verify minSdk = 23
+      - name: Verify minSdk = 26
         working-directory: mobile
         run: |
           # minSdk enforced via androidComponents.finalizeDsl (Flutter tooling
-          # rewrites a literal `minSdk = 23` back to flutter.minSdkVersion).
+          # rewrites a literal `minSdk` back to flutter.minSdkVersion).
+          # ADR 006: TrustTunnel / dual-core requires 26.
           if grep -q "requiredMinSdk = ${{ env.MIN_SDK }}" android/app/build.gradle.kts \
             && grep -q "finalizeDsl" android/app/build.gradle.kts; then
             echo "minSdk enforcement OK (finalizeDsl -> ${{ env.MIN_SDK }})"

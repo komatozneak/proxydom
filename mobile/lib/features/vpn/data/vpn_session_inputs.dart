@@ -1,95 +1,128 @@
 import '../../../core/config.dart';
-import '../../settings/data/vpn_route_mode.dart';
 import 'vpn_config.dart';
 import 'vpn_route_policy.dart';
 import 'vpn_service_config.dart';
 
-/// VLESS + Reality credentials shared across all egress hops.
+/// VLESS + Reality credentials for one egress hop (Xray builder input).
 class VlessRealityCreds {
   const VlessRealityCreds({
+    required this.protocol,
     required this.uuid,
     required this.serverPort,
     this.flow,
-    required this.tlsEnabled,
+    required this.transport,
+    required this.security,
     required this.serverName,
-    required this.realityEnabled,
     required this.publicKey,
     required this.shortId,
     required this.fingerprint,
+    required this.spiderX,
+    this.path,
+    this.mode,
   });
 
+  final String protocol;
   final String uuid;
   final int serverPort;
   final String? flow;
-  final bool tlsEnabled;
+  final String transport;
+  final String security;
   final String serverName;
-  final bool realityEnabled;
   final String publicKey;
   final String shortId;
   final String fingerprint;
+  final String spiderX;
+  final String? path;
+  final String? mode;
 
-  factory VlessRealityCreds.fromOutbound(SingBoxOutbound outbound) {
-    final tls = outbound.tls;
+  factory VlessRealityCreds.fromCandidate(XrayCandidate candidate) {
     return VlessRealityCreds(
-      uuid: outbound.uuid,
-      serverPort: outbound.serverPort,
-      flow: outbound.flow,
-      tlsEnabled: tls?.enabled ?? true,
-      serverName: tls?.serverName ?? '',
-      realityEnabled: tls?.realityEnabled ?? true,
-      publicKey: tls?.publicKey ?? '',
-      shortId: tls?.shortId ?? '',
-      fingerprint: tls?.fingerprint ?? 'chrome',
+      protocol: candidate.protocol,
+      uuid: candidate.uuid,
+      serverPort: candidate.port,
+      flow: candidate.flow,
+      transport: candidate.transport,
+      security: candidate.security,
+      serverName: candidate.serverName,
+      publicKey: candidate.publicKey,
+      shortId: candidate.shortId,
+      fingerprint: candidate.fingerprint,
+      spiderX: candidate.spiderX,
+      path: candidate.path,
+      mode: candidate.mode,
     );
   }
 }
 
-/// One egress hop (host rewritten; same [VlessRealityCreds]).
+/// One egress hop with per-candidate credentials.
 class EgressHop {
   const EgressHop({
     required this.id,
     required this.host,
-    this.port,
     this.label,
+    required this.creds,
+    this.region,
+    this.purpose,
   });
 
   final String id;
   final String host;
-  final int? port;
   final String? label;
+  final VlessRealityCreds creds;
+  final String? region;
+  final String? purpose;
 }
 
-/// How traffic is routed for this session.
+/// How traffic is routed for this session (modeless Огонь-style).
+///
+/// Builder does not use a mode enum — YouTube/Google always proxy; RU bundle +
+/// user «Что работает без VPN?» → direct; residual UDP blocked; final TCP → proxy.
 class RoutePolicy {
   const RoutePolicy({
-    required this.mode,
-    this.includeAdsBlock = kAdsBlockEnabled,
+    this.includeAdsBlock = kXrayAdsBlockEnabled,
+    this.includeOgonAdsAll = kXrayOgonAdsAllEnabled,
     this.includeGeoipRu = kGeoipRuEnabled,
     this.includeBundledRuRuleSets = true,
-    this.proxyDomainSuffixes = const [],
+    this.includeGovRuRuleSets = false,
+    this.useHevTunBridge = kUseHevTunBridge,
+    this.adsBlockDomains = kXrayAdsBlockDomains,
     this.proxyIpCidrs = const [],
     this.directDomainSuffixes = const [],
-    this.localRulePaths = const {},
+    this.directIpCidrs = const [],
   });
 
-  final VpnRouteMode mode;
-
-  /// Defaults to [kAdsBlockEnabled]; tests may force ON.
+  /// Defaults to [kXrayAdsBlockEnabled]; tests may force ON with curated domains.
   final bool includeAdsBlock;
 
-  /// Defaults to [kGeoipRuEnabled]; intentionally unused while false.
+  /// Огонь `geosite:category-ads-all`. Prod keeps [kXrayOgonAdsAllEnabled] false.
+  final bool includeOgonAdsAll;
+
+  /// Defaults to [kGeoipRuEnabled]; nest home-speed keeps RU IPs direct.
   final bool includeGeoipRu;
 
-  /// Smart mode loads local geosite-ru / tld-ru when paths are present.
+  /// Bundled RU geosite category-ru / tld-ru → direct.
   final bool includeBundledRuRuleSets;
 
-  final List<String> proxyDomainSuffixes;
+  /// geosite:category-gov-ru → direct (Огонь «Сайты госорганов РФ»).
+  final bool includeGovRuRuleSets;
+
+  /// When true, SOCKS-only Xray inbound + hev TUN bridge (no `protocol:tun`).
+  final bool useHevTunBridge;
+
+  /// Curated ads hosts. See [kXrayAdsBlockDomains].
+  final List<String> adsBlockDomains;
+
+  /// YouTube/Google CIDRs (youtube-google.cidr) → force-proxy before RU direct.
   final List<String> proxyIpCidrs;
+
+  /// User «works without VPN» sites → direct (force-proxy suffixes stripped).
   final List<String> directDomainSuffixes;
-  final Map<String, String> localRulePaths;
+
+  /// User «works without VPN» IP ranges → direct (Telegram DC style).
+  final List<String> directIpCidrs;
 }
 
-/// TUN inbound parameters for libbox (fd established by VpnService).
+/// TUN inbound parameters (fd established by VpnService; gVisor via setTunFd).
 class TunParams {
   const TunParams({
     required this.mtu,
@@ -116,57 +149,42 @@ class TunParams {
   }
 }
 
-/// All inputs for [VpnConfigConstructor.build] — no lossy sing-box round-trip.
+/// All inputs for [XrayConfigBuilder.build] — one hop per Xray candidate.
 class VpnSessionInputs {
   const VpnSessionInputs({
-    required this.creds,
     required this.hops,
     required this.route,
     required this.tun,
   });
 
-  final VlessRealityCreds creds;
   final List<EgressHop> hops;
   final RoutePolicy route;
   final TunParams tun;
 
-  /// Map API [VpnConfig] + prefs into typed constructor inputs.
+  /// Map API [VpnConfig] + prefs into typed builder inputs.
   factory VpnSessionInputs.fromVpnConfig({
     required VpnConfig config,
     required VpnServiceConfig service,
     required RoutePolicy route,
   }) {
-    final outbound = config.singBoxConfig.primaryOutbound;
-    if (outbound == null) {
-      throw StateError('sing-box config has no outbounds');
+    final hops = [
+      for (final candidate in config.xrayProfile.candidates)
+        EgressHop(
+          id: candidate.id,
+          host: candidate.host,
+          label: candidate.label,
+          creds: VlessRealityCreds.fromCandidate(candidate),
+          region: candidate.region,
+          purpose: candidate.purpose,
+        ),
+    ];
+    if (hops.isEmpty) {
+      throw StateError('xray_profile has no candidates');
     }
-    final candidates = config.resolveEgressCandidates();
-    final hops = candidates.isEmpty
-        ? [
-            EgressHop(
-              id: 'primary',
-              host: outbound.server,
-              port: outbound.serverPort,
-              label: outbound.server,
-            ),
-          ]
-        : [
-            for (final c in candidates)
-              EgressHop(
-                id: c.id,
-                host: c.host,
-                port: outbound.serverPort,
-                label: c.label,
-              ),
-          ];
     return VpnSessionInputs(
-      creds: VlessRealityCreds.fromOutbound(outbound),
       hops: hops,
       route: route,
-      tun: TunParams.fromService(
-        service,
-        logLevel: config.singBoxConfig.logLevel,
-      ),
+      tun: TunParams.fromService(service),
     );
   }
 
@@ -192,7 +210,7 @@ class VpnSessionInputs {
 
 final _ipv4Host = RegExp(r'^(\d{1,3}\.){3}\d{1,3}$');
 
-/// sing-box `ip_cidr` needs an address, not a DNS name.
+/// Xray `ip` rules need an address, not a DNS name.
 String? ipv4Cidr(String host) {
   if (host.isEmpty || host == 'unknown') return null;
   if (_ipv4Host.hasMatch(host)) return '$host/32';

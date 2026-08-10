@@ -9,12 +9,12 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import io.nekohasekai.libbox.InterfaceUpdateListener
 import java.net.NetworkInterface
 
 /**
- * Отслеживает underlying network (cellular/wifi), не VPN-туннель.
- * Без этого direct/proxy outbound на Android «пустой» — трафик не уходит.
+ * Tracks the underlying network (cellular/wifi), not the VPN tunnel.
+ * Needed so outbound proxy sockets bind to a real interface and so
+ * [VpnService.setUnderlyingNetworks] can keep the VPN validated.
  */
 internal object DefaultNetworkMonitor {
     private const val TAG = "DefaultNetworkMonitor"
@@ -26,31 +26,18 @@ internal object DefaultNetworkMonitor {
     var currentInterfaceName: String? = null
         private set
 
-    private var listener: InterfaceUpdateListener? = null
     private var connectivity: ConnectivityManager? = null
     private var callback: ConnectivityManager.NetworkCallback? = null
     private val mainHandler = Handler(Looper.getMainLooper())
 
-    fun setListener(context: Context, updateListener: InterfaceUpdateListener?) {
-        listener = updateListener
-        if (updateListener == null) {
-            stop(context)
-            return
-        }
-        start(context)
-        notifyCurrent(context)
-    }
-
-    /**
-     * Запускает монитор до [io.nekohasekai.libbox.CommandServer.start] — иначе race:
-     * VLESS к VPS стартует с пустым default interface.
-     */
+    /** Start monitoring before Xray/TT dial so protect() has a physical path. */
     fun prewarm(context: Context) {
         start(context.applicationContext)
     }
 
     /**
-     * Ждёт underlying network (cellular/wifi), не VPN. Возвращает false по таймауту.
+     * Waits for an underlying network (cellular/wifi), not VPN.
+     * Returns false on timeout.
      */
     fun awaitUnderlyingNetwork(context: Context, timeoutMs: Long = 3000): Boolean {
         prewarm(context)
@@ -73,8 +60,8 @@ internal object DefaultNetworkMonitor {
             val iface = lp.interfaceName
             if (iface.isNullOrBlank() || iface.startsWith("tun")) continue
             defaultNetwork = network
+            currentInterfaceName = iface
             Log.i(TAG, "underlying network ready: $iface")
-            listener?.let { notifyNetwork(cm, network) }
             return true
         }
         return defaultNetwork != null
@@ -98,14 +85,14 @@ internal object DefaultNetworkMonitor {
 
         val cb = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
-                notifyNetwork(cm, network)
+                rememberNetwork(cm, network)
             }
 
             override fun onCapabilitiesChanged(
                 network: Network,
                 networkCapabilities: NetworkCapabilities,
             ) {
-                notifyNetwork(cm, network)
+                rememberNetwork(cm, network)
             }
 
             override fun onLost(network: Network) {
@@ -113,7 +100,6 @@ internal object DefaultNetworkMonitor {
                     defaultNetwork = null
                     currentInterfaceName = null
                 }
-                listener?.updateDefaultInterface("", -1, false, false)
             }
         }
         callback = cb
@@ -140,42 +126,14 @@ internal object DefaultNetworkMonitor {
         }
     }
 
-    private fun stop(context: Context) {
-        val cm = connectivity ?: context.getSystemService(ConnectivityManager::class.java)
-        val cb = callback ?: return
-        runCatching { cm.unregisterNetworkCallback(cb) }
-            .onFailure { Log.w(TAG, "unregisterNetworkCallback: ${it.message}") }
-        callback = null
-        connectivity = null
-    }
-
-    private fun notifyCurrent(context: Context) {
-        val cm = connectivity ?: context.getSystemService(ConnectivityManager::class.java)
-        // activeNetwork при поднятом VPN = tun0; ждём callback от registerBestMatchingNetworkCallback.
-        val network = defaultNetwork
-        if (network != null) {
-            notifyNetwork(cm, network)
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val active = cm.activeNetwork
-            val caps = active?.let { cm.getNetworkCapabilities(it) }
-            if (active != null && caps != null &&
-                !caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
-            ) {
-                notifyNetwork(cm, active)
-            } else {
-                listener?.updateDefaultInterface("", -1, false, false)
-            }
-        } else {
-            listener?.updateDefaultInterface("", -1, false, false)
+    private fun rememberNetwork(cm: ConnectivityManager, network: Network) {
+        val caps = cm.getNetworkCapabilities(network)
+        if (caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) {
+            return
         }
-    }
-
-    private fun notifyNetwork(cm: ConnectivityManager, network: Network) {
         defaultNetwork = network
-        val updateListener = listener ?: return
         repeat(10) {
-            val linkProperties = cm.getLinkProperties(network)
-            if (linkProperties == null) {
+            val linkProperties = cm.getLinkProperties(network) ?: run {
                 Thread.sleep(100)
                 return@repeat
             }
@@ -186,15 +144,13 @@ internal object DefaultNetworkMonitor {
             }
             val interfaceIndex = try {
                 NetworkInterface.getByName(interfaceName)?.index ?: -1
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 Thread.sleep(100)
                 return@repeat
             }
-            updateListener.updateDefaultInterface(interfaceName, interfaceIndex, false, false)
             currentInterfaceName = interfaceName
             Log.i(TAG, "default interface: $interfaceName (index=$interfaceIndex)")
             return
         }
-        updateListener.updateDefaultInterface("", -1, false, false)
     }
 }

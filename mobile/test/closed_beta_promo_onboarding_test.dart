@@ -29,7 +29,8 @@ void main() {
       );
     });
 
-    test('gate on without access shows promo', () {
+    test('gate on without access shows promo (phone mode)', () {
+      if (AppConfig.authAnonymous) return;
       const entitlement = BetaEntitlement(
         hasAccess: false,
         betaPromoGateEnabled: true,
@@ -43,7 +44,7 @@ void main() {
       );
     });
 
-    test('server auth_anonymous_enabled routes to locked paywall', () {
+    test('server auth_anonymous_enabled Free cold start goes home/onboarding', () {
       const entitlement = BetaEntitlement(
         hasAccess: false,
         betaPromoGateEnabled: true,
@@ -54,7 +55,14 @@ void main() {
           entitlement: entitlement,
           onboardingCompleted: false,
         ),
-        PostAuthDestination.locked,
+        PostAuthDestination.onboarding,
+      );
+      expect(
+        PostAuthRouter.resolve(
+          entitlement: entitlement,
+          onboardingCompleted: true,
+        ),
+        PostAuthDestination.home,
       );
     });
 
@@ -70,10 +78,10 @@ void main() {
         }),
         throwsA(isA<FormatException>()),
       );
-      // Gate screen maps FormatException → retry UI, not soft-pass home.
       const failedAsEntitledWouldBe = BetaEntitlement.entitledGateOff;
       expect(failedAsEntitledWouldBe.treatAsEntitled, isTrue);
-      // Prove resolve of a gate-on empty access stays promo (no soft-pass).
+      // Phone mode: gate-on empty access stays promo.
+      if (AppConfig.authAnonymous) return;
       expect(
         PostAuthRouter.resolve(
           entitlement: const BetaEntitlement(
@@ -86,13 +94,11 @@ void main() {
       );
     });
 
-    test('anonymous never soft-passes without access even if gate is off', () {
-      // Requires AUTH_ANONYMOUS=true at compile time (app default).
-      // CI runs with AUTH_ANONYMOUS=false — skip when phone-mode.
+    test('anonymous Free cold start enters app without Premium', () {
       if (!AppConfig.authAnonymous) return;
       const entitlement = BetaEntitlement(
         hasAccess: false,
-        betaPromoGateEnabled: false,
+        betaPromoGateEnabled: true,
         authAnonymousEnabled: true,
       );
       expect(
@@ -100,7 +106,7 @@ void main() {
           entitlement: entitlement,
           onboardingCompleted: true,
         ),
-        PostAuthDestination.locked,
+        PostAuthDestination.home,
       );
     });
 

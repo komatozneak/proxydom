@@ -1,0 +1,50 @@
+{
+  "username": "fixture-user",
+  "links": [],
+  "expire": 1785654092,
+  "xray_profile": {
+    "schema_version": 1,
+    "candidates": [
+      {
+        "id": "de-1",
+        "label": "Germany",
+        "host": "203.0.113.10",
+        "port": 443,
+        "protocol": "vless",
+        "uuid": "11111111-2222-3333-4444-555555555555",
+        "flow": "xtls-rprx-vision",
+        "transport": "tcp",
+        "security": "reality",
+        "server_name": "cover.example",
+        "public_key": "fixture-public-key",
+        "short_id": "deadbeef",
+        "fingerprint": "chrome",
+        "spider_x": "/"
+      },
+      {
+        "id": "nl-2",
+        "label": "Netherlands",
+        "host": "203.0.113.20",
+        "port": 8443,
+        "protocol": "vless",
+        "uuid": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        "flow": null,
+        "transport": "raw",
+        "security": "reality",
+        "server_name": "second-cover.example",
+        "public_key": "second-public-key",
+        "short_id": "cafebabe",
+        "fingerprint": "firefox",
+        "spider_x": "/probe"
+      }
+    ]
+  },
+  "sing_box_config": {
+    "outbounds": [
+      {
+        "type": "vless",
+        "server": "legacy.invalid"
+      }
+    ]
+  }
+}

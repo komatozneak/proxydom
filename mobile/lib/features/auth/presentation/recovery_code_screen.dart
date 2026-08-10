@@ -10,6 +10,7 @@ import '../../beta/data/jwt_subject.dart';
 import '../../onboarding/data/onboarding_prefs.dart';
 import '../application/auth_provider.dart';
 import '../application/auth_state.dart';
+import '../data/recovery_code_storage.dart';
 
 /// Mandatory backup-code screen after first unlock (pay or promo).
 ///
@@ -46,6 +47,7 @@ class _RecoveryCodeScreenState extends ConsumerState<RecoveryCodeScreen> {
     if (!_confirmed || _code.isEmpty) return;
     setState(() => _busy = true);
     AppRouter.pendingRecoveryCode = null;
+    await RecoveryCodeStorage.instance.markShown();
     final auth = ref.read(authProvider).valueOrNull;
     final userId = auth is AuthStateAuthenticated
         ? (jwtSubject(auth.accessToken) ?? 'unknown')

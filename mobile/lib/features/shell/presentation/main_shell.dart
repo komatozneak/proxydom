@@ -1,34 +1,41 @@
-import 'dart:math' as math;
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/busy/busy_overlay.dart';
+import '../../../core/busy/busy_overlay_host.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/teremok_nav_icon.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../home/application/vpn_provider.dart';
 
-/// Bumped when user opens the Modes tab — triggers a reload.
+/// Bumped when user opens the Locations tab — triggers a reload.
 final modesTabTickProvider = StateProvider<int>((ref) => 0);
 
-/// Authenticated shell: Modes / Home / Settings (Home centered).
+/// Authenticated shell — branch indices MUST match [AppRouter] StatefulShellRoute:
+/// 0=Locations, 1=Home(VPN), 2=Settings.
 class MainShell extends ConsumerWidget {
   const MainShell({super.key, required this.navigationShell});
 
   final StatefulNavigationShell navigationShell;
 
-  /// Branch order: 0=Modes, 1=Home, 2=Settings.
-  static const int modesIndex = 0;
+  static const int locationsIndex = 0;
   static const int homeIndex = 1;
   static const int settingsIndex = 2;
 
-  /// Legacy alias — prefer [modesIndex].
-  static const int locationsIndex = modesIndex;
+  /// Legacy alias (Modes → Locations).
+  static const int modesIndex = locationsIndex;
 
   void _onTap(WidgetRef ref, int index) {
-    if (index == modesIndex) {
+    if (ref.read(busyOverlayProvider).isBusy) return;
+    if (index == locationsIndex) {
       ref.read(modesTabTickProvider.notifier).state++;
+    }
+    if (index == homeIndex) {
+      unawaited(ref.read(vpnProvider.notifier).syncFromNative());
     }
     navigationShell.goBranch(
       index,
@@ -44,47 +51,52 @@ class MainShell extends ConsumerWidget {
     final elevated = theme.colorScheme.surfaceContainerHighest;
     final line = theme.colorScheme.outline;
 
-    return Scaffold(
-      body: navigationShell,
-      bottomNavigationBar: DecoratedBox(
-        decoration: BoxDecoration(
-          color: elevated,
-          border: Border(top: BorderSide(color: line)),
-        ),
-        child: SafeArea(
-          top: false,
-          child: SizedBox(
-            height: 76,
-            child: Row(
-              children: [
-                Expanded(
-                  child: _SideNavGlyph(
-                    icon: AppIcons.sliders,
-                    label: l.navModes,
-                    selected: selected == modesIndex,
-                    onTap: () => _onTap(ref, modesIndex),
-                  ),
+    return Stack(
+      children: [
+        Scaffold(
+          body: navigationShell,
+          bottomNavigationBar: DecoratedBox(
+            decoration: BoxDecoration(
+              color: elevated,
+              border: Border(top: BorderSide(color: line)),
+            ),
+            child: SafeArea(
+              top: false,
+              child: SizedBox(
+                height: 76,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _SideNavGlyph(
+                        icon: AppIcons.mapPin,
+                        label: l.navLocations,
+                        selected: selected == locationsIndex,
+                        onTap: () => _onTap(ref, locationsIndex),
+                      ),
+                    ),
+                    Expanded(
+                      child: _CenterNavMark(
+                        selected: selected == homeIndex,
+                        semanticLabel: l.navVpn,
+                        onTap: () => _onTap(ref, homeIndex),
+                      ),
+                    ),
+                    Expanded(
+                      child: _SideNavGlyph(
+                        icon: AppIcons.settings,
+                        label: l.navSettings,
+                        selected: selected == settingsIndex,
+                        onTap: () => _onTap(ref, settingsIndex),
+                      ),
+                    ),
+                  ],
                 ),
-                Expanded(
-                  child: _CenterNavMark(
-                    selected: selected == homeIndex,
-                    semanticLabel: l.navVpn,
-                    onTap: () => _onTap(ref, homeIndex),
-                  ),
-                ),
-                Expanded(
-                  child: _SideNavGlyph(
-                    icon: AppIcons.settings,
-                    label: l.navSettings,
-                    selected: selected == settingsIndex,
-                    onTap: () => _onTap(ref, settingsIndex),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ),
-      ),
+        const BusyOverlayHost(),
+      ],
     );
   }
 }
@@ -102,8 +114,6 @@ class _SideNavGlyph extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
-  static const _flipMs = Duration(milliseconds: 280);
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -119,36 +129,21 @@ class _SideNavGlyph extends StatelessWidget {
         children: [
           AnimatedContainer(
             duration: const Duration(milliseconds: 180),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
               color: selected ? AppBrand.inkWithOpacity(0.08) : null,
               borderRadius: BorderRadius.circular(AppBrand.radiusNavPill),
             ),
-            // Vertical flip: idle upright, active upside-down (180° around X).
-            child: TweenAnimationBuilder<double>(
-              duration: _flipMs,
-              curve: Curves.easeInOutCubic,
-              tween: Tween<double>(end: selected ? 1.0 : 0.0),
-              builder: (context, t, child) {
-                return Transform(
-                  alignment: Alignment.center,
-                  filterQuality: FilterQuality.medium,
-                  transform: Matrix4.identity()
-                    ..setEntry(3, 2, 0.001)
-                    ..rotateX(math.pi * t),
-                  child: child,
-                );
-              },
-              child: AppIcon(icon, size: 20, color: color),
-            ),
+            child: AppIcon(icon, size: 18, color: color),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Text(
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: theme.textTheme.labelSmall?.copyWith(
               color: color,
+              fontSize: 10,
               fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
             ),
           ),
@@ -179,7 +174,7 @@ class _CenterNavMark extends StatelessWidget {
         selected: selected,
         label: semanticLabel,
         child: Center(
-          child: TeremokNavIcon(selected: selected, size: 56),
+          child: TeremokNavIcon(selected: selected, size: 52),
         ),
       ),
     );

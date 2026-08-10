@@ -1,25 +1,9 @@
-# Local sing-box rule-sets (RF-safe)
+# Mobile route assets (Xray)
 
-Ship binary `.srs` files in the APK. **Never** fetch from GitHub/jsDelivr at
-connect time — RF blocks that path (2026-07-14).
+| File | Purpose |
+|------|---------|
+| `youtube-google.cidr` | Google/YouTube IP ranges → force-proxy in Xray routing |
 
-## Files
-
-| Tag | File | Role |
-|-----|------|------|
-| `geosite-category-ru` | `geosite-category-ru.srs` | Smart mode → direct |
-| `geosite-tld-ru` | `geosite-tld-ru.srs` | Smart mode → direct |
-| `geoip-ru` | `geoip-ru.srs` | Shipped; runtime OFF (`kGeoipRuEnabled`) — CDN false positives |
-| `geosite-category-ads-all` | `geosite-category-ads-all.srs` | Ad block → reject; runtime OFF (`kAdsBlockEnabled`) |
-
-Policy constants: `mobile/lib/features/vpn/data/vpn_route_policy.dart`.
-Constructor: `VpnConfigConstructor` in `vpn_config_constructor.dart`.
-
-## Refresh ads list (offline / CI with network)
-
-```bash
-curl -fsSL -o mobile/assets/rules/geosite-category-ads-all.srs \
-  "https://cdn.jsdelivr.net/gh/SagerNet/sing-geosite@rule-set/geosite-category-ads-all.srs"
-```
-
-Commit the binary. Bump APK. No runtime update.
+Legacy sing-box `.srs` rule-sets were removed (ADR 005). Domain/IP geosite data
+ships as Android assets `geosite.dat` / `geoip.dat` under
+`android/app/src/main/assets/` for libXray.

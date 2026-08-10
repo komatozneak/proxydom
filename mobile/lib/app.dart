@@ -22,6 +22,7 @@ class TeremokApp extends ConsumerWidget {
 
     return MaterialApp.router(
       title: 'Teremok Connect',
+      debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: themeMode,
