@@ -2,6 +2,10 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../features/account/presentation/account_hub_screen.dart';
+import '../features/account/presentation/account_promo_screen.dart';
+import '../features/account/presentation/email_link_screen.dart';
+import '../features/account/presentation/telegram_link_screen.dart';
 import '../features/auth/application/auth_provider.dart'
     show authProvider, GoRouterRefreshNotifier;
 import '../features/auth/application/auth_state.dart';
@@ -221,6 +225,28 @@ class AppRouter {
                 path: '/settings',
                 builder: (c, s) => const SettingsScreen(),
                 routes: [
+                  GoRoute(
+                    path: 'account',
+                    builder: (c, s) => const AccountHubScreen(),
+                    routes: [
+                      GoRoute(
+                        path: 'telegram',
+                        builder: (c, s) => const TelegramLinkScreen(),
+                      ),
+                      GoRoute(
+                        path: 'email',
+                        builder: (c, s) => const EmailLinkScreen(),
+                      ),
+                      GoRoute(
+                        path: 'promo',
+                        builder: (c, s) => const AccountPromoScreen(),
+                      ),
+                      GoRoute(
+                        path: 'recovery',
+                        builder: (c, s) => const RestoreAccessScreen(),
+                      ),
+                    ],
+                  ),
                   GoRoute(
                     path: 'devices',
                     builder: (c, s) => const DevicesScreen(),

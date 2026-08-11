@@ -10,6 +10,7 @@ import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../home/application/vpn_provider.dart';
+import '../../settings/application/subscription_status_provider.dart';
 import '../data/node_display.dart';
 import '../data/vpn_controller.dart';
 import '../data/vpn_node.dart';
@@ -197,6 +198,25 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     }
   }
 
+  void _onLockedPremiumTap() {
+    final l = AppL10n.of(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(l.locationsPremiumUnavailable)),
+    );
+  }
+
+  /// Free/online egress + always keep Premium/locked rows in the pool (gray).
+  bool _inProductPool(VpnNode n) {
+    if (n.requiresPremium || n.locked || n.isYoutube) return true;
+    return n.isConnected || n.isDefault;
+  }
+
+  bool _isTileLocked(VpnNode n, {required bool userPremium}) {
+    if (n.locked) return true;
+    if (n.requiresPremium && !userPremium) return true;
+    return false;
+  }
+
   String _friendlyError(AppL10n l) {
     if (_lockdownHint) return l.regionLoadErrorAbort;
     return l.networkErrorFriendly;
@@ -236,14 +256,28 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       return Center(child: Text(l.regionEmpty));
     }
 
-    // Product pool: only show reachable egress (hide Marzban offline workers).
-    final online = nodes.where((n) => n.isConnected || n.isDefault).toList();
-    final sections = groupNodesByLocationSection(online);
+    final sub = ref.watch(subscriptionStatusProvider).valueOrNull;
+    final userPremium = sub != null && (sub.isPro || sub.isAlpha);
+
+    // Free online/default + Premium/locked always visible (gray for Free).
+    final pool = nodes.where(_inProductPool).toList();
+    final sections = groupNodesByLocationSection(pool);
+    final freeOnline =
+        pool.where((n) => !n.requiresPremium && (n.isConnected || n.isDefault));
 
     var selectedId = _selectedId ?? kRegionAutoId;
-    if (selectedId != kRegionAutoId &&
-        !online.any((n) => n.id == selectedId)) {
-      selectedId = kRegionAutoId;
+    if (selectedId != kRegionAutoId) {
+      VpnNode? selectedNode;
+      for (final n in pool) {
+        if (n.id == selectedId) {
+          selectedNode = n;
+          break;
+        }
+      }
+      if (selectedNode == null ||
+          _isTileLocked(selectedNode, userPremium: userPremium)) {
+        selectedId = kRegionAutoId;
+      }
     }
 
     final locale = Localizations.localeOf(context).languageCode;
@@ -263,22 +297,26 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       for (var i = 0; i < list.length; i++) {
         final node = list[i];
         final place = placeForNode(node, index: i);
-        final selected = selectedId == node.id;
+        final locked = _isTileLocked(node, userPremium: userPremium);
+        final selected = !locked && selectedId == node.id;
         final city = place.displaySubtitle(locale).trim();
-        final subtitle = city.isEmpty
-            ? l.regionOnline
-            : '$city · ${l.regionOnline}';
+        final subtitle = locked
+            ? l.locationsPremiumUnavailable
+            : (city.isEmpty ? l.regionOnline : '$city · ${l.regionOnline}');
         out.add(
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: RegionTile(
               selected: selected,
-              enabled: true,
+              enabled: !locked,
               leading: CircleAvatar(
                 backgroundColor: theme.colorScheme.surfaceContainerHighest,
                 child: Text(
                   place.flag,
-                  style: const TextStyle(fontSize: 22),
+                  style: TextStyle(
+                    fontSize: 22,
+                    color: locked ? theme.colorScheme.outline : null,
+                  ),
                 ),
               ),
               title: place.displayTitle(locale),
@@ -286,9 +324,10 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
               trailingBadge: node.isYoutube || node.requiresPremium
                   ? l.locationsPremiumLocked
                   : l.regionFree,
-              showBadge: selected,
-              signalGood: true,
-              onTap: () => _pick(node.id),
+              showBadge: selected ||
+                  (locked && (node.requiresPremium || node.isYoutube)),
+              signalGood: !locked,
+              onTap: locked ? _onLockedPremiumTap : () => _pick(node.id),
             ),
           ),
         );
@@ -347,7 +386,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
           sectionHeader(l.regionSectionServers),
           ...sectionTiles(sections[LocationSection.other]!),
         ],
-        if (online.isEmpty)
+        if (freeOnline.isEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Text(

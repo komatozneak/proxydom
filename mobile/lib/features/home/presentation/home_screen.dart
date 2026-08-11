@@ -16,6 +16,7 @@ import '../../settings/data/split_tunnel_prefs.dart';
 import '../../vpn/data/node_display.dart';
 import '../../vpn/data/vpn_controller.dart';
 import '../../vpn/data/vpn_node.dart';
+import '../../vpn/domain/vpn_connect_error.dart';
 import '../application/home_stats_provider.dart';
 import '../application/vpn_provider.dart';
 import '../application/vpn_status.dart';
@@ -375,6 +376,8 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
       VpnDisconnected() => l.homeDisconnected,
       VpnConnecting() => l.homeConnecting,
       VpnConnected() => l.homeConnected,
+      VpnError(:final code) when code == kVpnProbeFailedErrorCode =>
+        l.homeVpnProbeFailedTitle,
       VpnError(:final code) when code == kVpnConflictErrorCode =>
         l.homeVpnConflictTitle,
       VpnError(:final code) when code == 'device_limit_reached' =>
@@ -385,6 +388,11 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
       VpnDisconnected() => l.homeTapHint,
       VpnConnecting() => l.homeConnectingHint,
       VpnConnected() => l.homeConnectedHint,
+      VpnError(:final code, :final message)
+          when code == kVpnProbeFailedErrorCode =>
+        l.homeVpnProbeFailedHint(
+          message.isNotEmpty ? message : l.homeRegion,
+        ),
       VpnError(:final code, :final message)
           when code == kVpnConflictErrorCode =>
         (message.isNotEmpty && message != 'vpn_conflict')

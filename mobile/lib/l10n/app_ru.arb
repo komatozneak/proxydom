@@ -45,6 +45,7 @@
   "premiumOpenLocations": "Открыть локации",
   "subscriptionTabHint": "Тарифы и промокоды. Премиум открывает YouTube-локации.",
   "locationsPremiumLocked": "Премиум",
+  "locationsPremiumUnavailable": "Доступно в Premium",
   "settingsNoVpn": "Что работает без VPN?",
   "settingsNoVpnHint": "Эти адреса открываются напрямую, мимо VPN",
   "modesTitle": "Режим",
@@ -89,6 +90,15 @@
   "homeMoreMenu": "Ещё",
   "homeRetry": "Повторить",
   "homeErrorFriendly": "Не удалось подключиться. Попробуйте снова.",
+  "homeVpnProbeFailedTitle": "Сервер не отвечает",
+  "homeVpnProbeFailedHint": "Локация {node} временно недоступна. Выберите другую в «Локации» или повторите позже.",
+  "@homeVpnProbeFailedHint": {
+    "placeholders": {
+      "node": {
+        "type": "String"
+      }
+    }
+  },
   "homeVpnConflictTitle": "Мешает другой VPN",
   "homeVpnConflictHint": "Отключите другой VPN или «Всегда включён» в настройках Android, затем подключитесь снова.",
   "homeVpnConflictHintNamed": "Отключите «{app}» (или «Всегда включён») в настройках Android, затем подключитесь снова.",
@@ -387,5 +397,35 @@
   "settingsSeatAcceptFailed": "Не удалось принять код места",
   "settingsRecoverAccess": "Восстановить доступ",
   "settingsRecoverAccessHint": "Код восстановления после переустановки",
-  "bootstrapFailed": "Не удалось начать сессию. Проверьте связь."
+  "bootstrapFailed": "Не удалось начать сессию. Проверьте связь.",
+  "accountHubTitle": "Аккаунт",
+  "accountHubGuestLead": "Сейчас вы в гостевом режиме. Привяжите контакт, чтобы не потерять доступ.",
+  "accountHubLinkedLead": "Контакт привязан. Здесь — данные аккаунта и доступ.",
+  "accountHubLinkTelegram": "Telegram",
+  "accountHubLinkTelegramHint": "Привязать через бота",
+  "accountHubLinkEmail": "Почта",
+  "accountHubLinkEmailHint": "Привязать по коду из письма",
+  "accountHubRecovery": "Код восстановления",
+  "accountHubRecoveryHint": "Восстановить доступ после переустановки",
+  "accountHubPromo": "Промокод",
+  "accountHubPromoHint": "Активировать код приглашения или бета-доступ",
+  "accountHubAccessSection": "Ваш доступ",
+  "accountHubContact": "Контакт",
+  "accountHubLoadError": "Не удалось загрузить аккаунт",
+  "accountTelegramLead": "Откройте бота и подтвердите привязку. Вернитесь в приложение — статус обновится автоматически.",
+  "accountTelegramOpenBot": "Открыть Telegram",
+  "accountTelegramWaiting": "Ждём подтверждения…",
+  "accountTelegramWaitingHint": "После /start в боте вернитесь сюда.",
+  "accountTelegramStartFailed": "Не удалось начать привязку Telegram",
+  "accountEmailLead": "Укажите почту — пришлём одноразовый код.",
+  "accountEmailLabel": "Email",
+  "accountEmailSendCode": "Отправить код",
+  "accountEmailCodeLabel": "Код из письма",
+  "accountEmailVerify": "Подтвердить",
+  "accountEmailChangeAddress": "Другой адрес",
+  "accountEmailInvalid": "Введите корректный email",
+  "accountEmailSendFailed": "Не удалось отправить код",
+  "accountEmailCodeRequired": "Введите код из письма",
+  "accountEmailVerifyFailed": "Неверный или просроченный код",
+  "accountEmailDebugHint": "DEBUG: код подставлен из ответа API"
 }

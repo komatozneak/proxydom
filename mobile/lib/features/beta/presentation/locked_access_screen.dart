@@ -10,8 +10,7 @@ import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../billing/data/billing_api.dart';
-import '../application/beta_providers.dart';
-import '../data/beta_redeem_outcome.dart';
+import 'promo_redeem_form.dart';
 
 /// Activation paywall: welcome + Platega plans + promo (no intermediate CTA).
 class LockedAccessScreen extends ConsumerStatefulWidget {
@@ -22,65 +21,12 @@ class LockedAccessScreen extends ConsumerStatefulWidget {
 }
 
 class _LockedAccessScreenState extends ConsumerState<LockedAccessScreen> {
-  final _controller = TextEditingController();
-  final _focus = FocusNode();
-  bool _promoBusy = false;
   bool _payBusy = false;
   String? _error;
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    _focus.dispose();
-    super.dispose();
-  }
-
-  String _messageFor(BetaRedeemOutcomeCode code, AppL10n l) => switch (code) {
-        BetaRedeemOutcomeCode.invalid => l.promoOutcomeInvalid,
-        BetaRedeemOutcomeCode.expired => l.promoOutcomeExpired,
-        BetaRedeemOutcomeCode.exhausted => l.promoOutcomeExhausted,
-        BetaRedeemOutcomeCode.revoked => l.promoOutcomeRevoked,
-        BetaRedeemOutcomeCode.rateLimited => l.promoOutcomeRateLimited,
-        BetaRedeemOutcomeCode.unknown => l.promoOutcomeUnknown,
-        _ => l.promoOutcomeUnknown,
-      };
 
   void _goAfterUnlock() {
     AppRouter.postAuthResolved = true;
     context.go('/onboarding');
-  }
-
-  Future<void> _submitPromo() async {
-    final code = _controller.text.trim();
-    if (code.isEmpty) {
-      setState(() => _error = AppL10n.of(context).promoCodeEmpty);
-      return;
-    }
-    setState(() {
-      _promoBusy = true;
-      _error = null;
-    });
-    try {
-      final result = await ref.read(betaApiProvider).redeem(code);
-      if (!mounted) return;
-      if (result.outcome.isSuccess && result.hasAccess) {
-        _goAfterUnlock();
-        return;
-      }
-      setState(() {
-        _error = result.outcome.isSuccess && !result.hasAccess
-            ? AppL10n.of(context).promoOutcomeUnknown
-            : _messageFor(result.outcome, AppL10n.of(context));
-        _promoBusy = false;
-      });
-      _focus.requestFocus();
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _error = AppL10n.of(context).promoOutcomeUnknown;
-        _promoBusy = false;
-      });
-    }
   }
 
   Future<void> _pay(String plan) async {
@@ -145,7 +91,7 @@ class _LockedAccessScreenState extends ConsumerState<LockedAccessScreen> {
   Widget build(BuildContext context) {
     final l = AppL10n.of(context);
     final theme = Theme.of(context);
-    final busy = _promoBusy || _payBusy;
+    final busy = _payBusy;
     final muted = theme.colorScheme.onSurface.withValues(alpha: 0.72);
     final buttonStyle = FilledButton.styleFrom(
       minimumSize: const Size.fromHeight(52),
@@ -210,6 +156,16 @@ class _LockedAccessScreenState extends ConsumerState<LockedAccessScreen> {
                           child: Text(l.lockedPay3m),
                         ),
                         const SizedBox(height: 28),
+                        if (_error != null) ...[
+                          Text(
+                            _error!,
+                            style: TextStyle(
+                              color: theme.colorScheme.error,
+                              height: 1.35,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
                         Row(
                           children: [
                             Expanded(
@@ -239,46 +195,17 @@ class _LockedAccessScreenState extends ConsumerState<LockedAccessScreen> {
                           ],
                         ),
                         const SizedBox(height: 22),
-                        TextField(
-                          controller: _controller,
-                          focusNode: _focus,
+                        PromoRedeemForm(
                           enabled: !busy,
-                          textCapitalization: TextCapitalization.characters,
-                          autocorrect: false,
-                          decoration: InputDecoration(
-                            labelText: l.promoCodeLabel,
-                            hintText: l.promoCodeHint,
-                            border: const OutlineInputBorder(),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 18,
-                            ),
+                          useTonalButton: true,
+                          buttonStyle: buttonStyle,
+                          textFieldContentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 18,
                           ),
-                          onSubmitted: (_) => _submitPromo(),
-                        ),
-                        if (_error != null) ...[
-                          const SizedBox(height: 12),
-                          Text(
-                            _error!,
-                            style: TextStyle(
-                              color: theme.colorScheme.error,
-                              height: 1.35,
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: 18),
-                        FilledButton.tonal(
-                          style: buttonStyle,
-                          onPressed: busy ? null : _submitPromo,
-                          child: _promoBusy
-                              ? const SizedBox(
-                                  height: 22,
-                                  width: 22,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : Text(l.promoSubmit),
+                          onSuccess: () async {
+                            if (mounted) _goAfterUnlock();
+                          },
                         ),
                       ],
                     ),

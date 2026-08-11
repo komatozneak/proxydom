@@ -14,13 +14,19 @@ data class XrayRuntimeCandidate(
 /** Nest: probe only the primary candidate (ADR 005 soft failover budget). */
 const val AUTO_CANDIDATE_LIMIT = 1
 
-const val XRAY_SOCKS_PROBE_TIMEOUT_MS = 4_000
-const val XRAY_SOCKS_PROBE_ATTEMPTS = 3
+const val XRAY_SOCKS_PROBE_TIMEOUT_MS = 2_000
+const val XRAY_SOCKS_PROBE_ATTEMPTS = 2
 /** Inter-attempt pause after SOCKS not-ready / HTTPS fail. */
 const val XRAY_SOCKS_PROBE_RETRY_SLEEP_MS = 150L
 /** Max time spent polling SOCKS accept readiness before first HTTPS probe. */
-const val XRAY_SOCKS_WARMUP_BUDGET_MS = 400L
+const val XRAY_SOCKS_WARMUP_BUDGET_MS = 300L
 const val XRAY_SOCKS_WARMUP_POLL_MS = 200
+
+/** Upper bound for pre-connect SOCKS HTTPS probe (warmup + attempts). */
+fun socksHttpsProbeBudgetMs(): Long =
+    XRAY_SOCKS_WARMUP_BUDGET_MS +
+        XRAY_SOCKS_PROBE_ATTEMPTS.toLong() *
+        (XRAY_SOCKS_PROBE_TIMEOUT_MS + XRAY_SOCKS_PROBE_RETRY_SLEEP_MS + 800L)
 
 /**
  * Probe order for nest. [autoSelect] is retained for the MethodChannel contract;

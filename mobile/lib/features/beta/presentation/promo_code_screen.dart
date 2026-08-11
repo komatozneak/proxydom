@@ -1,86 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../core/router.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../l10n/app_localizations.dart';
-import '../application/beta_providers.dart';
-import '../data/beta_redeem_outcome.dart';
+import 'promo_redeem_form.dart';
 
 /// Promo code entry — after Flash Call, only when server advertises the gate.
-class PromoCodeScreen extends ConsumerStatefulWidget {
+class PromoCodeScreen extends ConsumerWidget {
   const PromoCodeScreen({super.key});
 
   @override
-  ConsumerState<PromoCodeScreen> createState() => _PromoCodeScreenState();
-}
-
-class _PromoCodeScreenState extends ConsumerState<PromoCodeScreen> {
-  final _controller = TextEditingController();
-  final _focus = FocusNode();
-  bool _submitting = false;
-  String? _error;
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    _focus.dispose();
-    super.dispose();
-  }
-
-  String _messageFor(BetaRedeemOutcomeCode code, AppL10n l) => switch (code) {
-        BetaRedeemOutcomeCode.invalid => l.promoOutcomeInvalid,
-        BetaRedeemOutcomeCode.expired => l.promoOutcomeExpired,
-        BetaRedeemOutcomeCode.exhausted => l.promoOutcomeExhausted,
-        BetaRedeemOutcomeCode.revoked => l.promoOutcomeRevoked,
-        BetaRedeemOutcomeCode.rateLimited => l.promoOutcomeRateLimited,
-        BetaRedeemOutcomeCode.unknown => l.promoOutcomeUnknown,
-        _ => l.promoOutcomeUnknown,
-      };
-
-  Future<void> _submit() async {
-    final code = _controller.text.trim();
-    if (code.isEmpty) {
-      setState(() => _error = AppL10n.of(context).promoCodeEmpty);
-      return;
-    }
-    setState(() {
-      _submitting = true;
-      _error = null;
-    });
-    try {
-      final result = await ref.read(betaApiProvider).redeem(code);
-      if (!mounted) return;
-      // Require server has_access — outcome alone must not open onboarding.
-      if (result.outcome.isSuccess && result.hasAccess) {
-        await AppRouter.goAfterEntitlement(context, '/onboarding');
-        return;
-      }
-      if (result.outcome.isSuccess && !result.hasAccess) {
-        setState(() {
-          _error = AppL10n.of(context).promoOutcomeUnknown;
-          _submitting = false;
-        });
-        return;
-      }
-      setState(() {
-        _error = _messageFor(result.outcome, AppL10n.of(context));
-        _submitting = false;
-      });
-      _focus.requestFocus();
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _error = AppL10n.of(context).promoOutcomeUnknown;
-        _submitting = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l = AppL10n.of(context);
     final theme = Theme.of(context);
 
@@ -98,7 +30,7 @@ class _PromoCodeScreenState extends ConsumerState<PromoCodeScreen> {
                   width: 88,
                   height: 88,
                   decoration: BoxDecoration(
-                    color: AppBrand.secondary.withOpacity(0.15),
+                    color: AppBrand.secondary.withValues(alpha: 0.15),
                     shape: BoxShape.circle,
                   ),
                   child: const AppIcon(
@@ -118,41 +50,15 @@ class _PromoCodeScreenState extends ConsumerState<PromoCodeScreen> {
               Text(
                 l.promoBody,
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurface.withOpacity(0.75),
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.75),
                 ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
-              TextField(
-                controller: _controller,
-                focusNode: _focus,
-                enabled: !_submitting,
-                textCapitalization: TextCapitalization.characters,
-                autocorrect: false,
-                decoration: InputDecoration(
-                  labelText: l.promoCodeLabel,
-                  hintText: l.promoCodeHint,
-                  border: const OutlineInputBorder(),
-                ),
-                onSubmitted: (_) => _submit(),
-              ),
-              if (_error != null) ...[
-                const SizedBox(height: 12),
-                Text(
-                  _error!,
-                  style: TextStyle(color: theme.colorScheme.error),
-                ),
-              ],
-              const SizedBox(height: 24),
-              FilledButton(
-                onPressed: _submitting ? null : _submit,
-                child: _submitting
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(l.promoSubmit),
+              PromoRedeemForm(
+                onSuccess: () async {
+                  await AppRouter.goAfterEntitlement(context, '/onboarding');
+                },
               ),
             ],
           ),

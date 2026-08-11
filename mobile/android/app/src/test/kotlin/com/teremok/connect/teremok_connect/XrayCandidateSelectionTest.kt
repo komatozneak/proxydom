@@ -1,6 +1,7 @@
 package com.teremok.connect.teremok_connect
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class XrayCandidateSelectionTest {
@@ -32,9 +33,10 @@ class XrayCandidateSelectionTest {
             b,
             fastestCandidate(listOf(a to 420L, b to 180L, c to 260L))?.first,
         )
-        assertEquals(4_000, XRAY_SOCKS_PROBE_TIMEOUT_MS)
-        assertEquals(3, XRAY_SOCKS_PROBE_ATTEMPTS)
+        assertEquals(2_000, XRAY_SOCKS_PROBE_TIMEOUT_MS)
+        assertEquals(2, XRAY_SOCKS_PROBE_ATTEMPTS)
         assertEquals(150L, XRAY_SOCKS_PROBE_RETRY_SLEEP_MS)
-        assertEquals(400L, XRAY_SOCKS_WARMUP_BUDGET_MS)
+        assertEquals(300L, XRAY_SOCKS_WARMUP_BUDGET_MS)
+        assertTrue(socksHttpsProbeBudgetMs() <= 6_500L)
     }
 }

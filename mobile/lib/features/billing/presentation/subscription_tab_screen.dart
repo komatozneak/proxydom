@@ -39,7 +39,7 @@ class SubscriptionTabScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           OutlinedButton(
-            onPressed: () => context.push('/promo'),
+            onPressed: () => context.push('/settings/account/promo'),
             child: Text(l.lockedOrPromo),
           ),
           const SizedBox(height: 24),
@@ -62,6 +62,8 @@ class SubscriptionTabScreen extends ConsumerWidget {
         return l.settingsAccessBetaTitle;
       case AccessCopyKind.cancelled:
         return l.settingsAccessCancelledSubtitle;
+      case AccessCopyKind.free:
+        return l.settingsAccessFreeTitle;
       case AccessCopyKind.none:
         return l.settingsAccessNoneTitle;
       case AccessCopyKind.generic:
@@ -79,6 +81,8 @@ class SubscriptionTabScreen extends ConsumerWidget {
     switch (accessCopyKind(s)) {
       case AccessCopyKind.closedBeta:
         return l.settingsAccessBetaSubtitle;
+      case AccessCopyKind.free:
+        return l.settingsAccessFreeSubtitle;
       case AccessCopyKind.none:
         return l.settingsAccessNoneSubtitle;
       default:

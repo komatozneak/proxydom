@@ -361,6 +361,12 @@ abstract class AppL10n {
   /// **'Premium'**
   String get locationsPremiumLocked;
 
+  /// No description provided for @locationsPremiumUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Available with Premium'**
+  String get locationsPremiumUnavailable;
+
   /// No description provided for @settingsNoVpn.
   ///
   /// In en, this message translates to:
@@ -624,6 +630,18 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Couldn’t connect. Please try again.'**
   String get homeErrorFriendly;
+
+  /// No description provided for @homeVpnProbeFailedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Server not responding'**
+  String get homeVpnProbeFailedTitle;
+
+  /// No description provided for @homeVpnProbeFailedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Location {node} is temporarily unavailable. Pick another in Locations or try again later.'**
+  String homeVpnProbeFailedHint(String node);
 
   /// No description provided for @homeVpnConflictTitle.
   ///
@@ -2280,6 +2298,186 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Couldn’t start the session. Check your connection.'**
   String get bootstrapFailed;
+
+  /// No description provided for @accountHubTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Account'**
+  String get accountHubTitle;
+
+  /// No description provided for @accountHubGuestLead.
+  ///
+  /// In en, this message translates to:
+  /// **'You’re in guest mode. Link a contact so you don’t lose access.'**
+  String get accountHubGuestLead;
+
+  /// No description provided for @accountHubLinkedLead.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact linked. Account details and access are below.'**
+  String get accountHubLinkedLead;
+
+  /// No description provided for @accountHubLinkTelegram.
+  ///
+  /// In en, this message translates to:
+  /// **'Telegram'**
+  String get accountHubLinkTelegram;
+
+  /// No description provided for @accountHubLinkTelegramHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Link via the bot'**
+  String get accountHubLinkTelegramHint;
+
+  /// No description provided for @accountHubLinkEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Email'**
+  String get accountHubLinkEmail;
+
+  /// No description provided for @accountHubLinkEmailHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Link with a code from email'**
+  String get accountHubLinkEmailHint;
+
+  /// No description provided for @accountHubRecovery.
+  ///
+  /// In en, this message translates to:
+  /// **'Recovery code'**
+  String get accountHubRecovery;
+
+  /// No description provided for @accountHubRecoveryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore access after reinstall'**
+  String get accountHubRecoveryHint;
+
+  /// No description provided for @accountHubPromo.
+  ///
+  /// In en, this message translates to:
+  /// **'Promo code'**
+  String get accountHubPromo;
+
+  /// No description provided for @accountHubPromoHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Redeem invite or beta access code'**
+  String get accountHubPromoHint;
+
+  /// No description provided for @accountHubAccessSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Your access'**
+  String get accountHubAccessSection;
+
+  /// No description provided for @accountHubContact.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact'**
+  String get accountHubContact;
+
+  /// No description provided for @accountHubLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t load account'**
+  String get accountHubLoadError;
+
+  /// No description provided for @accountTelegramLead.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the bot and confirm. Come back — status updates automatically.'**
+  String get accountTelegramLead;
+
+  /// No description provided for @accountTelegramOpenBot.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Telegram'**
+  String get accountTelegramOpenBot;
+
+  /// No description provided for @accountTelegramWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for confirmation…'**
+  String get accountTelegramWaiting;
+
+  /// No description provided for @accountTelegramWaitingHint.
+  ///
+  /// In en, this message translates to:
+  /// **'After /start in the bot, return here.'**
+  String get accountTelegramWaitingHint;
+
+  /// No description provided for @accountTelegramStartFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t start Telegram linking'**
+  String get accountTelegramStartFailed;
+
+  /// No description provided for @accountEmailLead.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your email — we’ll send a one-time code.'**
+  String get accountEmailLead;
+
+  /// No description provided for @accountEmailLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Email'**
+  String get accountEmailLabel;
+
+  /// No description provided for @accountEmailSendCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Send code'**
+  String get accountEmailSendCode;
+
+  /// No description provided for @accountEmailCodeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Code from email'**
+  String get accountEmailCodeLabel;
+
+  /// No description provided for @accountEmailVerify.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm'**
+  String get accountEmailVerify;
+
+  /// No description provided for @accountEmailChangeAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Different address'**
+  String get accountEmailChangeAddress;
+
+  /// No description provided for @accountEmailInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid email'**
+  String get accountEmailInvalid;
+
+  /// No description provided for @accountEmailSendFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t send the code'**
+  String get accountEmailSendFailed;
+
+  /// No description provided for @accountEmailCodeRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the code from email'**
+  String get accountEmailCodeRequired;
+
+  /// No description provided for @accountEmailVerifyFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid or expired code'**
+  String get accountEmailVerifyFailed;
+
+  /// No description provided for @accountEmailDebugHint.
+  ///
+  /// In en, this message translates to:
+  /// **'DEBUG: code filled from API response'**
+  String get accountEmailDebugHint;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

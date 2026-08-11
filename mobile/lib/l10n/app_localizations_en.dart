@@ -143,6 +143,9 @@ class AppL10nEn extends AppL10n {
   String get locationsPremiumLocked => 'Premium';
 
   @override
+  String get locationsPremiumUnavailable => 'Available with Premium';
+
+  @override
   String get settingsNoVpn => 'What works without VPN?';
 
   @override
@@ -280,6 +283,14 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get homeErrorFriendly => 'Couldn’t connect. Please try again.';
+
+  @override
+  String get homeVpnProbeFailedTitle => 'Server not responding';
+
+  @override
+  String homeVpnProbeFailedHint(String node) {
+    return 'Location $node is temporarily unavailable. Pick another in Locations or try again later.';
+  }
 
   @override
   String get homeVpnConflictTitle => 'Another VPN is blocking';
@@ -1191,4 +1202,99 @@ class AppL10nEn extends AppL10n {
   @override
   String get bootstrapFailed =>
       'Couldn’t start the session. Check your connection.';
+
+  @override
+  String get accountHubTitle => 'Account';
+
+  @override
+  String get accountHubGuestLead =>
+      'You’re in guest mode. Link a contact so you don’t lose access.';
+
+  @override
+  String get accountHubLinkedLead =>
+      'Contact linked. Account details and access are below.';
+
+  @override
+  String get accountHubLinkTelegram => 'Telegram';
+
+  @override
+  String get accountHubLinkTelegramHint => 'Link via the bot';
+
+  @override
+  String get accountHubLinkEmail => 'Email';
+
+  @override
+  String get accountHubLinkEmailHint => 'Link with a code from email';
+
+  @override
+  String get accountHubRecovery => 'Recovery code';
+
+  @override
+  String get accountHubRecoveryHint => 'Restore access after reinstall';
+
+  @override
+  String get accountHubPromo => 'Promo code';
+
+  @override
+  String get accountHubPromoHint => 'Redeem invite or beta access code';
+
+  @override
+  String get accountHubAccessSection => 'Your access';
+
+  @override
+  String get accountHubContact => 'Contact';
+
+  @override
+  String get accountHubLoadError => 'Couldn’t load account';
+
+  @override
+  String get accountTelegramLead =>
+      'Open the bot and confirm. Come back — status updates automatically.';
+
+  @override
+  String get accountTelegramOpenBot => 'Open Telegram';
+
+  @override
+  String get accountTelegramWaiting => 'Waiting for confirmation…';
+
+  @override
+  String get accountTelegramWaitingHint =>
+      'After /start in the bot, return here.';
+
+  @override
+  String get accountTelegramStartFailed => 'Couldn’t start Telegram linking';
+
+  @override
+  String get accountEmailLead =>
+      'Enter your email — we’ll send a one-time code.';
+
+  @override
+  String get accountEmailLabel => 'Email';
+
+  @override
+  String get accountEmailSendCode => 'Send code';
+
+  @override
+  String get accountEmailCodeLabel => 'Code from email';
+
+  @override
+  String get accountEmailVerify => 'Confirm';
+
+  @override
+  String get accountEmailChangeAddress => 'Different address';
+
+  @override
+  String get accountEmailInvalid => 'Enter a valid email';
+
+  @override
+  String get accountEmailSendFailed => 'Couldn’t send the code';
+
+  @override
+  String get accountEmailCodeRequired => 'Enter the code from email';
+
+  @override
+  String get accountEmailVerifyFailed => 'Invalid or expired code';
+
+  @override
+  String get accountEmailDebugHint => 'DEBUG: code filled from API response';
 }

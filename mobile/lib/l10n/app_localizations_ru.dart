@@ -144,6 +144,9 @@ class AppL10nRu extends AppL10n {
   String get locationsPremiumLocked => 'Премиум';
 
   @override
+  String get locationsPremiumUnavailable => 'Доступно в Premium';
+
+  @override
   String get settingsNoVpn => 'Что работает без VPN?';
 
   @override
@@ -281,6 +284,14 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get homeErrorFriendly => 'Не удалось подключиться. Попробуйте снова.';
+
+  @override
+  String get homeVpnProbeFailedTitle => 'Сервер не отвечает';
+
+  @override
+  String homeVpnProbeFailedHint(String node) {
+    return 'Локация $node временно недоступна. Выберите другую в «Локации» или повторите позже.';
+  }
 
   @override
   String get homeVpnConflictTitle => 'Мешает другой VPN';
@@ -1197,4 +1208,101 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get bootstrapFailed => 'Не удалось начать сессию. Проверьте связь.';
+
+  @override
+  String get accountHubTitle => 'Аккаунт';
+
+  @override
+  String get accountHubGuestLead =>
+      'Сейчас вы в гостевом режиме. Привяжите контакт, чтобы не потерять доступ.';
+
+  @override
+  String get accountHubLinkedLead =>
+      'Контакт привязан. Здесь — данные аккаунта и доступ.';
+
+  @override
+  String get accountHubLinkTelegram => 'Telegram';
+
+  @override
+  String get accountHubLinkTelegramHint => 'Привязать через бота';
+
+  @override
+  String get accountHubLinkEmail => 'Почта';
+
+  @override
+  String get accountHubLinkEmailHint => 'Привязать по коду из письма';
+
+  @override
+  String get accountHubRecovery => 'Код восстановления';
+
+  @override
+  String get accountHubRecoveryHint =>
+      'Восстановить доступ после переустановки';
+
+  @override
+  String get accountHubPromo => 'Промокод';
+
+  @override
+  String get accountHubPromoHint =>
+      'Активировать код приглашения или бета-доступ';
+
+  @override
+  String get accountHubAccessSection => 'Ваш доступ';
+
+  @override
+  String get accountHubContact => 'Контакт';
+
+  @override
+  String get accountHubLoadError => 'Не удалось загрузить аккаунт';
+
+  @override
+  String get accountTelegramLead =>
+      'Откройте бота и подтвердите привязку. Вернитесь в приложение — статус обновится автоматически.';
+
+  @override
+  String get accountTelegramOpenBot => 'Открыть Telegram';
+
+  @override
+  String get accountTelegramWaiting => 'Ждём подтверждения…';
+
+  @override
+  String get accountTelegramWaitingHint =>
+      'После /start в боте вернитесь сюда.';
+
+  @override
+  String get accountTelegramStartFailed =>
+      'Не удалось начать привязку Telegram';
+
+  @override
+  String get accountEmailLead => 'Укажите почту — пришлём одноразовый код.';
+
+  @override
+  String get accountEmailLabel => 'Email';
+
+  @override
+  String get accountEmailSendCode => 'Отправить код';
+
+  @override
+  String get accountEmailCodeLabel => 'Код из письма';
+
+  @override
+  String get accountEmailVerify => 'Подтвердить';
+
+  @override
+  String get accountEmailChangeAddress => 'Другой адрес';
+
+  @override
+  String get accountEmailInvalid => 'Введите корректный email';
+
+  @override
+  String get accountEmailSendFailed => 'Не удалось отправить код';
+
+  @override
+  String get accountEmailCodeRequired => 'Введите код из письма';
+
+  @override
+  String get accountEmailVerifyFailed => 'Неверный или просроченный код';
+
+  @override
+  String get accountEmailDebugHint => 'DEBUG: код подставлен из ответа API';
 }

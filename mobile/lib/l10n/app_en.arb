@@ -70,6 +70,8 @@
   "@subscriptionTabHint": {},
   "locationsPremiumLocked": "Premium",
   "@locationsPremiumLocked": {},
+  "locationsPremiumUnavailable": "Available with Premium",
+  "@locationsPremiumUnavailable": {},
   "settingsNoVpn": "What works without VPN?",
   "@settingsNoVpn": {},
   "settingsNoVpnHint": "These addresses open directly, bypassing the VPN",
@@ -128,6 +130,15 @@
   "@homeRetry": {},
   "homeErrorFriendly": "Couldn’t connect. Please try again.",
   "@homeErrorFriendly": {},
+  "homeVpnProbeFailedTitle": "Server not responding",
+  "homeVpnProbeFailedHint": "Location {node} is temporarily unavailable. Pick another in Locations or try again later.",
+  "@homeVpnProbeFailedHint": {
+    "placeholders": {
+      "node": {
+        "type": "String"
+      }
+    }
+  },
   "homeVpnConflictTitle": "Another VPN is blocking",
   "@homeVpnConflictTitle": {},
   "homeVpnConflictHint": "Turn off the other VPN or Always-on in Android settings, then connect again.",
@@ -557,5 +568,35 @@
   "settingsSeatAcceptFailed": "Couldn’t accept the seat code",
   "settingsRecoverAccess": "Restore access",
   "settingsRecoverAccessHint": "Use recovery code after reinstall",
-  "bootstrapFailed": "Couldn’t start the session. Check your connection."
+  "bootstrapFailed": "Couldn’t start the session. Check your connection.",
+  "accountHubTitle": "Account",
+  "accountHubGuestLead": "You’re in guest mode. Link a contact so you don’t lose access.",
+  "accountHubLinkedLead": "Contact linked. Account details and access are below.",
+  "accountHubLinkTelegram": "Telegram",
+  "accountHubLinkTelegramHint": "Link via the bot",
+  "accountHubLinkEmail": "Email",
+  "accountHubLinkEmailHint": "Link with a code from email",
+  "accountHubRecovery": "Recovery code",
+  "accountHubRecoveryHint": "Restore access after reinstall",
+  "accountHubPromo": "Promo code",
+  "accountHubPromoHint": "Redeem invite or beta access code",
+  "accountHubAccessSection": "Your access",
+  "accountHubContact": "Contact",
+  "accountHubLoadError": "Couldn’t load account",
+  "accountTelegramLead": "Open the bot and confirm. Come back — status updates automatically.",
+  "accountTelegramOpenBot": "Open Telegram",
+  "accountTelegramWaiting": "Waiting for confirmation…",
+  "accountTelegramWaitingHint": "After /start in the bot, return here.",
+  "accountTelegramStartFailed": "Couldn’t start Telegram linking",
+  "accountEmailLead": "Enter your email — we’ll send a one-time code.",
+  "accountEmailLabel": "Email",
+  "accountEmailSendCode": "Send code",
+  "accountEmailCodeLabel": "Code from email",
+  "accountEmailVerify": "Confirm",
+  "accountEmailChangeAddress": "Different address",
+  "accountEmailInvalid": "Enter a valid email",
+  "accountEmailSendFailed": "Couldn’t send the code",
+  "accountEmailCodeRequired": "Enter the code from email",
+  "accountEmailVerifyFailed": "Invalid or expired code",
+  "accountEmailDebugHint": "DEBUG: code filled from API response"
 }

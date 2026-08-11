@@ -12,6 +12,7 @@ import '../../../core/support_contact.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../account/application/account_profile_provider.dart';
 import '../../auth/application/auth_provider.dart';
 import '../../auth/application/logout_handler.dart';
 import '../application/devices_list_provider.dart';
@@ -399,6 +400,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final notifOn = _notifEnabled ?? false;
     final autoOn = _autoReconnect ?? false;
     final subAsync = ref.watch(subscriptionStatusProvider);
+    final accountAsync = ref.watch(accountProfileProvider);
     final devicesAsync = ref.watch(devicesListProvider);
     final themeMode =
         ref.watch(themeModeProvider).valueOrNull ?? ThemeMode.system;
@@ -413,6 +415,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       data: (d) => d.maxDevices > 1,
       orElse: () => premiumFromSub,
     );
+    final contactLinked = accountAsync.valueOrNull?.contactLinked ?? true;
+    final showGuestBadge = accountAsync.hasValue && !contactLinked;
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
@@ -435,8 +439,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 leading: _AccessStatusGlyph(status: subAsync),
                 title: _accessTitle(l, subAsync),
                 subtitle: _accessSubtitle(l, subAsync),
+                onTap: () => context.push('/settings/account'),
                 trailing: subAsync.when(
-                  data: (_) => null,
+                  data: (_) => Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (showGuestBadge)
+                        Text(
+                          '!',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                      if (showGuestBadge) const SizedBox(width: 6),
+                      const AppIcon(AppIcons.chevronRight, size: 18),
+                    ],
+                  ),
                   loading: () => const SizedBox(
                     width: 22,
                     height: 22,
@@ -473,13 +492,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     onTap: _acceptSeat,
                   ),
                 ],
-                const _CardDivider(),
-                _SettingsRow(
-                  icon: AppIcons.shield,
-                  title: l.settingsRecoverAccess,
-                  subtitle: l.settingsRecoverAccessHint,
-                  onTap: () => context.go('/restore'),
-                ),
                 const _CardDivider(),
                 _SettingsRow(
                   icon: AppIcons.siteTelegram,

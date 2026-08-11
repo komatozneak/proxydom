@@ -17,6 +17,7 @@ import '../../vpn/data/vpn_controller.dart';
 import '../../vpn/data/vpn_node.dart';
 import '../../vpn/data/vpn_nodes_repository.dart';
 import '../../vpn/data/vpn_service_config.dart';
+import '../../vpn/domain/vpn_connect_error.dart';
 import '../../settings/data/auto_reconnect_prefs.dart';
 import 'vpn_status.dart';
 
@@ -118,7 +119,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
         }
       case VpnNativeStatus.error:
         if (state is! VpnError) {
-          state = VpnError(message: await _nativeErrorMessage());
+          state = await _vpnErrorFromNative();
         }
       case VpnNativeStatus.disconnecting:
         break;
@@ -147,7 +148,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
         return;
       }
       if (native == VpnNativeStatus.error) {
-        state = VpnError(message: await _nativeErrorMessage());
+        state = await _vpnErrorFromNative();
         return;
       }
       // Stuck preparing/connecting/idle — force stop so UI can recover.
@@ -175,12 +176,14 @@ class VpnNotifier extends Notifier<VpnStatus> {
     }
   }
 
-  Future<String> _nativeErrorMessage() async {
+  Future<VpnError> _vpnErrorFromNative({
+    String fallbackMessage = 'Native VPN error',
+  }) async {
     final detail = await VpnController.instance.getLastError();
-    if (detail != null && detail.isNotEmpty) {
-      return 'vpn: $detail';
-    }
-    return 'Native VPN error';
+    return vpnErrorFromNativeDetail(
+      detail,
+      fallbackMessage: fallbackMessage,
+    );
   }
 
   /// After prepare denial: foreign Always-on / lockdown → [vpn_conflict], else permission.
@@ -214,7 +217,9 @@ class VpnNotifier extends Notifier<VpnStatus> {
         detail.toLowerCase().contains('permission denied')) {
       return _errorForPermissionFailure();
     }
-    return const VpnError(message: 'Failed to start VPN service');
+    return await _vpnErrorFromNative(
+      fallbackMessage: 'Failed to start VPN service',
+    );
   }
 
   /// Keep uptime across UI restarts while the same VpnService session lives.
@@ -333,7 +338,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
         return;
       }
       if (native == VpnNativeStatus.error) {
-        state = VpnError(message: await _nativeErrorMessage());
+        state = await _vpnErrorFromNative();
         return;
       }
       if (native == VpnNativeStatus.idle || native == VpnNativeStatus.unknown) {
@@ -434,7 +439,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
       }
       // ignore: avoid_print
       print('[VPN] selected node_id=$apiNodeId auto=$useAuto');
-      if (apiNodeId != null && catalog != null) {
+      if (apiNodeId != null) {
         for (final n in catalog) {
           if (n.id == apiNodeId) {
             _selectedNodeProtocol = n.protocol;
@@ -678,13 +683,13 @@ class VpnNotifier extends Notifier<VpnStatus> {
           return;
         }
         if (nativeStatus == VpnNativeStatus.error) {
-          state = VpnError(message: await _nativeErrorMessage());
+          state = await _vpnErrorFromNative();
           return;
         }
         if (nativeStatus == VpnNativeStatus.idle) {
           final detail = await VpnController.instance.getLastError();
           if (detail != null && detail.isNotEmpty) {
-            state = VpnError(message: 'vpn: $detail');
+            state = vpnErrorFromNativeDetail(detail);
             return;
           }
         }
@@ -888,8 +893,8 @@ unawaited(_confirmIdleDrop());
         if (wasConnected) _recordSessionEnd();
         unawaited(_clearConnectedSince());
         unawaited(
-          _nativeErrorMessage().then((msg) {
-            state = VpnError(message: msg);
+          _vpnErrorFromNative().then((err) {
+            state = err;
           }),
         );
         if (wasConnected) {
