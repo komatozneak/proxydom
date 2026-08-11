@@ -378,6 +378,8 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
       VpnConnected() => l.homeConnected,
       VpnError(:final code) when code == kVpnProbeFailedErrorCode =>
         l.homeVpnProbeFailedTitle,
+      VpnError(:final code) when code == 'tt_provision_failed' =>
+        l.homeTtProvisionFailedTitle,
       VpnError(:final code) when code == kVpnConflictErrorCode =>
         l.homeVpnConflictTitle,
       VpnError(:final code) when code == 'device_limit_reached' =>
@@ -393,6 +395,8 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
         l.homeVpnProbeFailedHint(
           message.isNotEmpty ? message : l.homeRegion,
         ),
+      VpnError(:final code) when code == 'tt_provision_failed' =>
+        l.homeTtProvisionFailedHint,
       VpnError(:final code, :final message)
           when code == kVpnConflictErrorCode =>
         (message.isNotEmpty && message != 'vpn_conflict')

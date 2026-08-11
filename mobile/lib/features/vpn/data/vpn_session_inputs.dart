@@ -167,8 +167,12 @@ class VpnSessionInputs {
     required VpnServiceConfig service,
     required RoutePolicy route,
   }) {
+    final profile = config.xrayProfile;
+    if (profile == null) {
+      throw StateError('xray_profile required for Xray session inputs');
+    }
     final hops = [
-      for (final candidate in config.xrayProfile.candidates)
+      for (final candidate in profile.candidates)
         EgressHop(
           id: candidate.id,
           host: candidate.host,

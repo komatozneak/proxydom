@@ -250,10 +250,11 @@ class VpnNotifier extends Notifier<VpnStatus> {
     final serverName = config != null
         ? resolveVpnDisplayLabel(config, displayLabel: _displayLabel)
         : kVpnBrandSessionName;
-    final protocol = _selectedNodeProtocol == kVpnNodeProtocolTrusttunnel
+    final protocol = config?.isTrustTunnelSession == true ||
+            _selectedNodeProtocol == kVpnNodeProtocolTrusttunnel
         ? 'TRUSTTUNNEL'
         : friendlyProtocolLabel(
-            config?.xrayProfile.candidates.isNotEmpty == true
+            config?.xrayProfile?.candidates.isNotEmpty == true
                 ? config!.primaryCandidate.protocol
                 : 'vless',
           );
@@ -470,8 +471,17 @@ class VpnNotifier extends Notifier<VpnStatus> {
             if (e.error == 'session_expired') return false;
             if (e.error == 'device_revoked') return false;
             if (e.error == 'device_limit_reached') return false;
+            if (e.error == 'tt_provision_failed') return false;
             if (e.error is FormatException || e.error is TypeError) {
               return false;
+            }
+            if (code == 502 || code == 503) {
+              // Hard provision failures must surface immediately (ADR 006).
+              final apiCode = _apiErrorCode(e);
+              if (apiCode == 'tt_provision_failed' ||
+                  apiCode == 'provision_pending') {
+                return false;
+              }
             }
           }
           return true;
@@ -648,11 +658,28 @@ class VpnNotifier extends Notifier<VpnStatus> {
       await VpnController.instance.requestNotificationPermission();
       state = const VpnConnecting(progress: 0.5);
 
-      // 3. Start VpnService — TrustTunnel when catalog node asks for it (ADR 006).
-      final useTrustTunnel = _selectedNodeProtocol == kVpnNodeProtocolTrusttunnel &&
-          _config?.trusttunnelProfile != null;
+      // 3. Start VpnService — core from active_core (ADR 006), never silent Xray
+      // fallback when the catalog/session is TrustTunnel.
+      final wantsTrustTunnel = _config!.isTrustTunnelSession ||
+          _selectedNodeProtocol == kVpnNodeProtocolTrusttunnel;
+      // ignore: avoid_print
+      print(
+        '[VPN] active_core=${_config!.activeCore.name} '
+        'node_id=${_config!.trusttunnelProfile?.nodeId ?? _config!.nodeHost} '
+        'protocol=$_selectedNodeProtocol',
+      );
+      if (wantsTrustTunnel) {
+        final tt = _config!.trusttunnelProfile;
+        if (tt == null) {
+          state = const VpnError(
+            message: 'tt_provision_failed',
+            code: 'tt_provision_failed',
+          );
+          return;
+        }
+      }
       final started = await _retryPolicy.execute(
-        () => useTrustTunnel
+        () => wantsTrustTunnel
             ? VpnController.instance.startTrustTunnel(
                 _config!.trusttunnelProfile!,
                 displayLabel: _displayLabel,
@@ -711,6 +738,16 @@ class VpnNotifier extends Notifier<VpnStatus> {
           state = const VpnError(
             message: 'device_limit_reached',
             code: 'device_limit_reached',
+          );
+          return;
+        }
+        if (e.error == 'tt_provision_failed' ||
+            _apiErrorCode(e) == 'tt_provision_failed' ||
+            code == 502 ||
+            code == 503) {
+          state = const VpnError(
+            message: 'tt_provision_failed',
+            code: 'tt_provision_failed',
           );
           return;
         }
@@ -928,6 +965,17 @@ unawaited(_confirmIdleDrop());
       state = const VpnDisconnected();
     }
   }
+}
+
+String? _apiErrorCode(DioException e) {
+  final detail = e.response?.data;
+  if (detail is! Map) return null;
+  final nested = detail['detail'];
+  if (nested is Map && nested['error'] is Map) {
+    final code = (nested['error'] as Map)['code'];
+    return code is String ? code : null;
+  }
+  return null;
 }
 
 final vpnProvider = NotifierProvider<VpnNotifier, VpnStatus>(

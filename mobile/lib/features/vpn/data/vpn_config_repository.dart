@@ -75,6 +75,22 @@ class VpnConfigRepository {
           }
         }
       }
+      if ((code == 502 || code == 503) && detail is Map) {
+        final err = detail['detail'];
+        if (err is Map && err['error'] is Map) {
+          final nested = err['error'] as Map;
+          final apiCode = nested['code'];
+          if (apiCode == 'tt_provision_failed' ||
+              apiCode == 'provision_pending') {
+            throw DioException(
+              requestOptions: e.requestOptions,
+              response: e.response,
+              type: DioExceptionType.badResponse,
+              error: 'tt_provision_failed',
+            );
+          }
+        }
+      }
       rethrow;
     } catch (e, st) {
       if (e is DioException) rethrow;

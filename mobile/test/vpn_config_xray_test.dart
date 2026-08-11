@@ -42,12 +42,12 @@ void main() {
     ) as Map<String, dynamic>;
     final config = VpnConfig.fromJson(payload);
 
-    expect(config.xrayProfile.schemaVersion, 1);
+    expect(config.xrayProfile!.schemaVersion, 1);
     expect(config.egressHosts, ['203.0.113.10', '203.0.113.20']);
     expect(config.expectedEgressHost, '203.0.113.10');
-    expect(config.xrayProfile.candidates[0].flow, 'xtls-rprx-vision');
-    expect(config.xrayProfile.candidates[1].port, 8443);
-    expect(config.xrayProfile.candidates[1].transport, 'raw');
+    expect(config.xrayProfile!.candidates[0].flow, 'xtls-rprx-vision');
+    expect(config.xrayProfile!.candidates[1].port, 8443);
+    expect(config.xrayProfile!.candidates[1].transport, 'raw');
   });
 
   test('parses complete candidate-specific Xray settings', () {
@@ -73,9 +73,9 @@ void main() {
       }),
     );
 
-    expect(config.xrayProfile.schemaVersion, 1);
-    expect(config.xrayProfile.candidates, hasLength(2));
-    final second = config.xrayProfile.candidates[1];
+    expect(config.xrayProfile!.schemaVersion, 1);
+    expect(config.xrayProfile!.candidates, hasLength(2));
+    final second = config.xrayProfile!.candidates[1];
     expect(second.host, '5.6.7.8');
     expect(second.port, 8443);
     expect(second.uuid, 'uuid-b');
@@ -133,9 +133,9 @@ void main() {
         ],
       }),
     );
-    expect(config.xrayProfile.schemaVersion, 2);
-    expect(config.xrayProfile.candidates.single.region, 'al');
-    expect(config.xrayProfile.candidates.single.purpose, 'youtube');
+    expect(config.xrayProfile!.schemaVersion, 2);
+    expect(config.xrayProfile!.candidates.single.region, 'al');
+    expect(config.xrayProfile!.candidates.single.purpose, 'youtube');
   });
 
   test('falls back to selected_link when xray_profile is missing', () {
@@ -152,9 +152,9 @@ void main() {
       'node_host': '203.0.113.10',
     });
 
-    expect(config.xrayProfile.schemaVersion, 1);
-    expect(config.xrayProfile.candidates, hasLength(1));
-    final candidate = config.xrayProfile.candidates.single;
+    expect(config.xrayProfile!.schemaVersion, 1);
+    expect(config.xrayProfile!.candidates, hasLength(1));
+    final candidate = config.xrayProfile!.candidates.single;
     expect(candidate.host, '203.0.113.10');
     expect(candidate.uuid, '11111111-2222-3333-4444-555555555555');
     expect(candidate.serverName, 'cover.example');
@@ -174,9 +174,9 @@ void main() {
       'links': <String>['https://ignored.example', link],
       'expire': 1785654092,
     });
-    expect(config.xrayProfile.candidates.single.host, '198.51.100.7');
-    expect(config.xrayProfile.candidates.single.port, 8443);
-    expect(config.xrayProfile.candidates.single.transport, 'raw');
+    expect(config.xrayProfile!.candidates.single.host, '198.51.100.7');
+    expect(config.xrayProfile!.candidates.single.port, 8443);
+    expect(config.xrayProfile!.candidates.single.transport, 'raw');
   });
 
   test('fills empty sid from legacy sing_box_config when xray_profile absent',
@@ -207,8 +207,8 @@ void main() {
         ],
       },
     });
-    expect(config.xrayProfile.candidates.single.shortId, '5d578915');
-    expect(config.xrayProfile.candidates.single.publicKey, 'fixture-public-key');
+    expect(config.xrayProfile!.candidates.single.shortId, '5d578915');
+    expect(config.xrayProfile!.candidates.single.publicKey, 'fixture-public-key');
   });
 
   test('prefers xray_profile over legacy sing-box data', () {

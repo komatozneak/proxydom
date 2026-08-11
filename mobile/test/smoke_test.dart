@@ -243,8 +243,8 @@ void main() {
     );
     expect(config.username, 'test_user');
     expect(config.links, hasLength(1));
-    expect(config.xrayProfile.schemaVersion, 1);
-    expect(config.xrayProfile.candidates, hasLength(1));
+    expect(config.xrayProfile!.schemaVersion, 1);
+    expect(config.xrayProfile!.candidates, hasLength(1));
     final primary = config.primaryCandidate;
     expect(primary.host, 'vpn-dev.example');
     expect(primary.port, 443);
@@ -335,6 +335,7 @@ void main() {
           username: 'empty',
           links: const [],
           expire: DateTime.utc(2026, 7, 1),
+          activeCore: VpnActiveCore.xray,
           xrayProfile: const XrayProfile(schemaVersion: 1, candidates: []),
         );
         expect(

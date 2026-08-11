@@ -37,7 +37,8 @@ String resolveVpnDisplayLabel(VpnConfig config, {String? displayLabel}) {
 
   addHost(config.nodeHost);
   addHost(config.expectedEgressHost);
-  if (config.xrayProfile.candidates.isNotEmpty) {
+  final xray = config.xrayProfile;
+  if (xray != null && xray.candidates.isNotEmpty) {
     addHost(config.primaryCandidate.host);
   }
 

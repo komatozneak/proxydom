@@ -631,6 +631,18 @@ abstract class AppL10n {
   /// **'Couldn’t connect. Please try again.'**
   String get homeErrorFriendly;
 
+  /// No description provided for @homeTtProvisionFailedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Server unavailable'**
+  String get homeTtProvisionFailedTitle;
+
+  /// No description provided for @homeTtProvisionFailedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t prepare this location. Try again later or pick another.'**
+  String get homeTtProvisionFailedHint;
+
   /// No description provided for @homeVpnProbeFailedTitle.
   ///
   /// In en, this message translates to:
@@ -736,7 +748,7 @@ abstract class AppL10n {
   /// No description provided for @settingsAccessEarlyTitle.
   ///
   /// In en, this message translates to:
-  /// **'Closed testing'**
+  /// **'Premium'**
   String get settingsAccessEarlyTitle;
 
   /// No description provided for @settingsAccessEarlySubtitle.
@@ -748,13 +760,13 @@ abstract class AppL10n {
   /// No description provided for @settingsAccessBetaTitle.
   ///
   /// In en, this message translates to:
-  /// **'Closed testing'**
+  /// **'Premium'**
   String get settingsAccessBetaTitle;
 
   /// No description provided for @settingsAccessBetaSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'By invite, no end date.'**
+  /// **'Invite access · Free limits lifted.'**
   String get settingsAccessBetaSubtitle;
 
   /// No description provided for @settingsAccessNoneTitle.
@@ -808,7 +820,7 @@ abstract class AppL10n {
   /// No description provided for @settingsSubscriptionAlpha.
   ///
   /// In en, this message translates to:
-  /// **'Closed testing'**
+  /// **'Premium'**
   String get settingsSubscriptionAlpha;
 
   /// No description provided for @settingsSubscriptionExpired.
@@ -1578,6 +1590,12 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Premium'**
   String get regionSectionYoutube;
+
+  /// No description provided for @regionSectionFree.
+  ///
+  /// In en, this message translates to:
+  /// **'Free'**
+  String get regionSectionFree;
 
   /// No description provided for @regionSectionEurope.
   ///
@@ -2352,6 +2370,18 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Restore access after reinstall'**
   String get accountHubRecoveryHint;
+
+  /// No description provided for @accountHubRecoverySaveBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Save your recovery code — you’ll need it after reinstall.'**
+  String get accountHubRecoverySaveBanner;
+
+  /// No description provided for @accountHubRecoverySaveCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Save code'**
+  String get accountHubRecoverySaveCta;
 
   /// No description provided for @accountHubPromo.
   ///

@@ -39,7 +39,8 @@ class VpnController {
   /// Start Xray VPN with [VpnConfig.xrayProfile] candidates (sequential failover).
   Future<bool> start(VpnConfig config, {String? displayLabel}) async {
     try {
-      if (config.xrayProfile.candidates.isEmpty) {
+      if (config.xrayProfile == null ||
+          config.xrayProfile!.candidates.isEmpty) {
         throw VpnControllerException('xray_profile has no candidates');
       }
 

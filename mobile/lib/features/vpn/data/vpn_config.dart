@@ -1,12 +1,19 @@
 import 'vless_link_parser.dart';
 
-/// Immutable models for `GET /api/v1/vpn/config` (Xray + optional TrustTunnel).
+/// Native VPN core selected by `/vpn/config` (ADR 006 ``active_core``).
+enum VpnActiveCore {
+  xray,
+  trusttunnel,
+}
+
+/// Immutable models for `GET /api/v1/vpn/config` (Xray XOR TrustTunnel).
 class VpnConfig {
   const VpnConfig({
     required this.username,
     required this.links,
     required this.expire,
-    required this.xrayProfile,
+    required this.activeCore,
+    this.xrayProfile,
     this.trusttunnelProfile,
     this.nodeHost,
   });
@@ -15,21 +22,36 @@ class VpnConfig {
   final List<String> links;
   final DateTime expire;
 
-  /// Authoritative native-runtime Xray profile (schema 1|2).
-  final XrayProfile xrayProfile;
+  /// Authoritative core for this connect session.
+  final VpnActiveCore activeCore;
 
-  /// Optional TrustTunnel core profile (ADR 006 dual-core).
+  /// Native-runtime Xray profile (schema 1|2). Required when [activeCore] is xray.
+  final XrayProfile? xrayProfile;
+
+  /// TrustTunnel core profile. Required when [activeCore] is trusttunnel.
   final TrustTunnelProfile? trusttunnelProfile;
 
   /// Egress VPS host from `GET /vpn/config` (`node_host`).
   final String? nodeHost;
 
+  bool get isTrustTunnelSession => activeCore == VpnActiveCore.trusttunnel;
+
   /// Expected public egress IP/host for E2E checks.
   String? get expectedEgressHost {
     final host = nodeHost?.trim();
     if (host != null && host.isNotEmpty) return host;
-    if (xrayProfile.candidates.isEmpty) return null;
-    final candidateHost = xrayProfile.candidates.first.host.trim();
+    final tt = trusttunnelProfile;
+    if (tt != null) {
+      final hostname = tt.hostname.trim();
+      if (hostname.isNotEmpty) return hostname;
+      if (tt.addresses.isNotEmpty) {
+        final addr = tt.addresses.first.split(':').first.trim();
+        if (addr.isNotEmpty) return addr;
+      }
+    }
+    final candidates = xrayProfile?.candidates ?? const <XrayCandidate>[];
+    if (candidates.isEmpty) return null;
+    final candidateHost = candidates.first.host.trim();
     if (candidateHost.isNotEmpty && candidateHost != 'unknown') {
       return candidateHost;
     }
@@ -37,32 +59,46 @@ class VpnConfig {
   }
 
   /// Ordered unique egress hosts for TUN bypass / direct cidr.
-  List<String> get egressHosts => [
-        for (final candidate in xrayProfile.candidates)
-          if (candidate.host.isNotEmpty && candidate.host != 'unknown')
-            candidate.host,
-      ];
+  List<String> get egressHosts {
+    if (isTrustTunnelSession) {
+      final host = expectedEgressHost;
+      return host == null ? const [] : [host];
+    }
+    return [
+      for (final candidate in xrayProfile?.candidates ?? const <XrayCandidate>[])
+        if (candidate.host.isNotEmpty && candidate.host != 'unknown')
+          candidate.host,
+    ];
+  }
 
   /// Preferred hop: match [nodeHost], else first candidate.
+  ///
+  /// Only valid for Xray sessions — callers must not use this for TT.
   XrayCandidate get primaryCandidate {
+    final profile = xrayProfile;
+    if (profile == null || profile.candidates.isEmpty) {
+      throw StateError('primaryCandidate requires an Xray profile');
+    }
     final host = nodeHost?.trim();
     if (host != null && host.isNotEmpty) {
-      for (final candidate in xrayProfile.candidates) {
+      for (final candidate in profile.candidates) {
         if (candidate.host == host) return candidate;
       }
     }
-    return xrayProfile.candidates.first;
+    return profile.candidates.first;
   }
 
   /// Copy with a single primary candidate (nest connect path).
   VpnConfig withPrimaryCandidateOnly() {
+    if (isTrustTunnelSession) return this;
     final primary = primaryCandidate;
     return VpnConfig(
       username: username,
       links: links,
       expire: expire,
+      activeCore: VpnActiveCore.xray,
       xrayProfile: XrayProfile(
-        schemaVersion: xrayProfile.schemaVersion,
+        schemaVersion: xrayProfile!.schemaVersion,
         candidates: [primary],
       ),
       trusttunnelProfile: trusttunnelProfile,
@@ -72,11 +108,49 @@ class VpnConfig {
 
   factory VpnConfig.fromJson(Map<String, dynamic> json) {
     final links = (json['links'] as List? ?? const []).cast<String>();
-    final xrayProfile = _resolveXrayProfile(json, links: links);
     final rawTt = json['trusttunnel_profile'];
     final TrustTunnelProfile? tt = rawTt is Map
         ? TrustTunnelProfile.fromJson(Map<String, dynamic>.from(rawTt))
         : null;
+    final rawCore = (json['active_core'] as String?)?.trim().toLowerCase();
+    final hasXrayMap = json['xray_profile'] is Map;
+
+    final VpnActiveCore activeCore;
+    if (rawCore == 'trusttunnel') {
+      activeCore = VpnActiveCore.trusttunnel;
+    } else if (rawCore == 'xray') {
+      activeCore = VpnActiveCore.xray;
+    } else if (tt != null && !hasXrayMap) {
+      // Legacy payload without active_core: TT-only body.
+      activeCore = VpnActiveCore.trusttunnel;
+    } else {
+      activeCore = VpnActiveCore.xray;
+    }
+
+    if (activeCore == VpnActiveCore.trusttunnel) {
+      if (tt == null) {
+        throw const FormatException(
+          'active_core=trusttunnel requires trusttunnel_profile',
+        );
+      }
+      final nodeHost = json['node_host'] as String?;
+      return VpnConfig(
+        username: json['username'] as String,
+        links: links,
+        expire: DateTime.fromMillisecondsSinceEpoch(
+          (json['expire'] as int) * 1000,
+          isUtc: true,
+        ),
+        activeCore: VpnActiveCore.trusttunnel,
+        xrayProfile: null,
+        trusttunnelProfile: tt,
+        nodeHost: (nodeHost != null && nodeHost.isNotEmpty)
+            ? nodeHost
+            : tt.hostname,
+      );
+    }
+
+    final xrayProfile = _resolveXrayProfile(json, links: links);
     final nodeHost = json['node_host'] as String?;
     return VpnConfig(
       username: json['username'] as String,
@@ -85,6 +159,7 @@ class VpnConfig {
         (json['expire'] as int) * 1000,
         isUtc: true,
       ),
+      activeCore: VpnActiveCore.xray,
       xrayProfile: xrayProfile,
       trusttunnelProfile: tt,
       nodeHost: nodeHost?.isNotEmpty == true
@@ -97,7 +172,9 @@ class VpnConfig {
         'username': username,
         'links': links,
         'expire': expire.millisecondsSinceEpoch ~/ 1000,
-        'xray_profile': xrayProfile.toJson(),
+        'active_core':
+            activeCore == VpnActiveCore.trusttunnel ? 'trusttunnel' : 'xray',
+        if (xrayProfile != null) 'xray_profile': xrayProfile!.toJson(),
         if (trusttunnelProfile != null)
           'trusttunnel_profile': trusttunnelProfile!.toJson(),
         if (nodeHost != null) 'node_host': nodeHost,

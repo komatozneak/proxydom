@@ -12,9 +12,9 @@ void main() {
     ) as Map<String, dynamic>;
     final config = VpnConfig.fromJson(payload);
 
-    // Xray profile stays intact alongside the TT profile (dual-core).
-    expect(config.xrayProfile.schemaVersion, 2);
-    expect(config.xrayProfile.candidates, hasLength(1));
+    expect(config.activeCore, VpnActiveCore.trusttunnel);
+    expect(config.isTrustTunnelSession, isTrue);
+    expect(config.xrayProfile, isNull);
 
     final tt = config.trusttunnelProfile;
     expect(tt, isNotNull);
@@ -57,7 +57,21 @@ void main() {
       File('test/fixtures/xray_profile_v1.json').readAsStringSync(),
     ) as Map<String, dynamic>;
     final config = VpnConfig.fromJson(payload);
+    expect(config.activeCore, VpnActiveCore.xray);
     expect(config.trusttunnelProfile, isNull);
+    expect(config.xrayProfile, isNotNull);
+  });
+
+  test('active_core=trusttunnel without profile → FormatException', () {
+    expect(
+      () => VpnConfig.fromJson({
+        'username': 'u',
+        'links': const <String>[],
+        'expire': 1785654092,
+        'active_core': 'trusttunnel',
+      }),
+      throwsFormatException,
+    );
   });
 
   test('incomplete trusttunnel_profile → FormatException', () {

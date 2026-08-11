@@ -2,29 +2,11 @@
   "username": "fixture-user",
   "links": [],
   "expire": 1785654092,
-  "xray_profile": {
-    "schema_version": 2,
-    "candidates": [
-      {
-        "id": "local",
-        "label": "Primary node",
-        "host": "203.0.113.10",
-        "port": 443,
-        "protocol": "vless",
-        "uuid": "11111111-2222-3333-4444-555555555555",
-        "flow": "xtls-rprx-vision",
-        "transport": "tcp",
-        "security": "reality",
-        "server_name": "cover.example",
-        "public_key": "fixture-public-key",
-        "short_id": "deadbeef",
-        "fingerprint": "chrome",
-        "spider_x": "/",
-        "region": "us",
-        "purpose": "general"
-      }
-    ]
-  },
+  "active_core": "trusttunnel",
+  "selected_link": null,
+  "xray_profile": null,
+  "node_host": "tt-al.teremokconnect.online",
+  "egress_candidates": [],
   "trusttunnel_profile": {
     "schema_version": 1,
     "node_id": "al-tirana-tt",

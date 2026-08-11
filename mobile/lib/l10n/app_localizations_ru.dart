@@ -286,6 +286,13 @@ class AppL10nRu extends AppL10n {
   String get homeErrorFriendly => 'Не удалось подключиться. Попробуйте снова.';
 
   @override
+  String get homeTtProvisionFailedTitle => 'Сервер недоступен';
+
+  @override
+  String get homeTtProvisionFailedHint =>
+      'Не удалось подготовить эту локацию. Попробуйте позже или выберите другую.';
+
+  @override
   String get homeVpnProbeFailedTitle => 'Сервер не отвечает';
 
   @override
@@ -345,17 +352,17 @@ class AppL10nRu extends AppL10n {
   String get settingsActiveBadge => 'Активна';
 
   @override
-  String get settingsAccessEarlyTitle => 'Закрытое тестирование';
+  String get settingsAccessEarlyTitle => 'Премиум';
 
   @override
   String get settingsAccessEarlySubtitle => 'Доступ по приглашению.';
 
   @override
-  String get settingsAccessBetaTitle => 'Закрытое тестирование';
+  String get settingsAccessBetaTitle => 'Премиум';
 
   @override
   String get settingsAccessBetaSubtitle =>
-      'По приглашению, без даты окончания.';
+      'Доступ по приглашению · без лимита Free.';
 
   @override
   String get settingsAccessNoneTitle => 'Нет доступа';
@@ -388,7 +395,7 @@ class AppL10nRu extends AppL10n {
   }
 
   @override
-  String get settingsSubscriptionAlpha => 'Закрытое тестирование';
+  String get settingsSubscriptionAlpha => 'Премиум';
 
   @override
   String get settingsSubscriptionExpired => 'Подписка истекла';
@@ -817,6 +824,9 @@ class AppL10nRu extends AppL10n {
   String get regionSectionYoutube => 'Премиум';
 
   @override
+  String get regionSectionFree => 'Бесплатно';
+
+  @override
   String get regionSectionEurope => 'Европа';
 
   @override
@@ -1238,6 +1248,13 @@ class AppL10nRu extends AppL10n {
   @override
   String get accountHubRecoveryHint =>
       'Восстановить доступ после переустановки';
+
+  @override
+  String get accountHubRecoverySaveBanner =>
+      'Сохраните код восстановления — он понадобится после переустановки.';
+
+  @override
+  String get accountHubRecoverySaveCta => 'Сохранить код';
 
   @override
   String get accountHubPromo => 'Промокод';

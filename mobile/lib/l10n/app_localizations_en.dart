@@ -285,6 +285,13 @@ class AppL10nEn extends AppL10n {
   String get homeErrorFriendly => 'Couldn’t connect. Please try again.';
 
   @override
+  String get homeTtProvisionFailedTitle => 'Server unavailable';
+
+  @override
+  String get homeTtProvisionFailedHint =>
+      'Couldn’t prepare this location. Try again later or pick another.';
+
+  @override
   String get homeVpnProbeFailedTitle => 'Server not responding';
 
   @override
@@ -345,16 +352,17 @@ class AppL10nEn extends AppL10n {
   String get settingsActiveBadge => 'Active';
 
   @override
-  String get settingsAccessEarlyTitle => 'Closed testing';
+  String get settingsAccessEarlyTitle => 'Premium';
 
   @override
   String get settingsAccessEarlySubtitle => 'Access is by invite.';
 
   @override
-  String get settingsAccessBetaTitle => 'Closed testing';
+  String get settingsAccessBetaTitle => 'Premium';
 
   @override
-  String get settingsAccessBetaSubtitle => 'By invite, no end date.';
+  String get settingsAccessBetaSubtitle =>
+      'Invite access · Free limits lifted.';
 
   @override
   String get settingsAccessNoneTitle => 'No access';
@@ -388,7 +396,7 @@ class AppL10nEn extends AppL10n {
   }
 
   @override
-  String get settingsSubscriptionAlpha => 'Closed testing';
+  String get settingsSubscriptionAlpha => 'Premium';
 
   @override
   String get settingsSubscriptionExpired => 'Subscription expired';
@@ -815,6 +823,9 @@ class AppL10nEn extends AppL10n {
   String get regionSectionYoutube => 'Premium';
 
   @override
+  String get regionSectionFree => 'Free';
+
+  @override
   String get regionSectionEurope => 'Europe';
 
   @override
@@ -1231,6 +1242,13 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get accountHubRecoveryHint => 'Restore access after reinstall';
+
+  @override
+  String get accountHubRecoverySaveBanner =>
+      'Save your recovery code — you’ll need it after reinstall.';
+
+  @override
+  String get accountHubRecoverySaveCta => 'Save code';
 
   @override
   String get accountHubPromo => 'Promo code';
