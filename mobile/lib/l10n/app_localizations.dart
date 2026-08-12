@@ -631,6 +631,24 @@ abstract class AppL10n {
   /// **'Couldn’t connect. Please try again.'**
   String get homeErrorFriendly;
 
+  /// Free monthly traffic exhausted — connect blocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Free traffic used up'**
+  String get homeQuotaExceededTitle;
+
+  /// Hint to upgrade after Free quota.
+  ///
+  /// In en, this message translates to:
+  /// **'You’ve used this month’s 4.20 GB. Upgrade to Premium for unlimited traffic.'**
+  String get homeQuotaExceededHint;
+
+  /// CTA to Platega / locked paywall.
+  ///
+  /// In en, this message translates to:
+  /// **'Upgrade'**
+  String get homeQuotaUpgradeCta;
+
   /// No description provided for @homeTtProvisionFailedTitle.
   ///
   /// In en, this message translates to:
@@ -2508,6 +2526,66 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'DEBUG: code filled from API response'**
   String get accountEmailDebugHint;
+
+  /// No description provided for @vpnDisclosureTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Protected connection'**
+  String get vpnDisclosureTitle;
+
+  /// No description provided for @vpnDisclosureLead.
+  ///
+  /// In en, this message translates to:
+  /// **'Before the first connect, we explain how VPN works in Teremok and which data the service needs.'**
+  String get vpnDisclosureLead;
+
+  /// No description provided for @vpnDisclosureVpnTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Why Android VPN is required'**
+  String get vpnDisclosureVpnTitle;
+
+  /// No description provided for @vpnDisclosureVpnBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The app uses the system VpnService to create a protected tunnel after you tap Connect. App traffic on the device is routed through this tunnel to Teremok VPN servers. This is the core function of the app — a protected connection, not access to a private corporate network.'**
+  String get vpnDisclosureVpnBody;
+
+  /// No description provided for @vpnDisclosureDataTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What data we process'**
+  String get vpnDisclosureDataTitle;
+
+  /// No description provided for @vpnDisclosureDataBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Install ID (device ID) and account ID — to grant access and restore it after reinstall. Subscription purchase history (via the payment provider; we do not store card numbers). On your request — a diagnostic report from Settings. Aggregated usage summary (connect attempts, session length) — without browsing history.'**
+  String get vpnDisclosureDataBody;
+
+  /// No description provided for @vpnDisclosureNotTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What we do not do'**
+  String get vpnDisclosureNotTitle;
+
+  /// No description provided for @vpnDisclosureNotBody.
+  ///
+  /// In en, this message translates to:
+  /// **'We do not log visited websites and do not use an advertising ID. We do not monetize other apps’ traffic by manipulating ads.'**
+  String get vpnDisclosureNotBody;
+
+  /// No description provided for @vpnDisclosureAccept.
+  ///
+  /// In en, this message translates to:
+  /// **'Accept and continue'**
+  String get vpnDisclosureAccept;
+
+  /// No description provided for @vpnDisclosureDecline.
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get vpnDisclosureDecline;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

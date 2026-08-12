@@ -17,6 +17,7 @@ import '../../vpn/data/node_display.dart';
 import '../../vpn/data/vpn_controller.dart';
 import '../../vpn/data/vpn_node.dart';
 import '../../vpn/domain/vpn_connect_error.dart';
+import '../../vpn/presentation/vpn_disclosure_dialog.dart';
 import '../application/home_stats_provider.dart';
 import '../application/vpn_provider.dart';
 import '../application/vpn_status.dart';
@@ -229,6 +230,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     if (status is VpnDisconnected || status is VpnError) {
       final again = ref.read(vpnProvider);
       if (again is VpnDisconnected || again is VpnError) {
+        final ok = await ensureVpnDisclosureAccepted(context);
+        if (!mounted || !ok) return;
         await notifier.connect();
       }
       return;
@@ -384,6 +387,8 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
         l.homeVpnConflictTitle,
       VpnError(:final code) when code == 'device_limit_reached' =>
         l.settingsSeatDeviceLimit,
+      VpnError(:final code) when code == 'quota_exceeded' =>
+        l.homeQuotaExceededTitle,
       VpnError() => l.homeError,
     };
     final statusHint = switch (status) {
@@ -406,12 +411,16 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
         l.homeVpnPermissionHint,
       VpnError(:final code) when code == 'device_limit_reached' =>
         l.settingsDevicesHint,
+      VpnError(:final code) when code == 'quota_exceeded' =>
+        l.homeQuotaExceededHint,
       VpnError() => l.homeErrorFriendly,
     };
     final showVpnSettingsCta =
         status is VpnError && status.code == kVpnConflictErrorCode;
     final showDevicesCta =
         status is VpnError && status.code == 'device_limit_reached';
+    final showQuotaCta =
+        status is VpnError && status.code == 'quota_exceeded';
 
     final nestSize = math.min(
       320.0,
@@ -466,6 +475,13 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
           FilledButton.tonal(
             onPressed: () => context.push('/settings/devices'),
             child: Text(l.devicesLimitOpenManage),
+          ),
+        ],
+        if (showQuotaCta) ...[
+          const SizedBox(height: 12),
+          FilledButton.tonal(
+            onPressed: () => context.push('/locked'),
+            child: Text(l.homeQuotaUpgradeCta),
           ),
         ],
         const SizedBox(height: 16),

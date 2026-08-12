@@ -78,6 +78,17 @@ class SubscriptionTabScreen extends ConsumerWidget {
           '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}';
       return l.settingsAccessActiveUntil(date);
     }
+    if (s.quotaUnlimited) {
+      return l.settingsAccessFreeSubtitle;
+    }
+    if (accessCopyKind(s) == AccessCopyKind.free &&
+        s.quotaBytesRemaining != null &&
+        s.quotaBytesLimit != null) {
+      final remGiB = s.quotaBytesRemaining! / (1024 * 1024 * 1024);
+      final limGiB = s.quotaBytesLimit! / (1024 * 1024 * 1024);
+      return '${l.settingsAccessFreeTitle}: '
+          '${remGiB.toStringAsFixed(2)} / ${limGiB.toStringAsFixed(2)} GiB';
+    }
     switch (accessCopyKind(s)) {
       case AccessCopyKind.closedBeta:
         return l.settingsAccessBetaSubtitle;

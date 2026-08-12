@@ -485,6 +485,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
             if (e.error == 'device_revoked') return false;
             if (e.error == 'hmac_required') return false;
             if (e.error == 'device_limit_reached') return false;
+            if (e.error == 'quota_exceeded') return false;
             if (e.error == 'tt_provision_failed') return false;
             if (e.error is FormatException || e.error is TypeError) {
               return false;
@@ -758,6 +759,14 @@ class VpnNotifier extends Notifier<VpnStatus> {
           state = const VpnError(
             message: 'device_limit_reached',
             code: 'device_limit_reached',
+          );
+          return;
+        }
+        if (e.error == 'quota_exceeded' ||
+            _apiErrorCode(e) == 'quota_exceeded') {
+          state = const VpnError(
+            message: 'quota_exceeded',
+            code: 'quota_exceeded',
           );
           return;
         }

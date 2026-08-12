@@ -285,6 +285,16 @@ class AppL10nEn extends AppL10n {
   String get homeErrorFriendly => 'Couldn’t connect. Please try again.';
 
   @override
+  String get homeQuotaExceededTitle => 'Free traffic used up';
+
+  @override
+  String get homeQuotaExceededHint =>
+      'You’ve used this month’s 4.20 GB. Upgrade to Premium for unlimited traffic.';
+
+  @override
+  String get homeQuotaUpgradeCta => 'Upgrade';
+
+  @override
   String get homeTtProvisionFailedTitle => 'Server unavailable';
 
   @override
@@ -1315,4 +1325,38 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get accountEmailDebugHint => 'DEBUG: code filled from API response';
+
+  @override
+  String get vpnDisclosureTitle => 'Protected connection';
+
+  @override
+  String get vpnDisclosureLead =>
+      'Before the first connect, we explain how VPN works in Teremok and which data the service needs.';
+
+  @override
+  String get vpnDisclosureVpnTitle => 'Why Android VPN is required';
+
+  @override
+  String get vpnDisclosureVpnBody =>
+      'The app uses the system VpnService to create a protected tunnel after you tap Connect. App traffic on the device is routed through this tunnel to Teremok VPN servers. This is the core function of the app — a protected connection, not access to a private corporate network.';
+
+  @override
+  String get vpnDisclosureDataTitle => 'What data we process';
+
+  @override
+  String get vpnDisclosureDataBody =>
+      'Install ID (device ID) and account ID — to grant access and restore it after reinstall. Subscription purchase history (via the payment provider; we do not store card numbers). On your request — a diagnostic report from Settings. Aggregated usage summary (connect attempts, session length) — without browsing history.';
+
+  @override
+  String get vpnDisclosureNotTitle => 'What we do not do';
+
+  @override
+  String get vpnDisclosureNotBody =>
+      'We do not log visited websites and do not use an advertising ID. We do not monetize other apps’ traffic by manipulating ads.';
+
+  @override
+  String get vpnDisclosureAccept => 'Accept and continue';
+
+  @override
+  String get vpnDisclosureDecline => 'Not now';
 }

@@ -11,6 +11,10 @@ class SubscriptionStatus {
     this.isTrial = false,
     this.isAlpha = false,
     this.daysRemaining,
+    this.quotaBytesUsed,
+    this.quotaBytesLimit,
+    this.quotaBytesRemaining,
+    this.quotaUnlimited = false,
   });
 
   final String? plan;
@@ -23,10 +27,21 @@ class SubscriptionStatus {
   final bool isTrial;
   final bool isAlpha;
   final int? daysRemaining;
+  final int? quotaBytesUsed;
+  final int? quotaBytesLimit;
+  final int? quotaBytesRemaining;
+  final bool quotaUnlimited;
 
   bool get hasActivePaid => isPro && status == 'active';
 
   bool get isEmpty => plan == null && status == null;
+
+  /// Free tier with no remaining server-metered bytes (ADR 013).
+  bool get quotaExhausted =>
+      !quotaUnlimited &&
+      quotaBytesRemaining != null &&
+      quotaBytesRemaining! <= 0 &&
+      (quotaBytesLimit ?? 0) > 0;
 
   factory SubscriptionStatus.fromJson(Map<String, dynamic> json) {
     DateTime? parseDt(Object? v) {
@@ -48,6 +63,10 @@ class SubscriptionStatus {
       isTrial: json['is_trial'] as bool? ?? false,
       isAlpha: isAlpha,
       daysRemaining: (json['days_remaining'] as num?)?.toInt(),
+      quotaBytesUsed: (json['quota_bytes_used'] as num?)?.toInt(),
+      quotaBytesLimit: (json['quota_bytes_limit'] as num?)?.toInt(),
+      quotaBytesRemaining: (json['quota_bytes_remaining'] as num?)?.toInt(),
+      quotaUnlimited: json['quota_unlimited'] as bool? ?? false,
     );
   }
 

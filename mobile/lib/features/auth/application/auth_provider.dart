@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/api_secret_storage.dart';
 import '../../../core/config.dart';
+import '../../../core/install_id_storage.dart';
 import '../../../core/router.dart';
 import '../../../core/token_storage.dart';
 import '../data/auth_api.dart';
@@ -24,10 +26,17 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
           refresh != null &&
           access.isNotEmpty &&
           refresh.isNotEmpty) {
-        return AuthStateAuthenticated(
-          accessToken: access,
-          refreshToken: refresh,
-        );
+        final secret = (await ApiSecretStorage.instance.read())?.trim();
+        if (secret != null && secret.isNotEmpty) {
+          return AuthStateAuthenticated(
+            accessToken: access,
+            refreshToken: refresh,
+          );
+        }
+        // ADR 012: JWT without api_secret → unsigned /v2. Re-register same
+        // install id so server re-returns the existing plaintext secret.
+        debugPrint('auth.restore_missing_api_secret → re-register');
+        return _registerDevice();
       }
     } catch (e, st) {
       debugPrint('auth.restore_failed: $e\n$st');
@@ -40,7 +49,7 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
     return const AuthStateUnauthenticated();
   }
 
-  Future<AuthState> _registerDevice() async {
+  Future<AuthState> _registerDevice({bool allowInstallRotate = true}) async {
     try {
       final result = await AuthApi().register(platform: 'android').timeout(
             const Duration(seconds: 45),
@@ -50,6 +59,18 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
         refreshToken: result.refreshToken,
       );
       await result.persistApiSecret();
+      final secret = result.apiSecret?.trim();
+      if (secret == null || secret.isEmpty) {
+        // Should not happen after server re-returns existing secret; last resort.
+        if (allowInstallRotate) {
+          debugPrint('auth.register_empty_api_secret → rotate install + retry');
+          await ApiSecretStorage.instance.clear();
+          await InstallIdStorage.instance.rotate();
+          return _registerDevice(allowInstallRotate: false);
+        }
+        debugPrint('auth.register_empty_api_secret → bootstrap failed');
+        return const AuthStateBootstrapFailed();
+      }
       final code = result.recoveryCode?.trim();
       if (code != null && code.isNotEmpty) {
         await RecoveryCodeStorage.instance.savePending(code);
@@ -120,6 +141,11 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
         refreshToken: result.refreshToken,
       );
       await result.persistApiSecret();
+      final secret = result.apiSecret?.trim();
+      if (secret == null || secret.isEmpty) {
+        debugPrint('auth.recover_empty_api_secret');
+        return false;
+      }
       state = AsyncData(
         AuthStateAuthenticated(
           accessToken: result.accessToken,

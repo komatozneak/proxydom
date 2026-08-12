@@ -55,6 +55,15 @@ class VpnConfigRepository {
       final detail = e.response?.data;
       if (code == 403 && detail is Map) {
         final err = detail['detail'];
+        // Plain string detail (legacy premium_required).
+        if (err == 'premium_required' || err == 'quota_exceeded') {
+          throw DioException(
+            requestOptions: e.requestOptions,
+            response: e.response,
+            type: DioExceptionType.badResponse,
+            error: err,
+          );
+        }
         if (err is Map && err['error'] is Map) {
           final nested = err['error'] as Map;
           if (nested['code'] == 'device_limit_reached') {
@@ -65,12 +74,28 @@ class VpnConfigRepository {
               error: 'device_limit_reached',
             );
           }
+          if (nested['code'] == 'quota_exceeded') {
+            throw DioException(
+              requestOptions: e.requestOptions,
+              response: e.response,
+              type: DioExceptionType.badResponse,
+              error: 'quota_exceeded',
+            );
+          }
           if (nested['code'] == 'device_revoked') {
             throw DioException(
               requestOptions: e.requestOptions,
               response: e.response,
               type: DioExceptionType.badResponse,
               error: 'device_revoked',
+            );
+          }
+          if (nested['code'] == 'premium_required') {
+            throw DioException(
+              requestOptions: e.requestOptions,
+              response: e.response,
+              type: DioExceptionType.badResponse,
+              error: 'premium_required',
             );
           }
         }

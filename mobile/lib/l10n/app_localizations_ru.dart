@@ -286,6 +286,16 @@ class AppL10nRu extends AppL10n {
   String get homeErrorFriendly => 'Не удалось подключиться. Попробуйте снова.';
 
   @override
+  String get homeQuotaExceededTitle => 'Лимит Free исчерпан';
+
+  @override
+  String get homeQuotaExceededHint =>
+      'В этом месяце израсходованы 4,20 ГБ. Оформите Premium — без лимита трафика.';
+
+  @override
+  String get homeQuotaUpgradeCta => 'Оформить Premium';
+
+  @override
   String get homeTtProvisionFailedTitle => 'Сервер недоступен';
 
   @override
@@ -1322,4 +1332,38 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get accountEmailDebugHint => 'DEBUG: код подставлен из ответа API';
+
+  @override
+  String get vpnDisclosureTitle => 'Защищённое соединение';
+
+  @override
+  String get vpnDisclosureLead =>
+      'Перед первым подключением коротко объясняем, как работает VPN в Теремке и какие данные нужны для сервиса.';
+
+  @override
+  String get vpnDisclosureVpnTitle => 'Зачем нужен VPN на Android';
+
+  @override
+  String get vpnDisclosureVpnBody =>
+      'Приложение использует системный VPNService, чтобы создать защищённый туннель после нажатия «Подключиться». Трафик приложений на устройстве направляется через этот туннель к серверам Teremok VPN. Это основная функция приложения — обеспечить защищённое соединение, а не доступ к корпоративной сети.';
+
+  @override
+  String get vpnDisclosureDataTitle => 'Какие данные мы обрабатываем';
+
+  @override
+  String get vpnDisclosureDataBody =>
+      'Идентификатор установки (device ID) и идентификатор аккаунта — чтобы выдать доступ и восстановить его после переустановки. История покупок подписки (через платёжного провайдера; номер карты мы не храним). По вашей инициативе — диагностический отчёт из Настроек. Агрегированная сводка использования (попытки подключения, длительность сессии) — без истории сайтов.';
+
+  @override
+  String get vpnDisclosureNotTitle => 'Чего мы не делаем';
+
+  @override
+  String get vpnDisclosureNotBody =>
+      'Не ведём историю посещённых сайтов и не используем рекламный идентификатор. Не монетизируем трафик других приложений через подмену рекламы.';
+
+  @override
+  String get vpnDisclosureAccept => 'Принимаю и продолжить';
+
+  @override
+  String get vpnDisclosureDecline => 'Не сейчас';
 }
