@@ -3,18 +3,16 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:teremok_connect/app.dart';
 import 'package:teremok_connect/core/api_client.dart';
+import 'package:teremok_connect/core/app_locale.dart';
 import 'package:teremok_connect/core/config.dart';
 import 'package:teremok_connect/core/result.dart';
 import 'package:teremok_connect/core/retry_policy.dart';
-import 'package:teremok_connect/core/router.dart';
 import 'package:teremok_connect/core/theme.dart';
 import 'package:teremok_connect/core/extensions.dart';
 import 'package:teremok_connect/core/token_storage.dart';
 import 'package:teremok_connect/features/auth/application/auth_state.dart';
 import 'package:teremok_connect/features/auth/application/logout_handler.dart';
-import 'package:teremok_connect/features/auth/domain/phone_country.dart';
 import 'package:teremok_connect/features/home/application/vpn_provider.dart';
 import 'package:teremok_connect/features/home/presentation/home_screen.dart';
 import 'package:teremok_connect/features/home/presentation/widgets/server_card.dart';
@@ -90,85 +88,7 @@ Map<String, dynamic> _vpnJson({
       },
     };
 
-/// Обёртка для тестов: подкладывает ProviderContainer, чтобы ConsumerWidget
-/// могли читать authProvider/vpnProvider.
-Widget _wrap(Widget child) => UncontrolledProviderScope(
-  container: ProviderContainer(),
-  child: child,
-);
-
 void main() {
-  testWidgets('App boots and shows login screen (en by default)', (tester) async {
-    AppLocale.set(const Locale('en'));
-    await tester.pumpWidget(_wrap(const TeremokApp()));
-    await tester.pump();
-    // initialLocation=/home; auth still loading → redirect skipped. Go login explicitly.
-    AppRouter.config.go('/login');
-    await tester.pumpAndSettle();
-
-    expect(find.text('Sign in'), findsWidgets);
-    expect(find.text('Call me'), findsOneWidget);
-    expect(find.byType(DropdownButtonFormField<PhoneCountry>), findsOneWidget);
-    expect(find.byType(TextFormField), findsOneWidget);
-  });
-
-  testWidgets('App boots and shows login screen (ru)', (tester) async {
-    AppLocale.set(const Locale('ru'));
-    await tester.pumpWidget(_wrap(const TeremokApp()));
-    await tester.pump();
-    AppRouter.config.go('/login');
-    await tester.pumpAndSettle();
-
-    expect(find.text('Вход'), findsWidgets);
-    expect(find.text('Позвонить мне'), findsOneWidget);
-    expect(find.byType(DropdownButtonFormField<PhoneCountry>), findsOneWidget);
-    expect(find.byType(TextFormField), findsOneWidget);
-  });
-
-  testWidgets('Login screen renders phone field and button', (tester) async {
-    AppLocale.set(const Locale('ru'));
-    await tester.pumpWidget(_wrap(const TeremokApp()));
-    await tester.pump();
-    AppRouter.config.go('/login');
-    await tester.pumpAndSettle();
-
-    expect(find.text('Позвонить мне'), findsOneWidget);
-    expect(find.textContaining('🇷🇺'), findsOneWidget);
-    expect(find.byType(TextFormField), findsOneWidget);
-  });
-
-  testWidgets('Verify screen renders digit boxes and resend button', (tester) async {
-    AppLocale.set(const Locale('ru'));
-    AppRouter.pendingPhone = '+79991234567';
-
-    final widget = MaterialApp.router(
-      routerConfig: AppRouter.config,
-      localizationsDelegates: AppL10n.localizationsDelegates,
-      supportedLocales: AppL10n.supportedLocales,
-      locale: AppLocale.current,
-    );
-    await tester.pumpWidget(_wrap(widget));
-    await tester.pump();
-
-    AppRouter.config.go(
-      '/verify?phone=${Uri.encodeComponent('+79991234567')}',
-    );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-
-    expect(find.text('Код из звонка'), findsOneWidget);
-    expect(find.textContaining('Позвонить повторно'), findsOneWidget);
-    // PIN uses one hidden numeric TextField (maxLength 4) + 4 visual boxes.
-    // Login phone TextField may still be in the router stack — don't count all.
-    expect(
-      find.byWidgetPredicate(
-        (w) => w is TextField && w.maxLength == 4,
-      ),
-      findsOneWidget,
-    );
-    expect(find.byType(AnimatedContainer), findsAtLeastNWidgets(4));
-  });
-
   testWidgets('Home screen shows Connect button when not connected', (tester) async {
     const vpnChannel = MethodChannel('teremok/vpn');
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger

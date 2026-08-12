@@ -28,7 +28,7 @@ final class AuthStateUnauthenticated extends AuthState {
   const AuthStateUnauthenticated();
 }
 
-/// Anonymous bootstrap failed (AUTH_ANONYMOUS) — show retry, not Flash Call.
+/// Anonymous bootstrap failed (AUTH_ANONYMOUS) — show retry UI.
 final class AuthStateBootstrapFailed extends AuthState {
   const AuthStateBootstrapFailed();
 }

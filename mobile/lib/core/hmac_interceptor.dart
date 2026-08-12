@@ -7,7 +7,7 @@ import 'package:dio/dio.dart';
 import 'api_secret_storage.dart';
 import 'install_id_storage.dart';
 
-/// Signs `/v2` requests with X-Signature (ADR 009).
+/// Signs `/v2` requests with X-Signature (ADR 009 / 012).
 class HmacSignatureInterceptor extends Interceptor {
   HmacSignatureInterceptor({
     ApiSecretStorage? secretStorage,
@@ -37,7 +37,15 @@ class HmacSignatureInterceptor extends Interceptor {
 
     final secret = await _secrets.read();
     if (secret == null || secret.isEmpty) {
-      handler.next(options);
+      // ADR 012: never send unsigned protected /v2 — force cold register.
+      handler.reject(
+        DioException(
+          requestOptions: options,
+          type: DioExceptionType.cancel,
+          error: 'hmac_required',
+          message: 'Missing api_secret for /v2 HMAC',
+        ),
+      );
       return;
     }
 

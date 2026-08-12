@@ -4,17 +4,13 @@ import 'package:go_router/go_router.dart';
 
 import '../features/account/presentation/account_hub_screen.dart';
 import '../features/account/presentation/account_promo_screen.dart';
-import '../features/account/presentation/email_link_screen.dart';
-import '../features/account/presentation/telegram_link_screen.dart';
 import '../features/auth/application/auth_provider.dart'
     show authProvider, GoRouterRefreshNotifier;
 import '../features/auth/application/auth_state.dart';
 import '../features/auth/data/recovery_code_storage.dart';
 import '../features/auth/presentation/bootstrap_failed_screen.dart';
-import '../features/auth/presentation/login_screen.dart';
 import '../features/auth/presentation/recovery_code_screen.dart';
 import '../features/auth/presentation/restore_access_screen.dart';
-import '../features/auth/presentation/verify_screen.dart';
 import '../features/beta/presentation/locked_access_screen.dart';
 import '../features/beta/presentation/post_auth_gate_screen.dart';
 import '../features/beta/presentation/promo_code_screen.dart';
@@ -33,13 +29,9 @@ import 'config.dart';
 
 /// Роутер приложения.
 ///
-/// Funnel (phone): welcome? → login → verify → /gate → promo? → onboarding? → shell.
 /// Funnel (anonymous): bootstrap → /gate → locked? → recovery? → onboarding? → shell.
 class AppRouter {
   AppRouter._();
-
-  /// Телефон, введённый на LoginScreen и передаваемый на Verify через query.
-  static String? pendingPhone;
 
   /// Cached welcome flag so redirect stays sync (warmed in main / gate).
   static bool? welcomeSeenCache;
@@ -97,8 +89,6 @@ class AppRouter {
       if (auth == null) return null;
 
       final loc = state.matchedLocation;
-      final goingToLogin = loc == '/login';
-      final goingToVerify = loc.startsWith('/verify');
       final goingToWelcome = loc == '/welcome';
       final goingToGate = loc == '/gate';
       final goingToPromo = loc == '/promo';
@@ -130,18 +120,15 @@ class AppRouter {
           }
           return null;
         }
-        if (goingToLogin || goingToVerify || goingToWelcome) {
-          return null;
-        }
         // First launch: optional welcome before login.
         if (welcomeSeenCache == false) {
           return '/welcome';
         }
-        return '/login';
+        return '/bootstrap-failed';
       }
 
-      // Authed: leave login/verify/welcome for the entitlement gate.
-      if (goingToLogin || goingToVerify || goingToWelcome || goingToBootstrapFail) {
+      // Authed: leave welcome for the entitlement gate.
+      if (goingToWelcome || goingToBootstrapFail) {
         return '/gate';
       }
       if (goingToGate || goingToPromo || goingToLocked || goingToRecovery || goingToRestore) {
@@ -160,13 +147,6 @@ class AppRouter {
     },
     routes: [
       GoRoute(path: '/welcome', builder: (c, s) => const WelcomeScreen()),
-      GoRoute(path: '/login', builder: (c, s) => const LoginScreen()),
-      GoRoute(
-        path: '/verify',
-        builder: (c, s) => VerifyScreen(
-          phone: s.uri.queryParameters['phone'] ?? pendingPhone ?? '',
-        ),
-      ),
       GoRoute(path: '/gate', builder: (c, s) => const PostAuthGateScreen()),
       GoRoute(path: '/promo', builder: (c, s) => const PromoCodeScreen()),
       GoRoute(path: '/locked', builder: (c, s) => const LockedAccessScreen()),
@@ -229,14 +209,6 @@ class AppRouter {
                     path: 'account',
                     builder: (c, s) => const AccountHubScreen(),
                     routes: [
-                      GoRoute(
-                        path: 'telegram',
-                        builder: (c, s) => const TelegramLinkScreen(),
-                      ),
-                      GoRoute(
-                        path: 'email',
-                        builder: (c, s) => const EmailLinkScreen(),
-                      ),
                       GoRoute(
                         path: 'promo',
                         builder: (c, s) => const AccountPromoScreen(),

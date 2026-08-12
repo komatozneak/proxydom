@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api_secret_storage.dart';
+import '../../../core/install_id_storage.dart';
 import '../../../core/router.dart';
 import '../../../core/token_storage.dart';
 import '../../home/application/vpn_provider.dart';
@@ -61,6 +62,13 @@ class LogoutHandler {
         await ApiSecretStorage.instance.clear();
       } catch (e) {
         errors.add('ApiSecretStorage.clear: $e');
+      }
+
+      // ADR 012: install dies whole — wipe id with secret so re-register mints anew.
+      try {
+        await InstallIdStorage.instance.rotate();
+      } catch (e) {
+        errors.add('InstallIdStorage.rotate: $e');
       }
 
       AppRouter.postAuthResolved = false;

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/config.dart';
 import '../../../core/router.dart';
 import '../../../core/support_contact.dart';
 import '../../../core/theme.dart';
@@ -147,13 +148,17 @@ class _LockedAccessScreenState extends ConsumerState<LockedAccessScreen> {
                         FilledButton(
                           style: buttonStyle,
                           onPressed: busy ? null : () => _pay('1m'),
-                          child: Text(l.lockedPay1m),
+                          child: Text(
+                            '${l.lockedPay1m} — ${AppConfig.plan1mPriceRub} ₽',
+                          ),
                         ),
                         const SizedBox(height: 14),
                         OutlinedButton(
                           style: outlinedStyle,
                           onPressed: busy ? null : () => _pay('3m'),
-                          child: Text(l.lockedPay3m),
+                          child: Text(
+                            '${l.lockedPay3m} — ${AppConfig.plan3mPriceRub} ₽',
+                          ),
                         ),
                         const SizedBox(height: 28),
                         if (_error != null) ...[
@@ -210,6 +215,54 @@ class _LockedAccessScreenState extends ConsumerState<LockedAccessScreen> {
                       ],
                     ),
                   ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  TextButton(
+                    onPressed: busy
+                        ? null
+                        : () => launchUrl(
+                              Uri.parse(AppConfig.privacyPolicyUrl),
+                              mode: LaunchMode.externalApplication,
+                            ),
+                    child: Text(l.settingsPrivacyPlaceholder),
+                  ),
+                  TextButton(
+                    onPressed: busy
+                        ? null
+                        : () => launchUrl(
+                              Uri.parse(AppConfig.termsOfServiceUrl),
+                              mode: LaunchMode.externalApplication,
+                            ),
+                    child: const Text('Соглашение'),
+                  ),
+                  TextButton(
+                    onPressed: busy
+                        ? null
+                        : () => launchUrl(
+                              Uri.parse(AppConfig.pricingUrl),
+                              mode: LaunchMode.externalApplication,
+                            ),
+                    child: const Text('Тарифы'),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
+              child: Text(
+                'Код проверки: PLAT',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: muted,
+                  letterSpacing: 0.3,
                 ),
               ),
             ),

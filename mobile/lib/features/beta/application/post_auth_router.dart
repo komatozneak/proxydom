@@ -2,7 +2,7 @@ import '../data/beta_entitlement.dart';
 import '../../onboarding/data/onboarding_prefs.dart';
 import '../../../core/config.dart';
 
-/// Post-auth destinations after Flash Call / anonymous bootstrap.
+/// Post-auth destinations after anonymous bootstrap.
 enum PostAuthDestination {
   promo,
   locked,
@@ -30,7 +30,6 @@ class PostAuthRouter {
       return PostAuthDestination.home;
     }
 
-    // Legacy phone / closed-beta promo path.
     if (entitlement.betaPromoGateEnabled && !entitlement.hasAccess) {
       return PostAuthDestination.promo;
     }

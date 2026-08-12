@@ -4,15 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:teremok_connect/core/theme.dart';
-import 'package:teremok_connect/features/auth/presentation/login_screen.dart';
-import 'package:teremok_connect/features/auth/presentation/verify_screen.dart';
 import 'package:teremok_connect/features/home/presentation/home_screen.dart';
 import 'package:teremok_connect/l10n/app_localizations.dart';
 
 const _screenSources = [
-  'lib/features/auth/presentation/login_screen.dart',
-  'lib/features/auth/presentation/verify_screen.dart',
   'lib/features/home/presentation/home_screen.dart',
+  'lib/features/settings/presentation/settings_screen.dart',
+  'lib/features/beta/presentation/locked_access_screen.dart',
 ];
 
 Widget _wrap(Widget child, {ThemeData? theme}) {
@@ -57,21 +55,6 @@ void main() {
         reason: '$path uses Colors.white',
       );
     }
-  });
-
-  testWidgets('login screen builds under AppTheme.light', (tester) async {
-    await tester.pumpWidget(_wrap(const LoginScreen()));
-    await tester.pump();
-    expect(find.byType(LoginScreen), findsOneWidget);
-    expect(find.byType(FilledButton), findsOneWidget);
-  });
-
-  testWidgets('verify screen builds under AppTheme.dark', (tester) async {
-    await tester.pumpWidget(
-      _wrap(const VerifyScreen(phone: '+79991234567'), theme: AppTheme.dark),
-    );
-    await tester.pump();
-    expect(find.byType(VerifyScreen), findsOneWidget);
   });
 
   testWidgets('home screen builds under AppTheme.light', (tester) async {

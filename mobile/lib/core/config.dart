@@ -111,17 +111,16 @@ class AppConfig {
   }
 
   /// Таймаут dio по умолчанию.
-  /// Flash-call ждёт ответ Zvonok на backend — даём запас на мобильной сети.
+  /// Auth/bootstrap requests may be slower on mobile networks, so keep headroom.
   static const Duration connectTimeout = Duration(seconds: 30);
   static const Duration receiveTimeout = Duration(seconds: 60);
 
-  /// Длиннее для /auth/flash-call/* (Zvonok API на backend может отвечать 15–30 с).
+  /// Longer timeout budget for bootstrap/recovery auth endpoints.
   static const Duration authConnectTimeout = Duration(seconds: 45);
   static const Duration authReceiveTimeout = Duration(seconds: 90);
 
-  /// Anonymous UUID cold start (no Flash Call). Pair with backend
-  /// `FEATURE_AUTH_ANONYMOUS=true`. Override: `--dart-define=AUTH_ANONYMOUS=false`
-  /// for legacy phone alpha builds.
+  /// Anonymous UUID cold start. Pair with backend
+  /// `FEATURE_AUTH_ANONYMOUS=true`.
   static const bool authAnonymous = bool.fromEnvironment(
     'AUTH_ANONYMOUS',
     defaultValue: true,
@@ -133,4 +132,24 @@ class AppConfig {
   /// Bare chat link (no prefill). Prefer [SupportContact.open].
   static const String supportTelegramUrl =
       'https://t.me/$supportTelegramUsername';
+
+  /// Bank / Play / Platega review — public legal pages (always-on footer).
+  static const String privacyPolicyUrl =
+      'https://teremokconnect.online/privacy.html';
+
+  static const String termsOfServiceUrl =
+      'https://teremokconnect.online/terms.html';
+
+  static const String pricingUrl = 'https://teremokconnect.online/pricing.html';
+
+  static const String supportPageUrl =
+      'https://teremokconnect.online/support.html';
+
+  static const String supportEmail = '27komatozneak@gmail.com';
+
+  /// Subscription list prices (RUB) — keep in sync with backend PLAN_*_PRICE_RUB.
+  static const int plan1mPriceRub = 199;
+  static const int plan3mPriceRub = 519;
+  static const int plan6mPriceRub = 929;
+  static const int plan12mPriceRub = 1490;
 }

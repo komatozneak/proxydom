@@ -28,8 +28,7 @@ class V2PathInterceptor extends Interceptor {
   }
 
   static bool _staysOnV1(String path) {
-    return path.contains('/auth/flash-call') ||
-        path.contains('/billing/subscription') ||
+    return path.contains('/billing/subscription') ||
         path.contains('/billing/platega/status') ||
         path.contains('/beta/') ||
         path.contains('/support') ||

@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/api_secret_storage.dart';
 import '../../../core/install_id_storage.dart';
 import '../../../core/retry_policy.dart';
 import '../../auth/application/auth_provider.dart';
@@ -30,11 +31,18 @@ final vpnNodesRepositoryProvider = Provider<VpnNodesRepository>(
   (ref) => VpnNodesRepository(),
 );
 
-/// Retry policy для VPN-операций (максимум 3 попытки).
+/// Retry policy for VPN ops. fetchConfig uses a longer policy for provision_pending.
 final _retryPolicy = RetryPolicy(
   maxAttempts: 3,
   initialDelay: const Duration(milliseconds: 500),
   maxDelay: const Duration(seconds: 3),
+);
+
+/// ADR 012: match gate/smoke — retry provision_pending with backoff.
+final _connectProvisionRetryPolicy = RetryPolicy(
+  maxAttempts: 5,
+  initialDelay: const Duration(milliseconds: 800),
+  maxDelay: const Duration(seconds: 6),
 );
 
 const _connectedSinceKey = 'vpn_connected_since_ms';
@@ -457,7 +465,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
     _displayLabel = await _labelForNodeId(apiNodeId, catalog: catalog);
 
     try {
-      return await _retryPolicy.execute(
+      return await _connectProvisionRetryPolicy.execute(
         () => ref.read(vpnConfigRepositoryProvider).getConfig(
               forceRefresh: true,
               nodeId: apiNodeId == kRegionAutoId ? null : apiNodeId,
@@ -465,21 +473,25 @@ class VpnNotifier extends Notifier<VpnStatus> {
         shouldRetry: (e) async {
           if (e is FormatException || e is TypeError) return false;
           if (e is DioException) {
+            // ADR 012: provision_pending is temporary — retry like smoke scripts.
+            if (e.error == 'provision_pending' ||
+                _apiErrorCode(e) == 'provision_pending') {
+              return true;
+            }
             // Не повторяем 4xx — авторизация/клиент; type может быть unknown.
             final code = e.response?.statusCode ?? 0;
             if (code >= 400 && code < 500) return false;
             if (e.error == 'session_expired') return false;
             if (e.error == 'device_revoked') return false;
+            if (e.error == 'hmac_required') return false;
             if (e.error == 'device_limit_reached') return false;
             if (e.error == 'tt_provision_failed') return false;
             if (e.error is FormatException || e.error is TypeError) {
               return false;
             }
             if (code == 502 || code == 503) {
-              // Hard provision failures must surface immediately (ADR 006).
-              final apiCode = _apiErrorCode(e);
-              if (apiCode == 'tt_provision_failed' ||
-                  apiCode == 'provision_pending') {
+              // TrustTunnel hard failures must surface immediately (ADR 006).
+              if (_apiErrorCode(e) == 'tt_provision_failed') {
                 return false;
               }
             }
@@ -492,11 +504,19 @@ class VpnNotifier extends Notifier<VpnStatus> {
         },
       );
     } on DioException catch (e) {
-      if (e.error == 'device_revoked') {
+      if (e.error == 'device_revoked' || e.error == 'hmac_required') {
         // ignore: avoid_print
-        print('[VPN] device_revoked → rotate install id and retry once');
+        print(
+          '[VPN] ${e.error} → rotate install + cold register, then retry once',
+        );
         await InstallIdStorage.instance.rotate();
+        await ApiSecretStorage.instance.clear();
         ref.read(vpnConfigRepositoryProvider).clearCache();
+        await ref.read(authProvider.notifier).retryBootstrap();
+        final auth = ref.read(authProvider).valueOrNull;
+        if (auth is! AuthStateAuthenticated) {
+          rethrow;
+        }
         return ref.read(vpnConfigRepositoryProvider).getConfig(
               forceRefresh: true,
               nodeId: apiNodeId == kRegionAutoId ? null : apiNodeId,
@@ -742,12 +762,27 @@ class VpnNotifier extends Notifier<VpnStatus> {
           return;
         }
         if (e.error == 'tt_provision_failed' ||
-            _apiErrorCode(e) == 'tt_provision_failed' ||
-            code == 502 ||
-            code == 503) {
+            _apiErrorCode(e) == 'tt_provision_failed') {
           state = const VpnError(
             message: 'tt_provision_failed',
             code: 'tt_provision_failed',
+          );
+          return;
+        }
+        if (e.error == 'provision_pending' ||
+            _apiErrorCode(e) == 'provision_pending' ||
+            code == 502 ||
+            code == 503) {
+          state = const VpnError(
+            message: 'provision_pending',
+            code: 'provision_pending',
+          );
+          return;
+        }
+        if (e.error == 'hmac_required' || e.error == 'device_revoked') {
+          state = VpnError(
+            message: e.error as String,
+            code: e.error as String,
           );
           return;
         }

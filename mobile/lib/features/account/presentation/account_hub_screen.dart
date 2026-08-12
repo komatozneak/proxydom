@@ -11,7 +11,7 @@ import '../../settings/data/subscription_status.dart';
 import '../application/account_profile_provider.dart';
 import '../data/account_profile.dart';
 
-/// Settings → Account hub (guest register routes vs linked profile).
+/// Settings → Account hub (device ID identity; recovery code + promo).
 class AccountHubScreen extends ConsumerWidget {
   const AccountHubScreen({super.key});
 
@@ -53,16 +53,11 @@ class AccountHubScreen extends ConsumerWidget {
               data: (profile) {
                 final accessTitle = _accessTitle(context, l, subAsync);
                 final accessSubtitle = _accessSubtitle(context, l, subAsync);
-                return profile.contactLinked
-                    ? _LinkedBody(
-                        profile: profile,
-                        accessTitle: accessTitle,
-                        accessSubtitle: accessSubtitle,
-                      )
-                    : _GuestBody(
-                        accessTitle: accessTitle,
-                        accessSubtitle: accessSubtitle,
-                      );
+                return _HubBody(
+                  profile: profile,
+                  accessTitle: accessTitle,
+                  accessSubtitle: accessSubtitle,
+                );
               },
             ),
           ],
@@ -148,12 +143,14 @@ class AccountHubScreen extends ConsumerWidget {
   }
 }
 
-class _GuestBody extends StatelessWidget {
-  const _GuestBody({
+class _HubBody extends StatelessWidget {
+  const _HubBody({
+    required this.profile,
     required this.accessTitle,
     required this.accessSubtitle,
   });
 
+  final AccountProfile profile;
   final String accessTitle;
   final String accessSubtitle;
 
@@ -174,17 +171,10 @@ class _GuestBody extends StatelessWidget {
         _SectionCard(
           children: [
             _NavTile(
-              icon: AppIcons.siteTelegram,
-              title: l.accountHubLinkTelegram,
-              subtitle: l.accountHubLinkTelegramHint,
-              onTap: () => context.push('/settings/account/telegram'),
-            ),
-            const Divider(height: 1),
-            _NavTile(
-              icon: AppIcons.globe,
-              title: l.accountHubLinkEmail,
-              subtitle: l.accountHubLinkEmailHint,
-              onTap: () => context.push('/settings/account/email'),
+              icon: AppIcons.shield,
+              title: l.accountHubRecovery,
+              subtitle: l.accountHubRecoveryHint,
+              onTap: () => context.push('/settings/account/recovery'),
             ),
             const Divider(height: 1),
             _NavTile(
@@ -195,10 +185,10 @@ class _GuestBody extends StatelessWidget {
             ),
             const Divider(height: 1),
             _NavTile(
-              icon: AppIcons.shield,
-              title: l.accountHubRecovery,
-              subtitle: l.accountHubRecoveryHint,
-              onTap: () => context.push('/settings/account/recovery'),
+              icon: AppIcons.devices,
+              title: l.settingsDevices,
+              subtitle: '${profile.devicesCount} / ${profile.deviceLimit}',
+              onTap: () => context.push('/settings/devices'),
             ),
           ],
         ),
@@ -213,74 +203,6 @@ class _GuestBody extends StatelessWidget {
             ListTile(
               title: Text(accessTitle),
               subtitle: Text(accessSubtitle),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _LinkedBody extends StatelessWidget {
-  const _LinkedBody({
-    required this.profile,
-    required this.accessTitle,
-    required this.accessSubtitle,
-  });
-
-  final AccountProfile profile;
-  final String accessTitle;
-  final String accessSubtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    final l = AppL10n.of(context);
-    final theme = Theme.of(context);
-    final contact = profile.telegramUsername != null
-        ? '@${profile.telegramUsername}'
-        : (profile.emailMasked ?? '—');
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          l.accountHubLinkedLead,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 16),
-        _SectionCard(
-          children: [
-            ListTile(
-              leading: const AppIcon(AppIcons.checkCircleFill, size: 22),
-              title: Text(l.accountHubContact),
-              subtitle: Text(contact),
-            ),
-            const Divider(height: 1),
-            ListTile(
-              title: Text(l.accountHubAccessSection),
-              subtitle: Text('$accessTitle · $accessSubtitle'),
-            ),
-            const Divider(height: 1),
-            _NavTile(
-              icon: AppIcons.devices,
-              title: l.settingsDevices,
-              subtitle: '${profile.devicesCount} / ${profile.deviceLimit}',
-              onTap: () => context.push('/settings/devices'),
-            ),
-            const Divider(height: 1),
-            _NavTile(
-              icon: AppIcons.crown,
-              title: l.accountHubPromo,
-              subtitle: l.accountHubPromoHint,
-              onTap: () => context.push('/settings/account/promo'),
-            ),
-            const Divider(height: 1),
-            _NavTile(
-              icon: AppIcons.shield,
-              title: l.accountHubRecovery,
-              subtitle: l.accountHubRecoveryHint,
-              onTap: () => context.push('/settings/account/recovery'),
             ),
           ],
         ),

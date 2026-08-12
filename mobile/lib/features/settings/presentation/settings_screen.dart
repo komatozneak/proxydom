@@ -12,7 +12,6 @@ import '../../../core/support_contact.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../account/application/account_profile_provider.dart';
 import '../../auth/application/auth_provider.dart';
 import '../../auth/application/logout_handler.dart';
 import '../application/devices_list_provider.dart';
@@ -400,7 +399,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final notifOn = _notifEnabled ?? false;
     final autoOn = _autoReconnect ?? false;
     final subAsync = ref.watch(subscriptionStatusProvider);
-    final accountAsync = ref.watch(accountProfileProvider);
     final devicesAsync = ref.watch(devicesListProvider);
     final themeMode =
         ref.watch(themeModeProvider).valueOrNull ?? ThemeMode.system;
@@ -415,8 +413,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       data: (d) => d.maxDevices > 1,
       orElse: () => premiumFromSub,
     );
-    final contactLinked = accountAsync.valueOrNull?.contactLinked ?? true;
-    final showGuestBadge = accountAsync.hasValue && !contactLinked;
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
@@ -441,21 +437,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 subtitle: _accessSubtitle(l, subAsync),
                 onTap: () => context.push('/settings/account'),
                 trailing: subAsync.when(
-                  data: (_) => Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (showGuestBadge)
-                        Text(
-                          '!',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: theme.colorScheme.primary,
-                          ),
-                        ),
-                      if (showGuestBadge) const SizedBox(width: 6),
-                      const AppIcon(AppIcons.chevronRight, size: 18),
-                    ],
-                  ),
+                  data: (_) => const AppIcon(AppIcons.chevronRight, size: 18),
                   loading: () => const SizedBox(
                     width: 22,
                     height: 22,
@@ -570,15 +552,40 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
-          TextButton(
-            onPressed: () {
-              // Placeholder link ? real policy URL later.
-              launchUrl(
-                Uri.parse('https://teremokconnect.online'),
-                mode: LaunchMode.externalApplication,
-              );
-            },
-            child: Text(l.settingsPrivacyPlaceholder),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 4,
+            runSpacing: 0,
+            children: [
+              TextButton(
+                onPressed: () => launchUrl(
+                  Uri.parse(AppConfig.privacyPolicyUrl),
+                  mode: LaunchMode.externalApplication,
+                ),
+                child: Text(l.settingsPrivacyPlaceholder),
+              ),
+              TextButton(
+                onPressed: () => launchUrl(
+                  Uri.parse(AppConfig.termsOfServiceUrl),
+                  mode: LaunchMode.externalApplication,
+                ),
+                child: const Text('Соглашение'),
+              ),
+              TextButton(
+                onPressed: () => launchUrl(
+                  Uri.parse(AppConfig.pricingUrl),
+                  mode: LaunchMode.externalApplication,
+                ),
+                child: const Text('Тарифы'),
+              ),
+              TextButton(
+                onPressed: () => launchUrl(
+                  Uri.parse(AppConfig.supportPageUrl),
+                  mode: LaunchMode.externalApplication,
+                ),
+                child: Text(l.settingsSupport),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           if (AppConfig.authAnonymous)

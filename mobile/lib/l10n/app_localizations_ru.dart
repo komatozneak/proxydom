@@ -1100,7 +1100,11 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get recoveryCodeBody =>
-      'Опционально для поддержки. Основной путь — номер платежа.';
+      'Сохраните код — основной способ восстановления после переустановки. Без кода — ID устройства и чек в поддержке.';
+
+  @override
+  String get accountHubGuestLead =>
+      'Аккаунт привязан к ID устройства. Сохраните код восстановления — после переустановки понадобится он или чек об оплате в поддержке.';
 
   @override
   String get recoveryCodeCopy => 'Скопировать';
@@ -1118,11 +1122,11 @@ class AppL10nRu extends AppL10n {
   String get restoreTitle => 'Восстановить доступ';
 
   @override
-  String get restoreHeadline => 'Введите номер платежа';
+  String get restoreHeadline => 'Восстановить доступ';
 
   @override
   String get restoreBody =>
-      'После переустановки вставьте ID платежа Platega из СМС банка или чека. Код сохранения не нужен.';
+      'Введите код восстановления. Без кода — напишите в поддержку с ID устройства и чеком Platega.';
 
   @override
   String get restorePaymentLabel => 'Номер платежа';
@@ -1166,7 +1170,7 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get restoreBodyCode =>
-      'После переустановки введите код, показанный при первом запуске.';
+      'После переустановки введите код, сохранённый при первом доступе.';
 
   @override
   String get settingsInviteDevice => 'Пригласить устройство';
@@ -1221,10 +1225,6 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get accountHubTitle => 'Аккаунт';
-
-  @override
-  String get accountHubGuestLead =>
-      'Сейчас вы в гостевом режиме. Привяжите контакт, чтобы не потерять доступ.';
 
   @override
   String get accountHubLinkedLead =>

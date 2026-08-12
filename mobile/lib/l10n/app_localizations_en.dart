@@ -1096,7 +1096,11 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get recoveryCodeBody =>
-      'Optional support fallback. Prefer restore by payment ID.';
+      'Save this code — main way to restore after reinstall. Without it, contact support with Device ID and payment receipt.';
+
+  @override
+  String get accountHubGuestLead =>
+      'You’re in guest mode. Link a contact so you don’t lose access.';
 
   @override
   String get recoveryCodeCopy => 'Copy code';
@@ -1114,11 +1118,11 @@ class AppL10nEn extends AppL10n {
   String get restoreTitle => 'Restore access';
 
   @override
-  String get restoreHeadline => 'Enter your payment ID';
+  String get restoreHeadline => 'Enter recovery code';
 
   @override
   String get restoreBody =>
-      'After reinstall, paste the Platega payment ID from your bank SMS or receipt. No backup code needed.';
+      'Enter the recovery code you saved at first unlock. Without it, contact support with Device ID and Platega receipt.';
 
   @override
   String get restorePaymentLabel => 'Payment ID';
@@ -1216,10 +1220,6 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get accountHubTitle => 'Account';
-
-  @override
-  String get accountHubGuestLead =>
-      'You’re in guest mode. Link a contact so you don’t lose access.';
 
   @override
   String get accountHubLinkedLead =>

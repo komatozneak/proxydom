@@ -2092,8 +2092,14 @@ abstract class AppL10n {
   /// No description provided for @recoveryCodeBody.
   ///
   /// In en, this message translates to:
-  /// **'Optional support fallback. Prefer restore by payment ID.'**
+  /// **'Save this code — main way to restore after reinstall. Without it, contact support with Device ID and payment receipt.'**
   String get recoveryCodeBody;
+
+  /// No description provided for @accountHubGuestLead.
+  ///
+  /// In en, this message translates to:
+  /// **'You’re in guest mode. Link a contact so you don’t lose access.'**
+  String get accountHubGuestLead;
 
   /// No description provided for @recoveryCodeCopy.
   ///
@@ -2128,13 +2134,13 @@ abstract class AppL10n {
   /// No description provided for @restoreHeadline.
   ///
   /// In en, this message translates to:
-  /// **'Enter your payment ID'**
+  /// **'Enter recovery code'**
   String get restoreHeadline;
 
   /// No description provided for @restoreBody.
   ///
   /// In en, this message translates to:
-  /// **'After reinstall, paste the Platega payment ID from your bank SMS or receipt. No backup code needed.'**
+  /// **'Enter the recovery code you saved at first unlock. Without it, contact support with Device ID and Platega receipt.'**
   String get restoreBody;
 
   /// No description provided for @restorePaymentLabel.
@@ -2322,12 +2328,6 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Account'**
   String get accountHubTitle;
-
-  /// No description provided for @accountHubGuestLead.
-  ///
-  /// In en, this message translates to:
-  /// **'You’re in guest mode. Link a contact so you don’t lose access.'**
-  String get accountHubGuestLead;
 
   /// No description provided for @accountHubLinkedLead.
   ///

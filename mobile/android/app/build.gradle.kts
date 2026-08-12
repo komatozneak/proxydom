@@ -86,10 +86,13 @@ android {
         }
     }
 
-    // ABI splits — отдельные APK на архитектуру.
+    // ABI splits — только для `flutter build apk`, не для app bundle (Play).
+    // AGP/R8: bundle + splits → "Multiple shrunk-resources files found" (issuetracker 402800800).
     splits {
         abi {
-            isEnable = true
+            isEnable = gradle.startParameter.taskNames.none {
+                it.contains("bundle", ignoreCase = true)
+            }
             reset()
             include("arm64-v8a", "armeabi-v7a", "x86_64")
             isUniversalApk = true

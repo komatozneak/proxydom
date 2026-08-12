@@ -1,5 +1,5 @@
 # Prod smoke на физическом Android (VPS backend). Запуск: .\run_prod.ps1
-# Anonymous UUID auth by default (skip Flash Call). Phone: -AuthAnonymous:$false
+# Anonymous UUID auth by default. Set -AuthAnonymous:$false only for legacy builds.
 param(
   [bool]$AuthAnonymous = $true
 )

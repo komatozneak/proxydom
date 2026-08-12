@@ -80,13 +80,35 @@ class VpnConfigRepository {
         if (err is Map && err['error'] is Map) {
           final nested = err['error'] as Map;
           final apiCode = nested['code'];
-          if (apiCode == 'tt_provision_failed' ||
-              apiCode == 'provision_pending') {
+          if (apiCode == 'tt_provision_failed') {
             throw DioException(
               requestOptions: e.requestOptions,
               response: e.response,
               type: DioExceptionType.badResponse,
               error: 'tt_provision_failed',
+            );
+          }
+          if (apiCode == 'provision_pending') {
+            throw DioException(
+              requestOptions: e.requestOptions,
+              response: e.response,
+              type: DioExceptionType.badResponse,
+              error: 'provision_pending',
+            );
+          }
+        }
+      }
+      // ADR 012: structured HMAC 401 → cold register.
+      if (code == 401 && detail is Map) {
+        final err = detail['detail'];
+        if (err is Map && err['error'] is Map) {
+          final nested = err['error'] as Map;
+          if (nested['code'] == 'hmac_required') {
+            throw DioException(
+              requestOptions: e.requestOptions,
+              response: e.response,
+              type: DioExceptionType.badResponse,
+              error: 'hmac_required',
             );
           }
         }

@@ -145,7 +145,7 @@ class ApiClient {
     );
   }
 
-  /// POST с увеличенным таймаутом для flash-call (Zvonok на backend).
+  /// POST with the longer auth timeout budget used by bootstrap/recovery flows.
   static Future<Response<dynamic>> postAuth(
     String path, {
     Object? data,

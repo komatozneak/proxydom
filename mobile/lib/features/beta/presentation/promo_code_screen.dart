@@ -7,7 +7,7 @@ import '../../../core/widgets/app_icon.dart';
 import '../../../l10n/app_localizations.dart';
 import 'promo_redeem_form.dart';
 
-/// Promo code entry — after Flash Call, only when server advertises the gate.
+/// Promo code entry for the closed-beta access gate.
 class PromoCodeScreen extends ConsumerWidget {
   const PromoCodeScreen({super.key});
 
