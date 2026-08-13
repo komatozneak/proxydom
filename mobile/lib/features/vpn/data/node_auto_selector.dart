@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import '../domain/eu_tt_fallback.dart';
 import 'node_display.dart';
 import 'vpn_node.dart';
 
@@ -17,7 +18,8 @@ class NodeAutoSelector {
   /// Returns best [VpnNode.id], or [kRegionAutoId] fallback to default catalog item.
   Future<String> pickBestNodeId(List<VpnNode> catalog) async {
     final candidates = catalog
-        .where((n) => n.isConnected || n.isDefault)
+        .where((n) => n.isAutoEligible)
+        .where((n) => !isHiddenEuTtFallbackNode(n))
         .where((n) => n.host.isNotEmpty)
         .toList();
     if (candidates.isEmpty) {

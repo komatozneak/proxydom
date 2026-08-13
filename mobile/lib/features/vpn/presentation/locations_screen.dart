@@ -14,6 +14,7 @@ import '../../settings/application/subscription_status_provider.dart';
 import '../data/node_display.dart';
 import '../data/vpn_controller.dart';
 import '../data/vpn_node.dart';
+import '../domain/eu_tt_fallback.dart';
 
 /// Full-screen region list (Locations tab).
 class LocationsScreen extends ConsumerStatefulWidget {
@@ -207,6 +208,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
 
   /// Free/online egress + always keep Premium/locked rows in the pool (gray).
   bool _inProductPool(VpnNode n) {
+    if (isHiddenEuTtFallbackNode(n)) return false;
     if (n.requiresPremium || n.locked || n.isYoutube) return true;
     return n.isConnected || n.isDefault;
   }

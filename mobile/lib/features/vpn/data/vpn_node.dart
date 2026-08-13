@@ -66,9 +66,14 @@ class VpnNode {
   bool get isGeneralXray =>
       !isTrustTunnel && !isYoutube && !isComingSoon && !isGeoUs;
 
-  /// Auto picker gate — prefer server `auto_eligible`, else [isGeneralXray].
-  bool get isAutoEligible =>
-      autoEligible ?? (isGeneralXray && (isConnected || isDefault));
+  /// Auto picker: server `auto_eligible`, else Free Xray general or Free US TT.
+  bool get isAutoEligible {
+    if (autoEligible != null) return autoEligible!;
+    if (isTrustTunnel) {
+      return isGeoUs && !isComingSoon && (isConnected || isDefault);
+    }
+    return isGeneralXray && (isConnected || isDefault);
+  }
 
   factory VpnNode.fromJson(Map<String, dynamic> json) {
     final rawHost = (json['host'] as String?) ?? '';
