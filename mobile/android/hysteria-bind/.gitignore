@@ -1,0 +1,2 @@
+# Local gomobile/gobind binaries (not sagernet GOPATH tools).
+.tools/

@@ -46,10 +46,11 @@ class AppConfig {
     defaultValue: '',
   );
 
-  /// Last-known good A-record for [vpsHostname] (RF). Prefer override / DNS
-  /// resolution at runtime where available; this is the offline fallback so
-  /// TUN bypass and Xray hosts pin stay valid if the A-record moves.
-  static const String vpsIpv4Fallback = '130.49.149.182';
+  /// Last-known good A-record for [vpsHostname] (Selectel RF API master).
+  /// Prefer override / DNS resolution at runtime where available; this is the
+  /// offline fallback so TUN bypass and Xray hosts pin stay valid if DNS fails
+  /// under VPN. Must match live `api.teremokconnect.online` A-record.
+  static const String vpsIpv4Fallback = '176.114.64.174';
 
   /// Effective control-plane IPv4 for routing / DNS hosts pin.
   static String get vpsControlPlaneIpv4 {

@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,13 +8,16 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/config.dart';
+import '../../../core/diagnostics/diagnostics_service.dart';
 import '../../../core/install_id_storage.dart';
 import '../../../core/support_contact.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../auth/application/auth_provider.dart';
+import '../../auth/application/auth_state.dart';
 import '../../auth/application/logout_handler.dart';
+import '../../home/application/vpn_provider.dart';
 import '../application/devices_list_provider.dart';
 import '../application/locale_provider.dart';
 import '../application/subscription_status_provider.dart';
@@ -39,6 +43,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _notifLoading = false;
   bool? _autoReconnect;
   bool _autoReconnectLoading = false;
+  bool _reportSending = false;
   String _versionLabel = '';
 
   @override
@@ -312,6 +317,81 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     // Phone path: GoRouter redirects to /login via refreshListenable.
   }
 
+  Future<void> _onSendReportPressed() async {
+    final l = AppL10n.of(context);
+    final auth = ref.read(authProvider).valueOrNull;
+    if (auth is! AuthStateAuthenticated) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.settingsReportUnauthorized)),
+      );
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l.settingsSendReport),
+        content: Text(l.settingsSendReportHint),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(l.settingsSendReportConfirm),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _reportSending = true);
+    String? report;
+    try {
+      final vpn = ref.read(vpnProvider);
+      final notifier = ref.read(vpnProvider.notifier);
+      final service = DiagnosticsService();
+      report = await service.buildReport(
+        authState: auth,
+        vpnUi: vpn,
+        cachedConfig: notifier.config,
+        autoWinnerId: notifier.autoWinnerId,
+        autoWinnerLabel: notifier.displayLabel,
+        lastProve: notifier.lastProveSummary,
+      );
+      await service.submit(report: report);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.settingsReportSent)),
+      );
+    } on DioException catch (e) {
+      if (!mounted) return;
+      final code = e.response?.statusCode ?? 0;
+      final copy = report;
+      if (code == 401 && copy != null && copy.isNotEmpty) {
+        await Clipboard.setData(ClipboardData(text: copy));
+      }
+      if (!mounted) return;
+      final message = code == 401
+          ? l.settingsReportUnauthorized
+          : (e.type == DioExceptionType.connectionError ||
+                  e.type == DioExceptionType.connectionTimeout ||
+                  e.type == DioExceptionType.receiveTimeout)
+              ? l.settingsReportNetworkError
+              : l.settingsReportFailed;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.settingsReportFailed)),
+      );
+    } finally {
+      if (mounted) setState(() => _reportSending = false);
+    }
+  }
+
   String _themeModeLabel(AppL10n l, ThemeMode mode) => switch (mode) {
         ThemeMode.light => l.settingsThemeLight,
         ThemeMode.dark => l.settingsThemeDark,
@@ -482,6 +562,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   onTap: () => SupportContact.open(screen: 'Настройки'),
                 ),
               ],
+              const _CardDivider(),
+              _SettingsRow(
+                icon: AppIcons.bug,
+                title: l.settingsSendReport,
+                subtitle: l.settingsSendReportHint,
+                onTap: _reportSending ? null : _onSendReportPressed,
+                trailing: _reportSending
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : null,
+              ),
             ],
           ),
           const SizedBox(height: 20),

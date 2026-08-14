@@ -1,99 +1,128 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:teremok_connect/features/vpn/data/node_auto_selector.dart';
+import 'package:teremok_connect/features/vpn/data/node_display.dart';
 import 'package:teremok_connect/features/vpn/data/vpn_node.dart';
 
+VpnNode _node({
+  required String id,
+  required String label,
+  String protocol = kVpnNodeProtocolVlessReality,
+  String? purpose,
+  bool requiresPremium = false,
+  bool locked = false,
+  String host = '204.11.2.216',
+  bool connected = true,
+}) {
+  return VpnNode(
+    id: id,
+    label: label,
+    host: host,
+    port: 443,
+    status: connected ? 'connected' : 'unknown',
+    isDefault: false,
+    protocol: protocol,
+    purpose: purpose,
+    requiresPremium: requiresPremium,
+    locked: locked,
+  );
+}
+
 void main() {
-  test('pickBestNodeId returns sole online node', () async {
-    const selector = NodeAutoSelector(timeout: Duration(milliseconds: 100));
-    const nodes = [
-      VpnNode(
-        id: 'node-185',
-        label: 'NL',
-        host: '185.139.228.192',
-        port: 443,
-        status: 'connected',
-        isDefault: false,
-      ),
-    ];
-    final id = await selector.pickBestNodeId(nodes);
-    expect(id, 'node-185');
-  });
+  final euRetired = _node(id: 'eu-primary', label: 'Восточная Европа');
+  final us = _node(
+    id: 'us-hy2-1',
+    label: 'США · Бесплатно',
+    purpose: 'geo-us',
+    protocol: kVpnNodeProtocolHysteria2,
+    host: '45.91.248.91',
+  );
+  final euFree = _node(
+    id: 'eu-hy2-1',
+    label: 'Европа · Бесплатно',
+    protocol: kVpnNodeProtocolHysteria2,
+    host: '217.60.3.9',
+    purpose: 'general',
+  );
+  final gaming = _node(
+    id: 'eu-gaming',
+    label: 'Игровой · Premium',
+    protocol: kVpnNodeProtocolTrusttunnel,
+    purpose: 'gaming',
+    requiresPremium: true,
+    host: '204.11.2.216',
+  );
+  final youtube = _node(
+    id: 'al-youtube',
+    label: 'YouTube · Premium',
+    protocol: kVpnNodeProtocolTrusttunnel,
+    purpose: 'youtube',
+    requiresPremium: true,
+    host: '85.155.228.235',
+  );
+  final stub = _node(
+    id: 'premium-youtube',
+    label: 'Скоро',
+    protocol: kVpnNodeProtocolTrusttunnel,
+    purpose: 'coming_soon',
+    requiresPremium: true,
+    locked: true,
+    host: '0.0.0.0',
+  );
 
-  test('Auto never picks hidden EU TT fallback', () async {
-    const selector = NodeAutoSelector(timeout: Duration(milliseconds: 80));
-    const nodes = [
-      VpnNode(
-        id: 'eu-primary',
-        label: 'EU',
-        host: '127.0.0.1',
-        port: 9,
-        status: 'connected',
-        isDefault: true,
-      ),
-      VpnNode(
-        id: 'eu-tt-1',
-        label: 'EU',
-        host: '127.0.0.1',
-        port: 443,
-        status: 'connected',
-        isDefault: false,
-        protocol: kVpnNodeProtocolTrusttunnel,
-        purpose: 'general',
-        region: 'eu',
-        autoEligible: true,
-      ),
-    ];
-    final id = await selector.pickBestNodeId(nodes);
-    expect(id, 'eu-primary');
-  });
-
-  test('Auto may pick Free US TT when it is the only eligible node', () async {
-    const selector = NodeAutoSelector(timeout: Duration(milliseconds: 80));
-    const nodes = [
-      VpnNode(
-        id: 'us-geo-1',
-        label: 'США',
-        host: '127.0.0.1',
-        port: 9,
-        status: 'connected',
-        isDefault: false,
-        protocol: kVpnNodeProtocolTrusttunnel,
-        purpose: 'geo-us',
-        region: 'us',
-        autoEligible: true,
-      ),
-      VpnNode(
-        id: 'al-youtube',
-        label: 'YouTube',
-        host: '127.0.0.1',
-        port: 443,
-        status: 'connected',
-        isDefault: false,
-        protocol: kVpnNodeProtocolTrusttunnel,
-        purpose: 'youtube',
-        autoEligible: false,
-      ),
-    ];
-    final id = await selector.pickBestNodeId(nodes);
-    expect(id, 'us-geo-1');
-  });
-
-  test('resolveNodeIdForConfig returns stored id when not auto', () async {
-    const nodes = [
-      VpnNode(
-        id: 'node-usa',
-        label: 'USA',
-        host: '45.91.248.91',
-        port: 443,
-        status: 'connected',
-        isDefault: false,
-      ),
-    ];
-    final id = await resolveNodeIdForConfig(
-      storedId: 'node-usa',
-      catalog: nodes,
-      selector: const NodeAutoSelector(timeout: Duration(milliseconds: 50)),
+  test('Free Auto pool is EU then US Hy2, never TT / YouTube / eu-primary', () {
+    final pool = autoPoolFor(
+      [youtube, us, euFree, euRetired, gaming, stub],
+      isPremium: false,
     );
-    expect(id, 'node-usa');
+    expect(pool.map((n) => n.id), ['eu-hy2-1', 'us-hy2-1']);
+    expect(youtube.inAutoPool(isPremium: false), isFalse);
+    expect(gaming.inAutoPool(isPremium: false), isFalse);
+    expect(euRetired.inAutoPool(isPremium: false), isFalse);
+    expect(euFree.isAutoEligible, isTrue);
+    expect(autoPoolRank(euFree), 0);
+    expect(autoPoolRank(us), 1);
+    expect(autoPoolRank(gaming), 3);
+    expect(autoPoolRank(youtube), 4);
+  });
+
+  test('Premium Auto pool is EU Hy2, US Hy2, gaming, then YouTube', () {
+    final pool = autoPoolFor(
+      [youtube, us, euFree, euRetired, gaming],
+      isPremium: true,
+    );
+    expect(
+      pool.map((n) => n.id),
+      ['eu-hy2-1', 'us-hy2-1', 'eu-gaming', 'al-youtube'],
+    );
+    expect(gaming.inAutoPool(isPremium: true), isTrue);
+    expect(youtube.inAutoPool(isPremium: true), isTrue);
+    expect(euRetired.inAutoPool(isPremium: true), isFalse);
+  });
+
+  test('coming-soon stub and empty host never enter Auto', () {
+    expect(stub.inAutoPool(isPremium: true), isFalse);
+    expect(stub.inAutoPool(isPremium: false), isFalse);
+  });
+
+  test('autoCandidateHintLabel is short product copy', () {
+    expect(autoCandidateHintLabel(us), 'США');
+    expect(autoCandidateHintLabel(euFree), 'Европа');
+    expect(autoCandidateHintLabel(gaming), 'Игровой');
+    expect(autoCandidateHintLabel(youtube), 'YouTube');
+  });
+
+  test('resolveNodeIdForConfig keeps manual id (no Auto swap)', () {
+    expect(
+      resolveNodeIdForConfig(storedId: 'us-hy2-1', catalog: [us, euFree]),
+      'us-hy2-1',
+    );
+    expect(
+      resolveNodeIdForConfig(storedId: kRegionAutoId, catalog: [us, euFree]),
+      isNull,
+    );
+    expect(
+      resolveNodeIdForConfig(storedId: null, catalog: [us, euFree]),
+      isNull,
+    );
   });
 }

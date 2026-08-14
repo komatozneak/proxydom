@@ -4,13 +4,13 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
-import '../../../core/diagnostics/agent_debug_log.dart';
 import '../../settings/data/split_tunnel_prefs.dart';
 import 'vpn_config.dart';
 import 'vpn_route_policy.dart';
 import 'vpn_service_config.dart';
 import 'vpn_session_inputs.dart';
 import 'vpn_session_meta.dart';
+import 'vpn_session_snapshot.dart';
 import 'xray_config_builder.dart';
 import 'youtube_google_cidrs.dart';
 
@@ -24,93 +24,173 @@ class VpnController {
 
   static const _methodChannel = MethodChannel('teremok/vpn');
   static const _eventChannel = EventChannel('teremok/vpn/status');
+  static const _sessionEventChannel = EventChannel('teremok/vpn/session');
   static const _trafficEventChannel = EventChannel('teremok/vpn/traffic');
   static const _pingEventChannel = EventChannel('teremok/vpn/ping');
-
-  /// Xray start can take longer than sing-box (asset load + Reality handshake).
-  static const Duration startTimeout = Duration(seconds: 45);
 
   static const Duration stopTimeout = Duration(seconds: 5);
 
   Stream<VpnNativeStatus>? _statusStream;
+  Stream<VpnSessionSnapshot>? _sessionStream;
   Stream<VpnTrafficStats>? _trafficStream;
   Stream<int?>? _pingStream;
+
+  /// Build MethodChannel params for one minted config (Xray / TT / Hy2).
+  Future<String> buildStartParamsJson(
+    VpnConfig config, {
+    String? displayLabel,
+    String? catalogNodeId,
+  }) async {
+    if (config.isTrustTunnelSession) {
+      final profile = config.trusttunnelProfile;
+      if (profile == null) {
+        throw VpnControllerException('tt_provision_failed');
+      }
+      final disallowedApps =
+          (await SplitTunnelPrefs.loadDisallowedPackages()).toList()..sort();
+      return jsonEncode({
+        'schemaVersion': 2,
+        'vpnCore': 'trusttunnel',
+        'autoJob': true,
+        'sessionName': kVpnBrandSessionName,
+        'displayLabel': (displayLabel?.trim().isNotEmpty == true)
+            ? displayLabel!.trim()
+            : 'TrustTunnel · ${profile.hostname}',
+        'outboundType': 'trusttunnel',
+        'trusttunnelToml': profile.toml,
+        'trusttunnelHost': profile.hostname,
+        'trusttunnelNodeId': profile.nodeId,
+        'controlPlaneHosts': VpnServiceConfig.controlPlaneHostsOf(),
+        if (disallowedApps.isNotEmpty)
+          'disallowedApplications': disallowedApps,
+      });
+    }
+    if (config.isHysteriaSession) {
+      final profile = config.hysteriaProfile;
+      if (profile == null) {
+        throw VpnControllerException('hy2_provision_failed');
+      }
+      final disallowedApps =
+          (await SplitTunnelPrefs.loadDisallowedPackages()).toList()..sort();
+      return jsonEncode({
+        'schemaVersion': 2,
+        'vpnCore': 'hysteria',
+        'autoJob': true,
+        'sessionName': kVpnBrandSessionName,
+        'displayLabel': (displayLabel?.trim().isNotEmpty == true)
+            ? displayLabel!.trim()
+            : 'Hysteria · ${profile.server}',
+        'outboundType': 'hysteria2',
+        'hysteriaServer': profile.server,
+        'hysteriaAuth': profile.auth,
+        'hysteriaSni': profile.sni,
+        'hysteriaSocksListen': profile.socksListen,
+        'hysteriaNodeId': profile.nodeId,
+        if (profile.bandwidthUp != null) 'hysteriaBandwidthUp': profile.bandwidthUp,
+        if (profile.bandwidthDown != null)
+          'hysteriaBandwidthDown': profile.bandwidthDown,
+        'controlPlaneHosts': VpnServiceConfig.controlPlaneHostsOf(),
+        if (disallowedApps.isNotEmpty)
+          'disallowedApplications': disallowedApps,
+      });
+    }
+    if (config.xrayProfile == null || config.xrayProfile!.candidates.isEmpty) {
+      throw VpnControllerException('xray_profile has no candidates');
+    }
+    final serviceConfig = VpnServiceConfig.fromVpnConfig(
+      config,
+      displayLabel: displayLabel,
+    );
+    final bundledRu =
+        kSmartRuSplitEnabled && await SplitTunnelPrefs.isBundledRuEnabled();
+    final govRu =
+        kSmartRuSplitEnabled && await SplitTunnelPrefs.isGovRuEnabled();
+    final siteSuffixes = await SplitTunnelPrefs.enabledDomainSuffixes();
+    final siteCidrs = await SplitTunnelPrefs.enabledProxyIpCidrs();
+    final disallowedApps =
+        (await SplitTunnelPrefs.loadDisallowedPackages()).toList()..sort();
+    var ytCidrs = const <String>[];
+    try {
+      ytCidrs = await loadYoutubeGoogleCidrs();
+    } catch (e) {
+      // ignore: avoid_print
+      print('[VPN] youtube-google.cidr skipped: $e');
+    }
+    await VpnSessionMeta.saveConnectMeta(
+      ruRulesLoaded: bundledRu,
+      ruRuleTags: const [],
+      expectedEgressHost: config.expectedEgressHost,
+    );
+    final inputs = VpnSessionInputs.fromVpnConfig(
+      config: config,
+      service: serviceConfig,
+      route: RoutePolicy(
+        includeAdsBlock: kXrayAdsBlockEnabled,
+        includeOgonAdsAll: kXrayOgonAdsAllEnabled,
+        includeGeoipRu: kGeoipRuEnabled,
+        includeBundledRuRuleSets: bundledRu,
+        includeGovRuRuleSets: govRu,
+        useHevTunBridge: kUseHevTunBridge,
+        adsBlockDomains: kXrayAdsBlockDomains,
+        proxyIpCidrs: ytCidrs,
+        directDomainSuffixes: siteSuffixes,
+        directIpCidrs: siteCidrs,
+      ),
+    );
+    final candidates = XrayConfigBuilder.buildCandidateConfigs(inputs);
+    final raw = jsonDecode(
+      serviceConfig.toJsonStringWithXrayCandidates(
+        candidates,
+        disallowedApplications: disallowedApps,
+      ),
+    );
+    if (raw is Map<String, dynamic>) {
+      raw['autoJob'] = true;
+      if (catalogNodeId != null) raw['autoNodeId'] = catalogNodeId;
+      return jsonEncode(raw);
+    }
+    return serviceConfig.toJsonStringWithXrayCandidates(
+      candidates,
+      disallowedApplications: disallowedApps,
+    );
+  }
 
   /// Start Xray VPN with [VpnConfig.xrayProfile] candidates (sequential failover).
   Future<bool> start(VpnConfig config, {String? displayLabel}) async {
     try {
-      if (config.xrayProfile == null ||
-          config.xrayProfile!.candidates.isEmpty) {
-        throw VpnControllerException('xray_profile has no candidates');
-      }
-
-      final serviceConfig = VpnServiceConfig.fromVpnConfig(
+      final paramsJson = await buildStartParamsJson(
         config,
         displayLabel: displayLabel,
       );
-      // Always smart-style directs (Modes UI removed). Gated by prefs toggles.
-      final bundledRu =
-          kSmartRuSplitEnabled && await SplitTunnelPrefs.isBundledRuEnabled();
-      final govRu =
-          kSmartRuSplitEnabled && await SplitTunnelPrefs.isGovRuEnabled();
-      final siteSuffixes = await SplitTunnelPrefs.enabledDomainSuffixes();
-      final siteCidrs = await SplitTunnelPrefs.enabledProxyIpCidrs();
-      final disallowedApps =
-          (await SplitTunnelPrefs.loadDisallowedPackages()).toList()..sort();
-      var ytCidrs = const <String>[];
-      try {
-        ytCidrs = await loadYoutubeGoogleCidrs();
-      } catch (e) {
-        // ignore: avoid_print
-        print('[VPN] youtube-google.cidr skipped: $e');
-      }
-
-      await VpnSessionMeta.saveConnectMeta(
-        ruRulesLoaded: bundledRu,
-        ruRuleTags: const [],
-        expectedEgressHost: config.expectedEgressHost,
+      final result = await _methodChannel.invokeMethod<bool>(
+        'start',
+        {'paramsJson': paramsJson},
       );
-
-      final inputs = VpnSessionInputs.fromVpnConfig(
-        config: config,
-        service: serviceConfig,
-        route: RoutePolicy(
-          includeAdsBlock: kXrayAdsBlockEnabled,
-          includeOgonAdsAll: kXrayOgonAdsAllEnabled,
-          includeGeoipRu: kGeoipRuEnabled,
-          includeBundledRuRuleSets: bundledRu,
-          includeGovRuRuleSets: govRu,
-          useHevTunBridge: kUseHevTunBridge,
-          adsBlockDomains: kXrayAdsBlockDomains,
-          proxyIpCidrs: ytCidrs,
-          directDomainSuffixes: siteSuffixes,
-          directIpCidrs: siteCidrs,
-        ),
-      );
-      final candidates = XrayConfigBuilder.buildCandidateConfigs(inputs);
-      final paramsJson = serviceConfig.toJsonStringWithXrayCandidates(
-        candidates,
-        disallowedApplications: disallowedApps,
-      );
-
-      final result = await _methodChannel
-          .invokeMethod<bool>('start', {'paramsJson': paramsJson})
-          .timeout(
-            startTimeout,
-            onTimeout: () {
-              throw VpnControllerException(
-                'start timeout after ${startTimeout.inSeconds}s',
-              );
-            },
-          );
       if (result == true) {
         await SplitTunnelPrefs.markApplied();
       }
       return result ?? false;
-    } on TimeoutException catch (e) {
-      throw VpnControllerException('start timeout: $e');
     } on PlatformException catch (e) {
       throw VpnControllerException('start failed: ${e.code} ${e.message}');
+    }
+  }
+
+  /// Auto: sequential data-plane prove over already-minted [paramsJson] rows.
+  Future<bool> startAuto(List<String> paramsJsonList) async {
+    if (paramsJsonList.isEmpty) {
+      throw VpnControllerException('auto pool empty');
+    }
+    try {
+      final result = await _methodChannel.invokeMethod<bool>(
+        'startAuto',
+        {'candidatesJson': paramsJsonList},
+      );
+      if (result == true) {
+        await SplitTunnelPrefs.markApplied();
+      }
+      return result ?? false;
+    } on PlatformException catch (e) {
+      throw VpnControllerException('auto start failed: ${e.code} ${e.message}');
     }
   }
 
@@ -138,41 +218,61 @@ class VpnController {
           'disallowedApplications': disallowedApps,
       });
 
-      await agentDebugLog(
-        hypothesisId: 'TT1',
-        location: 'vpn_controller.dart:startTrustTunnel',
-        message: 'tt start enqueued',
-        runId: 'trusttunnel',
-        data: {
-          'nodeId': profile.nodeId,
-          'host': profile.hostname,
-          'upstream': profile.upstreamProtocol,
-          'fallback': profile.upstreamFallbackProtocol,
-          'antiDpi': profile.antiDpi,
-          'dnsUpstreams': profile.dnsUpstreams.length,
-          'tomlLen': profile.toml.length,
-        },
+      final result = await _methodChannel.invokeMethod<bool>(
+        'start',
+        {'paramsJson': paramsJson},
       );
-
-      final result = await _methodChannel
-          .invokeMethod<bool>('start', {'paramsJson': paramsJson})
-          .timeout(
-            startTimeout,
-            onTimeout: () {
-              throw VpnControllerException(
-                'start timeout after ${startTimeout.inSeconds}s',
-              );
-            },
-          );
       if (result == true) {
         await SplitTunnelPrefs.markApplied();
       }
       return result ?? false;
-    } on TimeoutException catch (e) {
-      throw VpnControllerException('trusttunnel start timeout: $e');
     } on PlatformException catch (e) {
       throw VpnControllerException(
         'trusttunnel start failed: ${e.code} ${e.message}',
+      );
+    }
+  }
+
+  /// Start Hysteria2 core (ADR 015). Native proves via local SOCKS, not QUIC-up.
+  Future<bool> startHysteria(
+    HysteriaProfile profile, {
+    String? displayLabel,
+  }) async {
+    try {
+      final disallowedApps =
+          (await SplitTunnelPrefs.loadDisallowedPackages()).toList()..sort();
+      final paramsJson = jsonEncode({
+        'schemaVersion': 2,
+        'vpnCore': 'hysteria',
+        'sessionName': kVpnBrandSessionName,
+        'displayLabel': (displayLabel?.trim().isNotEmpty == true)
+            ? displayLabel!.trim()
+            : 'Hysteria · ${profile.server}',
+        'outboundType': 'hysteria2',
+        'hysteriaServer': profile.server,
+        'hysteriaAuth': profile.auth,
+        'hysteriaSni': profile.sni,
+        'hysteriaSocksListen': profile.socksListen,
+        'hysteriaNodeId': profile.nodeId,
+        if (profile.bandwidthUp != null) 'hysteriaBandwidthUp': profile.bandwidthUp,
+        if (profile.bandwidthDown != null)
+          'hysteriaBandwidthDown': profile.bandwidthDown,
+        'controlPlaneHosts': VpnServiceConfig.controlPlaneHostsOf(),
+        if (disallowedApps.isNotEmpty)
+          'disallowedApplications': disallowedApps,
+      });
+
+      final result = await _methodChannel.invokeMethod<bool>(
+        'start',
+        {'paramsJson': paramsJson},
+      );
+      if (result == true) {
+        await SplitTunnelPrefs.markApplied();
+      }
+      return result ?? false;
+    } on PlatformException catch (e) {
+      throw VpnControllerException(
+        'hysteria start failed: ${e.code} ${e.message}',
       );
     }
   }
@@ -200,10 +300,7 @@ class VpnController {
   Future<VpnNativeStatus> getStatus() async {
     try {
       final result = await _methodChannel.invokeMethod<String>('getStatus');
-      return VpnNativeStatus.values.firstWhere(
-        (s) => s.name == result,
-        orElse: () => VpnNativeStatus.unknown,
-      );
+      return parseVpnNativeStatus(result);
     } on PlatformException {
       return VpnNativeStatus.unknown;
     }
@@ -229,7 +326,7 @@ class VpnController {
   }
 
   /// Last N lines of VPN core stderr (Xray / legacy sing-box working dir).
-  Future<String?> getVpnCoreStderrTail({int maxLines = 30}) async {
+  Future<String?> getVpnCoreStderrTail({int maxLines = 400}) async {
     try {
       return await _methodChannel.invokeMethod<String>(
         'getSingBoxStderrTail',
@@ -243,7 +340,7 @@ class VpnController {
   }
 
   /// Compat alias for diagnostics / older call sites.
-  Future<String?> getSingBoxStderrTail({int maxLines = 30}) =>
+  Future<String?> getSingBoxStderrTail({int maxLines = 400}) =>
       getVpnCoreStderrTail(maxLines: maxLines);
 
   Future<String?> getUnderlyingNetworkInterface() async {
@@ -335,10 +432,7 @@ class VpnController {
         .receiveBroadcastStream()
         .map((event) {
           if (event is String) {
-            return VpnNativeStatus.values.firstWhere(
-              (s) => s.name == event,
-              orElse: () => VpnNativeStatus.unknown,
-            );
+            return parseVpnNativeStatus(event);
           }
           return VpnNativeStatus.unknown;
         })
@@ -346,6 +440,19 @@ class VpnController {
           return VpnNativeStatus.unknown;
         });
     return _statusStream!;
+  }
+
+  Stream<VpnSessionSnapshot> get sessionStream {
+    _sessionStream ??= _sessionEventChannel
+        .receiveBroadcastStream()
+        .map(VpnSessionSnapshot.fromEvent)
+        .handleError((_) {
+          return const VpnSessionSnapshot(
+            phase: VpnSessionPhase.unknown,
+            generation: 0,
+          );
+        });
+    return _sessionStream!;
   }
 
   Stream<VpnTrafficStats> get trafficStream {
@@ -423,6 +530,16 @@ enum VpnNativeStatus {
   disconnecting,
   revoked,
   error,
+}
+
+/// Maps Android legacy status strings. `probing` is SessionPhase.Proving.
+VpnNativeStatus parseVpnNativeStatus(String? raw) {
+  if (raw == null || raw.isEmpty) return VpnNativeStatus.unknown;
+  if (raw == 'probing') return VpnNativeStatus.connecting;
+  return VpnNativeStatus.values.firstWhere(
+    (s) => s.name == raw,
+    orElse: () => VpnNativeStatus.unknown,
+  );
 }
 
 final class VpnTrafficStats {

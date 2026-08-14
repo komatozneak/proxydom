@@ -14,6 +14,10 @@
 -keep class libXray.** { *; }
 -keep class go.** { *; }
 
+# Hy2 gomobile AAR (namespaced off libXray's go.Seq / libgojni.so)
+-keep class hy2bind.** { *; }
+-keep class hy.** { *; }
+
 # TrustTunnel native client — ADR 006
 -keep class com.adguard.trusttunnel.** { *; }
 -keep class ch.qos.** { *; }

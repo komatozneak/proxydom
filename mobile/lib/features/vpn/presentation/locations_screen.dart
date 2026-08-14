@@ -11,10 +11,10 @@ import '../../../core/widgets/app_icon.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../home/application/vpn_provider.dart';
 import '../../settings/application/subscription_status_provider.dart';
+import '../../settings/data/subscription_status.dart';
 import '../data/node_display.dart';
 import '../data/vpn_controller.dart';
 import '../data/vpn_node.dart';
-import '../domain/eu_tt_fallback.dart';
 
 /// Full-screen region list (Locations tab).
 class LocationsScreen extends ConsumerStatefulWidget {
@@ -44,6 +44,15 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     final theme = Theme.of(context);
     final canPop = context.canPop();
     final busy = ref.watch(busyOverlayProvider).isBusy;
+    ref.listen<AsyncValue<SubscriptionStatus>>(subscriptionStatusProvider, (
+      previous,
+      next,
+    ) {
+      bool prem(SubscriptionStatus? s) => s != null && s.unlocksPremium;
+      if (prem(previous?.valueOrNull) != prem(next.valueOrNull)) {
+        unawaited(_load());
+      }
+    });
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
@@ -208,15 +217,23 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
 
   /// Free/online egress + always keep Premium/locked rows in the pool (gray).
   bool _inProductPool(VpnNode n) {
-    if (isHiddenEuTtFallbackNode(n)) return false;
     if (n.requiresPremium || n.locked || n.isYoutube) return true;
     return n.isConnected || n.isDefault;
   }
 
   bool _isTileLocked(VpnNode n, {required bool userPremium}) {
-    if (n.locked) return true;
+    final purpose = (n.purpose ?? '').toLowerCase();
+    if (purpose == 'coming_soon' || n.host == '0.0.0.0') return true;
     if (n.requiresPremium && !userPremium) return true;
+    if (!userPremium && n.locked) return true;
     return false;
+  }
+
+  String _subtitleFor(VpnNode node, AppL10n l, {required bool locked}) {
+    if (locked) return l.locationsPremiumUnavailable;
+    if (node.isYoutube) return l.regionBlurbYoutube;
+    if (node.isGaming) return l.regionBlurbGaming;
+    return l.regionBlurbFree;
   }
 
   String _friendlyError(AppL10n l) {
@@ -259,7 +276,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     }
 
     final sub = ref.watch(subscriptionStatusProvider).valueOrNull;
-    final userPremium = sub != null && (sub.isPro || sub.isAlpha);
+    final userPremium = sub != null && sub.unlocksPremium;
 
     // Free online/default + Premium/locked always visible (gray for Free).
     final pool = nodes.where(_inProductPool).toList();
@@ -301,10 +318,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
         final place = placeForNode(node, index: i);
         final locked = _isTileLocked(node, userPremium: userPremium);
         final selected = !locked && selectedId == node.id;
-        final city = place.displaySubtitle(locale).trim();
-        final subtitle = locked
-            ? l.locationsPremiumUnavailable
-            : (city.isEmpty ? l.regionOnline : '$city · ${l.regionOnline}');
+        final subtitle = _subtitleFor(node, l, locked: locked);
         out.add(
           Padding(
             padding: const EdgeInsets.only(bottom: 8),

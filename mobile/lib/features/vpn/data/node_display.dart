@@ -39,8 +39,7 @@ const String kRegionAutoId = 'auto';
 
 /// Product pool: host → country/city for the Locations list.
 ///
-/// EU primary IPs (`204…` / `217…`) intentionally omitted — catalog label
-/// («Европа · основной») must win over IP-geo Frankfurt.
+/// `204.11` omitted — gaming TT product label must win over IP-geo.
 const Map<String, NodePlace> kKnownNodePlaces = {
   '185.139.228.192': NodePlace(
     title: 'Нидерланды',
@@ -50,11 +49,18 @@ const Map<String, NodePlace> kKnownNodePlaces = {
     flag: '🇳🇱',
   ),
   '45.91.248.91': NodePlace(
-    title: 'США',
-    subtitle: 'Нью-Йорк',
-    titleEn: 'USA',
-    subtitleEn: 'New York',
+    title: 'США · Бесплатно',
+    subtitle: '',
+    titleEn: 'USA · Free',
+    subtitleEn: '',
     flag: '🇺🇸',
+  ),
+  '217.60.3.9': NodePlace(
+    title: 'Европа · Бесплатно',
+    subtitle: '',
+    titleEn: 'Europe · Free',
+    subtitleEn: '',
+    flag: '🇪🇺',
   ),
 };
 
@@ -94,15 +100,33 @@ bool isResolvedPlace(NodePlace place) {
 
 /// Product label for YouTube / Premium egress (never country name).
 const NodePlace kYoutubePremiumPlace = NodePlace(
-  title: 'Premium · YouTube',
-  titleEn: 'Premium · YouTube',
+  title: 'YouTube · Premium',
+  titleEn: 'YouTube · Premium',
   subtitle: '',
   flag: '👑',
+);
+
+/// Premium gaming TT (DE ping for RF clients) — never country name.
+const NodePlace kGamingPremiumPlace = NodePlace(
+  title: 'Игровой · Premium',
+  titleEn: 'Gaming · Premium',
+  subtitle: '',
+  flag: '🎮',
 );
 
 const String kFlagEurope = '🇪🇺';
 const String kFlagUsa = '🇺🇸';
 const String kFlagGlobe = '🌐';
+const String kFlagGaming = '🎮';
+
+/// Visible Free Hy2 row if a live Hy2 node is in the catalog (not on 204.11).
+const NodePlace kHysteriaMobilePlace = NodePlace(
+  title: 'Европа · Бесплатно',
+  titleEn: 'Europe · Free',
+  subtitle: '',
+  subtitleEn: '',
+  flag: kFlagEurope,
+);
 
 /// Locations list section for grouping (Auto is separate UI row).
 enum LocationSection { premium, europe, usa, other }
@@ -110,6 +134,7 @@ enum LocationSection { premium, europe, usa, other }
 /// Flag for catalog product labels / node.region (not GeoIP).
 String flagForNode(VpnNode node, {String? productLabel}) {
   if (node.isYoutube) return '👑';
+  if (node.isGaming) return kFlagGaming;
   final region = (node.region ?? '').trim().toLowerCase();
   if (region == 'eu' || region == 'europe') return kFlagEurope;
   if (region == 'us' || region == 'usa') return kFlagUsa;
@@ -126,6 +151,7 @@ String flagForNode(VpnNode node, {String? productLabel}) {
 String flagForProductLabel(String label) {
   final t = label.trim().toLowerCase();
   if (t.isEmpty) return kFlagGlobe;
+  if (t.contains('игровой') || t.contains('gaming')) return kFlagGaming;
   if (t.contains('европа') || t.contains('europe')) return kFlagEurope;
   if (t.contains('сша') ||
       t.contains('usa') ||
@@ -138,7 +164,9 @@ String flagForProductLabel(String label) {
 
 /// Which Locations section a node belongs to (first match wins).
 LocationSection locationSectionFor(VpnNode node) {
-  if (node.isYoutube || node.requiresPremium) return LocationSection.premium;
+  if (node.isYoutube || node.isGaming || node.requiresPremium) {
+    return LocationSection.premium;
+  }
   final region = (node.region ?? '').trim().toLowerCase();
   final label = (node.label.isNotEmpty ? node.label : node.name).toLowerCase();
   if (region == 'eu' ||
@@ -217,8 +245,33 @@ NodePlace placeForHost(String host, {int index = 0, String? fallbackLabel}) {
 }
 
 NodePlace placeForNode(VpnNode node, {int index = 0}) {
-  // YouTube path wins over known GeoIP map (e.g. AL IP must not say «Албания»).
+  // YouTube / gaming product labels win over GeoIP (AL/DE must not leak).
   if (node.isYoutube) return kYoutubePremiumPlace;
+  if (node.isGaming) return kGamingPremiumPlace;
+  if (node.isHysteria) {
+    final hyLabel = node.label.isNotEmpty ? node.label : node.name;
+    if (hyLabel.isNotEmpty && _isSafeProductLabel(hyLabel)) {
+      return NodePlace(
+        title: hyLabel,
+        subtitle: '',
+        flag: flagForNode(node, productLabel: hyLabel),
+      );
+    }
+    if (node.isGeoUs) {
+      return const NodePlace(
+        title: 'США · Бесплатно',
+        titleEn: 'USA · Free',
+        subtitle: '',
+        flag: kFlagUsa,
+      );
+    }
+    return const NodePlace(
+      title: 'Европа · Бесплатно',
+      titleEn: 'Europe · Free',
+      subtitle: '',
+      flag: kFlagEurope,
+    );
+  }
 
   final raw = node.label.isNotEmpty
       ? node.label

@@ -5,7 +5,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/api_client.dart';
 import '../../../core/vpn_nodes.dart';
-import '../domain/eu_tt_fallback.dart';
 import 'vpn_node.dart';
 
 const _selectedNodeKey = SelectedRegionStore.key;
@@ -64,7 +63,6 @@ class VpnNodesRepository {
     return raw
         .whereType<Map>()
         .map((e) => VpnNode.fromJson(Map<String, dynamic>.from(e)))
-        .where((n) => !isHiddenEuTtFallbackNode(n))
         .toList();
   }
 
@@ -78,11 +76,21 @@ class VpnNodesRepository {
       return decoded
           .whereType<Map>()
           .map((e) => VpnNode.fromJson(Map<String, dynamic>.from(e)))
-          .where((n) => !isHiddenEuTtFallbackNode(n))
           .toList();
     } catch (_) {
       return null;
     }
+  }
+
+  Future<void> clearCache() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_nodesCacheKey);
+  }
+
+  /// Drop disk cache and fetch the catalog for the current entitlement.
+  Future<List<VpnNode>> refreshAfterEntitlementChange() async {
+    await clearCache();
+    return listNodes(allowCacheFallback: false);
   }
 
   Future<void> _saveCache(List<VpnNode> nodes) async {

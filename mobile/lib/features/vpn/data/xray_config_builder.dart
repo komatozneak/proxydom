@@ -23,7 +23,7 @@ const kXraySocksPort = 10808;
 /// FakeDNS **OFF**. `quic-reject` UDP/443.
 ///
 /// Modeless routing (Огонь-style):
-/// - YouTube/Google force-proxy — always;
+/// - YouTube/Google force-proxy — always (TSPU; not split-tunnel);
 /// - «Что работает без VPN?» list (user sites + RU bundle geosite/geoip) → direct;
 /// - everything else → proxy (final).
 ///
@@ -131,7 +131,7 @@ class XrayConfigBuilder {
         },
       // Instant QUIC failure — silent blackhole makes Cronet wait ~15s+ on
       // googlevideo (Pixel YT.qoe connecttimeout / ad spinner). Redirect
-      // refuses immediately so apps fall back to TCP→proxy.
+      // refuses immediately so apps fall back to TCP→proxy (XHTTP).
       if (useQuicReject)
         {
           'protocol': 'freedom',
@@ -262,7 +262,7 @@ class XrayConfigBuilder {
     rules.add({'type': 'field', 'network': 'udp', 'outboundTag': 'block'});
     rules.add(viaProxy({'network': 'tcp'}));
 
-    // Google/YT → DNS via Vision so A records match egress (not RU edge
+    // Google/YT → DNS via proxy so A records match egress (not RU edge
     // from 77.88 direct). Everything else: Yandex then CF (UDP/53 rules above).
     final googleDnsDomains = <String>[
       for (final s in kSmartProxyForceSuffixes) 'domain:$s',
@@ -390,7 +390,7 @@ class XrayConfigBuilder {
                 ? '/'
                 : creds.path,
             'mode': (creds.mode == null || creds.mode!.isEmpty)
-                ? 'stream-one'
+                ? 'stream-up'
                 : creds.mode,
           },
         if (creds.security == 'reality')

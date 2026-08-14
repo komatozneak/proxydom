@@ -25,7 +25,7 @@ class VpnNode {
   final bool isDefault;
   final String name;
 
-  /// Core protocol: `vless-reality` (Xray) or `trusttunnel` (ADR 006).
+  /// Core protocol: `vless-reality`, `trusttunnel`, or `hysteria2`.
   final String protocol;
 
   /// ISO region code (e.g. "us", "al", "uz") for YouTube/geo specialization.
@@ -50,8 +50,14 @@ class VpnNode {
   /// TrustTunnel node → client starts the TT core instead of Xray.
   bool get isTrustTunnel => protocol == kVpnNodeProtocolTrusttunnel;
 
+  /// Hysteria2 Free LTE path (ADR 015). In Free Auto via data-plane prove.
+  bool get isHysteria => protocol == kVpnNodeProtocolHysteria2;
+
   /// YouTube-specialized egress (ad-free region or TrustTunnel YT node).
   bool get isYoutube => (purpose ?? '').toLowerCase() == 'youtube';
+
+  /// Premium gaming TrustTunnel (EU / DE ping), never YouTube copy.
+  bool get isGaming => (purpose ?? '').toLowerCase() == 'gaming';
 
   /// Placeholder for a not-yet-provisioned node — UI shows but disables it.
   bool get isComingSoon =>
@@ -64,16 +70,32 @@ class VpnNode {
 
   /// Xray node eligible for Auto / General section (never TT / YT / coming-soon).
   bool get isGeneralXray =>
-      !isTrustTunnel && !isYoutube && !isComingSoon && !isGeoUs;
+      !isTrustTunnel && !isYoutube && !isGaming && !isComingSoon && !isGeoUs;
 
-  /// Auto picker: server `auto_eligible`, else Free Xray general or Free US TT.
-  bool get isAutoEligible {
-    if (autoEligible != null) return autoEligible!;
-    if (isTrustTunnel) {
-      return isGeoUs && !isComingSoon && (isConnected || isDefault);
+  /// True when this row may be tried in Auto for [isPremium].
+  ///
+  /// Free: metered Xray / Hy2. TT, YouTube, gaming never. Coming-soon stubs out.
+  /// Retired EU Xray (`eu-primary`) never enters Auto.
+  bool inAutoPool({required bool isPremium}) {
+    if (host.isEmpty || host == '0.0.0.0') return false;
+    if (isComingSoon) return false;
+    if (!isConnected && !isDefault) return false;
+    final idLower = id.trim().toLowerCase();
+    if (idLower == 'eu-primary') return false;
+    if (!isPremium) {
+      if (isTrustTunnel || isYoutube || isGaming || requiresPremium) {
+        return false;
+      }
+      return isHysteria ||
+          protocol == kVpnNodeProtocolVlessReality ||
+          isGeneralXray ||
+          isGeoUs;
     }
-    return isGeneralXray && (isConnected || isDefault);
+    return true;
   }
+
+  /// Legacy alias: Free-pool membership (tests / old call sites).
+  bool get isAutoEligible => inAutoPool(isPremium: false);
 
   factory VpnNode.fromJson(Map<String, dynamic> json) {
     final rawHost = (json['host'] as String?) ?? '';
@@ -138,3 +160,4 @@ class VpnNode {
 /// Node protocol markers from `GET /api/v1/vpn/nodes` (ADR 006 dual-core).
 const kVpnNodeProtocolVlessReality = 'vless-reality';
 const kVpnNodeProtocolTrusttunnel = 'trusttunnel';
+const kVpnNodeProtocolHysteria2 = 'hysteria2';

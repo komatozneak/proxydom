@@ -36,7 +36,7 @@ const bool kSmartRuSplitEnabled = true;
 const bool kUseHevTunBridge = false;
 
 /// Domains that must use proxy **before** RU geosite directs.
-/// Media CDN (`googlevideo`, `gvt*`) must stay here for playback under RF DPI.
+/// Media CDN (`googlevideo`, `gvt*`) stays here — RF DPI / TSPU, not split-tunnel.
 const kSmartProxyForceSuffixes = <String>[
   'youtube.com',
   'youtu.be',

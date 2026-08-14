@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import '../api_client.dart';
 import '../config.dart';
 import 'app_log_buffer.dart';
 import 'egress_verify.dart';
@@ -15,16 +16,27 @@ import '../../features/vpn/data/vpn_session_meta.dart';
 
 /// Collects a beta diagnostic bundle and sends it to the owner via backend.
 class DiagnosticsService {
-  DiagnosticsService({Dio? dio}) : _dio = dio ?? Dio();
+  DiagnosticsService({Dio? dio}) : _dio = dio ?? ApiClient.instance;
 
   final Dio _dio;
 
   static String? lastFlutterError;
 
+  /// Backend [DiagnosticsReportIn] max_length is 120_000.
+  static const int telegramMaxChars = 120000;
+
+  /// Leave headroom for JSON wrapping when POSTing to Telegram.
+  static const int postMaxChars = 110000;
+
+  static const int logcatChunkChars = 800;
+
   Future<String> buildReport({
     required AuthState authState,
     required VpnStatus vpnUi,
     VpnConfig? cachedConfig,
+    String? autoWinnerId,
+    String? autoWinnerLabel,
+    String? lastProve,
   }) async {
     final generatedUtc = DateTime.now().toUtc().toIso8601String();
     final packageInfo = await PackageInfo.fromPlatform();
@@ -33,7 +45,9 @@ class DiagnosticsService {
     final nativeStatus = await VpnController.instance.getStatus();
     final nativeError = await VpnController.instance.getLastError();
     final lockdown = await VpnController.instance.isLockdownEnabled();
-    final stderrTail = await VpnController.instance.getVpnCoreStderrTail();
+    final stderrTail = await VpnController.instance.getVpnCoreStderrTail(
+      maxLines: 400,
+    );
     final underlying = await VpnController.instance.getUnderlyingNetworkInterface();
 
     final sessionMeta = await VpnSessionMeta.load();
@@ -70,6 +84,9 @@ class DiagnosticsService {
         'ru_rules_paths: ${sessionMeta.ruRuleTags.isEmpty ? '(none)' : sessionMeta.ruRuleTags.join(', ')}',
       )
       ..writeln('underlying_network: ${underlying ?? '(unsupported)'}')
+      ..writeln('auto_winner_id: ${autoWinnerId ?? '(none)'}')
+      ..writeln('auto_winner_label: ${autoWinnerLabel ?? '(none)'}')
+      ..writeln('last_prove: ${lastProve ?? '(none)'}')
       ..writeln('vpn_stderr_tail:')
       ..writeln(stderrTail ?? '(unsupported)')
       ..writeln('last_vpn_error: $lastVpnError')
@@ -80,19 +97,44 @@ class DiagnosticsService {
     return buffer.toString().trim();
   }
 
-  Future<void> submit({
-    required String accessToken,
-    required String report,
-  }) async {
-    await _dio.post<Map<String, dynamic>>(
-      '${AppConfig.baseUrl}/support/diagnostics',
-      data: {'report': report},
+  /// Last [postMaxChars] so Telegram accepts the POST; logcat still gets the full bundle.
+  static String clipForPost(String report) {
+    if (report.length <= postMaxChars) return report;
+    return report.substring(report.length - postMaxChars);
+  }
+
+  /// Dump the full bundle to `flutter run` / logcat (Cursor reads the terminal).
+  static void dumpReportToLogcat(String report) {
+    debugPrint('=== DIAG-REPORT BEGIN ===', wrapWidth: logcatChunkChars);
+    for (var i = 0; i < report.length; i += logcatChunkChars) {
+      final end = i + logcatChunkChars > report.length
+          ? report.length
+          : i + logcatChunkChars;
+      debugPrint(report.substring(i, end), wrapWidth: logcatChunkChars);
+    }
+    debugPrint('=== DIAG-REPORT END ===', wrapWidth: logcatChunkChars);
+  }
+
+  Future<void> submit({required String report}) async {
+    dumpReportToLogcat(report);
+    final payload = clipForPost(report);
+    final resp = await _dio.post<Map<String, dynamic>>(
+      '/support/diagnostics',
+      data: {'report': payload},
       options: Options(
-        headers: {'Authorization': 'Bearer $accessToken'},
         receiveTimeout: const Duration(seconds: 30),
         sendTimeout: const Duration(seconds: 30),
       ),
     );
+    final code = resp.statusCode ?? 0;
+    if (code < 200 || code >= 300) {
+      throw DioException(
+        requestOptions: resp.requestOptions,
+        response: resp,
+        type: DioExceptionType.badResponse,
+        message: 'diagnostics failed: $code',
+      );
+    }
   }
 
   String _vpnUiLabel(VpnStatus status) => switch (status) {

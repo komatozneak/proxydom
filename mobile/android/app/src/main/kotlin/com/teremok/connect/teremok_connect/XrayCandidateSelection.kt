@@ -14,15 +14,15 @@ data class XrayRuntimeCandidate(
 /** Nest: probe only the primary candidate (ADR 005 soft failover budget). */
 const val AUTO_CANDIDATE_LIMIT = 1
 
-const val XRAY_SOCKS_PROBE_TIMEOUT_MS = 2_000
+const val XRAY_SOCKS_PROBE_TIMEOUT_MS = 1_000
 const val XRAY_SOCKS_PROBE_ATTEMPTS = 2
-/** Inter-attempt pause after SOCKS not-ready / HTTPS fail. */
+/** Inter-attempt pause after SOCKS not-ready / CONNECT fail. */
 const val XRAY_SOCKS_PROBE_RETRY_SLEEP_MS = 150L
-/** Max time spent polling SOCKS accept readiness before first HTTPS probe. */
+/** Max time spent polling SOCKS accept readiness before first CONNECT probe. */
 const val XRAY_SOCKS_WARMUP_BUDGET_MS = 300L
 const val XRAY_SOCKS_WARMUP_POLL_MS = 200
 
-/** Upper bound for pre-connect SOCKS HTTPS probe (warmup + attempts). */
+/** Upper bound for pre-connect SOCKS CONNECT probe (warmup + attempts). */
 fun socksHttpsProbeBudgetMs(): Long =
     XRAY_SOCKS_WARMUP_BUDGET_MS +
         XRAY_SOCKS_PROBE_ATTEMPTS.toLong() *
@@ -47,6 +47,10 @@ fun fastestCandidate(
 /** Dual-core switch (ADR 006): exact string `"trusttunnel"` only. */
 internal fun isTrustTunnelCore(params: Map<String, Any?>): Boolean =
     params["vpnCore"] == TeremokVpnService.VPN_CORE_TRUSTTUNNEL
+
+/** Triple-core switch (ADR 015): exact string `"hysteria"` only. */
+internal fun isHysteriaCore(params: Map<String, Any?>): Boolean =
+    params["vpnCore"] == TeremokVpnService.VPN_CORE_HYSTERIA
 
 /** Parse `xrayCandidateConfigs` from paramsJson (List of maps). */
 internal fun runtimeCandidates(params: Map<String, Any?>): List<XrayRuntimeCandidate> {

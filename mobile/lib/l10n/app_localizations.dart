@@ -631,19 +631,19 @@ abstract class AppL10n {
   /// **'Couldn’t connect. Please try again.'**
   String get homeErrorFriendly;
 
-  /// Free monthly traffic exhausted — connect blocked.
+  /// No description provided for @homeQuotaExceededTitle.
   ///
   /// In en, this message translates to:
   /// **'Free traffic used up'**
   String get homeQuotaExceededTitle;
 
-  /// Hint to upgrade after Free quota.
+  /// No description provided for @homeQuotaExceededHint.
   ///
   /// In en, this message translates to:
   /// **'You’ve used this month’s 4.20 GB. Upgrade to Premium for unlimited traffic.'**
   String get homeQuotaExceededHint;
 
-  /// CTA to Platega / locked paywall.
+  /// No description provided for @homeQuotaUpgradeCta.
   ///
   /// In en, this message translates to:
   /// **'Upgrade'**
@@ -1582,7 +1582,7 @@ abstract class AppL10n {
   /// No description provided for @regionAutoSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Best available server'**
+  /// **'EU Hy2 → US Hy2'**
   String get regionAutoSubtitle;
 
   /// No description provided for @regionSelected.
@@ -1650,6 +1650,24 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'online'**
   String get regionOnline;
+
+  /// No description provided for @regionBlurbFree.
+  ///
+  /// In en, this message translates to:
+  /// **'Hysteria2 · apps, AI, websites'**
+  String get regionBlurbFree;
+
+  /// No description provided for @regionBlurbGaming.
+  ///
+  /// In en, this message translates to:
+  /// **'TrustTunnel · low ping'**
+  String get regionBlurbGaming;
+
+  /// No description provided for @regionBlurbYoutube.
+  ///
+  /// In en, this message translates to:
+  /// **'TrustTunnel · ad-free'**
+  String get regionBlurbYoutube;
 
   /// No description provided for @regionOffline.
   ///

@@ -34,6 +34,9 @@ class SubscriptionStatus {
 
   bool get hasActivePaid => isPro && status == 'active';
 
+  /// Catalog / Auto pool gate — same as backend `catalog_unlocks_premium`.
+  bool get unlocksPremium => isPro || isTrial || isAlpha;
+
   bool get isEmpty => plan == null && status == null;
 
   /// Free tier with no remaining server-metered bytes (ADR 013).

@@ -1,0 +1,310 @@
+// Package hy2bind is a gomobile bind of official apernet/hysteria (MIT).
+//
+// Pin the hysteria tag in go.mod / build-aar.sh. Not sing-box, not Bereznev.
+package hy2bind
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"log"
+	"net"
+	"strconv"
+	"sync"
+	"time"
+
+	"github.com/apernet/hysteria/core/v2/client"
+	"github.com/xjasonlyu/tun2socks/v2/core"
+	"github.com/xjasonlyu/tun2socks/v2/core/device"
+	"github.com/xjasonlyu/tun2socks/v2/core/device/fdbased"
+	"github.com/xjasonlyu/tun2socks/v2/core/option"
+	"github.com/xjasonlyu/tun2socks/v2/tunnel"
+	gstack "gvisor.dev/gvisor/pkg/tcpip/stack"
+)
+
+// Protector is implemented from Kotlin (VpnService.protect).
+type Protector interface {
+	Protect(fd int) bool
+}
+
+type startConfig struct {
+	Server      string `json:"server"`
+	Auth        string `json:"auth"`
+	SNI         string `json:"sni"`
+	SocksListen string `json:"socks_listen"`
+}
+
+type protectedFactory struct{}
+
+func (f *protectedFactory) New(addr net.Addr) (net.PacketConn, error) {
+	pc, err := net.ListenUDP("udp", nil)
+	if err != nil {
+		return nil, err
+	}
+	raw, err := pc.SyscallConn()
+	if err != nil {
+		_ = pc.Close()
+		return nil, err
+	}
+	var protErr error
+	if err := raw.Control(func(fd uintptr) {
+		mu.Lock()
+		p := protector
+		mu.Unlock()
+		if p != nil && !p.Protect(int(fd)) {
+			protErr = errors.New("protect failed")
+		}
+	}); err != nil {
+		_ = pc.Close()
+		return nil, err
+	}
+	if protErr != nil {
+		_ = pc.Close()
+		return nil, protErr
+	}
+	return pc, nil
+}
+
+var (
+	mu        sync.Mutex
+	protector Protector
+	hyClient  client.Client
+	socksLn   net.Listener
+	tunDev    device.Device
+	tunStk    *gstack.Stack
+)
+
+// SetProtector installs VpnService.protect for QUIC sockets (required on Android).
+func SetProtector(p Protector) {
+	mu.Lock()
+	defer mu.Unlock()
+	protector = p
+}
+
+// Start connects the official Hy2 client and serves SOCKS5. Returns "" on success.
+func Start(configJSON string) string {
+	mu.Lock()
+	already := hyClient != nil
+	mu.Unlock()
+	if already {
+		return "already running"
+	}
+	var cfg startConfig
+	if err := json.Unmarshal([]byte(configJSON), &cfg); err != nil {
+		return err.Error()
+	}
+	if cfg.Server == "" || cfg.Auth == "" {
+		return "server and auth are required"
+	}
+	if cfg.SocksListen == "" {
+		cfg.SocksListen = "127.0.0.1:10808"
+	}
+	udpAddr, err := net.ResolveUDPAddr("udp", cfg.Server)
+	if err != nil {
+		return fmt.Sprintf("resolve: %v", err)
+	}
+
+	c, _, err := client.NewClient(&client.Config{
+		ConnFactory: &protectedFactory{},
+		ServerAddr:  udpAddr,
+		Auth:        cfg.Auth,
+		TLSConfig: client.TLSConfig{
+			ServerName: cfg.SNI,
+		},
+		// Official TUN clients set this: TCP() returns before the server
+		// confirms the dest, saving one RTT on every YouTube/page socket.
+		FastOpen: true,
+	})
+	if err != nil {
+		return fmt.Sprintf("hy2 client: %v", err)
+	}
+
+	ln, err := net.Listen("tcp", cfg.SocksListen)
+	if err != nil {
+		_ = c.Close()
+		return fmt.Sprintf("socks listen: %v", err)
+	}
+
+	mu.Lock()
+	if hyClient != nil {
+		mu.Unlock()
+		_ = ln.Close()
+		_ = c.Close()
+		return "already running"
+	}
+	hyClient = c
+	socksLn = ln
+	mu.Unlock()
+	go serveSOCKS(ln, c)
+	return ""
+}
+
+// StartTun attaches VpnService TUN fd to gVisor inside this Go runtime and
+// forwards TCP/UDP via HyClient.TCP/UDP (official TUN path). Do not use
+// libXray as the pump — a second gomobile runtime deadlocks on Pixel.
+func StartTun(fd int, mtu int) string {
+	if fd <= 0 {
+		return "invalid tun fd"
+	}
+	if mtu <= 0 {
+		mtu = 1500
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if tunStk != nil {
+		closeTunFd(fd)
+		return "tun already running"
+	}
+	if hyClient == nil {
+		closeTunFd(fd)
+		return "hy2 not started"
+	}
+	dev, err := fdbased.Open(strconv.Itoa(fd), uint32(mtu), 0)
+	if err != nil {
+		closeTunFd(fd)
+		return fmt.Sprintf("tun fd: %v", err)
+	}
+	tunnel.T().SetDialer(&hyDialer{c: hyClient})
+	st, err := core.CreateStack(&core.Config{
+		LinkEndpoint:     dev,
+		TransportHandler: tunnel.T(),
+		Options: []option.Option{
+			option.WithTCPModerateReceiveBuffer(true),
+		},
+	})
+	if err != nil {
+		dev.Close()
+		return fmt.Sprintf("tun stack: %v", err)
+	}
+	tunDev = dev
+	tunStk = st
+	log.Printf("hy2bind tun started fd=%d mtu=%d", fd, mtu)
+	return ""
+}
+
+// StopTun tears down the gVisor stack. Safe if TUN was never started.
+func StopTun() {
+	mu.Lock()
+	dev := tunDev
+	st := tunStk
+	tunDev = nil
+	tunStk = nil
+	mu.Unlock()
+	if dev != nil {
+		dev.Close()
+	}
+	if st != nil {
+		st.Close()
+		st.Wait()
+	}
+}
+
+// Stop closes TUN, SOCKS, and the Hy2 client.
+func Stop() {
+	StopTun()
+	mu.Lock()
+	ln := socksLn
+	c := hyClient
+	socksLn = nil
+	hyClient = nil
+	mu.Unlock()
+	if ln != nil {
+		_ = ln.Close()
+	}
+	if c != nil {
+		_ = c.Close()
+	}
+}
+
+func serveSOCKS(ln net.Listener, c client.Client) {
+	for {
+		conn, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		go handleSOCKS(conn, c)
+	}
+}
+
+func socksFail(conn net.Conn, rep byte) {
+	_, _ = conn.Write([]byte{0x05, rep, 0x00, 0x01, 0, 0, 0, 0, 0, 0})
+}
+
+func handleSOCKS(conn net.Conn, c client.Client) {
+	defer conn.Close()
+	_ = conn.SetDeadline(time.Now().Add(20 * time.Second))
+	hdr := make([]byte, 2)
+	if _, err := io.ReadFull(conn, hdr); err != nil || hdr[0] != 0x05 {
+		return
+	}
+	nmethods := int(hdr[1])
+	if nmethods > 0 {
+		if _, err := io.ReadFull(conn, make([]byte, nmethods)); err != nil {
+			return
+		}
+	}
+	if _, err := conn.Write([]byte{0x05, 0x00}); err != nil {
+		return
+	}
+	req := make([]byte, 4)
+	if _, err := io.ReadFull(conn, req); err != nil {
+		return
+	}
+	if req[0] != 0x05 || req[1] != 0x01 {
+		socksFail(conn, 0x07)
+		return
+	}
+	host, port, ok := readSOCKSAddr(conn, req[3])
+	if !ok {
+		socksFail(conn, 0x08)
+		return
+	}
+	target := net.JoinHostPort(host, strconv.Itoa(port))
+	remote, err := c.TCP(target)
+	if err != nil {
+		log.Printf("hy2bind socks TCP %s: %v", target, err)
+		socksFail(conn, 0x04)
+		return
+	}
+	defer remote.Close()
+	_ = conn.SetDeadline(time.Time{})
+	if _, err := conn.Write([]byte{0x05, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0}); err != nil {
+		return
+	}
+	errc := make(chan struct{}, 2)
+	go func() { _, _ = io.Copy(remote, conn); errc <- struct{}{} }()
+	go func() { _, _ = io.Copy(conn, remote); errc <- struct{}{} }()
+	<-errc
+}
+
+func readSOCKSAddr(conn net.Conn, atyp byte) (string, int, bool) {
+	switch atyp {
+	case 0x01:
+		buf := make([]byte, 6)
+		if _, err := io.ReadFull(conn, buf); err != nil {
+			return "", 0, false
+		}
+		return net.IP(buf[0:4]).String(), int(buf[4])<<8 | int(buf[5]), true
+	case 0x03:
+		lb := make([]byte, 1)
+		if _, err := io.ReadFull(conn, lb); err != nil {
+			return "", 0, false
+		}
+		rest := make([]byte, int(lb[0])+2)
+		if _, err := io.ReadFull(conn, rest); err != nil {
+			return "", 0, false
+		}
+		host := string(rest[:len(rest)-2])
+		port := int(rest[len(rest)-2])<<8 | int(rest[len(rest)-1])
+		return host, port, true
+	case 0x04:
+		buf := make([]byte, 18)
+		if _, err := io.ReadFull(conn, buf); err != nil {
+			return "", 0, false
+		}
+		return net.IP(buf[0:16]).String(), int(buf[16])<<8 | int(buf[17]), true
+	default:
+		return "", 0, false
+	}
+}

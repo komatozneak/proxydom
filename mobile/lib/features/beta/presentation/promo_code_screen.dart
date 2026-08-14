@@ -5,6 +5,8 @@ import '../../../core/router.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../home/application/vpn_provider.dart';
+import '../../settings/application/subscription_status_provider.dart';
 import 'promo_redeem_form.dart';
 
 /// Promo code entry for the closed-beta access gate.
@@ -57,7 +59,13 @@ class PromoCodeScreen extends ConsumerWidget {
               const SizedBox(height: 32),
               PromoRedeemForm(
                 onSuccess: () async {
-                  await AppRouter.goAfterEntitlement(context, '/onboarding');
+                  await ref
+                      .read(vpnNodesRepositoryProvider)
+                      .refreshAfterEntitlementChange();
+                  await ref.read(subscriptionStatusProvider.notifier).refresh();
+                  if (context.mounted) {
+                    await AppRouter.goAfterEntitlement(context, '/onboarding');
+                  }
                 },
               ),
             ],

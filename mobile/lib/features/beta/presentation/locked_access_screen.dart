@@ -11,6 +11,8 @@ import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../billing/data/billing_api.dart';
+import '../../home/application/vpn_provider.dart';
+import '../../settings/application/subscription_status_provider.dart';
 import 'promo_redeem_form.dart';
 
 /// Activation paywall: welcome + Platega plans + promo (no intermediate CTA).
@@ -25,7 +27,12 @@ class _LockedAccessScreenState extends ConsumerState<LockedAccessScreen> {
   bool _payBusy = false;
   String? _error;
 
-  void _goAfterUnlock() {
+  Future<void> _goAfterUnlock() async {
+    await ref
+        .read(vpnNodesRepositoryProvider)
+        .refreshAfterEntitlementChange();
+    await ref.read(subscriptionStatusProvider.notifier).refresh();
+    if (!mounted) return;
     AppRouter.postAuthResolved = true;
     context.go('/onboarding');
   }
@@ -209,7 +216,7 @@ class _LockedAccessScreenState extends ConsumerState<LockedAccessScreen> {
                             vertical: 18,
                           ),
                           onSuccess: () async {
-                            if (mounted) _goAfterUnlock();
+                            if (mounted) await _goAfterUnlock();
                           },
                         ),
                       ],

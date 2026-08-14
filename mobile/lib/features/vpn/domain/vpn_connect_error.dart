@@ -1,4 +1,5 @@
 import '../../home/application/vpn_status.dart';
+import '../data/vpn_session_snapshot.dart';
 
 /// Machine code when native SOCKS HTTPS pre-connect probe fails.
 const kVpnProbeFailedErrorCode = 'server_probe_failed';
@@ -47,5 +48,28 @@ VpnError vpnErrorFromNativeDetail(
       code: 'permission_denied',
     );
   }
+  if (detail.toLowerCase().contains('path_incompatible')) {
+    return const VpnError(
+      message: 'Авто: ни один сервер не прошёл проверку',
+      code: 'path_incompatible',
+    );
+  }
   return VpnError(message: 'vpn: $detail');
+}
+
+/// Map ADR 014 session Error / PathIncompatible to Home [VpnError].
+VpnError vpnErrorFromSession(
+  VpnSessionSnapshot snap, {
+  String fallbackMessage = 'Native VPN error',
+}) {
+  if (snap.reason == VpnSessionReason.pathIncompatible) {
+    return const VpnError(
+      message: 'Авто: ни один сервер не прошёл проверку',
+      code: 'path_incompatible',
+    );
+  }
+  return vpnErrorFromNativeDetail(
+    snap.detail,
+    fallbackMessage: fallbackMessage,
+  );
 }

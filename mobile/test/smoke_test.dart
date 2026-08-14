@@ -391,7 +391,7 @@ void main() {
       expect(map['outboundServer'], 's');
       expect(map['outboundServerPort'], 443);
       expect(map['outboundUuid'], 'u');
-      expect(map['controlPlaneHosts'], contains('130.49.149.182'));
+      expect(map['controlPlaneHosts'], contains('176.114.64.174'));
       expect(map['egressHosts'], ['s']);
     });
   });
@@ -409,7 +409,7 @@ void main() {
     );
     expect(AppConfig.vpsBaseUrl, startsWith('https://'));
     expect(AppConfig.vpsBaseUrl, contains('/v2'));
-    expect(AppConfig.vpsIpv4, '130.49.149.182');
+    expect(AppConfig.vpsIpv4, '176.114.64.174');
   });
 
   test('AppConfig dev switch via APP_ENV=dev dart-define', () {

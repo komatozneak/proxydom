@@ -125,6 +125,11 @@ dependencies {
     // Transitive deps below mirror the adapter's lib/build.gradle.kts because
     // a raw AAR carries no POM.
     implementation(files("libs/trusttunnel-client-android.aar"))
+    // Official Hy2 AAR (optional until `hysteria-bind/build-aar.sh` runs).
+    val hy2Aar = file("libs/hysteria-client.aar")
+    if (hy2Aar.exists()) {
+        implementation(files(hy2Aar))
+    }
     implementation("com.akuleshov7:ktoml-core:0.7.0")
     implementation("org.slf4j:slf4j-api:1.7.25")
     implementation("com.github.tony19:logback-android:2.0.0")

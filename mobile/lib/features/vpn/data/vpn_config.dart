@@ -1,9 +1,10 @@
 import 'vless_link_parser.dart';
 
-/// Native VPN core selected by `/vpn/config` (ADR 006 ``active_core``).
+/// Native VPN core selected by `/vpn/config` (ADR 015 ``active_core``).
 enum VpnActiveCore {
   xray,
   trusttunnel,
+  hysteria,
 }
 
 /// Immutable models for `GET /api/v1/vpn/config` (Xray XOR TrustTunnel).
@@ -15,6 +16,7 @@ class VpnConfig {
     required this.activeCore,
     this.xrayProfile,
     this.trusttunnelProfile,
+    this.hysteriaProfile,
     this.nodeHost,
   });
 
@@ -31,15 +33,27 @@ class VpnConfig {
   /// TrustTunnel core profile. Required when [activeCore] is trusttunnel.
   final TrustTunnelProfile? trusttunnelProfile;
 
+  /// Hysteria2 core profile. Required when [activeCore] is hysteria.
+  final HysteriaProfile? hysteriaProfile;
+
   /// Egress VPS host from `GET /vpn/config` (`node_host`).
   final String? nodeHost;
 
   bool get isTrustTunnelSession => activeCore == VpnActiveCore.trusttunnel;
 
+  bool get isHysteriaSession => activeCore == VpnActiveCore.hysteria;
+
   /// Expected public egress IP/host for E2E checks.
   String? get expectedEgressHost {
     final host = nodeHost?.trim();
     if (host != null && host.isNotEmpty) return host;
+    final hy = hysteriaProfile;
+    if (hy != null) {
+      final server = hy.server.trim();
+      if (server.isNotEmpty) {
+        return server.split(':').first.trim();
+      }
+    }
     final tt = trusttunnelProfile;
     if (tt != null) {
       final hostname = tt.hostname.trim();
@@ -60,7 +74,7 @@ class VpnConfig {
 
   /// Ordered unique egress hosts for TUN bypass / direct cidr.
   List<String> get egressHosts {
-    if (isTrustTunnelSession) {
+    if (isTrustTunnelSession || isHysteriaSession) {
       final host = expectedEgressHost;
       return host == null ? const [] : [host];
     }
@@ -90,7 +104,7 @@ class VpnConfig {
 
   /// Copy with a single primary candidate (nest connect path).
   VpnConfig withPrimaryCandidateOnly() {
-    if (isTrustTunnelSession) return this;
+    if (isTrustTunnelSession || isHysteriaSession) return this;
     final primary = primaryCandidate;
     return VpnConfig(
       username: username,
@@ -102,6 +116,7 @@ class VpnConfig {
         candidates: [primary],
       ),
       trusttunnelProfile: trusttunnelProfile,
+      hysteriaProfile: hysteriaProfile,
       nodeHost: nodeHost ?? primary.host,
     );
   }
@@ -112,14 +127,22 @@ class VpnConfig {
     final TrustTunnelProfile? tt = rawTt is Map
         ? TrustTunnelProfile.fromJson(Map<String, dynamic>.from(rawTt))
         : null;
+    final rawHy = json['hysteria_profile'];
+    final HysteriaProfile? hy = rawHy is Map
+        ? HysteriaProfile.fromJson(Map<String, dynamic>.from(rawHy))
+        : null;
     final rawCore = (json['active_core'] as String?)?.trim().toLowerCase();
     final hasXrayMap = json['xray_profile'] is Map;
 
     final VpnActiveCore activeCore;
     if (rawCore == 'trusttunnel') {
       activeCore = VpnActiveCore.trusttunnel;
+    } else if (rawCore == 'hysteria') {
+      activeCore = VpnActiveCore.hysteria;
     } else if (rawCore == 'xray') {
       activeCore = VpnActiveCore.xray;
+    } else if (hy != null && !hasXrayMap && tt == null) {
+      activeCore = VpnActiveCore.hysteria;
     } else if (tt != null && !hasXrayMap) {
       // Legacy payload without active_core: TT-only body.
       activeCore = VpnActiveCore.trusttunnel;
@@ -144,9 +167,34 @@ class VpnConfig {
         activeCore: VpnActiveCore.trusttunnel,
         xrayProfile: null,
         trusttunnelProfile: tt,
+        hysteriaProfile: null,
         nodeHost: (nodeHost != null && nodeHost.isNotEmpty)
             ? nodeHost
             : tt.hostname,
+      );
+    }
+
+    if (activeCore == VpnActiveCore.hysteria) {
+      if (hy == null) {
+        throw const FormatException(
+          'active_core=hysteria requires hysteria_profile',
+        );
+      }
+      final nodeHost = json['node_host'] as String?;
+      return VpnConfig(
+        username: json['username'] as String,
+        links: links,
+        expire: DateTime.fromMillisecondsSinceEpoch(
+          (json['expire'] as int) * 1000,
+          isUtc: true,
+        ),
+        activeCore: VpnActiveCore.hysteria,
+        xrayProfile: null,
+        trusttunnelProfile: null,
+        hysteriaProfile: hy,
+        nodeHost: (nodeHost != null && nodeHost.isNotEmpty)
+            ? nodeHost
+            : hy.server.split(':').first,
       );
     }
 
@@ -162,6 +210,7 @@ class VpnConfig {
       activeCore: VpnActiveCore.xray,
       xrayProfile: xrayProfile,
       trusttunnelProfile: tt,
+      hysteriaProfile: hy,
       nodeHost: nodeHost?.isNotEmpty == true
           ? nodeHost
           : xrayProfile.candidates.first.host,
@@ -172,11 +221,15 @@ class VpnConfig {
         'username': username,
         'links': links,
         'expire': expire.millisecondsSinceEpoch ~/ 1000,
-        'active_core':
-            activeCore == VpnActiveCore.trusttunnel ? 'trusttunnel' : 'xray',
+        'active_core': switch (activeCore) {
+          VpnActiveCore.trusttunnel => 'trusttunnel',
+          VpnActiveCore.hysteria => 'hysteria',
+          VpnActiveCore.xray => 'xray',
+        },
         if (xrayProfile != null) 'xray_profile': xrayProfile!.toJson(),
         if (trusttunnelProfile != null)
           'trusttunnel_profile': trusttunnelProfile!.toJson(),
+        if (hysteriaProfile != null) 'hysteria_profile': hysteriaProfile!.toJson(),
         if (nodeHost != null) 'node_host': nodeHost,
       };
 
@@ -474,6 +527,68 @@ class TrustTunnelProfile {
         'anti_dpi': antiDpi,
         'dns_upstreams': dnsUpstreams,
         'toml': toml,
+      };
+}
+
+/// Hysteria2 client profile (ADR 015). SOCKS prove on [socksListen].
+class HysteriaProfile {
+  const HysteriaProfile({
+    required this.schemaVersion,
+    required this.nodeId,
+    required this.server,
+    required this.auth,
+    required this.username,
+    required this.sni,
+    required this.socksListen,
+    this.bandwidthUp,
+    this.bandwidthDown,
+  });
+
+  final int schemaVersion;
+  final String nodeId;
+  final String server;
+  final String auth;
+  final String username;
+  final String sni;
+  final String socksListen;
+  final String? bandwidthUp;
+  final String? bandwidthDown;
+
+  factory HysteriaProfile.fromJson(Map<String, dynamic> json) {
+    final schemaVersion = json['schema_version'] as int? ?? 1;
+    if (schemaVersion != 1) {
+      throw FormatException(
+        'Unsupported hysteria_profile schema_version: $schemaVersion',
+      );
+    }
+    final server = (json['server'] as String? ?? '').trim();
+    final auth = (json['auth'] as String? ?? '').trim();
+    if (server.isEmpty || auth.isEmpty) {
+      throw const FormatException('Incomplete hysteria_profile');
+    }
+    return HysteriaProfile(
+      schemaVersion: schemaVersion,
+      nodeId: json['node_id'] as String? ?? '',
+      server: server,
+      auth: auth,
+      username: json['username'] as String? ?? '',
+      sni: json['sni'] as String? ?? '',
+      socksListen: json['socks_listen'] as String? ?? '127.0.0.1:10808',
+      bandwidthUp: json['bandwidth_up'] as String?,
+      bandwidthDown: json['bandwidth_down'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'schema_version': schemaVersion,
+        'node_id': nodeId,
+        'server': server,
+        'auth': auth,
+        'username': username,
+        'sni': sni,
+        'socks_listen': socksListen,
+        if (bandwidthUp != null) 'bandwidth_up': bandwidthUp,
+        if (bandwidthDown != null) 'bandwidth_down': bandwidthDown,
       };
 }
 

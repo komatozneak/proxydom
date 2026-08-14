@@ -19,11 +19,11 @@ import javax.net.ssl.SSLSocketFactory
 /**
  * Periodic path-latency probe for Home `ms`.
  *
- * When SOCKS is up: SOCKS5 CONNECT to [PROBE_HOST]:443 **and** SOCKS HTTPS
- * [PROBE_URL] must both succeed — CONNECT-only can look healthy while the
- * HTTPS/DNS data-plane is dead (Europe XHTTP hang pattern).
- *
+ * When SOCKS is up: SOCKS5 CONNECT RTT to [PROBE_HOST]:443 (no TLS).
  * Fallback: direct TCP through TUN (no protect) when SOCKS is down.
+ *
+ * Connect/Auto prove uses [socksConnectProbe] (SOCKS CONNECT to
+ * [PROBE_HOST]:443, no HTTP). Cloudflare generate_204 hangs through VPS.
  *
  * After [FAIL_CLEAR_THRESHOLD] consecutive failures, emits `null` so Flutter
  * shows `— ms` instead of freezing on the last good sample.
@@ -43,6 +43,7 @@ class VpnPingMonitor(
         const val FAIL_CLEAR_THRESHOLD = 2
         const val PROBE_HOST = "1.1.1.1"
         const val PROBE_PORT = 443
+        const val PROBE_HTTP_PORT = 80
         const val PROBE_URL = "https://cp.cloudflare.com/generate_204"
         const val PROBE_HTTPS_HOST = "cp.cloudflare.com"
         const val PROBE_HTTPS_PATH = "/generate_204"
@@ -111,6 +112,94 @@ class VpnPingMonitor(
                     (System.nanoTime() - started) / 1_000_000L
                 }
             }.getOrNull()
+
+        /**
+         * SOCKS5 CONNECT to [PROBE_HOST]:443 — Connect/Auto gate.
+         *
+         * TCP handshake through the proxy only. HTTP/HTTPS generate_204 through
+         * the VPS often never returns (Pixel: Read timed out, pages still load).
+         */
+        fun socksConnectProbe(
+            socksHost: String = GvisorTun2Socks.SOCKS_HOST,
+            socksPort: Int = GvisorTun2Socks.SOCKS_PORT,
+            destHost: String = PROBE_HOST,
+            destPort: Int = PROBE_PORT,
+            timeoutMs: Int = PROBE_TIMEOUT_MS,
+        ): SocksHttpsResult =
+            try {
+                Socket().use { socket ->
+                    socket.soTimeout = timeoutMs
+                    socket.connect(InetSocketAddress(socksHost, socksPort), timeoutMs)
+                    val out = DataOutputStream(socket.getOutputStream())
+                    val inp = DataInputStream(socket.getInputStream())
+                    socks5Greeting(out, inp)
+                    val started = System.nanoTime()
+                    socks5ConnectIpv4(out, inp, destHost, destPort)
+                    val rttMs = ((System.nanoTime() - started) / 1_000_000L)
+                        .toInt()
+                        .coerceAtLeast(1)
+                    SocksHttpsResult.Ok(rttMs)
+                }
+            } catch (e: SocketTimeoutException) {
+                SocksHttpsResult.Fail("timeout=${e.message ?: "read"}")
+            } catch (e: Exception) {
+                SocksHttpsResult.Fail("${e.javaClass.simpleName}=${e.message ?: "err"}")
+            }
+
+        fun socksConnectOk(
+            socksHost: String = GvisorTun2Socks.SOCKS_HOST,
+            socksPort: Int = GvisorTun2Socks.SOCKS_PORT,
+            timeoutMs: Int = PROBE_TIMEOUT_MS,
+        ): Boolean = socksConnectProbe(socksHost, socksPort, timeoutMs = timeoutMs).isOk
+
+        /**
+         * HTTP generate_204 via SOCKS5 — no TLS (Clash url-test / Android captive).
+         *
+         * First IPv4 CONNECT [PROBE_HOST]:80 + Host [PROBE_HTTPS_HOST] (no DNS).
+         * If that fails, domain CONNECT [PROBE_HTTPS_HOST]:80.
+         */
+        fun socksHttpProbe(
+            socksHost: String = GvisorTun2Socks.SOCKS_HOST,
+            socksPort: Int = GvisorTun2Socks.SOCKS_PORT,
+            timeoutMs: Int = PROBE_TIMEOUT_MS,
+        ): SocksHttpsResult {
+            val ipv4 = socksHttpAfterConnect(
+                socksHost = socksHost,
+                socksPort = socksPort,
+                timeoutMs = timeoutMs,
+                connect = { out, inp ->
+                    socks5ConnectIpv4(out, inp, PROBE_HOST, PROBE_HTTP_PORT)
+                },
+                hostHeader = PROBE_HTTPS_HOST,
+            )
+            if (ipv4.isOk) return ipv4
+            runCatching { Log.i(TAG, "HTTP 204 ipv4 fail (${ipv4.detail}) — domain :80") }
+            return socksHttpAfterConnect(
+                socksHost = socksHost,
+                socksPort = socksPort,
+                timeoutMs = timeoutMs,
+                connect = { out, inp ->
+                    socks5ConnectDomain(out, inp, PROBE_HTTPS_HOST, PROBE_HTTP_PORT)
+                },
+                hostHeader = PROBE_HTTPS_HOST,
+            )
+        }
+
+        fun socksHttpOk(
+            socksHost: String = GvisorTun2Socks.SOCKS_HOST,
+            socksPort: Int = GvisorTun2Socks.SOCKS_PORT,
+            timeoutMs: Int = PROBE_TIMEOUT_MS,
+        ): Boolean = socksHttpProbe(socksHost, socksPort, timeoutMs).isOk
+
+        /**
+         * HTTP generate_204 via TUN (no protect). IPv4 :80 then domain :80.
+         */
+        fun tunHttpOk(timeoutMs: Int = PROBE_TIMEOUT_MS): Boolean {
+            if (tunHttpOnce(PROBE_HOST, PROBE_HTTP_PORT, PROBE_HTTPS_HOST, timeoutMs)) {
+                return true
+            }
+            return tunHttpOnce(PROBE_HTTPS_HOST, PROBE_HTTP_PORT, PROBE_HTTPS_HOST, timeoutMs)
+        }
 
         /**
          * HTTPS generate_204 via SOCKS5 domain CONNECT + TLS (not HttpURLConnection).
@@ -194,6 +283,34 @@ class VpnPingMonitor(
             timeoutMs: Int = PROBE_TIMEOUT_MS,
         ): Boolean = socksHttpsProbe(socksHost, socksPort, url, timeoutMs).isOk
 
+        /**
+         * HTTPS generate_204 via the process default route (TUN when VPN is up).
+         * Do not [android.net.VpnService.protect] this socket.
+         */
+        fun tunHttpsOk(timeoutMs: Int = PROBE_TIMEOUT_MS): Boolean =
+            runCatching {
+                val factory = SSLSocketFactory.getDefault() as SSLSocketFactory
+                (factory.createSocket() as SSLSocket).use { ssl ->
+                    ssl.soTimeout = timeoutMs
+                    ssl.connect(
+                        InetSocketAddress(PROBE_HTTPS_HOST, PROBE_PORT),
+                        timeoutMs,
+                    )
+                    ssl.startHandshake()
+                    val out = ssl.outputStream
+                    val req = "GET $PROBE_HTTPS_PATH HTTP/1.1\r\n" +
+                        "Host: $PROBE_HTTPS_HOST\r\n" +
+                        "Connection: close\r\n\r\n"
+                    out.write(req.toByteArray(StandardCharsets.US_ASCII))
+                    out.flush()
+                    val line = BufferedReader(
+                        InputStreamReader(ssl.inputStream, StandardCharsets.US_ASCII),
+                    ).readLine() ?: return@runCatching false
+                    val code = parseHttpStatusCode(line) ?: return@runCatching false
+                    code in 200..399
+                }
+            }.getOrDefault(false)
+
         fun tcpConnectRttMs(
             host: String = PROBE_HOST,
             port: Int = PROBE_PORT,
@@ -206,6 +323,82 @@ class VpnPingMonitor(
                     (System.nanoTime() - started) / 1_000_000L
                 }
             }.getOrNull()
+
+        private fun socks5ConnectIpv4(
+            out: DataOutputStream,
+            inp: DataInputStream,
+            destHost: String,
+            destPort: Int,
+        ) {
+            val addr = InetAddress.getByName(destHost).address
+            require(addr.size == 4) { "IPv4 probe only" }
+            out.writeByte(0x05)
+            out.writeByte(0x01)
+            out.writeByte(0x00)
+            out.writeByte(0x01)
+            out.write(addr)
+            out.writeShort(destPort)
+            out.flush()
+            socks5ReadConnectReply(inp)
+        }
+
+        private fun socksHttpAfterConnect(
+            socksHost: String,
+            socksPort: Int,
+            timeoutMs: Int,
+            connect: (DataOutputStream, DataInputStream) -> Unit,
+            hostHeader: String,
+        ): SocksHttpsResult =
+            try {
+                Socket().use { socket ->
+                    socket.soTimeout = timeoutMs
+                    socket.connect(InetSocketAddress(socksHost, socksPort), timeoutMs)
+                    val out = DataOutputStream(socket.getOutputStream())
+                    val inp = DataInputStream(socket.getInputStream())
+                    socks5Greeting(out, inp)
+                    connect(out, inp)
+                    httpGenerate204(socket, hostHeader)
+                }
+            } catch (e: SocketTimeoutException) {
+                SocksHttpsResult.Fail("timeout=${e.message ?: "read"}")
+            } catch (e: Exception) {
+                SocksHttpsResult.Fail("${e.javaClass.simpleName}=${e.message ?: "err"}")
+            }
+
+        private fun tunHttpOnce(
+            connectHost: String,
+            port: Int,
+            hostHeader: String,
+            timeoutMs: Int,
+        ): Boolean =
+            runCatching {
+                Socket().use { socket ->
+                    socket.soTimeout = timeoutMs
+                    socket.connect(InetSocketAddress(connectHost, port), timeoutMs)
+                    httpGenerate204(socket, hostHeader).isOk
+                }
+            }.getOrDefault(false)
+
+        private fun httpGenerate204(socket: Socket, hostHeader: String): SocksHttpsResult {
+            val request =
+                "GET $PROBE_HTTPS_PATH HTTP/1.1\r\n" +
+                    "Host: $hostHeader\r\n" +
+                    "Connection: close\r\n" +
+                    "User-Agent: TeremokVpnProbe/1\r\n" +
+                    "\r\n"
+            socket.getOutputStream().write(request.toByteArray(StandardCharsets.US_ASCII))
+            socket.getOutputStream().flush()
+            val statusLine = BufferedReader(
+                InputStreamReader(socket.getInputStream(), StandardCharsets.US_ASCII),
+            ).readLine() ?: return SocksHttpsResult.Fail("empty_status")
+            val code = parseHttpStatusCode(statusLine)
+                ?: return SocksHttpsResult.Fail("bad_status=$statusLine")
+            return if (code in 200..299) {
+                SocksHttpsResult.Ok(code)
+            } else {
+                SocksHttpsResult.Fail("code=$code")
+            }
+        }
 
         private fun socks5Greeting(out: DataOutputStream, inp: DataInputStream) {
             out.write(byteArrayOf(0x05, 0x01, 0x00))
@@ -281,7 +474,7 @@ class VpnPingMonitor(
         worker =
             Thread(
                 {
-                    Log.i(TAG, "ping monitor started (SOCKS CONNECT+HTTPS then TUN TCP)")
+                    Log.i(TAG, "ping monitor started (SOCKS CONNECT RTT, then TUN TCP)")
                     while (running.get()) {
                         probeOnce()
                         var waited = 0L
@@ -337,19 +530,9 @@ class VpnPingMonitor(
             if (connectMs == null) {
                 Log.i(TAG, "SOCKS CONNECT failed")
             } else {
-                val https = socksHttpsProbe()
-                if (!https.isOk) {
-                    Log.i(
-                        TAG,
-                        "SOCKS CONNECT ok (${connectMs}ms) but HTTPS generate_204 " +
-                            "failed (${https.detail})",
-                    )
-                    // CONNECT alone is not enough — treat as fail (no TUN fallback
-                    // when SOCKS is up: TUN path would lie about app traffic).
-                    return null
-                }
+                DiagnosticRing.append(TAG, "path.connect ok=true")
                 val clamped = clampDelayMs(connectMs) ?: return null
-                return Sample(clamped, "socks5+https")
+                return Sample(clamped, "socks5")
             }
         } else {
             Log.i(TAG, "SOCKS unreachable — trying TUN TCP")

@@ -819,7 +819,7 @@ class AppL10nRu extends AppL10n {
   String get regionAutoTitle => 'Автоматически';
 
   @override
-  String get regionAutoSubtitle => 'Лучший доступный сервер';
+  String get regionAutoSubtitle => 'Европа Hy2 → США Hy2';
 
   @override
   String get regionSelected => 'Выбрано';
@@ -853,6 +853,15 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get regionOnline => 'онлайн';
+
+  @override
+  String get regionBlurbFree => 'Hysteria2 · сервисы, нейросети, сайты';
+
+  @override
+  String get regionBlurbGaming => 'TrustTunnel · низкий пинг';
+
+  @override
+  String get regionBlurbYoutube => 'TrustTunnel · без рекламы';
 
   @override
   String get regionOffline => 'офлайн';

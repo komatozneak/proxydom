@@ -33,7 +33,7 @@ class XrayCandidateSelectionTest {
             b,
             fastestCandidate(listOf(a to 420L, b to 180L, c to 260L))?.first,
         )
-        assertEquals(2_000, XRAY_SOCKS_PROBE_TIMEOUT_MS)
+        assertEquals(1_000, XRAY_SOCKS_PROBE_TIMEOUT_MS)
         assertEquals(2, XRAY_SOCKS_PROBE_ATTEMPTS)
         assertEquals(150L, XRAY_SOCKS_PROBE_RETRY_SLEEP_MS)
         assertEquals(300L, XRAY_SOCKS_WARMUP_BUDGET_MS)

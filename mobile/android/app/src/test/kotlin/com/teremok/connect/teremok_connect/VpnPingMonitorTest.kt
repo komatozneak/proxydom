@@ -64,6 +64,52 @@ class VpnPingMonitorTest {
     }
 
     @Test
+    fun `socksConnectOk to dead socks returns false`() {
+        assertFalse(
+            VpnPingMonitor.socksConnectOk(
+                socksHost = "127.0.0.1",
+                socksPort = 1,
+                timeoutMs = 200,
+            ),
+        )
+    }
+
+    @Test
+    fun `socksConnectProbe to dead socks returns Fail with reason`() {
+        val result = VpnPingMonitor.socksConnectProbe(
+            socksHost = "127.0.0.1",
+            socksPort = 1,
+            timeoutMs = 200,
+        )
+        assertTrue(result is VpnPingMonitor.SocksHttpsResult.Fail)
+        assertFalse(result.isOk)
+        assertTrue(result.detail.isNotBlank())
+    }
+
+    @Test
+    fun `socksHttpOk to dead socks returns false`() {
+        assertFalse(
+            VpnPingMonitor.socksHttpOk(
+                socksHost = "127.0.0.1",
+                socksPort = 1,
+                timeoutMs = 200,
+            ),
+        )
+    }
+
+    @Test
+    fun `socksHttpProbe to dead socks returns Fail with reason`() {
+        val result = VpnPingMonitor.socksHttpProbe(
+            socksHost = "127.0.0.1",
+            socksPort = 1,
+            timeoutMs = 200,
+        )
+        assertTrue(result is VpnPingMonitor.SocksHttpsResult.Fail)
+        assertFalse(result.isOk)
+        assertTrue(result.detail.isNotBlank())
+    }
+
+    @Test
     fun `socksHttpsOk to dead socks returns false`() {
         assertFalse(
             VpnPingMonitor.socksHttpsOk(

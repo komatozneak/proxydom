@@ -22,6 +22,12 @@ import java.util.concurrent.atomic.AtomicBoolean
 import com.adguard.trusttunnel.VpnClient
 import com.adguard.trusttunnel.VpnState
 import com.adguard.trusttunnel.VpnServiceConfig as TtVpnServiceConfig
+import com.teremok.connect.teremok_connect.session.AutoCandidate
+import com.teremok.connect.teremok_connect.session.PathHealth
+import com.teremok.connect.teremok_connect.session.SessionPhase
+import com.teremok.connect.teremok_connect.session.SessionSnapshot
+import com.teremok.connect.teremok_connect.session.SessionSnapshotBroadcaster
+import com.teremok.connect.teremok_connect.session.VpnSessionEngine
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
@@ -29,16 +35,19 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Android VpnService with dual-core runtime (ADR 005 / ADR 006):
+ * Android VpnService with triple-core runtime (ADR 005 / 006 / 015):
  * - Xray: VpnService TUN → libXray setTunFd (gVisor) → VLESS
  * - TrustTunnel: VpnService TUN → TrustTunnelBridge / VpnClient
+ * - Hysteria2: VpnService TUN → libXray tun2socks → Hy2 SOCKS (prove on :10808)
  */
 class TeremokVpnService : VpnService() {
 
     companion object {
         const val TAG = "TeremokVpn"
         const val ACTION_START = "com.teremok.connect.START_VPN"
+        const val ACTION_START_AUTO = "com.teremok.connect.START_VPN_AUTO"
         const val ACTION_STOP = "com.teremok.connect.STOP_VPN"
+        const val EXTRA_AUTO_CANDIDATES = "autoCandidatesJson"
         const val EXTRA_USERNAME = "username"
         const val EXTRA_PROTOCOL = "protocol"
         const val EXTRA_PARAMS_JSON = "paramsJson"
@@ -46,24 +55,19 @@ class TeremokVpnService : VpnService() {
         /** Session payload schema from Flutter VpnServiceConfig / VpnController. */
         const val SESSION_SCHEMA_VERSION = 2
 
-        /** paramsJson["vpnCore"] values — dual-core switch (ADR 006). */
+        /** paramsJson["vpnCore"] values — triple-core switch (ADR 015). */
         const val VPN_CORE_XRAY = "xray"
         const val VPN_CORE_TRUSTTUNNEL = "trusttunnel"
+        const val VPN_CORE_HYSTERIA = "hysteria"
 
         /** TT native CONNECTED wait budget. */
         private const val TT_CONNECT_TIMEOUT_MS = 20_000L
-
-        /** Минимальный интервал между попытками start (debounce reconnect storm). */
-        private const val START_DEBOUNCE_MS = 2000L
 
         const val PREFS_NAME = "teremok_vpn_session"
         private const val KEY_PARAMS_JSON = "params_json"
         private const val KEY_USERNAME = "username"
         private const val KEY_PROTOCOL = "protocol"
         private const val KEY_ACTIVE = "active"
-
-        @Volatile
-        private var lastStartAttemptMs: Long = 0L
 
         @Volatile
         private var instance: TeremokVpnService? = null
@@ -268,11 +272,17 @@ class TeremokVpnService : VpnService() {
         }
 
         /**
-         * Status for Flutter [getStatus] — prefer live service, then
+         * Status for Flutter [getStatus] — prefer live TUN, then
          * active-session + system VPN (Always-on / process race).
          */
         fun resolveUiStatus(context: android.content.Context): String {
-            val live = instance?.currentStatus
+            val svc = instance
+            if (svc != null && svc.hasLiveTun()) {
+                val live = svc.currentStatus
+                if (live == "idle") return "connected"
+                return live
+            }
+            val live = svc?.currentStatus
             if (live != null && live != "idle") return live
             if (hasActiveSession(context) && isSystemVpnUp(context)) {
                 return "connected"
@@ -296,12 +306,17 @@ class TeremokVpnService : VpnService() {
          * present, otherwise empty string (libbox stderr removed).
          */
         fun readSingBoxStderrTail(context: android.content.Context, maxLines: Int): String {
+            val ring = DiagnosticRing.tail(maxLines)
             val file = java.io.File(context.filesDir, "xray/stderr.log")
-            if (!file.exists()) return ""
-            return runCatching {
-                val lines = file.readLines()
-                if (lines.isEmpty()) "" else lines.takeLast(maxLines).joinToString("\n")
-            }.getOrDefault("")
+            val fileTail = if (!file.exists()) {
+                ""
+            } else {
+                runCatching {
+                    val lines = file.readLines()
+                    if (lines.isEmpty()) "" else lines.takeLast(maxLines).joinToString("\n")
+                }.getOrDefault("")
+            }
+            return listOf(ring, fileTail).filter { it.isNotBlank() }.joinToString("\n")
         }
 
         fun sessionPrefs(context: android.content.Context) =
@@ -359,8 +374,76 @@ class TeremokVpnService : VpnService() {
     @Volatile
     private var establishInProgress = false
     private var trafficMonitor: VpnTrafficMonitor? = null
-    private var pingMonitor: VpnPingMonitor? = null
     private var notificationSessionLine: String = "Теремок VPN"
+
+    private val sessionEngine: VpnSessionEngine by lazy { VpnSessionEngine(sessionHost) }
+
+    private val sessionHost = object : VpnSessionEngine.Host {
+        override fun onSnapshot(snapshot: SessionSnapshot) {
+            SessionSnapshotBroadcaster.emit(snapshot)
+            if (snapshot.phase == SessionPhase.Error) {
+                VpnStatusBroadcaster.setError(
+                    snapshot.detail ?: snapshot.reason.name,
+                )
+            }
+            currentStatus = snapshot.phase.toLegacyStatus()
+            VpnStatusBroadcaster.emit(currentStatus)
+        }
+
+        override fun establishGeneration(
+            generation: Long,
+            username: String,
+            protocol: String,
+            params: Map<String, Any?>,
+            alive: () -> Boolean,
+            emit: (SessionSnapshot) -> Unit,
+        ): Boolean {
+            if (!alive()) return false
+            startVpn(username, protocol, params)
+            return isRunning
+        }
+
+        override fun teardownGeneration(generation: Long) {
+            val stopping = currentStatus == "disconnecting" ||
+                sessionEngine.currentSnapshot().phase.toLegacyStatus() == "disconnecting"
+            if (stopping) {
+                stopVpn()
+            } else {
+                teardownCores()
+            }
+        }
+
+        override fun onPathDegraded(generation: Long, detail: String) {
+            Log.w(TAG, "path degraded gen=$generation $detail")
+        }
+
+        override fun onPathDead(generation: Long, detail: String) {
+            Log.e(TAG, "path dead gen=$generation $detail")
+            DiagnosticRing.append(TAG, "path dead gen=$generation $detail")
+        }
+
+        override fun onUnderlyingChangedWhileUp(generation: Long, iface: String?) {
+            Log.i(TAG, "underlying changed gen=$generation iface=$iface")
+        }
+
+        override fun proveCandidateSocks(
+            username: String,
+            protocol: String,
+            params: Map<String, Any?>,
+            alive: () -> Boolean,
+        ): Boolean = proveAutoCandidate(username, protocol, params, alive)
+
+        override fun persistAutoWinner(candidate: AutoCandidate) {
+            val json = candidate.paramsJson.ifBlank {
+                JSONObject(candidate.params.filterValues { it != null }).toString()
+            }
+            persistSession(candidate.username, candidate.protocol, json)
+        }
+
+        override fun markPersistedInactive() {
+            markSessionInactive()
+        }
+    }
 
     /**
      * Текущий статус сервиса для [VpnStatusBroadcaster].
@@ -371,10 +454,18 @@ class TeremokVpnService : VpnService() {
     var currentStatus: String = "idle"
         private set
 
+    /** TUN established — Home must not treat this as idle even if [currentStatus] lagged. */
+    fun hasLiveTun(): Boolean = isRunning || tunInterface != null
+
+    /** Auto SOCKS prove must not [stopSelf] on a single candidate fail. */
+    @Volatile
+    private var autoProving = false
+
     override fun onCreate() {
         super.onCreate()
         instance = this
         VpnStatusBroadcaster.attachAppContext(applicationContext)
+        DefaultNetworkMonitor.prewarm(this)
         // Do NOT broadcast "idle" here when Always-on is about to restore —
         // Flutter syncFromNative would paint Disconnected while the tunnel is up.
         if (prefs().getBoolean(KEY_ACTIVE, false)) {
@@ -400,13 +491,19 @@ class TeremokVpnService : VpnService() {
                 val params = runCatching { jsonToMap(JSONObject(paramsJson)) }
                     .onFailure { Log.w(TAG, "failed to parse paramsJson, using defaults", it) }
                     .getOrDefault(emptyMap())
-                startVpn(username, protocol, params)
+                sessionEngine.enqueueStart(username, protocol, params)
+            }
+            ACTION_START_AUTO -> {
+                val raw = intent.getStringExtra(EXTRA_AUTO_CANDIDATES) ?: "[]"
+                val candidates = parseAutoCandidates(raw)
+                Log.i(TAG, "onStartCommand: ACTION_START_AUTO n=${candidates.size}")
+                sessionEngine.enqueueAutoStart(candidates)
             }
             ACTION_STOP -> {
                 Log.i(TAG, "onStartCommand: ACTION_STOP")
                 // Keep params_json so Quick Settings can reconnect without Flutter.
                 markSessionInactive()
-                stopVpn()
+                sessionEngine.enqueueStop(markInactive = true)
             }
             else -> {
                 // Always-on VPN / START_STICKY restart: intent is often null.
@@ -483,7 +580,7 @@ class TeremokVpnService : VpnService() {
             VpnStatusBroadcaster.emit(currentStatus)
             return
         }
-        startVpn(username, protocol, params)
+        sessionEngine.enqueueStart(username, protocol, params)
     }
 
     /**
@@ -591,6 +688,138 @@ class TeremokVpnService : VpnService() {
         }
     }
 
+    private fun parseAutoCandidates(raw: String): List<AutoCandidate> {
+        val arr = runCatching { JSONArray(raw) }.getOrNull() ?: return emptyList()
+        val out = ArrayList<AutoCandidate>(arr.length())
+        for (i in 0 until arr.length()) {
+            val obj = arr.optJSONObject(i) ?: continue
+            val params = jsonToMap(obj)
+            val nodeId = (params["autoNodeId"] as? String)?.trim().orEmpty()
+                .ifBlank { (params["hysteriaNodeId"] as? String)?.trim().orEmpty() }
+                .ifBlank { (params["trusttunnelNodeId"] as? String)?.trim().orEmpty() }
+                .ifBlank { "auto-$i" }
+            val host = (params["trusttunnelHost"] as? String)?.trim().orEmpty()
+                .ifBlank { (params["hysteriaServer"] as? String)?.substringBefore(':').orEmpty() }
+                .ifBlank { (params["outboundServer"] as? String)?.trim().orEmpty() }
+            val label = (params["displayLabel"] as? String)?.trim().orEmpty().ifBlank { nodeId }
+            val protocol = (params["outboundType"] as? String)?.trim().orEmpty().ifBlank { "vless" }
+            val username = (params["username"] as? String)?.trim().orEmpty().ifBlank { "anonymous" }
+            out.add(
+                AutoCandidate(
+                    nodeId = nodeId,
+                    host = host,
+                    label = label,
+                    username = username,
+                    protocol = protocol,
+                    params = params,
+                    paramsJson = obj.toString(),
+                ),
+            )
+        }
+        return out
+    }
+
+    /**
+     * Data-plane prove without claiming Connected. Xray/Hy2: SOCKS CONNECT.
+     * TT: TUN + TCP CONNECT (handshake is not enough).
+     */
+    private fun proveAutoCandidate(
+        username: String,
+        protocol: String,
+        params: Map<String, Any?>,
+        alive: () -> Boolean,
+    ): Boolean {
+        if (!alive()) return false
+        autoProving = true
+        return try {
+            if (isTrustTunnelCore(params)) {
+                startTrustTunnelOnWorker(username, protocol, params)
+                if (!isRunning) return false
+                val health = PathHealth().proveEgress(
+                    adapter = PathHealth.CoreAdapter.TrustTunnel,
+                    alive = alive,
+                    underlyingIface = DefaultNetworkMonitor.defaultNetwork?.toString(),
+                    candidateLabel = (params["trusttunnelNodeId"] as? String) ?: "tt",
+                )
+                val ok = health is PathHealth.HealthResult.Ok
+                if (!ok) teardownCores()
+                ok
+            } else if (isHysteriaCore(params)) {
+                proveHysteriaSocks(params, alive)
+            } else {
+                proveXraySocks(params, alive)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "proveAutoCandidate failed: ${e.message}")
+            teardownCores()
+            false
+        } finally {
+            autoProving = false
+        }
+    }
+
+    private fun proveXraySocks(
+        params: Map<String, Any?>,
+        alive: () -> Boolean,
+    ): Boolean {
+        val candidates = runtimeCandidates(params)
+        val selected = candidates.firstOrNull() ?: return false
+        DefaultNetworkMonitor.prewarm(this)
+        if (!DefaultNetworkMonitor.awaitUnderlyingNetwork(this, 5000)) return false
+        val bridge = XrayBridge.instance
+        bridge.bind(this)
+        if (!bridge.loadLibrary()) return false
+        if (!bridge.start(selected.configJson, tunFd = 0)) {
+            bridge.stop()
+            return false
+        }
+        val health = PathHealth().proveEgress(
+            adapter = PathHealth.CoreAdapter.XraySocks,
+            alive = alive,
+            underlyingIface = DefaultNetworkMonitor.defaultNetwork?.toString(),
+            candidateLabel = selected.id,
+        )
+        bridge.stop()
+        return health is PathHealth.HealthResult.Ok
+    }
+
+    private fun proveHysteriaSocks(
+        params: Map<String, Any?>,
+        alive: () -> Boolean,
+    ): Boolean {
+        val server = (params["hysteriaServer"] as? String)?.trim().orEmpty()
+        val auth = (params["hysteriaAuth"] as? String)?.trim().orEmpty()
+        if (server.isEmpty() || auth.isEmpty()) return false
+        val sni = (params["hysteriaSni"] as? String)?.trim().orEmpty()
+        val socksListen = (params["hysteriaSocksListen"] as? String)?.trim()
+            .orEmpty()
+            .ifBlank { "${GvisorTun2Socks.SOCKS_HOST}:${GvisorTun2Socks.SOCKS_PORT}" }
+        DefaultNetworkMonitor.prewarm(this)
+        if (!DefaultNetworkMonitor.awaitUnderlyingNetwork(this, 5000)) return false
+        ProtectGuard.reset()
+        val hy = HysteriaBridge.instance
+        hy.bind(this)
+        if (!hy.start(server = server, auth = auth, sni = sni, socksListen = socksListen)) {
+            Log.w(TAG, "proveHysteriaSocks: start failed ${hy.lastErrorMessage}")
+            return false
+        }
+        val health = PathHealth().proveEgress(
+            adapter = PathHealth.CoreAdapter.HysteriaSocks,
+            alive = alive,
+            underlyingIface = DefaultNetworkMonitor.defaultNetwork?.toString(),
+            candidateLabel = (params["hysteriaNodeId"] as? String) ?: server,
+        )
+        if (health !is PathHealth.HealthResult.Ok) {
+            Log.w(TAG, "proveHysteriaSocks: $health")
+            hy.stop()
+            return false
+        }
+        // Leave Hy2 up for establish. Stop+Start after libXray.touch deadlocks
+        // the second gomobile runtime (Pixel: Hy2bind.start never returns).
+        Log.i(TAG, "proveHysteriaSocks: ok, Hy2 SOCKS kept for TUN")
+        return true
+    }
+
     /**
      * Creates TUN and starts Xray (gVisor) or TrustTunnel based on paramsJson.
      */
@@ -600,20 +829,13 @@ class TeremokVpnService : VpnService() {
         params: Map<String, Any?>,
     ) {
         if (isRunning) {
-            Log.w(TAG, "startVpn: already running — stop+reapply new params")
-            runCatching { stopVpn() }
-            lastStartAttemptMs = 0L
+            Log.w(TAG, "startVpn: already running — teardown+reapply new params")
+            teardownCores()
         }
         if (establishInProgress) {
             Log.w(TAG, "startVpn: establish already in progress, skip")
             return
         }
-        val now = System.currentTimeMillis()
-        if (now - lastStartAttemptMs < START_DEBOUNCE_MS) {
-            Log.w(TAG, "startVpn: debounce (${now - lastStartAttemptMs}ms), skip")
-            return
-        }
-        lastStartAttemptMs = now
         establishInProgress = true
 
         notificationSessionLine = buildNotificationSessionLine(params, protocol)
@@ -630,7 +852,7 @@ class TeremokVpnService : VpnService() {
             if (!validateRuntimeParams(params)) {
                 failStart(
                     "invalid session: need schemaVersion=$SESSION_SCHEMA_VERSION " +
-                        "with xrayCandidateConfigs or trusttunnelToml " +
+                        "with xrayCandidateConfigs, trusttunnelToml, or hysteriaServer " +
                         "(legacy singBoxConfigJson rejected)",
                 )
                 return
@@ -638,6 +860,10 @@ class TeremokVpnService : VpnService() {
 
             if (isTrustTunnelCore(params)) {
                 startTrustTunnelOnWorker(username, protocol, params)
+                return
+            }
+            if (isHysteriaCore(params)) {
+                startHysteriaOnWorker(username, protocol, params)
                 return
             }
 
@@ -654,6 +880,10 @@ class TeremokVpnService : VpnService() {
         }
         if (isTrustTunnelCore(params)) {
             return !((params["trusttunnelToml"] as? String).isNullOrBlank())
+        }
+        if (isHysteriaCore(params)) {
+            return !((params["hysteriaServer"] as? String).isNullOrBlank()) &&
+                !((params["hysteriaAuth"] as? String).isNullOrBlank())
         }
         return runtimeCandidates(params).isNotEmpty()
     }
@@ -746,10 +976,7 @@ class TeremokVpnService : VpnService() {
             return
         }
 
-        DefaultNetworkMonitor.defaultNetwork?.let { network ->
-            runCatching { setUnderlyingNetworks(arrayOf(network)) }
-                .onFailure { Log.w(TAG, "setUnderlyingNetworks failed", it) }
-        }
+        VpnUnderlyingNetworkPolicy.applyTo(this)
 
         val bridge = XrayBridge.instance
         bridge.bind(this)
@@ -772,8 +999,7 @@ class TeremokVpnService : VpnService() {
             return
         }
 
-        // Hard SOCKS HTTPS gate: CONNECT-only can look healthy while Europe XHTTP
-        // data-plane is dead (cp.cloudflare.com generate_204 hang). Refuse connected.
+        // SOCKS CONNECT :443 through proxy. HTTP generate_204 hangs on VPS.
         if (!probeSocksHttps(selected)) {
             failStart(
                 "${selected.id}@${selected.host}: SOCKS HTTPS probe failed",
@@ -878,9 +1104,7 @@ class TeremokVpnService : VpnService() {
             return
         }
         tunInterface = tun
-        DefaultNetworkMonitor.defaultNetwork?.let { network ->
-            runCatching { setUnderlyingNetworks(arrayOf(network)) }
-        }
+        VpnUnderlyingNetworkPolicy.applyTo(this)
 
         val bridge = TrustTunnelBridge.instance
         bridge.bind(this)
@@ -949,8 +1173,132 @@ class TeremokVpnService : VpnService() {
     }
 
     /**
-     * SOCKS HTTPS generate_204 through local Xray SOCKS — must pass before
-     * `connected`. Runs off the main thread (SOCKS5 + TLS sockets).
+     * Hysteria2 (ADR 015): official client SOCKS + libXray tun pump + SOCKS prove.
+     * Soft-pass on QUIC-up is forbidden — same SOCKS CONNECT gate as Xray.
+     */
+    private fun startHysteriaOnWorker(
+        username: String,
+        protocol: String,
+        params: Map<String, Any?>,
+    ) {
+        val server = (params["hysteriaServer"] as? String)?.trim().orEmpty()
+        val auth = (params["hysteriaAuth"] as? String)?.trim().orEmpty()
+        if (server.isEmpty() || auth.isEmpty()) {
+            failStart("hysteriaServer/hysteriaAuth missing")
+            return
+        }
+        val sni = (params["hysteriaSni"] as? String)?.trim().orEmpty()
+        val socksListen = (params["hysteriaSocksListen"] as? String)?.trim()
+            .orEmpty()
+            .ifBlank { "${GvisorTun2Socks.SOCKS_HOST}:${GvisorTun2Socks.SOCKS_PORT}" }
+        val nodeId = (params["hysteriaNodeId"] as? String)?.trim().orEmpty()
+            .ifBlank { "eu-hy2-1" }
+
+        val sessionName = (params["sessionName"] as? String)
+            ?.takeIf { it.isNotBlank() }
+            ?: "Теремок VPN"
+        // Hy2 QUIC overhead on LTE: 1500 inner packets fragment and stall
+        // the first request of each page. Video then recovers via TCP MSS.
+        val mtu = 1280
+        val address = (params["address"] as? String) ?: "10.255.255.1"
+        val addressPrefix = (params["addressPrefix"] as? Number)?.toInt() ?: 30
+        @Suppress("UNCHECKED_CAST")
+        val routes = (params["routes"] as? List<String>) ?: listOf("0.0.0.0/0")
+        // TUN peer 10.255.255.2 is not a resolver. Hy2 UDP must reach a public
+        // DNS (same hijack as hyDialer for leftover RFC1918 :53).
+        val dnsServers = listOf("1.1.1.1", "8.8.8.8")
+
+        DefaultNetworkMonitor.prewarm(this)
+        if (!DefaultNetworkMonitor.awaitUnderlyingNetwork(this, 5000)) {
+            failStart("underlying network not ready")
+            return
+        }
+        ProtectGuard.reset()
+        ProtectGuard.onFailure = {
+            Log.e(TAG, "Hysteria: protect() failed — stopping VPN")
+            Handler(Looper.getMainLooper()).post {
+                if (isRunning || establishInProgress) {
+                    failStart("VpnService.protect() failed")
+                }
+            }
+        }
+
+        val builder = Builder()
+            .setSession(sessionName)
+            .setMtu(mtu)
+            .addAddress(address, addressPrefix)
+        for (route in routes) {
+            val parts = route.split("/")
+            if (parts.size == 2 && !parts[0].contains(":")) {
+                runCatching { builder.addRoute(parts[0], parts[1].toInt()) }
+            }
+        }
+        for (dns in dnsServers) {
+            builder.addDnsServer(dns)
+        }
+        applyBypassRoutes(builder, server.substringBefore(':'), params)
+        applyDisallowedApplications(builder, params)
+
+        currentStatus = "connecting"
+        VpnStatusBroadcaster.emit(currentStatus)
+
+        tunInterface = builder.establish()
+        val activeTun = tunInterface
+        if (activeTun == null) {
+            ProtectGuard.onFailure = null
+            failStart("VPN permission denied or establish() returned null")
+            return
+        }
+        VpnUnderlyingNetworkPolicy.applyTo(this)
+
+        val hy = HysteriaBridge.instance
+        hy.bind(this)
+        if (!hy.start(server = server, auth = auth, sni = sni, socksListen = socksListen)) {
+            failStart(hy.lastErrorMessage ?: "Hysteria start failed")
+            return
+        }
+        if (ProtectGuard.hasFailed()) {
+            failStart("VpnService.protect() failed during Hysteria start")
+            return
+        }
+        // libXray as TUN pump deadlocks while hyjni is loaded (two gomobile
+        // Go runtimes). Pump gVisor inside hy2bind instead.
+        // gVisor unix.Close's this fd. detachFd so ParcelFileDescriptor is
+        // not still the fdsan owner (Pixel abort on StopTun / Auto restart).
+        val tunFd = try {
+            ParcelFileDescriptor.dup(activeTun.fileDescriptor).detachFd()
+        } catch (t: Throwable) {
+            failStart("Hysteria tun fd dup failed: ${t.message}")
+            return
+        }
+        if (!hy.startTun(tunFd = tunFd, mtu = mtu)) {
+            failStart(hy.lastErrorMessage ?: "Hysteria tun pump failed")
+            return
+        }
+
+        val probeCandidate = XrayRuntimeCandidate(
+            id = nodeId,
+            host = server.substringBefore(':'),
+            label = "hysteria",
+            configJson = hysteriaTun2SocksConfig(mtu),
+        )
+        if (!probeSocksHttps(probeCandidate)) {
+            failStart("$nodeId@$server: SOCKS HTTPS probe failed")
+            return
+        }
+
+        isRunning = true
+        establishInProgress = false
+        currentStatus = "connected"
+        VpnStatusBroadcaster.emit(currentStatus)
+        showConnectedNotification()
+        startTrafficMonitor()
+        Log.i(TAG, "startVpn: Hysteria established server=$server user=$username")
+    }
+
+    /**
+     * SOCKS CONNECT to 1.1.1.1:443 through local Xray SOCKS — must pass before
+     * `connected`. Runs off the main thread (no TLS, no generate_204).
      */
     private fun probeSocksHttps(selected: XrayRuntimeCandidate): Boolean {
         val okFlag = AtomicBoolean(false)
@@ -981,13 +1329,13 @@ class TeremokVpnService : VpnService() {
                             Thread.sleep(XRAY_SOCKS_PROBE_RETRY_SLEEP_MS)
                             continue
                         }
-                        val outcome = VpnPingMonitor.socksHttpsProbe(
+                        val outcome = VpnPingMonitor.socksConnectProbe(
                             timeoutMs = XRAY_SOCKS_PROBE_TIMEOUT_MS,
                         )
                         if (outcome is VpnPingMonitor.SocksHttpsResult.Ok) {
                             Log.i(
                                 TAG,
-                                "SOCKS HTTP ${outcome.code} ok candidate=" +
+                                "SOCKS CONNECT ${outcome.code}ms ok candidate=" +
                                     "${selected.id}@${selected.host} attempt=$attempt",
                             )
                             okFlag.set(true)
@@ -995,7 +1343,7 @@ class TeremokVpnService : VpnService() {
                         }
                         Log.w(
                             TAG,
-                            "SOCKS HTTPS probe fail candidate=" +
+                            "SOCKS CONNECT probe fail candidate=" +
                                 "${selected.id}@${selected.host} " +
                                 "attempt=$attempt/$XRAY_SOCKS_PROBE_ATTEMPTS " +
                                 "err=${outcome.detail}",
@@ -1023,7 +1371,7 @@ class TeremokVpnService : VpnService() {
         if (!finished) {
             Log.w(
                 TAG,
-                "SOCKS HTTPS probe timeout candidate=${selected.id}@${selected.host}",
+                "SOCKS CONNECT probe timeout candidate=${selected.id}@${selected.host}",
             )
         }
         return okFlag.get()
@@ -1032,10 +1380,48 @@ class TeremokVpnService : VpnService() {
     private fun failStart(message: String) {
         establishInProgress = false
         VpnStatusBroadcaster.setError(message)
+        DiagnosticRing.append(TAG, "failStart autoProving=$autoProving msg=$message")
+        if (autoProving) {
+            Log.w(TAG, "failStart during auto prove (no stopSelf): $message")
+            teardownCores()
+            return
+        }
         currentStatus = "error"
         VpnStatusBroadcaster.emit(currentStatus)
         markSessionInactive()
         stopVpn()
+    }
+
+    /** Stop cores + TUN without [stopSelf] (engine re-establish). */
+    private fun teardownCores() {
+        try {
+            stopTrafficMonitor()
+            HysteriaBridge.instance.stop()
+            TrustTunnelBridge.instance.stop()
+            XrayBridge.instance.stop()
+            tunInterface?.close()
+            Log.i(TAG, "teardownCores: cores stopped, TUN closed if any")
+        } catch (e: Exception) {
+            Log.e(TAG, "teardownCores: error", e)
+        } finally {
+            ProtectGuard.onFailure = null
+            tunInterface = null
+            isRunning = false
+            establishInProgress = false
+            // TUN is gone — never leave Flutter/getStatus on "connected".
+            // During Auto hops the session snapshot is SoT; do not emit idle
+            // or Nest paints rest between candidates.
+            if (currentStatus != "revoked" && currentStatus != "disconnecting") {
+                if (currentStatus != "idle") {
+                    currentStatus = "idle"
+                    if (autoProving) {
+                        VpnStatusBroadcaster.remember("idle")
+                    } else {
+                        VpnStatusBroadcaster.emit(currentStatus)
+                    }
+                }
+            }
+        }
     }
 
     private fun stopVpn() {
@@ -1049,18 +1435,10 @@ class TeremokVpnService : VpnService() {
                 currentStatus = "disconnecting"
                 VpnStatusBroadcaster.emit(currentStatus)
             }
-            stopTrafficMonitor()
-            TrustTunnelBridge.instance.stop()
-            XrayBridge.instance.stop()
-            tunInterface?.close()
-            Log.i(TAG, "stopVpn: cores stopped, TUN closed if any")
+            teardownCores()
         } catch (e: Exception) {
             Log.e(TAG, "stopVpn: error", e)
         } finally {
-            ProtectGuard.onFailure = null
-            tunInterface = null
-            isRunning = false
-            establishInProgress = false
             if (currentStatus != "revoked") {
                 currentStatus = "idle"
                 VpnStatusBroadcaster.emit(currentStatus)
@@ -1127,7 +1505,8 @@ class TeremokVpnService : VpnService() {
                 showConnectedNotification(downText = downText, upText = upText)
             }
         }.also { it.start() }
-        startPingMonitor()
+        // Home ping off: SOCKS CONNECT every 5s shared the same proxy as tabs.
+        // Flutter already renders `— ms` when delayMs is null.
     }
 
     private fun stopTrafficMonitor() {
@@ -1137,16 +1516,7 @@ class TeremokVpnService : VpnService() {
         VpnTrafficBroadcaster.clear()
     }
 
-    private fun startPingMonitor() {
-        stopPingMonitor()
-        pingMonitor = VpnPingMonitor { delayMs ->
-            VpnPingBroadcaster.emit(delayMs)
-        }.also { it.start() }
-    }
-
     private fun stopPingMonitor() {
-        pingMonitor?.stop()
-        pingMonitor = null
         VpnPingBroadcaster.clear()
     }
 
@@ -1173,6 +1543,7 @@ class TeremokVpnService : VpnService() {
 object VpnChannelRegistry {
     const val METHOD_CHANNEL = "teremok/vpn"
     const val EVENT_CHANNEL = "teremok/vpn/status"
+    const val SESSION_EVENT_CHANNEL = "teremok/vpn/session"
     const val TRAFFIC_EVENT_CHANNEL = "teremok/vpn/traffic"
     const val PING_EVENT_CHANNEL = "teremok/vpn/ping"
 
@@ -1251,6 +1622,27 @@ object VpnChannelRegistry {
         MethodChannel(engine.dartExecutor.binaryMessenger, METHOD_CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
+                    "startAuto" -> {
+                        val rows = call.argument<List<*>>("candidatesJson")
+                            ?: emptyList<Any?>()
+                        val arr = JSONArray()
+                        for (row in rows) {
+                            val text = row as? String ?: continue
+                            runCatching { arr.put(JSONObject(text)) }
+                        }
+                        val intent = Intent(
+                            appContext,
+                            TeremokVpnService::class.java,
+                        ).apply {
+                            action = TeremokVpnService.ACTION_START_AUTO
+                            putExtra(
+                                TeremokVpnService.EXTRA_AUTO_CANDIDATES,
+                                arr.toString(),
+                            )
+                        }
+                        appContext.startService(intent)
+                        result.success(true)
+                    }
                     "start" -> {
                         // paramsJson — JSON-строка с flat keys (см. VpnServiceConfig)
                         val paramsJson = call.argument<String>("paramsJson") ?: "{}"
@@ -1371,7 +1763,7 @@ object VpnChannelRegistry {
                         }
                     }
                     "getSingBoxStderrTail" -> {
-                        val maxLines = call.argument<Int>("maxLines") ?: 30
+                        val maxLines = call.argument<Int>("maxLines") ?: 400
                         result.success(
                             TeremokVpnService.readSingBoxStderrTail(appContext, maxLines),
                         )
@@ -1412,6 +1804,17 @@ object VpnChannelRegistry {
 
                 override fun onCancel(arguments: Any?) {
                     VpnStatusBroadcaster.unregister()
+                }
+            })
+
+        EventChannel(engine.dartExecutor.binaryMessenger, SESSION_EVENT_CHANNEL)
+            .setStreamHandler(object : EventChannel.StreamHandler {
+                override fun onListen(arguments: Any?, events: EventChannel.EventSink) {
+                    SessionSnapshotBroadcaster.register(events)
+                }
+
+                override fun onCancel(arguments: Any?) {
+                    SessionSnapshotBroadcaster.unregister()
                 }
             })
 
@@ -1544,6 +1947,11 @@ object VpnStatusBroadcaster {
 
     fun unregister() {
         sink = null
+    }
+
+    /** Update lastStatus without EventChannel (hop teardown during Auto). */
+    fun remember(status: String) {
+        lastStatus = status
     }
 
     fun emit(status: String) {

@@ -2,19 +2,20 @@ package com.teremok.connect.teremok_connect
 
 import android.content.Context
 import android.net.ConnectivityManager
+import android.net.LinkProperties
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import java.net.NetworkInterface
 
 /**
- * Tracks the underlying network (cellular/wifi), not the VPN tunnel.
- * Needed so outbound proxy sockets bind to a real interface and so
- * [VpnService.setUnderlyingNetworks] can keep the VPN validated.
+ * Tracks the OS physical underlying network (cellular/wifi), not the VPN tunnel.
+ *
+ * Same pattern as Огонь `XrayVpnService`: default callback + NOT_VPN callback,
+ * skip VPN, keep last physical, [VpnService.setUnderlyingNetworks] when the
+ * service is up. [NET_CAPABILITY_VALIDATED] is read, never requested.
  */
 internal object DefaultNetworkMonitor {
     private const val TAG = "DefaultNetworkMonitor"
@@ -27,130 +28,184 @@ internal object DefaultNetworkMonitor {
         private set
 
     private var connectivity: ConnectivityManager? = null
-    private var callback: ConnectivityManager.NetworkCallback? = null
+    private var defaultCallback: ConnectivityManager.NetworkCallback? = null
+    private var physicalCallback: ConnectivityManager.NetworkCallback? = null
     private val mainHandler = Handler(Looper.getMainLooper())
 
-    /** Start monitoring before Xray/TT dial so protect() has a physical path. */
     fun prewarm(context: Context) {
         start(context.applicationContext)
     }
 
     /**
-     * Waits for an underlying network (cellular/wifi), not VPN.
+     * Waits for a physical network (cellular/wifi), not VPN.
      * Returns false on timeout.
      */
     fun awaitUnderlyingNetwork(context: Context, timeoutMs: Long = 3000): Boolean {
         prewarm(context)
+        val cm = connectivity ?: context.getSystemService(ConnectivityManager::class.java)
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
-            if (hasUnderlyingNetwork(context)) return true
+            if (hasPhysical()) return true
+            val active = cm.activeNetwork
+            if (!isVpn(cm, active)) {
+                consider(cm, active, allowReplace = true)
+            }
+            if (hasPhysical()) return true
             Thread.sleep(50)
         }
         Log.e(TAG, "underlying network not ready after ${timeoutMs}ms")
         return false
     }
 
-    private fun hasUnderlyingNetwork(context: Context): Boolean {
-        val cm = connectivity ?: context.getSystemService(ConnectivityManager::class.java)
-        for (network in cm.allNetworks) {
-            val caps = cm.getNetworkCapabilities(network) ?: continue
-            if (caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) continue
-            if (!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) continue
-            val lp = cm.getLinkProperties(network) ?: continue
-            val iface = lp.interfaceName
-            if (iface.isNullOrBlank() || iface.startsWith("tun")) continue
-            defaultNetwork = network
-            currentInterfaceName = iface
-            Log.i(TAG, "underlying network ready: $iface")
-            return true
-        }
-        return defaultNetwork != null
-    }
+    private fun hasPhysical(): Boolean =
+        defaultNetwork != null && !currentInterfaceName.isNullOrBlank()
+
+    private fun physicalRequest(): NetworkRequest =
+        NetworkRequest.Builder()
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+            .build()
 
     private fun start(context: Context) {
-        if (callback != null) return
+        if (defaultCallback != null) return
         val cm = context.getSystemService(ConnectivityManager::class.java)
         connectivity = cm
 
-        val request = NetworkRequest.Builder()
-            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-            .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED)
-            .apply {
-                if (Build.VERSION.SDK_INT == Build.VERSION_CODES.M) {
-                    removeCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
-                    removeCapability(NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL)
-                }
-            }
-            .build()
-
-        val cb = object : ConnectivityManager.NetworkCallback() {
+        val defaultCb = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
-                rememberNetwork(cm, network)
+                consider(cm, network, allowReplace = true)
             }
 
             override fun onCapabilitiesChanged(
                 network: Network,
                 networkCapabilities: NetworkCapabilities,
             ) {
-                rememberNetwork(cm, network)
+                consider(cm, network, allowReplace = true)
+            }
+
+            override fun onLinkPropertiesChanged(network: Network, lp: LinkProperties) {
+                consider(cm, network, allowReplace = false)
+            }
+
+            override fun onLost(network: Network) {
+                // Default moved (often onto the VPN). Last physical stays.
+            }
+        }
+
+        val physicalCb = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                consider(cm, network, allowReplace = true)
+            }
+
+            override fun onCapabilitiesChanged(
+                network: Network,
+                networkCapabilities: NetworkCapabilities,
+            ) {
+                consider(cm, network, allowReplace = true)
+            }
+
+            override fun onLinkPropertiesChanged(network: Network, lp: LinkProperties) {
+                consider(cm, network, allowReplace = false)
             }
 
             override fun onLost(network: Network) {
                 if (defaultNetwork == network) {
                     defaultNetwork = null
                     currentInterfaceName = null
+                    Log.i(TAG, "physical underlying lost")
+                    DiagnosticRing.append(TAG, "net.lost")
+                }
+                val active = cm.activeNetwork
+                if (!isVpn(cm, active)) {
+                    consider(cm, active, allowReplace = true)
                 }
             }
         }
-        callback = cb
+
+        defaultCallback = defaultCb
+        physicalCallback = physicalCb
 
         try {
-            when {
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-                    cm.registerBestMatchingNetworkCallback(request, cb, mainHandler)
-                }
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.P -> {
-                    cm.requestNetwork(request, cb, mainHandler)
-                }
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.N -> {
-                    cm.registerDefaultNetworkCallback(cb, mainHandler)
-                }
-                else -> {
-                    cm.requestNetwork(request, cb)
-                }
-            }
-            Log.i(TAG, "network monitor started (sdk=${Build.VERSION.SDK_INT})")
+            cm.registerDefaultNetworkCallback(defaultCb, mainHandler)
+            cm.registerNetworkCallback(physicalRequest(), physicalCb, mainHandler)
+            Log.i(TAG, "network monitor started (default + NOT_VPN)")
         } catch (e: Exception) {
             Log.e(TAG, "failed to start network monitor", e)
-            callback = null
+            runCatching { cm.unregisterNetworkCallback(defaultCb) }
+            runCatching { cm.unregisterNetworkCallback(physicalCb) }
+            defaultCallback = null
+            physicalCallback = null
+        }
+        val active = cm.activeNetwork
+        if (!isVpn(cm, active)) {
+            consider(cm, active, allowReplace = true)
         }
     }
 
-    private fun rememberNetwork(cm: ConnectivityManager, network: Network) {
-        val caps = cm.getNetworkCapabilities(network)
-        if (caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) {
+    private fun isVpn(cm: ConnectivityManager, network: Network?): Boolean {
+        if (network == null) return false
+        val caps = cm.getNetworkCapabilities(network) ?: return false
+        val iface = cm.getLinkProperties(network)?.interfaceName
+        return caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN) ||
+            (iface?.startsWith("tun") == true)
+    }
+
+    /**
+     * Ignore VPN. First physical INTERNET net is kept even if not yet validated.
+     * Unvalidated Wi‑Fi does not replace an already pinned LTE (or other) net.
+     * A validated different net may replace from [onAvailable] or
+     * [onCapabilitiesChanged] ([allowReplace]); link-property updates do not.
+     */
+    private fun consider(
+        cm: ConnectivityManager,
+        network: Network?,
+        allowReplace: Boolean,
+    ) {
+        if (network == null) return
+        val caps = cm.getNetworkCapabilities(network) ?: return
+        val iface = cm.getLinkProperties(network)?.interfaceName
+        if (caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN) ||
+            iface?.startsWith("tun") == true
+        ) {
+            Log.d(TAG, "skip vpn iface=${iface ?: "(none)"}")
+            return
+        }
+        if (!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
+            Log.i(TAG, "skip no-internet iface=${iface ?: "(none)"}")
+            return
+        }
+        if (iface.isNullOrBlank()) {
+            Log.i(TAG, "skip no-iface")
+            return
+        }
+        val validated = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+        val current = defaultNetwork
+        if (current != null && current != network) {
+            if (!allowReplace) {
+                Log.i(TAG, "skip link-only other iface=$iface current=$currentInterfaceName")
+                return
+            }
+            if (!validated) {
+                Log.i(TAG, "skip unvalidated replace iface=$iface current=$currentInterfaceName")
+                return
+            }
+        }
+        rememberAndPin(network, iface)
+    }
+
+    private fun rememberAndPin(network: Network, iface: String) {
+        if (defaultNetwork == network && currentInterfaceName == iface) {
+            Log.d(TAG, "skip same iface=$iface")
             return
         }
         defaultNetwork = network
-        repeat(10) {
-            val linkProperties = cm.getLinkProperties(network) ?: run {
-                Thread.sleep(100)
-                return@repeat
-            }
-            val interfaceName = linkProperties.interfaceName
-            if (interfaceName.isNullOrBlank()) {
-                Thread.sleep(100)
-                return@repeat
-            }
-            val interfaceIndex = try {
-                NetworkInterface.getByName(interfaceName)?.index ?: -1
-            } catch (_: Exception) {
-                Thread.sleep(100)
-                return@repeat
-            }
-            currentInterfaceName = interfaceName
-            Log.i(TAG, "default interface: $interfaceName (index=$interfaceIndex)")
-            return
-        }
+        currentInterfaceName = iface
+        Log.i(TAG, "default interface: $iface")
+        DiagnosticRing.append(TAG, "net.iface $iface")
+        val vpn = TeremokVpnService.currentInstance() ?: return
+        VpnUnderlyingNetworkPolicy.applyTo(
+            vpn,
+            VpnUnderlyingNetworkPolicy.Underlying(network, iface),
+        )
     }
 }

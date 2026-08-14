@@ -226,6 +226,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     if (before is VpnConnecting && status is VpnConnected) {
       return;
     }
+    // Tray key was on, Home said Disconnected: paint Connected, do not tear down.
+    if ((before is VpnDisconnected || before is VpnError) &&
+        status is VpnConnected) {
+      return;
+    }
 
     if (status is VpnDisconnected || status is VpnError) {
       final again = ref.read(vpnProvider);
@@ -393,7 +398,8 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
     };
     final statusHint = switch (status) {
       VpnDisconnected() => l.homeTapHint,
-      VpnConnecting() => l.homeConnectingHint,
+      VpnConnecting(:final hint) =>
+        (hint != null && hint.isNotEmpty) ? hint : l.homeConnectingHint,
       VpnConnected() => l.homeConnectedHint,
       VpnError(:final code, :final message)
           when code == kVpnProbeFailedErrorCode =>

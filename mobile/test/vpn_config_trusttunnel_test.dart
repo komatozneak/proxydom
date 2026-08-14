@@ -125,4 +125,41 @@ void main() {
     final restored = VpnNode.fromJson(ttNode.toJson());
     expect(restored.isTrustTunnel, isTrue);
   });
+
+  test('parses hysteria_profile and Hy2 is Free-Auto eligible', () {
+    final config = VpnConfig.fromJson({
+      'username': 'u',
+      'links': const <String>[],
+      'expire': 1785654092,
+      'active_core': 'hysteria',
+      'node_host': '204.11.2.216',
+      'hysteria_profile': {
+        'schema_version': 1,
+        'node_id': 'eu-hy2-1',
+        'server': 'hy2.teremokconnect.online:443',
+        'auth': 'hy21xabcd:secret',
+        'username': 'hy21xabcd',
+        'sni': 'hy2.teremokconnect.online',
+        'socks_listen': '127.0.0.1:10808',
+      },
+    });
+    expect(config.activeCore, VpnActiveCore.hysteria);
+    expect(config.isHysteriaSession, isTrue);
+    expect(config.hysteriaProfile!.server, 'hy2.teremokconnect.online:443');
+    expect(config.xrayProfile, isNull);
+    expect(config.trusttunnelProfile, isNull);
+
+    final node = VpnNode.fromJson({
+      'id': 'eu-hy2-1',
+      'label': 'Европа · Бесплатно',
+      'host': '204.11.2.216',
+      'port': 443,
+      'status': 'connected',
+      'is_default': false,
+      'protocol': 'hysteria2',
+      'auto_eligible': true,
+    });
+    expect(node.isHysteria, isTrue);
+    expect(node.isAutoEligible, isTrue);
+  });
 }

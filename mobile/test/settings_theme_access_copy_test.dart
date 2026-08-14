@@ -38,6 +38,13 @@ void main() {
       );
       expect(accessCopyKind(s), AccessCopyKind.paidOrTrial);
     });
+
+    test('unlocksPremium matches catalog_unlocks_premium (pro/trial/alpha)', () {
+      expect(const SubscriptionStatus(isPro: true).unlocksPremium, isTrue);
+      expect(const SubscriptionStatus(isTrial: true).unlocksPremium, isTrue);
+      expect(const SubscriptionStatus(isAlpha: true).unlocksPremium, isTrue);
+      expect(SubscriptionStatus.empty.unlocksPremium, isFalse);
+    });
   });
 
   group('ThemeModePrefs', () {

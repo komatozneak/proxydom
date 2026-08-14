@@ -818,7 +818,7 @@ class AppL10nEn extends AppL10n {
   String get regionAutoTitle => 'Automatic';
 
   @override
-  String get regionAutoSubtitle => 'Best available server';
+  String get regionAutoSubtitle => 'EU Hy2 → US Hy2';
 
   @override
   String get regionSelected => 'Selected';
@@ -852,6 +852,15 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get regionOnline => 'online';
+
+  @override
+  String get regionBlurbFree => 'Hysteria2 · apps, AI, websites';
+
+  @override
+  String get regionBlurbGaming => 'TrustTunnel · low ping';
+
+  @override
+  String get regionBlurbYoutube => 'TrustTunnel · ad-free';
 
   @override
   String get regionOffline => 'offline';

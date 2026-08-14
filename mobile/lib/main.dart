@@ -1,5 +1,8 @@
+import 'dart:io' as io;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:rive/rive.dart';
 
 import 'app.dart';
@@ -18,6 +21,15 @@ void main() async {
   // Required before flutter_secure_storage / path_provider on cold start.
   WidgetsFlutterBinding.ensureInitialized();
   await RiveNative.init();
+
+  try {
+    final dir = await getApplicationSupportDirectory();
+    await AppLogBuffer.instance.attachPersistFile(
+      io.File('${dir.path}/product.log'),
+    );
+  } catch (_) {
+    // Persist is best-effort; in-memory ring still feeds reports.
+  }
 
   // ADR 009: probe discovery hosts before auth/register.
   try {

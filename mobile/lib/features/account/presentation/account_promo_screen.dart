@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../beta/presentation/promo_redeem_form.dart';
+import '../../home/application/vpn_provider.dart';
 import '../../settings/application/subscription_status_provider.dart';
 
 /// Promo redeem from Account hub — pop back after success (shell SoT).
@@ -44,6 +45,9 @@ class AccountPromoScreen extends ConsumerWidget {
               const SizedBox(height: 24),
               PromoRedeemForm(
                 onSuccess: () async {
+                  await ref
+                      .read(vpnNodesRepositoryProvider)
+                      .refreshAfterEntitlementChange();
                   await ref.read(subscriptionStatusProvider.notifier).refresh();
                   if (context.mounted) context.pop();
                 },

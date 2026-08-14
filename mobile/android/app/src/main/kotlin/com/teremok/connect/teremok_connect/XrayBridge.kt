@@ -124,6 +124,7 @@ class XrayBridge private constructor() {
                 lastErrorMessage = "VpnService not bound for protect()"
                 return false
             }
+            Log.i(TAG, "start: registerDialer + attachTunFd=$tunFd")
             LibXray.registerDialerController(dialerController)
             GvisorTun2Socks.attachTunFd(tunFd)
 
@@ -139,6 +140,7 @@ class XrayBridge private constructor() {
             val configFile = File(datDir, "config.json")
             configFile.writeText(cleanJson)
 
+            Log.i(TAG, "start: testXray begin")
             val testResult = decodeResponse(
                 LibXray.testXray(
                     encodeRequest(
@@ -148,6 +150,7 @@ class XrayBridge private constructor() {
                     ),
                 ),
             )
+            Log.i(TAG, "start: testXray done success=${testResult.optBoolean("success")}")
             if (!testResult.optBoolean("success")) {
                 lastErrorMessage = testResult.optString("error").ifEmpty { "testXray failed" }
                 Log.e(TAG, "start: config invalid: $lastErrorMessage")
@@ -162,7 +165,9 @@ class XrayBridge private constructor() {
                 return false
             }
 
+            Log.i(TAG, "start: runXrayFromJSON begin")
             val runResult = decodeResponse(LibXray.runXrayFromJSON(runB64))
+            Log.i(TAG, "start: runXrayFromJSON done success=${runResult.optBoolean("success")}")
             if (!runResult.optBoolean("success")) {
                 lastErrorMessage = runResult.optString("error").ifEmpty { "runXrayFromJSON failed" }
                 Log.e(TAG, "start: run failed: $lastErrorMessage")
@@ -234,7 +239,9 @@ class XrayBridge private constructor() {
         copyAssetIfNeeded(ctx, "geosite.dat", workingPath)
 
         // Touch LibXray (loads libgojni.so via go.Seq) then register protect.
+        Log.i(TAG, "ensureSetup: LibXray.touch begin")
         LibXray.touch()
+        Log.i(TAG, "ensureSetup: LibXray.touch done")
         LibXray.registerDialerController(dialerController)
 
         isSetup.set(true)

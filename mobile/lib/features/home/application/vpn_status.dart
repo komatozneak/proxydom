@@ -13,10 +13,13 @@ final class VpnDisconnected extends VpnStatus {
 
 /// Подключается. Показываем прогресс-индикатор.
 final class VpnConnecting extends VpnStatus {
-  const VpnConnecting({required this.progress});
+  const VpnConnecting({required this.progress, this.hint});
 
   /// 0.0 .. 1.0
   final double progress;
+
+  /// Auto prove label, e.g. «Проверяем Восточную Европу…».
+  final String? hint;
 }
 
 /// Подключён к серверу по выбранному протоколу.

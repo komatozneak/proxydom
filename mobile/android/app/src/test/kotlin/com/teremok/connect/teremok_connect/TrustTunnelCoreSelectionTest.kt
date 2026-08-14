@@ -24,5 +24,13 @@ class TrustTunnelCoreSelectionTest {
     fun `core constants are stable across the MethodChannel contract`() {
         assertEquals("xray", TeremokVpnService.VPN_CORE_XRAY)
         assertEquals("trusttunnel", TeremokVpnService.VPN_CORE_TRUSTTUNNEL)
+        assertEquals("hysteria", TeremokVpnService.VPN_CORE_HYSTERIA)
+    }
+
+    @Test
+    fun `vpnCore hysteria selects the Hy2 core`() {
+        assertTrue(isHysteriaCore(mapOf("vpnCore" to "hysteria")))
+        assertFalse(isHysteriaCore(mapOf("vpnCore" to "xray")))
+        assertFalse(isHysteriaCore(mapOf("vpnCore" to "trusttunnel")))
     }
 }

@@ -72,6 +72,16 @@ final class VpnSessionSnapshot {
 
   bool get isProving => phase == VpnSessionPhase.proving;
 
+  /// Auto SOCKS hops: ignore native connected (no TUN yet / Always-on leftover).
+  bool get ignoresNativeConnected => phase == VpnSessionPhase.proving;
+
+  /// Auto/manual walk: Flutter must ignore intermediate native error/idle.
+  bool get ownsConnectUi =>
+      phase == VpnSessionPhase.binding ||
+      phase == VpnSessionPhase.proving ||
+      phase == VpnSessionPhase.tunUp ||
+      phase == VpnSessionPhase.coreStarting;
+
   factory VpnSessionSnapshot.fromJson(Map<String, dynamic> json) {
     return VpnSessionSnapshot(
       phase: parseVpnSessionPhase(json['phase'] as String?),
@@ -112,6 +122,16 @@ final class VpnSessionSnapshot {
       generation: 0,
     );
   }
+}
+
+/// Native/session idle must not paint Nest rest while Auto/manual walk is open.
+bool connectingIdleShouldDrop({
+  required bool walkActive,
+  required bool sessionOwnsUi,
+  required VpnSessionPhase lastPhase,
+}) {
+  if (walkActive || sessionOwnsUi) return false;
+  return lastPhase == VpnSessionPhase.idle;
 }
 
 VpnSessionPhase parseVpnSessionPhase(String? raw) {

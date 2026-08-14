@@ -102,7 +102,7 @@ void main() {
     test('DNS: Google/YT via proxy; others via direct (no FakeDNS)', () {
       final config = buildAndParse(makeInputs());
       final dns = config['dns'] as Map;
-      expect(dns['hosts']['api.teremokconnect.online'], '130.49.149.182');
+      expect(dns['hosts']['api.teremokconnect.online'], '176.114.64.174');
       expect(dns['queryStrategy'], 'UseIPv4');
       final servers = dns['servers'] as List;
       expect(servers, hasLength(4));
@@ -810,6 +810,43 @@ void main() {
       expect(xhttp['path'], '/teremok/xhttp');
       expect(xhttp['mode'], 'stream-one');
       expect(stream['security'], 'reality');
+    });
+
+    test('xhttp omitted mode defaults to stream-up', () {
+      const xhttpCreds = VlessRealityCreds(
+        protocol: 'vless',
+        uuid: 'xhttp-uuid',
+        serverPort: 443,
+        transport: 'xhttp',
+        security: 'reality',
+        serverName: 'www.cloudflare.com',
+        publicKey: 'xhttpPublicKey',
+        shortId: '7711c319',
+        fingerprint: 'chrome',
+        spiderX: '/',
+        path: '/teremok/xhttp',
+      );
+      final runtime = XrayConfigBuilder.buildCandidateConfigs(
+        const VpnSessionInputs(
+          hops: [
+            EgressHop(
+              id: 'eu-primary',
+              host: '31.59.103.144',
+              label: 'EU',
+              creds: xhttpCreds,
+            ),
+          ],
+          route: RoutePolicy(),
+          tun: testTun,
+        ),
+      );
+      final config = jsonDecode(runtime.single.configJson) as Map<String, dynamic>;
+      final vless = (config['outbounds'] as List)
+          .where((outbound) => (outbound as Map)['protocol'] == 'vless')
+          .cast<Map>()
+          .single;
+      final xhttp = (vless['streamSettings'] as Map)['xhttpSettings'] as Map;
+      expect(xhttp['mode'], 'stream-up');
     });
 
     test('routing domainStrategy is IPIfNonMatch', () {
