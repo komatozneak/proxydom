@@ -51,6 +51,7 @@ class TeremokVpnService : VpnService() {
         const val EXTRA_USERNAME = "username"
         const val EXTRA_PROTOCOL = "protocol"
         const val EXTRA_PARAMS_JSON = "paramsJson"
+        const val EXTRA_APP_INITIATED = "appInitiated"
 
         /** Session payload schema from Flutter VpnServiceConfig / VpnController. */
         const val SESSION_SCHEMA_VERSION = 2
@@ -68,6 +69,7 @@ class TeremokVpnService : VpnService() {
         private const val KEY_USERNAME = "username"
         private const val KEY_PROTOCOL = "protocol"
         private const val KEY_ACTIVE = "active"
+        private const val KEY_APP_INITIATED = "app_initiated"
 
         @Volatile
         private var instance: TeremokVpnService? = null
@@ -325,8 +327,24 @@ class TeremokVpnService : VpnService() {
         /** Last successful connect params still on disk (survives intentional disconnect). */
         fun hasPersistedParams(context: android.content.Context): Boolean {
             val json = sessionPrefs(context).getString(KEY_PARAMS_JSON, null)
-            return !json.isNullOrBlank()
+            return VpnShadePolicy.isUsableParamsJson(json)
         }
+
+        fun isAppInitiatedSession(context: android.content.Context): Boolean =
+            sessionPrefs(context).getBoolean(KEY_APP_INITIATED, true)
+
+        fun allowUserDisconnect(context: android.content.Context): Boolean {
+            val snap = queryAlwaysOnVpnSnapshot(context)
+            return VpnShadePolicy.allowUserDisconnect(
+                alwaysOn = snap["alwaysOn"] as? Boolean,
+                lockdown = snap["lockdown"] as? Boolean,
+                sdkInt = Build.VERSION.SDK_INT,
+                appInitiated = isAppInitiatedSession(context),
+            )
+        }
+
+        fun tileStateFor(status: String, lockdown: Boolean?): Int =
+            VpnShadePolicy.tileState(status, lockdown)
 
         fun isVpnRunning(): Boolean {
             val s = VpnStatusBroadcaster.currentStatus()
@@ -340,8 +358,8 @@ class TeremokVpnService : VpnService() {
         fun startFromPersistedSession(context: android.content.Context): Boolean {
             val store = sessionPrefs(context)
             val paramsJson = store.getString(KEY_PARAMS_JSON, null)
-            if (paramsJson.isNullOrBlank()) {
-                Log.w(TAG, "startFromPersistedSession: no params")
+            if (paramsJson == null || !VpnShadePolicy.isUsableParamsJson(paramsJson)) {
+                Log.w(TAG, "startFromPersistedSession: no usable params")
                 return false
             }
             val username = store.getString(KEY_USERNAME, "anonymous") ?: "anonymous"
@@ -351,13 +369,19 @@ class TeremokVpnService : VpnService() {
                 putExtra(EXTRA_USERNAME, username)
                 putExtra(EXTRA_PROTOCOL, protocol)
                 putExtra(EXTRA_PARAMS_JSON, paramsJson)
+                putExtra(EXTRA_APP_INITIATED, true)
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
+            return try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+                true
+            } catch (e: Exception) {
+                Log.w(TAG, "startFromPersistedSession: start failed", e)
+                false
             }
-            return true
         }
 
         fun stopVpnService(context: android.content.Context) {
@@ -388,6 +412,13 @@ class TeremokVpnService : VpnService() {
             }
             currentStatus = snapshot.phase.toLegacyStatus()
             VpnStatusBroadcaster.emit(currentStatus)
+            if (snapshot.phase == SessionPhase.ConnectedHealthy ||
+                snapshot.phase == SessionPhase.ConnectedDegraded ||
+                snapshot.phase == SessionPhase.Error ||
+                snapshot.phase == SessionPhase.Idle
+            ) {
+                autoProving = false
+            }
         }
 
         override fun establishGeneration(
@@ -484,10 +515,11 @@ class TeremokVpnService : VpnService() {
                 val username = intent.getStringExtra(EXTRA_USERNAME) ?: "anonymous"
                 val protocol = intent.getStringExtra(EXTRA_PROTOCOL) ?: "unknown"
                 val paramsJson = intent.getStringExtra(EXTRA_PARAMS_JSON) ?: "{}"
+                val appInitiated = intent.getBooleanExtra(EXTRA_APP_INITIATED, true)
                 Log.i(TAG, "onStartCommand: ACTION_START (user=$username, proto=$protocol)")
                 // Persist before establish so Always-on / sticky restart after reboot
                 // can rebuild the tunnel without Flutter reinjecting params.
-                persistSession(username, protocol, paramsJson)
+                persistSession(username, protocol, paramsJson, appInitiated)
                 val params = runCatching { jsonToMap(JSONObject(paramsJson)) }
                     .onFailure { Log.w(TAG, "failed to parse paramsJson, using defaults", it) }
                     .getOrDefault(emptyMap())
@@ -497,10 +529,13 @@ class TeremokVpnService : VpnService() {
                 val raw = intent.getStringExtra(EXTRA_AUTO_CANDIDATES) ?: "[]"
                 val candidates = parseAutoCandidates(raw)
                 Log.i(TAG, "onStartCommand: ACTION_START_AUTO n=${candidates.size}")
+                // Whole Auto walk — hop teardownCores must not emit idle.
+                autoProving = true
                 sessionEngine.enqueueAutoStart(candidates)
             }
             ACTION_STOP -> {
                 Log.i(TAG, "onStartCommand: ACTION_STOP")
+                autoProving = false
                 // Keep params_json so Quick Settings can reconnect without Flutter.
                 markSessionInactive()
                 sessionEngine.enqueueStop(markInactive = true)
@@ -516,14 +551,20 @@ class TeremokVpnService : VpnService() {
 
     private fun prefs() = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
 
-    private fun persistSession(username: String, protocol: String, paramsJson: String) {
+    private fun persistSession(
+        username: String,
+        protocol: String,
+        paramsJson: String,
+        appInitiated: Boolean = true,
+    ) {
         prefs().edit()
             .putBoolean(KEY_ACTIVE, true)
+            .putBoolean(KEY_APP_INITIATED, appInitiated)
             .putString(KEY_USERNAME, username)
             .putString(KEY_PROTOCOL, protocol)
             .putString(KEY_PARAMS_JSON, paramsJson)
             .apply()
-        Log.i(TAG, "persistSession: saved (${paramsJson.length} chars)")
+        Log.i(TAG, "persistSession: saved (${paramsJson.length} chars) appInitiated=$appInitiated")
     }
 
     /** Intentional disconnect — keep last config for QS tile reconnect. */
@@ -571,6 +612,7 @@ class TeremokVpnService : VpnService() {
         val username = store.getString(KEY_USERNAME, "anonymous") ?: "anonymous"
         val protocol = store.getString(KEY_PROTOCOL, "unknown") ?: "unknown"
         Log.i(TAG, "restoreSessionIfNeeded: restarting (user=$username, proto=$protocol, was=$currentStatus)")
+        store.edit().putBoolean(KEY_APP_INITIATED, false).apply()
         val params = runCatching { jsonToMap(JSONObject(paramsJson)) }
             .onFailure { Log.w(TAG, "restoreSessionIfNeeded: bad JSON", it) }
             .getOrDefault(emptyMap())
@@ -753,8 +795,6 @@ class TeremokVpnService : VpnService() {
             Log.w(TAG, "proveAutoCandidate failed: ${e.message}")
             teardownCores()
             false
-        } finally {
-            autoProving = false
         }
     }
 
@@ -1408,17 +1448,17 @@ class TeremokVpnService : VpnService() {
             tunInterface = null
             isRunning = false
             establishInProgress = false
-            // TUN is gone — never leave Flutter/getStatus on "connected".
-            // During Auto hops the session snapshot is SoT; do not emit idle
-            // or Nest paints rest between candidates.
+            // TUN is gone — never leave Flutter/getStatus on "connected"
+            // after a real stop. Auto hops (Binding/Proving) must keep
+            // connecting/probing: idle here paints Nest rest while Hy2 is live.
             if (currentStatus != "revoked" && currentStatus != "disconnecting") {
-                if (currentStatus != "idle") {
+                val hop = autoProving ||
+                    sessionEngine.currentSnapshot().phase.suppressTeardownIdleBroadcast()
+                if (hop) {
+                    VpnStatusBroadcaster.remember(currentStatus)
+                } else if (currentStatus != "idle") {
                     currentStatus = "idle"
-                    if (autoProving) {
-                        VpnStatusBroadcaster.remember("idle")
-                    } else {
-                        VpnStatusBroadcaster.emit(currentStatus)
-                    }
+                    VpnStatusBroadcaster.emit(currentStatus)
                 }
             }
         }
@@ -1665,6 +1705,7 @@ object VpnChannelRegistry {
                             putExtra(TeremokVpnService.EXTRA_USERNAME, username)
                             putExtra(TeremokVpnService.EXTRA_PROTOCOL, protocol)
                             putExtra(TeremokVpnService.EXTRA_PARAMS_JSON, paramsJson)
+                            putExtra(TeremokVpnService.EXTRA_APP_INITIATED, true)
                         }
                         appContext.startService(intent)
                         result.success(true)
@@ -1786,6 +1827,10 @@ object VpnChannelRegistry {
                         val svc = serviceProvider() ?: TeremokVpnService.currentInstance()
                         svc?.onNotificationStyleChanged()
                         result.success(true)
+                    }
+                    "requestAddQsTile" -> {
+                        val host = activityProvider() ?: appContext
+                        QsTilePrompter.requestAdd(host, result)
                     }
                     "listLauncherApps" -> {
                         val includeIcons = call.argument<Boolean>("includeIcons") ?: true
@@ -1956,6 +2001,7 @@ object VpnStatusBroadcaster {
 
     fun emit(status: String) {
         lastStatus = status
+        appContext?.let { TeremokTileService.requestListening(it) }
         mainHandler.post {
             val current = sink
             if (current != null) {

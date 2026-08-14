@@ -124,13 +124,75 @@ final class VpnSessionSnapshot {
   }
 }
 
+/// `VpnNativeStatus.idle` / `getStatus()` is not SoT during walk or a live session.
+///
+/// Binding/Proving often report idle while TUN is coming up. ConnectedHealthy
+/// can still flap idle under Always-on / lockdown — do not demote Nest.
+bool nativeIdleMustNotDemote({
+  required bool walkActive,
+  required bool sessionOwnsUi,
+  required VpnSessionPhase lastPhase,
+}) {
+  if (walkActive || sessionOwnsUi) return true;
+  switch (lastPhase) {
+    case VpnSessionPhase.binding:
+    case VpnSessionPhase.tunUp:
+    case VpnSessionPhase.coreStarting:
+    case VpnSessionPhase.proving:
+    case VpnSessionPhase.connectedHealthy:
+    case VpnSessionPhase.connectedDegraded:
+      return true;
+    case VpnSessionPhase.stopping:
+    case VpnSessionPhase.idle:
+    case VpnSessionPhase.error:
+    case VpnSessionPhase.unknown:
+      return false;
+  }
+}
+
+/// Session EventChannel can replay Idle/Unknown after Binding/Proving/Connected
+/// (Auto hop teardownCores, engine reconnect). Keep the last live phase.
+/// Stopping/Error idle is real teardown — do not ignore.
+bool shouldIgnoreRegressiveIdleSnapshot({
+  required VpnSessionPhase incoming,
+  required VpnSessionPhase lastPhase,
+  required bool walkActive,
+  required bool sessionOwnsUi,
+}) {
+  if (incoming != VpnSessionPhase.idle &&
+      incoming != VpnSessionPhase.unknown) {
+    return false;
+  }
+  if (walkActive || sessionOwnsUi) return true;
+  switch (lastPhase) {
+    case VpnSessionPhase.binding:
+    case VpnSessionPhase.tunUp:
+    case VpnSessionPhase.coreStarting:
+    case VpnSessionPhase.proving:
+    case VpnSessionPhase.connectedHealthy:
+    case VpnSessionPhase.connectedDegraded:
+      return true;
+    case VpnSessionPhase.stopping:
+    case VpnSessionPhase.idle:
+    case VpnSessionPhase.error:
+    case VpnSessionPhase.unknown:
+      return false;
+  }
+}
+
 /// Native/session idle must not paint Nest rest while Auto/manual walk is open.
 bool connectingIdleShouldDrop({
   required bool walkActive,
   required bool sessionOwnsUi,
   required VpnSessionPhase lastPhase,
 }) {
-  if (walkActive || sessionOwnsUi) return false;
+  if (nativeIdleMustNotDemote(
+        walkActive: walkActive,
+        sessionOwnsUi: sessionOwnsUi,
+        lastPhase: lastPhase,
+      )) {
+    return false;
+  }
   return lastPhase == VpnSessionPhase.idle;
 }
 

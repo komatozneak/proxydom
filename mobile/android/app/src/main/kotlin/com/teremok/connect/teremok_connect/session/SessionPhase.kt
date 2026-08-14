@@ -24,6 +24,12 @@ enum class SessionPhase {
         Stopping -> "disconnecting"
         Error -> "error"
     }
+
+    /** Auto hop teardown must not broadcast idle — Nest would paint rest while TUN is coming up. */
+    fun suppressTeardownIdleBroadcast(): Boolean = when (this) {
+        Binding, TunUp, CoreStarting, Proving -> true
+        else -> false
+    }
 }
 
 /** Classified path / session outcomes (not wall-clock kludges). */

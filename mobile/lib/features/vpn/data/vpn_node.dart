@@ -31,7 +31,7 @@ class VpnNode {
   /// ISO region code (e.g. "us", "al", "uz") for YouTube/geo specialization.
   final String? region;
 
-  /// Node role: `general`, `youtube`, `geo-us`, `coming_soon`, … (ADR 006).
+  /// Node role: `general`, `youtube`, `geo-us`, `geo-in`, `coming_soon`, … (ADR 006).
   final String? purpose;
 
   /// Server hint: eligible for Auto picker. Null → derive via [isAutoEligible].
@@ -68,17 +68,26 @@ class VpnNode {
   /// Geo-US services node (not YouTube — US shows mid-roll ads).
   bool get isGeoUs => (purpose ?? '').toLowerCase() == 'geo-us';
 
+  /// Premium India geo exit (local apps / prices). Never Auto.
+  bool get isGeoIn => (purpose ?? '').toLowerCase() == 'geo-in';
+
   /// Xray node eligible for Auto / General section (never TT / YT / coming-soon).
   bool get isGeneralXray =>
-      !isTrustTunnel && !isYoutube && !isGaming && !isComingSoon && !isGeoUs;
+      !isTrustTunnel &&
+      !isYoutube &&
+      !isGaming &&
+      !isComingSoon &&
+      !isGeoUs &&
+      !isGeoIn;
 
   /// True when this row may be tried in Auto for [isPremium].
   ///
-  /// Free: metered Xray / Hy2. TT, YouTube, gaming never. Coming-soon stubs out.
+  /// Free: metered Xray / Hy2. TT, YouTube, gaming, geo-in never.
   /// Retired EU Xray (`eu-primary`) never enters Auto.
   bool inAutoPool({required bool isPremium}) {
     if (host.isEmpty || host == '0.0.0.0') return false;
     if (isComingSoon) return false;
+    if (isGeoIn) return false;
     if (!isConnected && !isDefault) return false;
     final idLower = id.trim().toLowerCase();
     if (idLower == 'eu-primary') return false;

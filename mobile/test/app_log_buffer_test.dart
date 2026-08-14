@@ -49,4 +49,23 @@ void main() {
     expect(text, contains('vpn.mint id=us-geo-1 active_core=xray'));
     expect(text, isNot(contains('skip=')));
   });
+
+  test('ProductLog vpn.egress_probe keeps catalog IPv4 not SNI', () {
+    final buf = AppLogBuffer.instance;
+    buf.clear();
+    ProductLog.event('vpn.egress_probe', {
+      'external_ip': '217.60.3.9',
+      'winner_id': 'eu-hy2-1',
+      'catalog_host': '217.60.3.9',
+    });
+    final text = buf.formatRecentLog();
+    expect(
+      text,
+      contains(
+        'vpn.egress_probe external_ip=217.60.3.9 '
+        'winner_id=eu-hy2-1 catalog_host=217.60.3.9',
+      ),
+    );
+    expect(text, isNot(contains('hy2-eu.teremokconnect.online')));
+  });
 }

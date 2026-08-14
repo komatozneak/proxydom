@@ -1,8 +1,10 @@
 import 'dart:io';
+import 'dart:math';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../api_client.dart';
 import '../config.dart';
@@ -30,6 +32,13 @@ class DiagnosticsService {
 
   static const int logcatChunkChars = 800;
 
+  /// Catalog `VpnNode.host` for Pixel E2E (IP↔IP vs icanhazip, not SNI).
+  static String formatCatalogHost(String? host) {
+    final trimmed = host?.trim();
+    if (trimmed == null || trimmed.isEmpty) return '(none)';
+    return trimmed;
+  }
+
   Future<String> buildReport({
     required AuthState authState,
     required VpnStatus vpnUi,
@@ -37,6 +46,7 @@ class DiagnosticsService {
     String? autoWinnerId,
     String? autoWinnerLabel,
     String? lastProve,
+    String? catalogHost,
   }) async {
     final generatedUtc = DateTime.now().toUtc().toIso8601String();
     final packageInfo = await PackageInfo.fromPlatform();
@@ -77,8 +87,12 @@ class DiagnosticsService {
       ..writeln('vpn_native_last_error: ${nativeError ?? '(none)'}')
       ..writeln('vpn_lockdown: $lockdown')
       ..writeln('external_ip: ${egress.externalIpLabel}')
+      ..writeln('catalog_host: ${formatCatalogHost(catalogHost)}')
       ..writeln('expected_egress_host: ${expectedHost ?? '(unknown)'}')
       ..writeln('egress_ok: ${egress.egressOkLabel}')
+      ..writeln(
+        'egress_check: ${egressCheckLabel(externalIp: egress.externalIp, catalogHost: catalogHost)}',
+      )
       ..writeln('ru_rules_loaded: ${sessionMeta.ruRulesLoaded}')
       ..writeln(
         'ru_rules_paths: ${sessionMeta.ruRuleTags.isEmpty ? '(none)' : sessionMeta.ruRuleTags.join(', ')}',
@@ -95,6 +109,32 @@ class DiagnosticsService {
       ..writeln(AppLogBuffer.instance.formatRecentLog());
 
     return buffer.toString().trim();
+  }
+
+  /// Short id for local persist + snackbar (no secrets).
+  static String newReportId() {
+    final ms = DateTime.now().toUtc().millisecondsSinceEpoch;
+    final suffix = Random().nextInt(0xFFFF).toRadixString(16).padLeft(4, '0');
+    return 'r$ms$suffix';
+  }
+
+  /// Write the bundle on-device. Success of «Send report» is this file, not Telegram.
+  static Future<({String reportId, String body, File? file})> persistLocal(
+    String report, {
+    Directory? directory,
+  }) async {
+    final reportId = newReportId();
+    final body = 'report_id: $reportId\n$report';
+    dumpReportToLogcat(body);
+    File? file;
+    try {
+      final dir = directory ?? await getApplicationSupportDirectory();
+      file = File('${dir.path}/diag_$reportId.txt');
+      await file.writeAsString(body);
+    } catch (_) {
+      file = null;
+    }
+    return (reportId: reportId, body: body, file: file);
   }
 
   /// Last [postMaxChars] so Telegram accepts the POST; logcat still gets the full bundle.
@@ -115,8 +155,11 @@ class DiagnosticsService {
     debugPrint('=== DIAG-REPORT END ===', wrapWidth: logcatChunkChars);
   }
 
-  Future<void> submit({required String report}) async {
-    dumpReportToLogcat(report);
+  Future<void> submit({
+    required String report,
+    bool dumpToLogcat = true,
+  }) async {
+    if (dumpToLogcat) dumpReportToLogcat(report);
     final payload = clipForPost(report);
     final resp = await _dio.post<Map<String, dynamic>>(
       '/support/diagnostics',

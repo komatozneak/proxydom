@@ -1,3 +1,8 @@
+String formatGib(double gib, {bool russian = true}) {
+  final raw = gib.toStringAsFixed(2);
+  return russian ? raw.replaceAll('.', ',') : raw;
+}
+
 /// Speed / latency formatters for Home compact metrics.
 String formatBytesPerSec(int bytesPerSec, {bool russian = true}) {
   if (bytesPerSec <= 0) {

@@ -22,6 +22,24 @@ class EgressVerifyResult {
   }
 }
 
+/// IP↔IP vs catalog host. Hostname/SNI is inconclusive — not a tunnel-dead gate.
+String egressCheckLabel({
+  required String? externalIp,
+  required String? catalogHost,
+}) {
+  final ip = externalIp?.trim();
+  final host = catalogHost?.trim();
+  if (ip == null || ip.isEmpty || host == null || host.isEmpty) {
+    return 'inconclusive';
+  }
+  if (!_looksLikeIpv4(host)) return 'inconclusive';
+  return ip == host ? 'match' : 'mismatch';
+}
+
+bool _looksLikeIpv4(String value) {
+  return RegExp(r'^\d{1,3}(\.\d{1,3}){3}$').hasMatch(value);
+}
+
 Future<EgressVerifyResult> verifyEgress({String? expectedHost}) async {
   final ip = await fetchExternalIp();
   if (ip == null) {

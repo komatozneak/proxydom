@@ -65,6 +65,7 @@ const _countryRuOverrides = {
   'EE': 'Эстония',
   'LV': 'Латвия',
   'LT': 'Литва',
+  'IN': 'Индия',
 };
 
 /// City overrides keyed by country when we prefer a canonical hub name.

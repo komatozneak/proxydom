@@ -62,6 +62,13 @@ const Map<String, NodePlace> kKnownNodePlaces = {
     subtitleEn: '',
     flag: '🇪🇺',
   ),
+  '107.181.139.193': NodePlace(
+    title: 'Индия · Premium',
+    subtitle: '',
+    titleEn: 'India · Premium',
+    subtitleEn: '',
+    flag: '🇮🇳',
+  ),
 };
 
 /// Strip `host:port` / whitespace so catalog keys match [kKnownNodePlaces].
@@ -114,8 +121,17 @@ const NodePlace kGamingPremiumPlace = NodePlace(
   flag: '🎮',
 );
 
+/// Premium India geo (local apps / prices) — country is the product.
+const NodePlace kIndiaPremiumPlace = NodePlace(
+  title: 'Индия · Premium',
+  titleEn: 'India · Premium',
+  subtitle: '',
+  flag: '🇮🇳',
+);
+
 const String kFlagEurope = '🇪🇺';
 const String kFlagUsa = '🇺🇸';
+const String kFlagIndia = '🇮🇳';
 const String kFlagGlobe = '🌐';
 const String kFlagGaming = '🎮';
 
@@ -135,9 +151,11 @@ enum LocationSection { premium, europe, usa, other }
 String flagForNode(VpnNode node, {String? productLabel}) {
   if (node.isYoutube) return '👑';
   if (node.isGaming) return kFlagGaming;
+  if (node.isGeoIn) return kFlagIndia;
   final region = (node.region ?? '').trim().toLowerCase();
   if (region == 'eu' || region == 'europe') return kFlagEurope;
   if (region == 'us' || region == 'usa') return kFlagUsa;
+  if (region == 'in' || region == 'india') return kFlagIndia;
   if (node.isGeoUs) return kFlagUsa;
 
   final label = (productLabel ??
@@ -147,11 +165,12 @@ String flagForNode(VpnNode node, {String? productLabel}) {
   return flagForProductLabel(label);
 }
 
-/// Infer EU/US flag from user-facing catalog copy.
+/// Infer EU/US/IN flag from user-facing catalog copy.
 String flagForProductLabel(String label) {
   final t = label.trim().toLowerCase();
   if (t.isEmpty) return kFlagGlobe;
   if (t.contains('игровой') || t.contains('gaming')) return kFlagGaming;
+  if (t.contains('индия') || t.contains('india')) return kFlagIndia;
   if (t.contains('европа') || t.contains('europe')) return kFlagEurope;
   if (t.contains('сша') ||
       t.contains('usa') ||
@@ -245,9 +264,10 @@ NodePlace placeForHost(String host, {int index = 0, String? fallbackLabel}) {
 }
 
 NodePlace placeForNode(VpnNode node, {int index = 0}) {
-  // YouTube / gaming product labels win over GeoIP (AL/DE must not leak).
+  // YouTube / gaming / India product labels win over GeoIP.
   if (node.isYoutube) return kYoutubePremiumPlace;
   if (node.isGaming) return kGamingPremiumPlace;
+  if (node.isGeoIn) return kIndiaPremiumPlace;
   if (node.isHysteria) {
     final hyLabel = node.label.isNotEmpty ? node.label : node.name;
     if (hyLabel.isNotEmpty && _isSafeProductLabel(hyLabel)) {

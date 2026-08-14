@@ -59,14 +59,19 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
     await SplitTunnelPrefs.purgePresetSites();
     final cats = await SplitTunnelPrefs.loadOsnovnyeEnabled();
     final sites = await SplitTunnelPrefs.loadSites();
-    final pending = await SplitTunnelPrefs.hasPendingChanges();
-    final disallowed = await SplitTunnelPrefs.loadDisallowedPackages();
     final apps = await InstalledAppsChannel.listLauncherApps();
+    await SplitTunnelPrefs.seedDefaultBypassIfNeeded(
+      apps.map((a) => a.packageName),
+    );
+    final disallowed = await SplitTunnelPrefs.loadDisallowedPackages();
+    final pendingAfterSeed = await SplitTunnelPrefs.hasPendingChanges();
     if (!mounted) return;
+    final vpn = ref.read(vpnProvider);
+    final sessionLive = vpn is VpnConnected || vpn is VpnConnecting;
     setState(() {
       _osnovnye = cats;
       _sites = sites.where((s) => !s.isPreset).toList();
-      _pending = pending;
+      _pending = sessionLive && pendingAfterSeed;
       _disallowed = disallowed;
       _apps = apps;
       _loading = false;
@@ -171,8 +176,7 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
                         border: Border.all(color: AppBrand.primary),
                       ),
                       labelColor: AppBrand.primary,
-                      unselectedLabelColor:
-                          theme.colorScheme.onSurfaceVariant,
+                      unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
                       tabs: [
                         Tab(text: appsLabel),
                         Tab(text: sitesLabel),
@@ -263,14 +267,20 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
   }
 
   List<LauncherAppInfo> get _filteredApps {
-    if (_query.isEmpty) return _apps;
-    return _apps
-        .where(
-          (a) =>
-              a.label.toLowerCase().contains(_query) ||
-              a.packageName.toLowerCase().contains(_query),
-        )
-        .toList();
+    final q = _query;
+    final filtered = q.isEmpty
+        ? _apps
+        : _apps
+            .where(
+              (a) =>
+                  a.label.toLowerCase().contains(q) ||
+                  a.packageName.toLowerCase().contains(q),
+            )
+            .toList();
+    return sortLauncherAppsBypassFirst(
+      apps: filtered,
+      disallowedPackages: _disallowed,
+    );
   }
 
   List<SplitTunnelSite> get _filteredSites {
@@ -338,7 +348,8 @@ class _AppsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final enabled = apps.where((a) => disallowed.contains(a.packageName)).length;
+    final enabled =
+        apps.where((a) => disallowed.contains(a.packageName)).length;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -474,8 +485,7 @@ class _SitesTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l = AppL10n.of(context);
-    final enabledCount =
-        osnovnye.values.where((v) => v).length;
+    final enabledCount = osnovnye.values.where((v) => v).length;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -493,9 +503,7 @@ class _SitesTab extends StatelessWidget {
                 ),
               ),
               Icon(
-                osnovnyeExpanded
-                    ? Icons.expand_less
-                    : Icons.expand_more,
+                osnovnyeExpanded ? Icons.expand_less : Icons.expand_more,
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ],
@@ -633,7 +641,8 @@ class _AddSiteSheetState extends State<_AddSiteSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(l.splitTunnelAddSite, style: Theme.of(context).textTheme.titleMedium),
+          Text(l.splitTunnelAddSite,
+              style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 12),
           TextField(
             controller: _label,

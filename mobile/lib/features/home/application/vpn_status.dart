@@ -47,3 +47,13 @@ final class VpnError extends VpnStatus {
   /// Machine-readable code, e.g. `permission_denied`.
   final String? code;
 }
+
+/// Native TUN up may leave sticky [VpnError] (Home Nest stayed red while
+/// the tunnel was already live). SOCKS prove still owns the walk.
+bool shouldApplyNativeConnected({
+  required VpnStatus ui,
+  required bool sessionProving,
+}) {
+  if (sessionProving) return false;
+  return ui is! VpnConnected;
+}

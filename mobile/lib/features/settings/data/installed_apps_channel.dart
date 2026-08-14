@@ -40,12 +40,27 @@ class LauncherAppInfo {
   required Iterable<String> launcherPackages,
   required Set<String> disallowedPackages,
 }) {
-  final pkgs = launcherPackages
-      .map((p) => p.trim())
-      .where((p) => p.isNotEmpty)
-      .toSet();
+  final pkgs =
+      launcherPackages.map((p) => p.trim()).where((p) => p.isNotEmpty).toSet();
   final enabled = disallowedPackages.where(pkgs.contains).length;
   return (enabled: enabled, total: pkgs.length);
+}
+
+/// Enabled bypass apps first, then A–Z by label (No-VPN Apps tab).
+List<LauncherAppInfo> sortLauncherAppsBypassFirst({
+  required Iterable<LauncherAppInfo> apps,
+  required Set<String> disallowedPackages,
+}) {
+  final list = apps.toList();
+  list.sort((a, b) {
+    final ad = disallowedPackages.contains(a.packageName);
+    final bd = disallowedPackages.contains(b.packageName);
+    if (ad != bd) return ad ? -1 : 1;
+    final byLabel = a.label.toLowerCase().compareTo(b.label.toLowerCase());
+    if (byLabel != 0) return byLabel;
+    return a.packageName.compareTo(b.packageName);
+  });
+  return list;
 }
 
 /// Known package ids for Sites «Основные» — only VK uses launcher logo.

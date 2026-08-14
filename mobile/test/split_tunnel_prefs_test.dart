@@ -132,5 +132,46 @@ void main() {
       await SplitTunnelPrefs.setDisallowedPackage('com.example.app', false);
       expect(await SplitTunnelPrefs.loadDisallowedPackages(), isEmpty);
     });
+
+    test('seedDefaultBypassIfNeeded adds only installed curated packages',
+        () async {
+      expect(kDefaultBypassPackages, contains('ru.yandex.taxi'));
+      final added = await SplitTunnelPrefs.seedDefaultBypassIfNeeded([
+        'ru.yandex.taxi',
+        'com.example.other',
+      ]);
+      expect(added, isTrue);
+      expect(
+        await SplitTunnelPrefs.loadDisallowedPackages(),
+        {'ru.yandex.taxi'},
+      );
+      expect(await SplitTunnelPrefs.hasPendingChanges(), isTrue);
+    });
+
+    test('seedDefaultBypassIfNeeded does not re-add after user off', () async {
+      await SplitTunnelPrefs.seedDefaultBypassIfNeeded(['ru.yandex.taxi']);
+      await SplitTunnelPrefs.setDisallowedPackage('ru.yandex.taxi', false);
+      expect(await SplitTunnelPrefs.loadDisallowedPackages(), isEmpty);
+      final again = await SplitTunnelPrefs.seedDefaultBypassIfNeeded([
+        'ru.yandex.taxi',
+      ]);
+      expect(again, isFalse);
+      expect(await SplitTunnelPrefs.loadDisallowedPackages(), isEmpty);
+    });
+
+    test(
+        'seedDefaultBypassIfNeeded skips missing packages and still marks seeded',
+        () async {
+      final added = await SplitTunnelPrefs.seedDefaultBypassIfNeeded([
+        'com.only.other',
+      ]);
+      expect(added, isFalse);
+      expect(await SplitTunnelPrefs.loadDisallowedPackages(), isEmpty);
+      final again = await SplitTunnelPrefs.seedDefaultBypassIfNeeded([
+        'ru.yandex.taxi',
+      ]);
+      expect(again, isFalse);
+      expect(await SplitTunnelPrefs.loadDisallowedPackages(), isEmpty);
+    });
   });
 }

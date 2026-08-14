@@ -50,6 +50,15 @@
   "@navPremium": {},
   "homeTrafficRemainder": "Data left",
   "@homeTrafficRemainder": {},
+  "homeTrafficExhausted": "Traffic used up",
+  "@homeTrafficExhausted": {},
+  "homeTrafficAmount": "{remaining} / {limit} GB",
+  "@homeTrafficAmount": {
+    "placeholders": {
+      "remaining": {"type": "String"},
+      "limit": {"type": "String"}
+    }
+  },
   "homeNoVpnRow": "What works without VPN?",
   "@homeNoVpnRow": {},
   "premiumHeadline": "YouTube without ads",
@@ -404,10 +413,16 @@
   "@settingsVersion": {"placeholders": {"version": {"type": "String"}}},
   "settingsTitle": "Settings",
   "settingsSendReport": "Send diagnostic report",
-  "settingsSendReportHint": "Sent to the owner for debugging. Your phone number is masked on the server.",
+  "settingsSendReportHint": "Saved on the device and copied. Then sent to the owner if the network allows. Phone number is masked on the server.",
   "settingsSendReportConfirm": "Send",
   "settingsReportSent": "Report sent",
   "@settingsReportSent": {},
+  "settingsReportSaved": "Report saved: {id}. Copied to clipboard.",
+  "@settingsReportSaved": {
+    "placeholders": {
+      "id": {"type": "String"}
+    }
+  },
   "settingsReportFailed": "Couldn't send the report",
   "@settingsReportFailed": {},
   "settingsReportUnauthorized": "Session expired — sign in again and retry",
@@ -415,7 +430,7 @@
   "settingsReportNetworkError": "Can't reach the server — try again later",
   "@settingsReportNetworkError": {},
   "settingsVpnNotificationTitle": "Shade notification",
-  "settingsVpnNotificationHint": "Detailed card: region, speed, disconnect",
+  "settingsVpnNotificationHint": "Detailed card: region and speed. Disconnect is on the notification.",
   "settingsQsTileTitle": "Quick Settings tile",
   "settingsQsTileHint": "Connect and disconnect from the Android Quick Settings shade",
   "settingsQsTileAdd": "Add to Quick Settings",
@@ -423,6 +438,7 @@
   "settingsQsTileAdded": "Tile added to Quick Settings",
   "settingsQsTileAlreadyAdded": "Tile already in Quick Settings — open the shade and scroll",
   "settingsQsTileManual": "Add manually: shade → pencil → “Teremok VPN”",
+  "settingsQsTileNotAdded": "The tile was not added",
   "homeAbout": "About",
   "homeConfigError": "Failed to get config: {message}",
   "@homeConfigError": {"placeholders": {"message": {"type": "String"}}},
@@ -458,6 +474,7 @@
   "regionBlurbFree": "Hysteria2 · apps, AI, websites",
   "regionBlurbGaming": "TrustTunnel · low ping",
   "regionBlurbYoutube": "TrustTunnel · ad-free",
+  "regionBlurbIndia": "Hysteria2 · local apps and prices",
   "regionOffline": "offline",
   "regionFree": "Available",
   "regionNoneOnline": "No servers online — try again later",

@@ -35,6 +35,14 @@
   "navSubscription": "Подписка",
   "navPremium": "Премиум",
   "homeTrafficRemainder": "Остаток трафика",
+  "homeTrafficExhausted": "Трафик закончился",
+  "homeTrafficAmount": "{remaining} / {limit} ГБ",
+  "@homeTrafficAmount": {
+    "placeholders": {
+      "remaining": {"type": "String"},
+      "limit": {"type": "String"}
+    }
+  },
   "homeNoVpnRow": "Что работает без VPN?",
   "premiumHeadline": "YouTube без рекламы",
   "premiumBody": "Премиум открывает ноды без рекламы YouTube, до 5 устройств и снимает лимит 4,20 ГБ.",
@@ -240,14 +248,20 @@
   "@settingsVersion": {"placeholders": {"version": {"type": "String"}}},
   "settingsTitle": "Настройки",
   "settingsSendReport": "Отправить отчёт",
-  "settingsSendReportHint": "Отправляется владельцу для отладки. Номер телефона маскируется на сервере.",
+  "settingsSendReportHint": "Сначала сохраняется на устройстве и копируется. Потом уходит владельцу, если сеть есть. Номер телефона маскируется на сервере.",
   "settingsSendReportConfirm": "Отправить",
   "settingsReportSent": "Отчёт отправлен",
+  "settingsReportSaved": "Отчёт сохранён: {id}. Скопирован в буфер.",
+  "@settingsReportSaved": {
+    "placeholders": {
+      "id": {"type": "String"}
+    }
+  },
   "settingsReportFailed": "Не удалось отправить отчёт",
   "settingsReportUnauthorized": "Сессия устарела — войдите снова и повторите",
   "settingsReportNetworkError": "Нет связи с сервером — попробуйте позже",
   "settingsVpnNotificationTitle": "Уведомление в шторке",
-  "settingsVpnNotificationHint": "Подробная карточка: регион, скорость, отключение",
+  "settingsVpnNotificationHint": "Подробная карточка: регион и скорость. Отключить — в уведомлении.",
   "settingsQsTileTitle": "Плитка в шторке",
   "settingsQsTileHint": "Быстрое подключение и отключение из панели быстрых настроек Android",
   "settingsQsTileAdd": "Добавить в шторку",
@@ -255,6 +269,7 @@
   "settingsQsTileAdded": "Плитка добавлена в шторку",
   "settingsQsTileAlreadyAdded": "Плитка уже в шторке — откройте панель и пролистайте",
   "settingsQsTileManual": "Добавьте вручную: шторка → карандаш → «Теремок VPN»",
+  "settingsQsTileNotAdded": "Плитка не добавлена",
   "homeAbout": "О приложении",
   "homeConfigError": "Не удалось получить конфиг: {message}",
   "homeFetchConfig": "Получить конфиг",
@@ -289,6 +304,7 @@
   "regionBlurbFree": "Hysteria2 · сервисы, нейросети, сайты",
   "regionBlurbGaming": "TrustTunnel · низкий пинг",
   "regionBlurbYoutube": "TrustTunnel · без рекламы",
+  "regionBlurbIndia": "Hysteria2 · местные сервисы и цены",
   "regionOffline": "офлайн",
   "regionFree": "Свободно",
   "regionNoneOnline": "Нет доступных серверов — попробуйте позже",

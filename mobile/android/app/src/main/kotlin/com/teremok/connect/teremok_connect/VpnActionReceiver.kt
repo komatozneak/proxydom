@@ -9,11 +9,12 @@ import android.util.Log
 class VpnActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         if (intent?.action != ACTION_DISCONNECT) return
-        Log.i(TAG, "notification disconnect tapped")
-        val stop = Intent(context, TeremokVpnService::class.java).apply {
-            action = TeremokVpnService.ACTION_STOP
+        if (!TeremokVpnService.allowUserDisconnect(context)) {
+            Log.i(TAG, "notification disconnect ignored (always-on/lockdown)")
+            return
         }
-        context.startService(stop)
+        Log.i(TAG, "notification disconnect tapped")
+        TeremokVpnService.stopVpnService(context)
     }
 
     companion object {

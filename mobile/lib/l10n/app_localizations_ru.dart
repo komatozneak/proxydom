@@ -112,6 +112,14 @@ class AppL10nRu extends AppL10n {
   String get homeTrafficRemainder => 'Остаток трафика';
 
   @override
+  String get homeTrafficExhausted => 'Трафик закончился';
+
+  @override
+  String homeTrafficAmount(String remaining, String limit) {
+    return '$remaining / $limit ГБ';
+  }
+
+  @override
   String get homeNoVpnRow => 'Что работает без VPN?';
 
   @override
@@ -709,13 +717,18 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get settingsSendReportHint =>
-      'Отправляется владельцу для отладки. Номер телефона маскируется на сервере.';
+      'Сначала сохраняется на устройстве и копируется. Потом уходит владельцу, если сеть есть. Номер телефона маскируется на сервере.';
 
   @override
   String get settingsSendReportConfirm => 'Отправить';
 
   @override
   String get settingsReportSent => 'Отчёт отправлен';
+
+  @override
+  String settingsReportSaved(String id) {
+    return 'Отчёт сохранён: $id. Скопирован в буфер.';
+  }
 
   @override
   String get settingsReportFailed => 'Не удалось отправить отчёт';
@@ -733,7 +746,7 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get settingsVpnNotificationHint =>
-      'Подробная карточка: регион, скорость, отключение';
+      'Подробная карточка: регион и скорость. Отключить — в уведомлении.';
 
   @override
   String get settingsQsTileTitle => 'Плитка в шторке';
@@ -759,6 +772,9 @@ class AppL10nRu extends AppL10n {
   @override
   String get settingsQsTileManual =>
       'Добавьте вручную: шторка → карандаш → «Теремок VPN»';
+
+  @override
+  String get settingsQsTileNotAdded => 'Плитка не добавлена';
 
   @override
   String get homeAbout => 'О приложении';
@@ -862,6 +878,9 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get regionBlurbYoutube => 'TrustTunnel · без рекламы';
+
+  @override
+  String get regionBlurbIndia => 'Hysteria2 · местные сервисы и цены';
 
   @override
   String get regionOffline => 'офлайн';

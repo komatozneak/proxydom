@@ -22,16 +22,18 @@ List<VpnNode> autoPoolFor(
   return pool;
 }
 
-/// EU Free Hy2 → US Hy2 → gaming TT → YouTube. Not RTT.
+/// EU Free Hy2 → US Hy2 → gaming TT → YouTube. Not RTT. India geo never Auto.
 int autoPoolRank(VpnNode node) {
+  if (node.isGeoIn) return 99;
   if (node.isYoutube) return 4;
   if (node.isGaming) return 3;
   if (node.isGeoUs) return 1;
   return 0;
 }
 
-/// Short Auto status label: США / Европа / Игровой / YouTube.
+/// Short Auto status label: США / Европа / Игровой / YouTube / Индия.
 String autoCandidateHintLabel(VpnNode node) {
+  if (node.isGeoIn) return 'Индия';
   if (node.isYoutube) return 'YouTube';
   if (node.isGaming) return 'Игровой';
   if (node.isGeoUs) return 'США';
@@ -39,6 +41,7 @@ String autoCandidateHintLabel(VpnNode node) {
   final label = node.label.isNotEmpty ? node.label : node.id;
   final lower = label.toLowerCase();
   if (lower.contains('youtube')) return 'YouTube';
+  if (lower.contains('индия') || lower.contains('india')) return 'Индия';
   if (lower.contains('игров') || lower.contains('gaming')) return 'Игровой';
   if (lower.contains('европ') || lower.contains('europe')) {
     return 'Европа';

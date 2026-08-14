@@ -46,6 +46,19 @@ class SubscriptionStatus {
       quotaBytesRemaining! <= 0 &&
       (quotaBytesLimit ?? 0) > 0;
 
+  /// Home / subscription HP bar: metered Free only (not Premium / alpha).
+  bool get showsMeteredQuotaBar =>
+      !quotaUnlimited && !unlocksPremium && (quotaBytesLimit ?? 0) > 0;
+
+  /// Remaining Free bytes as 0…1. Empty / unknown limit → 1.
+  double get quotaRemainingFraction {
+    final limit = quotaBytesLimit ?? 0;
+    if (limit <= 0) return 1;
+    final remaining =
+        quotaBytesRemaining ?? (limit - (quotaBytesUsed ?? 0)).clamp(0, limit);
+    return (remaining / limit).clamp(0.0, 1.0);
+  }
+
   factory SubscriptionStatus.fromJson(Map<String, dynamic> json) {
     DateTime? parseDt(Object? v) {
       if (v is! String || v.isEmpty) return null;

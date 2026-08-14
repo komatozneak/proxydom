@@ -27,6 +27,42 @@ class MainActivity : FlutterActivity() {
     @Volatile
     private var pendingNotificationResult: MethodChannel.Result? = null
 
+    @Volatile
+    private var pendingTileConnect = false
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleTileIntent(intent)
+    }
+
+    /**
+     * QS tile collapsed here when [VpnService.prepare] is non-null or persisted
+     * params are missing. Consent → start last session without waiting for Flutter.
+     */
+    private fun handleTileIntent(intent: Intent?) {
+        if (intent?.action != TeremokTileService.ACTION_TILE_TOGGLE) return
+        intent.action = Intent.ACTION_MAIN
+        if (!TeremokVpnService.hasPersistedParams(this)) {
+            Log.i(TAG, "QS tile: no persisted session — Home")
+            return
+        }
+        val prepareIntent = TeremokVpnService.prepareVpn(this)
+        if (prepareIntent == null) {
+            TeremokVpnService.startFromPersistedSession(this)
+            return
+        }
+        pendingTileConnect = true
+        Log.i(TAG, "QS tile: launching VPN consent")
+        try {
+            @Suppress("DEPRECATION")
+            startActivityForResult(prepareIntent, REQUEST_VPN_PERMISSION)
+        } catch (e: Exception) {
+            pendingTileConnect = false
+            Log.w(TAG, "QS tile: consent launch failed", e)
+        }
+    }
+
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         // Android 17 (API 37) on this Pixel: INTERNET is prot=dangerous.
         // Without a runtime grant, Dart sockets fail with errno 13 (EACCES).
@@ -60,6 +96,7 @@ class MainActivity : FlutterActivity() {
         VpnStatusBroadcaster.attachAppContext(applicationContext)
         // Prompt early so FGS notification is visible when VPN connects.
         ensureNotificationPermission(null)
+        handleTileIntent(intent)
 
         VpnChannelRegistry.register(
             engine = flutterEngine,
@@ -155,6 +192,12 @@ class MainActivity : FlutterActivity() {
             TAG,
             "VPN permission resultCode=$resultCode, granted=$granted, conflict=$conflict",
         )
+        if (pendingTileConnect) {
+            pendingTileConnect = false
+            if (granted) {
+                TeremokVpnService.startFromPersistedSession(this)
+            }
+        }
         pendingPermissionResult?.success(granted)
         pendingPermissionResult = null
     }

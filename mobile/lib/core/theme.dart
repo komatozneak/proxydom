@@ -64,6 +64,12 @@ class AppBrand {
 
   static const Color onSurfaceVariantDark = Color(0xFFA1A1AA);
 
+  /// Free quota HP bar: healthy → caution → critical, then depleted grey.
+  static const Color quotaHealthy = success;
+  static const Color quotaCaution = livingHouse;
+  static const Color quotaCritical = destructive;
+  static const Color quotaDepleted = inkMutedLight;
+
   static const double radiusCard = 16;
   static const double radiusPill = 27;
   static const double radiusNavPill = 999;

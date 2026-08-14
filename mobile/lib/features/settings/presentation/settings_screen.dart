@@ -26,6 +26,7 @@ import '../data/access_status_copy.dart';
 import '../data/auto_reconnect_prefs.dart';
 import '../data/subscription_status.dart';
 import '../data/vpn_notification_prefs.dart';
+import '../data/qs_tile_prefs.dart';
 import 'kill_switch_settings_tile.dart';
 import 'seat_code_entry_dialog.dart';
 
@@ -41,6 +42,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   String? _installId;
   bool? _notifEnabled;
   bool _notifLoading = false;
+  bool _qsAdding = false;
   bool? _autoReconnect;
   bool _autoReconnectLoading = false;
   bool _reportSending = false;
@@ -202,6 +204,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     setState(() => _notifLoading = false);
   }
 
+  Future<void> _onAddQsTile() async {
+    if (_qsAdding) return;
+    setState(() => _qsAdding = true);
+    final result = await QsTilePrefs.requestAdd();
+    if (!mounted) return;
+    setState(() => _qsAdding = false);
+    final l = AppL10n.of(context);
+    final message = switch (result) {
+      'added' => l.settingsQsTileAdded,
+      'already_added' => l.settingsQsTileAlreadyAdded,
+      'not_added' => l.settingsQsTileNotAdded,
+      _ => l.settingsQsTileManual,
+    };
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
   Future<void> _onAutoReconnectChanged(bool value) async {
     setState(() {
       _autoReconnectLoading = true;
@@ -319,13 +337,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _onSendReportPressed() async {
     final l = AppL10n.of(context);
-    final auth = ref.read(authProvider).valueOrNull;
-    if (auth is! AuthStateAuthenticated) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l.settingsReportUnauthorized)),
-      );
-      return;
-    }
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -346,41 +357,41 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (confirmed != true || !mounted) return;
 
     setState(() => _reportSending = true);
-    String? report;
     try {
+      final auth = ref.read(authProvider).valueOrNull;
       final vpn = ref.read(vpnProvider);
       final notifier = ref.read(vpnProvider.notifier);
       final service = DiagnosticsService();
-      report = await service.buildReport(
-        authState: auth,
+      final report = await service.buildReport(
+        authState: auth ?? const AuthStateUnauthenticated(),
         vpnUi: vpn,
         cachedConfig: notifier.config,
         autoWinnerId: notifier.autoWinnerId,
         autoWinnerLabel: notifier.displayLabel,
         lastProve: notifier.lastProveSummary,
+        catalogHost: notifier.catalogHost,
       );
-      await service.submit(report: report);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l.settingsReportSent)),
-      );
-    } on DioException catch (e) {
-      if (!mounted) return;
-      final code = e.response?.statusCode ?? 0;
-      final copy = report;
-      if (code == 401 && copy != null && copy.isNotEmpty) {
-        await Clipboard.setData(ClipboardData(text: copy));
+      final saved = await DiagnosticsService.persistLocal(report);
+      await Clipboard.setData(ClipboardData(text: saved.body));
+
+      var delivered = false;
+      if (auth is AuthStateAuthenticated) {
+        try {
+          await service.submit(report: saved.body, dumpToLogcat: false);
+          delivered = true;
+        } on DioException {
+          delivered = false;
+        }
       }
       if (!mounted) return;
-      final message = code == 401
-          ? l.settingsReportUnauthorized
-          : (e.type == DioExceptionType.connectionError ||
-                  e.type == DioExceptionType.connectionTimeout ||
-                  e.type == DioExceptionType.receiveTimeout)
-              ? l.settingsReportNetworkError
-              : l.settingsReportFailed;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
+        SnackBar(
+          content: Text(
+            delivered
+                ? l.settingsReportSent
+                : l.settingsReportSaved(saved.reportId),
+          ),
+        ),
       );
     } catch (_) {
       if (!mounted) return;
@@ -605,6 +616,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ? null
                         : _onNotifChanged,
                   ),
+                ),
+                const _CardDivider(),
+                _SettingsRow(
+                  icon: AppIcons.house,
+                  title: l.settingsQsTileTitle,
+                  subtitle: l.settingsQsTileHint,
+                  onTap: _qsAdding ? null : _onAddQsTile,
+                  trailing: _qsAdding
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : null,
                 ),
               ],
               const _CardDivider(),

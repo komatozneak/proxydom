@@ -29,6 +29,23 @@ void main() {
     });
   });
 
+  group('sortLauncherAppsBypassFirst', () {
+    test('puts disallowed packages first then sorts by label', () {
+      const a =
+          LauncherAppInfo(packageName: 'ru.yandex.taxi', label: 'Yandex Go');
+      const b = LauncherAppInfo(packageName: 'com.b', label: 'Browser');
+      const c = LauncherAppInfo(packageName: 'com.c', label: 'Bank');
+      final sorted = sortLauncherAppsBypassFirst(
+        apps: const [b, a, c],
+        disallowedPackages: {'ru.yandex.taxi', 'com.c'},
+      );
+      expect(
+        sorted.map((e) => e.packageName).toList(),
+        ['com.c', 'ru.yandex.taxi', 'com.b'],
+      );
+    });
+  });
+
   group('iconForOsnovnyeCategory', () {
     test('returns VK launcher icon only', () {
       final typed = <String, Uint8List>{

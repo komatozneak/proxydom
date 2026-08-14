@@ -12,12 +12,16 @@ import androidx.core.app.NotificationCompat
 /**
  * Foreground VPN notification.
  *
- * Detailed (default): Amnezia-style card — speeds, region, disconnect.
- * Minimal: required FGS stub when user turns the shade card off in Settings.
+ * Detailed (opt-in): region, speeds, disconnect.
+ * Compact connected: required FGS card on a LOW channel so it is not below
+ * the fold; disconnect action is on the *expanded* notification (not compact).
+ * Connecting stub stays on the legacy MIN channel.
  */
 object VpnNotificationHelper {
     private const val CHANNEL_DETAILED = "teremok_vpn_v5"
     private const val CHANNEL_MINIMAL = "teremok_vpn_minimal_v5"
+    /** Compact connected — new id: existing MIN importance cannot be raised. */
+    private const val CHANNEL_CONNECTED_COMPACT = "teremok_vpn_connected_v6"
     private const val LEGACY_CHANNEL_ID = "teremok_vpn"
     private const val LEGACY_CHANNEL_DETAILED = "teremok_vpn_v2"
     private const val LEGACY_CHANNEL_DETAILED_V3 = "teremok_vpn_v3"
@@ -76,7 +80,21 @@ object VpnNotificationHelper {
                     "Теремок VPN (фон)",
                     NotificationManager.IMPORTANCE_MIN,
                 ).apply {
-                    description = "Служебное уведомление при скрытой карточке"
+                    description = "Служебное уведомление при подключении"
+                    setShowBadge(false)
+                    setSound(null, null)
+                    enableVibration(false)
+                },
+            )
+        }
+        if (nm.getNotificationChannel(CHANNEL_CONNECTED_COMPACT) == null) {
+            nm.createNotificationChannel(
+                NotificationChannel(
+                    CHANNEL_CONNECTED_COMPACT,
+                    "Теремок VPN (подключено)",
+                    NotificationManager.IMPORTANCE_LOW,
+                ).apply {
+                    description = "Статус VPN в шторке"
                     setShowBadge(false)
                     setSound(null, null)
                     enableVibration(false)
@@ -97,7 +115,7 @@ object VpnNotificationHelper {
                 showDisconnect = false,
             )
         } else {
-            buildMinimal(
+            buildMinimalConnecting(
                 context,
                 context.getString(R.string.vpn_notification_connecting),
             )
@@ -111,6 +129,7 @@ object VpnNotificationHelper {
         upText: String,
     ): Notification {
         ensureChannel(context)
+        val showDisconnect = TeremokVpnService.allowUserDisconnect(context)
         return if (isDetailedEnabled(context)) {
             buildDetailed(
                 context = context,
@@ -118,12 +137,13 @@ object VpnNotificationHelper {
                 statusLine = context.getString(R.string.vpn_notification_connected),
                 downText = downText,
                 upText = upText,
-                showDisconnect = true,
+                showDisconnect = showDisconnect,
             )
         } else {
-            buildMinimal(
+            buildCompactConnected(
                 context,
                 context.getString(R.string.vpn_notification_connected),
+                showDisconnect,
             )
         }
     }
@@ -174,17 +194,13 @@ object VpnNotificationHelper {
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
 
         if (showDisconnect) {
-            builder.addAction(
-                0,
-                context.getString(R.string.vpn_notification_disconnect),
-                disconnectPending(context),
-            )
+            addDisconnectAction(builder, context)
         }
         return stripLargeIconExtras(builder.build())
     }
 
-    /** Tiny FGS stub — Android still requires a notification while VPN runs. */
-    private fun buildMinimal(context: Context, status: String): Notification {
+    /** Tiny FGS stub while connecting — MIN channel, no disconnect. */
+    private fun buildMinimalConnecting(context: Context, status: String): Notification {
         val notification = NotificationCompat.Builder(context, CHANNEL_MINIMAL)
             .setSmallIcon(R.drawable.ic_stat_teremok)
             .setLargeIcon(null as android.graphics.Bitmap?)
@@ -201,6 +217,46 @@ object VpnNotificationHelper {
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .build()
         return stripLargeIconExtras(notification)
+    }
+
+    /**
+     * Compact connected card. Action is on the expanded row (Android design);
+     * LOW importance keeps it in the shade instead of below the fold.
+     */
+    private fun buildCompactConnected(
+        context: Context,
+        status: String,
+        showDisconnect: Boolean,
+    ): Notification {
+        val builder = NotificationCompat.Builder(context, CHANNEL_CONNECTED_COMPACT)
+            .setSmallIcon(R.drawable.ic_stat_teremok)
+            .setLargeIcon(null as android.graphics.Bitmap?)
+            .setColor(0xFFC78F29.toInt())
+            .setContentTitle("Теремок VPN")
+            .setContentText(status)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setSilent(true)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setContentIntent(launchPending(context))
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+        if (showDisconnect) {
+            addDisconnectAction(builder, context)
+        }
+        return stripLargeIconExtras(builder.build())
+    }
+
+    private fun addDisconnectAction(
+        builder: NotificationCompat.Builder,
+        context: Context,
+    ) {
+        builder.addAction(
+            0,
+            context.getString(R.string.vpn_notification_disconnect),
+            disconnectPending(context),
+        )
     }
 
     /** Some OEMs keep a stale largeIcon from older channel posts — clear extras. */

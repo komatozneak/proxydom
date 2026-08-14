@@ -301,6 +301,18 @@ abstract class AppL10n {
   /// **'Data left'**
   String get homeTrafficRemainder;
 
+  /// No description provided for @homeTrafficExhausted.
+  ///
+  /// In en, this message translates to:
+  /// **'Traffic used up'**
+  String get homeTrafficExhausted;
+
+  /// No description provided for @homeTrafficAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'{remaining} / {limit} GB'**
+  String homeTrafficAmount(String remaining, String limit);
+
   /// No description provided for @homeNoVpnRow.
   ///
   /// In en, this message translates to:
@@ -1396,7 +1408,7 @@ abstract class AppL10n {
   /// No description provided for @settingsSendReportHint.
   ///
   /// In en, this message translates to:
-  /// **'Sent to the owner for debugging. Your phone number is masked on the server.'**
+  /// **'Saved on the device and copied. Then sent to the owner if the network allows. Phone number is masked on the server.'**
   String get settingsSendReportHint;
 
   /// No description provided for @settingsSendReportConfirm.
@@ -1410,6 +1422,12 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Report sent'**
   String get settingsReportSent;
+
+  /// No description provided for @settingsReportSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Report saved: {id}. Copied to clipboard.'**
+  String settingsReportSaved(String id);
 
   /// No description provided for @settingsReportFailed.
   ///
@@ -1438,7 +1456,7 @@ abstract class AppL10n {
   /// No description provided for @settingsVpnNotificationHint.
   ///
   /// In en, this message translates to:
-  /// **'Detailed card: region, speed, disconnect'**
+  /// **'Detailed card: region and speed. Disconnect is on the notification.'**
   String get settingsVpnNotificationHint;
 
   /// No description provided for @settingsQsTileTitle.
@@ -1482,6 +1500,12 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Add manually: shade → pencil → “Teremok VPN”'**
   String get settingsQsTileManual;
+
+  /// No description provided for @settingsQsTileNotAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'The tile was not added'**
+  String get settingsQsTileNotAdded;
 
   /// No description provided for @homeAbout.
   ///
@@ -1668,6 +1692,12 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'TrustTunnel · ad-free'**
   String get regionBlurbYoutube;
+
+  /// No description provided for @regionBlurbIndia.
+  ///
+  /// In en, this message translates to:
+  /// **'Hysteria2 · local apps and prices'**
+  String get regionBlurbIndia;
 
   /// No description provided for @regionOffline.
   ///

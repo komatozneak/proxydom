@@ -111,6 +111,14 @@ class AppL10nEn extends AppL10n {
   String get homeTrafficRemainder => 'Data left';
 
   @override
+  String get homeTrafficExhausted => 'Traffic used up';
+
+  @override
+  String homeTrafficAmount(String remaining, String limit) {
+    return '$remaining / $limit GB';
+  }
+
+  @override
   String get homeNoVpnRow => 'What works without VPN?';
 
   @override
@@ -709,13 +717,18 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get settingsSendReportHint =>
-      'Sent to the owner for debugging. Your phone number is masked on the server.';
+      'Saved on the device and copied. Then sent to the owner if the network allows. Phone number is masked on the server.';
 
   @override
   String get settingsSendReportConfirm => 'Send';
 
   @override
   String get settingsReportSent => 'Report sent';
+
+  @override
+  String settingsReportSaved(String id) {
+    return 'Report saved: $id. Copied to clipboard.';
+  }
 
   @override
   String get settingsReportFailed => 'Couldn\'t send the report';
@@ -733,7 +746,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get settingsVpnNotificationHint =>
-      'Detailed card: region, speed, disconnect';
+      'Detailed card: region and speed. Disconnect is on the notification.';
 
   @override
   String get settingsQsTileTitle => 'Quick Settings tile';
@@ -758,6 +771,9 @@ class AppL10nEn extends AppL10n {
   @override
   String get settingsQsTileManual =>
       'Add manually: shade → pencil → “Teremok VPN”';
+
+  @override
+  String get settingsQsTileNotAdded => 'The tile was not added';
 
   @override
   String get homeAbout => 'About';
@@ -861,6 +877,9 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get regionBlurbYoutube => 'TrustTunnel · ad-free';
+
+  @override
+  String get regionBlurbIndia => 'Hysteria2 · local apps and prices';
 
   @override
   String get regionOffline => 'offline';

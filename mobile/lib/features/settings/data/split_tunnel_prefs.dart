@@ -92,9 +92,7 @@ DomainNormalizeResult normalizeSplitTunnelDomain(String raw) {
   if (s.isEmpty) {
     return const DomainNormalizeErr(DomainNormalizeErrorKind.empty);
   }
-  if (s.contains('://') ||
-      s.startsWith('http:') ||
-      s.startsWith('https:')) {
+  if (s.contains('://') || s.startsWith('http:') || s.startsWith('https:')) {
     return const DomainNormalizeErr(DomainNormalizeErrorKind.scheme);
   }
   if (s.contains('/') ||
@@ -146,6 +144,7 @@ class SplitTunnelPrefs {
   static const _draftRevKey = 'split_tunnel_draft_rev_v1';
   static const _osnovnyeKey = 'split_tunnel_osnovnye_v1';
   static const _disallowedAppsKey = 'split_tunnel_disallowed_apps_v1';
+  static const _seededBypassKey = 'split_tunnel_seeded_bypass_v1';
 
   /// Default ON — preserves existing RU `.srs` direct behavior.
   static Future<bool> isBundledRuEnabled() async {
@@ -210,7 +209,8 @@ class SplitTunnelPrefs {
     return raw.where((p) => p.trim().isNotEmpty).toSet();
   }
 
-  static Future<void> setDisallowedPackage(String packageName, bool bypass) async {
+  static Future<void> setDisallowedPackage(
+      String packageName, bool bypass) async {
     final prefs = await SharedPreferences.getInstance();
     final set = await loadDisallowedPackages();
     final pkg = packageName.trim();
@@ -222,6 +222,31 @@ class SplitTunnelPrefs {
     }
     await prefs.setStringList(_disallowedAppsKey, set.toList()..sort());
     await _bumpDraft(prefs);
+  }
+
+  /// Once per install: exclude curated RU apps that are actually installed.
+  ///
+  /// Apps path (`addDisallowedApplication`) works on Hy2/TT/Xray. Sites
+  /// «Сервисы Яндекса» is Xray-only and does not fix Yandex Go on Free Hy2.
+  /// Never re-runs after [_seededBypassKey] so a user off-toggle sticks.
+  static Future<bool> seedDefaultBypassIfNeeded(
+    Iterable<String> installedPackages,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(_seededBypassKey) == true) return false;
+    final installed = installedPackages
+        .map((p) => p.trim())
+        .where((p) => p.isNotEmpty)
+        .toSet();
+    final toAdd = kDefaultBypassPackages.intersection(installed);
+    if (toAdd.isNotEmpty) {
+      final current = await loadDisallowedPackages();
+      current.addAll(toAdd);
+      await prefs.setStringList(_disallowedAppsKey, current.toList()..sort());
+      await _bumpDraft(prefs);
+    }
+    await prefs.setBool(_seededBypassKey, true);
+    return toAdd.isNotEmpty;
   }
 
   static Future<bool> isGovRuEnabled() async {
@@ -365,6 +390,21 @@ class SplitTunnelPrefs {
   }
 }
 
+/// Curated TUN-exclude packages (Yandex Go / banks / Gosuslugi).
+/// Only seeded when the package is installed; missing ids are skipped.
+const kDefaultBypassPackages = <String>{
+  'ru.yandex.taxi',
+  'ru.yandex.android.taxi',
+  'ru.yandex.ytaxi',
+  'ru.yandex.taximeter',
+  'ru.sberbankmobile',
+  'ru.sberbank.sberbankid',
+  'com.idamob.tinkoff.android',
+  'ru.alfabank.mobile.android',
+  'ru.vtb24.mobilebanking.android',
+  'ru.gosuslugi.mobile',
+};
+
 /// Огонь «Основные» category kind.
 enum OsnovnyeKind { geositeRu, geositeGov, domains }
 
@@ -388,8 +428,7 @@ class OsnovnyeCategory {
   final List<String> domains;
   final bool defaultEnabled;
 
-  String label(String languageCode) =>
-      languageCode == 'en' ? labelEn : labelRu;
+  String label(String languageCode) => languageCode == 'en' ? labelEn : labelRu;
 }
 
 /// Fixed 7 categories matching Огонь «Основные» (counter N/7).

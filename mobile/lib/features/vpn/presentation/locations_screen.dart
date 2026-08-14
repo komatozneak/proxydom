@@ -233,6 +233,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     if (locked) return l.locationsPremiumUnavailable;
     if (node.isYoutube) return l.regionBlurbYoutube;
     if (node.isGaming) return l.regionBlurbGaming;
+    if (node.isGeoIn) return l.regionBlurbIndia;
     return l.regionBlurbFree;
   }
 

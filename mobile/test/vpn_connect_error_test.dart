@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:teremok_connect/features/home/application/vpn_status.dart';
 import 'package:teremok_connect/features/vpn/data/vpn_session_snapshot.dart';
 import 'package:teremok_connect/features/vpn/domain/vpn_connect_error.dart';
 
@@ -39,7 +40,8 @@ void main() {
           phase: VpnSessionPhase.error,
           generation: 1,
           reason: VpnSessionReason.pathIncompatible,
-          detail: 'path_incompatible: auto: no candidate passed data-plane prove',
+          detail:
+              'path_incompatible: auto: no candidate passed data-plane prove',
         ),
       );
       expect(err.code, 'path_incompatible');
@@ -143,6 +145,83 @@ void main() {
         ),
         isTrue,
       );
+      expect(
+        connectingIdleShouldDrop(
+          walkActive: false,
+          sessionOwnsUi: false,
+          lastPhase: VpnSessionPhase.connectedHealthy,
+        ),
+        isFalse,
+      );
+      expect(
+        nativeIdleMustNotDemote(
+          walkActive: false,
+          sessionOwnsUi: false,
+          lastPhase: VpnSessionPhase.connectedHealthy,
+        ),
+        isTrue,
+      );
+      expect(
+        nativeIdleMustNotDemote(
+          walkActive: false,
+          sessionOwnsUi: false,
+          lastPhase: VpnSessionPhase.proving,
+        ),
+        isTrue,
+      );
+      expect(
+        nativeIdleMustNotDemote(
+          walkActive: false,
+          sessionOwnsUi: false,
+          lastPhase: VpnSessionPhase.idle,
+        ),
+        isFalse,
+      );
+      expect(
+        shouldIgnoreRegressiveIdleSnapshot(
+          incoming: VpnSessionPhase.idle,
+          lastPhase: VpnSessionPhase.proving,
+          walkActive: false,
+          sessionOwnsUi: false,
+        ),
+        isTrue,
+      );
+      expect(
+        shouldIgnoreRegressiveIdleSnapshot(
+          incoming: VpnSessionPhase.unknown,
+          lastPhase: VpnSessionPhase.connectedHealthy,
+          walkActive: false,
+          sessionOwnsUi: false,
+        ),
+        isTrue,
+      );
+      expect(
+        shouldIgnoreRegressiveIdleSnapshot(
+          incoming: VpnSessionPhase.idle,
+          lastPhase: VpnSessionPhase.idle,
+          walkActive: false,
+          sessionOwnsUi: false,
+        ),
+        isFalse,
+      );
+      expect(
+        shouldIgnoreRegressiveIdleSnapshot(
+          incoming: VpnSessionPhase.connectedHealthy,
+          lastPhase: VpnSessionPhase.proving,
+          walkActive: false,
+          sessionOwnsUi: false,
+        ),
+        isFalse,
+      );
+      expect(
+        shouldIgnoreRegressiveIdleSnapshot(
+          incoming: VpnSessionPhase.idle,
+          lastPhase: VpnSessionPhase.stopping,
+          walkActive: false,
+          sessionOwnsUi: false,
+        ),
+        isFalse,
+      );
     });
 
     test('ignoresNativeConnected only while proving', () {
@@ -172,6 +251,39 @@ void main() {
           phase: VpnSessionPhase.coreStarting,
           generation: 1,
         ).ignoresNativeConnected,
+        isFalse,
+      );
+    });
+  });
+
+  group('shouldApplyNativeConnected', () {
+    test('heals sticky VpnError when not proving', () {
+      expect(
+        shouldApplyNativeConnected(
+          ui: const VpnError(message: 'fail'),
+          sessionProving: false,
+        ),
+        isTrue,
+      );
+    });
+
+    test('does not overwrite Connected or heal during SOCKS prove', () {
+      expect(
+        shouldApplyNativeConnected(
+          ui: VpnConnected(
+            serverName: 'EU',
+            protocol: 'hysteria',
+            connectedSince: DateTime.utc(2026, 8, 14),
+          ),
+          sessionProving: false,
+        ),
+        isFalse,
+      );
+      expect(
+        shouldApplyNativeConnected(
+          ui: const VpnError(message: 'fail'),
+          sessionProving: true,
+        ),
         isFalse,
       );
     });

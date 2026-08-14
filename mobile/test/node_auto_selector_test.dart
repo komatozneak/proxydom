@@ -69,15 +69,25 @@ void main() {
     host: '0.0.0.0',
   );
 
+  final india = _node(
+    id: 'in-geo-1',
+    label: 'Индия · Premium',
+    protocol: kVpnNodeProtocolHysteria2,
+    purpose: 'geo-in',
+    requiresPremium: true,
+    host: '107.181.139.193',
+  );
+
   test('Free Auto pool is EU then US Hy2, never TT / YouTube / eu-primary', () {
     final pool = autoPoolFor(
-      [youtube, us, euFree, euRetired, gaming, stub],
+      [youtube, us, euFree, euRetired, gaming, stub, india],
       isPremium: false,
     );
     expect(pool.map((n) => n.id), ['eu-hy2-1', 'us-hy2-1']);
     expect(youtube.inAutoPool(isPremium: false), isFalse);
     expect(gaming.inAutoPool(isPremium: false), isFalse);
     expect(euRetired.inAutoPool(isPremium: false), isFalse);
+    expect(india.inAutoPool(isPremium: false), isFalse);
     expect(euFree.isAutoEligible, isTrue);
     expect(autoPoolRank(euFree), 0);
     expect(autoPoolRank(us), 1);
@@ -87,7 +97,7 @@ void main() {
 
   test('Premium Auto pool is EU Hy2, US Hy2, gaming, then YouTube', () {
     final pool = autoPoolFor(
-      [youtube, us, euFree, euRetired, gaming],
+      [youtube, us, euFree, euRetired, gaming, india],
       isPremium: true,
     );
     expect(
@@ -97,6 +107,7 @@ void main() {
     expect(gaming.inAutoPool(isPremium: true), isTrue);
     expect(youtube.inAutoPool(isPremium: true), isTrue);
     expect(euRetired.inAutoPool(isPremium: true), isFalse);
+    expect(india.inAutoPool(isPremium: true), isFalse);
   });
 
   test('coming-soon stub and empty host never enter Auto', () {
@@ -109,6 +120,7 @@ void main() {
     expect(autoCandidateHintLabel(euFree), 'Европа');
     expect(autoCandidateHintLabel(gaming), 'Игровой');
     expect(autoCandidateHintLabel(youtube), 'YouTube');
+    expect(autoCandidateHintLabel(india), 'Индия');
   });
 
   test('resolveNodeIdForConfig keeps manual id (no Auto swap)', () {

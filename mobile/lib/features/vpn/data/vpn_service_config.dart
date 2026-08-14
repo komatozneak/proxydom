@@ -3,6 +3,7 @@ import 'dart:convert';
 import '../../../core/config.dart';
 import 'node_display.dart';
 import 'vpn_config.dart';
+import 'vpn_node.dart';
 import 'xray_config_builder.dart';
 
 /// User-facing brand name for VPN session / fallback labels (no Marzban id).
@@ -18,6 +19,26 @@ String normalizeOutboundType(String? type) {
 /// Protocol label for Home / notification (e.g. `VLESS`).
 String friendlyProtocolLabel(String? type) =>
     normalizeOutboundType(type).toUpperCase();
+
+/// Session protocol for logs / Home: Hy2 and TrustTunnel must not fall back to VLESS.
+String sessionProtocolLabel({
+  required VpnConfig? config,
+  String? selectedNodeProtocol,
+}) {
+  final selected = (selectedNodeProtocol ?? '').trim().toLowerCase();
+  if (config?.isHysteriaSession == true ||
+      selected == kVpnNodeProtocolHysteria2) {
+    return 'HYSTERIA2';
+  }
+  if (config?.isTrustTunnelSession == true ||
+      selected == kVpnNodeProtocolTrusttunnel) {
+    return 'TRUSTTUNNEL';
+  }
+  if (config?.xrayProfile?.candidates.isNotEmpty == true) {
+    return friendlyProtocolLabel(config!.primaryCandidate.protocol);
+  }
+  return friendlyProtocolLabel('vless');
+}
 
 /// Human label for region/node; never Marzban `username`.
 ///

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/utils/format_utils.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../home/presentation/widgets/free_quota_bar.dart';
 import '../../settings/application/subscription_status_provider.dart';
 import '../../settings/data/access_status_copy.dart';
 import '../../settings/data/subscription_status.dart';
@@ -23,11 +25,40 @@ class SubscriptionTabScreen extends ConsumerWidget {
         padding: const EdgeInsets.all(20),
         children: [
           async.when(
-            data: (status) => Card(
-              child: ListTile(
-                title: Text(_titleFor(l, status)),
-                subtitle: Text(_subtitleFor(l, status)),
-              ),
+            data: (status) => Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Card(
+                  child: ListTile(
+                    title: Text(_titleFor(l, status)),
+                    subtitle: Text(_subtitleFor(l, status)),
+                  ),
+                ),
+                if (status.showsMeteredQuotaBar) ...[
+                  const SizedBox(height: 12),
+                  FreeQuotaBar(
+                    remainingFraction: status.quotaRemainingFraction,
+                    title: l.homeTrafficRemainder,
+                    amountLabel: l.homeTrafficAmount(
+                      formatGib(
+                        (status.quotaBytesRemaining ?? 0) /
+                            (1024 * 1024 * 1024),
+                        russian: Localizations.localeOf(context).languageCode ==
+                            'ru',
+                      ),
+                      formatGib(
+                        (status.quotaBytesLimit ?? 0) / (1024 * 1024 * 1024),
+                        russian: Localizations.localeOf(context).languageCode ==
+                            'ru',
+                      ),
+                    ),
+                    exhaustedLabel: l.homeTrafficExhausted,
+                    onTap: status.quotaExhausted
+                        ? () => context.push('/locked')
+                        : null,
+                  ),
+                ],
+              ],
             ),
             loading: () => const LinearProgressIndicator(),
             error: (_, __) => Text(l.settingsAccessNoneSubtitle),
@@ -79,15 +110,7 @@ class SubscriptionTabScreen extends ConsumerWidget {
       return l.settingsAccessActiveUntil(date);
     }
     if (s.quotaUnlimited) {
-      return l.settingsAccessFreeSubtitle;
-    }
-    if (accessCopyKind(s) == AccessCopyKind.free &&
-        s.quotaBytesRemaining != null &&
-        s.quotaBytesLimit != null) {
-      final remGiB = s.quotaBytesRemaining! / (1024 * 1024 * 1024);
-      final limGiB = s.quotaBytesLimit! / (1024 * 1024 * 1024);
-      return '${l.settingsAccessFreeTitle}: '
-          '${remGiB.toStringAsFixed(2)} / ${limGiB.toStringAsFixed(2)} GiB';
+      return l.premiumUnlimitedTraffic;
     }
     switch (accessCopyKind(s)) {
       case AccessCopyKind.closedBeta:

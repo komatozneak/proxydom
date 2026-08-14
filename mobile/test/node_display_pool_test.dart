@@ -9,6 +9,7 @@ void main() {
         '185.139.228.192': ('Нидерланды', 'Амстердам', '🇳🇱'),
         '45.91.248.91': ('США · Бесплатно', '', '🇺🇸'),
         '217.60.3.9': ('Европа · Бесплатно', '', '🇪🇺'),
+        '107.181.139.193': ('Индия · Premium', '', '🇮🇳'),
       };
 
       for (final entry in cases.entries) {
@@ -204,6 +205,26 @@ void main() {
       expect(place.title.toLowerCase(), isNot(contains('албания')));
       expect(place.title.toLowerCase(), isNot(contains('albania')));
       expect(place.subtitle, isEmpty);
+    });
+
+    test('geo-in purpose shows Индия · Premium with India flag', () {
+      const india = VpnNode(
+        id: 'in-geo-1',
+        label: 'Node IN',
+        host: '107.181.139.193',
+        port: 443,
+        status: 'connected',
+        isDefault: false,
+        name: 'in-geo-1',
+        purpose: 'geo-in',
+        region: 'in',
+        protocol: kVpnNodeProtocolHysteria2,
+        requiresPremium: true,
+      );
+      final place = placeForNode(india, index: 0);
+      expect(place.title, 'Индия · Premium');
+      expect(place.flag, '🇮🇳');
+      expect(locationSectionFor(india), LocationSection.premium);
     });
 
     test('groupNodesByLocationSection order Premium Europe USA', () {

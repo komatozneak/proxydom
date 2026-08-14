@@ -51,6 +51,17 @@ class SessionSnapshotTest {
     }
 
     @Test
+    fun `auto hop phases suppress idle broadcast`() {
+        assertTrue(SessionPhase.Binding.suppressTeardownIdleBroadcast())
+        assertTrue(SessionPhase.Proving.suppressTeardownIdleBroadcast())
+        assertTrue(SessionPhase.TunUp.suppressTeardownIdleBroadcast())
+        assertTrue(SessionPhase.CoreStarting.suppressTeardownIdleBroadcast())
+        assertEquals(false, SessionPhase.ConnectedHealthy.suppressTeardownIdleBroadcast())
+        assertEquals(false, SessionPhase.Idle.suppressTeardownIdleBroadcast())
+        assertEquals(false, SessionPhase.Error.suppressTeardownIdleBroadcast())
+    }
+
+    @Test
     fun `path transport from iface`() {
         assertEquals(PathTransport.Wifi, PathTransport.fromIface("wlan0"))
         assertEquals(PathTransport.Cellular, PathTransport.fromIface("rmnet1"))

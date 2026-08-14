@@ -57,15 +57,10 @@ class _SignalNestHeroState extends State<SignalNestHero>
   }
 
   void _configureMotion(TreeState state, {required bool animateEmerge}) {
-    final needsTick = state != TreeState.error;
-    if (needsTick) {
-      if (!_clock.isAnimating) {
-        _clock
-          ..duration = const Duration(seconds: 1)
-          ..repeat();
-      }
-    } else {
-      _clock.stop();
+    if (!_clock.isAnimating) {
+      _clock
+        ..duration = const Duration(seconds: 1)
+        ..repeat();
     }
 
     switch (state) {
@@ -88,8 +83,11 @@ class _SignalNestHeroState extends State<SignalNestHero>
           _emerge.value = 1;
         }
       case TreeState.error:
-        _emerge.value = 0;
-        _clock.stop();
+        if (animateEmerge) {
+          _emerge.reverse();
+        } else {
+          _emerge.value = 0;
+        }
     }
   }
 
@@ -108,7 +106,8 @@ class _SignalNestHeroState extends State<SignalNestHero>
 
   double get _tSec => _sw.elapsedMilliseconds / 1000.0;
 
-  static ({double sx, double sy, double dy}) _slimeHop(double tSec, double amp) {
+  static ({double sx, double sy, double dy}) _slimeHop(
+      double tSec, double amp) {
     final a = amp.clamp(0.0, 1.0);
     final wave = math.sin(tSec * math.pi * 2 / 1.4);
     final lift = math.max(0.0, wave);
@@ -132,7 +131,8 @@ class _SignalNestHeroState extends State<SignalNestHero>
         final p = 1.0 + 0.010 * (0.5 + 0.5 * math.sin(t * math.pi * 2 / 2.8));
         return (sx: p, sy: p, dy: 0);
       case TreeState.error:
-        return (sx: 1.0, sy: 1.0, dy: 0);
+        final p = 1.0 + 0.005 * (0.5 + 0.5 * math.sin(t * math.pi * 2 / 3.6));
+        return (sx: p, sy: p, dy: 0);
     }
   }
 
@@ -182,10 +182,26 @@ class _SignalNestHeroState extends State<SignalNestHero>
               if (isError) {
                 house = ColorFiltered(
                   colorFilter: const ColorFilter.matrix(<double>[
-                    0.2126, 0.7152, 0.0722, 0, 0,
-                    0.2126, 0.7152, 0.0722, 0, 0,
-                    0.2126, 0.7152, 0.0722, 0, 0,
-                    0, 0, 0, 0.92, 0,
+                    0.2126,
+                    0.7152,
+                    0.0722,
+                    0,
+                    0,
+                    0.2126,
+                    0.7152,
+                    0.0722,
+                    0,
+                    0,
+                    0.2126,
+                    0.7152,
+                    0.0722,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0.92,
+                    0,
                   ]),
                   child: house,
                 );
@@ -313,7 +329,8 @@ class _RefSymNetPainter extends CustomPainter {
           ..isAntiAlias = true,
       );
 
-      final phase = tSec * (energetic ? 1.55 : 0.95) + i * (math.pi * 2 / sparkCount);
+      final phase =
+          tSec * (energetic ? 1.55 : 0.95) + i * (math.pi * 2 / sparkCount);
       final t = 0.5 + 0.5 * math.sin(phase);
       final bead = Offset.lerp(hub, p, t)!;
       final glow = math.sin(t * math.pi);
