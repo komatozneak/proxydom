@@ -1012,8 +1012,56 @@ abstract class AppL10n {
   /// No description provided for @devicesHint.
   ///
   /// In en, this message translates to:
-  /// **'Each app install gets its own VPN key. You can revoke access for a single device.'**
+  /// **'You can log out other devices if you no longer have them.'**
   String get devicesHint;
+
+  /// No description provided for @devicesCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Created: {date}'**
+  String devicesCreated(String date);
+
+  /// No description provided for @devicesCurrentDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Current device'**
+  String get devicesCurrentDevice;
+
+  /// No description provided for @devicesSectionThis.
+  ///
+  /// In en, this message translates to:
+  /// **'This install'**
+  String get devicesSectionThis;
+
+  /// No description provided for @devicesSectionGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'In the group'**
+  String get devicesSectionGroup;
+
+  /// No description provided for @devicesSectionActions.
+  ///
+  /// In en, this message translates to:
+  /// **'Group'**
+  String get devicesSectionActions;
+
+  /// No description provided for @devicesInGroupLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'In the group'**
+  String get devicesInGroupLabel;
+
+  /// No description provided for @devicesGroupEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'One device so far · {count} slots left'**
+  String devicesGroupEmpty(int count);
+
+  /// No description provided for @devicesLimitReached.
+  ///
+  /// In en, this message translates to:
+  /// **'Device limit reached'**
+  String get devicesLimitReached;
 
   /// No description provided for @devicesCount.
   ///
@@ -1042,8 +1090,20 @@ abstract class AppL10n {
   /// No description provided for @devicesThisDevice.
   ///
   /// In en, this message translates to:
-  /// **'this device'**
+  /// **'You'**
   String get devicesThisDevice;
+
+  /// No description provided for @devicesOwnerLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscription owner'**
+  String get devicesOwnerLabel;
+
+  /// No description provided for @devicesInvitedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Invited device'**
+  String get devicesInvitedLabel;
 
   /// No description provided for @devicesRevoke.
   ///
@@ -1087,22 +1147,28 @@ abstract class AppL10n {
   /// **'Could not revoke device'**
   String get devicesRevokeFailed;
 
+  /// No description provided for @devicesLeaveHint.
+  ///
+  /// In en, this message translates to:
+  /// **'This install becomes its own Free account'**
+  String get devicesLeaveHint;
+
   /// No description provided for @devicesLeave.
   ///
   /// In en, this message translates to:
-  /// **'Leave account'**
+  /// **'Leave external subscription'**
   String get devicesLeave;
 
   /// No description provided for @devicesLeaveTitle.
   ///
   /// In en, this message translates to:
-  /// **'Leave shared account?'**
+  /// **'Leave this subscription?'**
   String get devicesLeaveTitle;
 
   /// No description provided for @devicesLeaveBody.
   ///
   /// In en, this message translates to:
-  /// **'This install becomes its own account. Subscription stays on the old account. Save any new recovery code if shown.'**
+  /// **'This install becomes its own Free account. The paid subscription stays with the owner. Save the new recovery code if shown.'**
   String get devicesLeaveBody;
 
   /// No description provided for @devicesLeaveConfirm.
@@ -1122,6 +1188,42 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Could not leave the account'**
   String get devicesLeaveFailed;
+
+  /// No description provided for @devicesLogoutAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign out everywhere'**
+  String get devicesLogoutAll;
+
+  /// No description provided for @devicesLogoutAllHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke every device on this account, including this phone'**
+  String get devicesLogoutAllHint;
+
+  /// No description provided for @devicesLogoutAllTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign out on all devices?'**
+  String get devicesLogoutAllTitle;
+
+  /// No description provided for @devicesLogoutAllBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Every device on this account will lose access, including this phone. Recover with your code or register again.'**
+  String get devicesLogoutAllBody;
+
+  /// No description provided for @devicesLogoutAllConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign out everywhere'**
+  String get devicesLogoutAllConfirm;
+
+  /// No description provided for @devicesLogoutAllFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not sign out everywhere'**
+  String get devicesLogoutAllFailed;
 
   /// No description provided for @devicesLimitOpenManage.
   ///
@@ -1408,7 +1510,7 @@ abstract class AppL10n {
   /// No description provided for @settingsSendReportHint.
   ///
   /// In en, this message translates to:
-  /// **'Saved on the device and copied. Then sent to the owner if the network allows. Phone number is masked on the server.'**
+  /// **'Saved on the device and copied. Then sent to the owner if the network allows.'**
   String get settingsSendReportHint;
 
   /// No description provided for @settingsSendReportConfirm.
@@ -1456,7 +1558,7 @@ abstract class AppL10n {
   /// No description provided for @settingsVpnNotificationHint.
   ///
   /// In en, this message translates to:
-  /// **'Detailed card: region and speed. Disconnect is on the notification.'**
+  /// **'Card in the shade with Disconnect. Off hides the card; VPN stays on.'**
   String get settingsVpnNotificationHint;
 
   /// No description provided for @settingsQsTileTitle.
@@ -1468,7 +1570,7 @@ abstract class AppL10n {
   /// No description provided for @settingsQsTileHint.
   ///
   /// In en, this message translates to:
-  /// **'Connect and disconnect from the Android Quick Settings shade'**
+  /// **'Add a tile to connect and disconnect from Quick Settings'**
   String get settingsQsTileHint;
 
   /// No description provided for @settingsQsTileAdd.
@@ -2296,31 +2398,31 @@ abstract class AppL10n {
   /// No description provided for @settingsInviteDevice.
   ///
   /// In en, this message translates to:
-  /// **'Invite another device'**
+  /// **'Add device to my subscription'**
   String get settingsInviteDevice;
 
   /// No description provided for @settingsInviteDeviceHint.
   ///
   /// In en, this message translates to:
-  /// **'Create a short seat code'**
+  /// **'Create a code to join your group'**
   String get settingsInviteDeviceHint;
 
   /// No description provided for @settingsAcceptSeat.
   ///
   /// In en, this message translates to:
-  /// **'Enter seat code'**
+  /// **'Join group'**
   String get settingsAcceptSeat;
 
   /// No description provided for @settingsAcceptSeatHint.
   ///
   /// In en, this message translates to:
-  /// **'Join another account'**
+  /// **'Join a subscription by invitation'**
   String get settingsAcceptSeatHint;
 
   /// No description provided for @settingsSeatCodeTitle.
   ///
   /// In en, this message translates to:
-  /// **'Seat code'**
+  /// **'Invitation code'**
   String get settingsSeatCodeTitle;
 
   /// No description provided for @settingsSeatCodeCopied.
@@ -2332,19 +2434,19 @@ abstract class AppL10n {
   /// No description provided for @settingsSeatInviteFailed.
   ///
   /// In en, this message translates to:
-  /// **'Couldn’t create a seat code'**
+  /// **'Couldn’t create an invitation code'**
   String get settingsSeatInviteFailed;
 
   /// No description provided for @settingsAcceptSeatOk.
   ///
   /// In en, this message translates to:
-  /// **'Device joined the account'**
+  /// **'Device added to the group'**
   String get settingsAcceptSeatOk;
 
   /// No description provided for @settingsSeatPremiumRequired.
   ///
   /// In en, this message translates to:
-  /// **'Inviting devices requires Premium'**
+  /// **'Adding devices requires Premium'**
   String get settingsSeatPremiumRequired;
 
   /// No description provided for @settingsSeatCodeNotFound.
@@ -2356,7 +2458,7 @@ abstract class AppL10n {
   /// No description provided for @settingsSeatDeviceLimit.
   ///
   /// In en, this message translates to:
-  /// **'Device limit reached for this account'**
+  /// **'Device limit reached for this subscription'**
   String get settingsSeatDeviceLimit;
 
   /// No description provided for @settingsSeatOwnCode.
@@ -2368,8 +2470,62 @@ abstract class AppL10n {
   /// No description provided for @settingsSeatAcceptFailed.
   ///
   /// In en, this message translates to:
-  /// **'Couldn’t accept the seat code'**
+  /// **'Couldn’t join the group'**
   String get settingsSeatAcceptFailed;
+
+  /// No description provided for @settingsSeatCodeTtl.
+  ///
+  /// In en, this message translates to:
+  /// **'Code is valid for 30 minutes'**
+  String get settingsSeatCodeTtl;
+
+  /// No description provided for @settingsSeatShowQr.
+  ///
+  /// In en, this message translates to:
+  /// **'Show code'**
+  String get settingsSeatShowQr;
+
+  /// No description provided for @settingsSeatScanHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan the QR code or follow the link'**
+  String get settingsSeatScanHint;
+
+  /// No description provided for @settingsPayOwnerOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Only the subscription owner can pay'**
+  String get settingsPayOwnerOnly;
+
+  /// No description provided for @settingsSeatForbidden.
+  ///
+  /// In en, this message translates to:
+  /// **'Only the subscription owner can do this'**
+  String get settingsSeatForbidden;
+
+  /// No description provided for @seatAcceptConsentTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Join this group?'**
+  String get seatAcceptConsentTitle;
+
+  /// No description provided for @seatAcceptConsentBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The account owner will see this device’s name, platform, and the date it was added. You can leave the group later.'**
+  String get seatAcceptConsentBody;
+
+  /// No description provided for @seatAcceptConsentConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Join'**
+  String get seatAcceptConsentConfirm;
+
+  /// No description provided for @devicesOwnerCannotLeave.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke other devices before leaving'**
+  String get devicesOwnerCannotLeave;
 
   /// No description provided for @settingsRecoverAccess.
   ///

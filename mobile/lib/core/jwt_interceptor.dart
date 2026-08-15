@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 
+import 'install_id_storage.dart';
 import 'token_storage.dart';
 
 /// Late-bound logout hook — set from `main.dart` before first API call.
@@ -32,9 +33,13 @@ class JwtRefreshInterceptor extends QueuedInterceptor {
       final normalizedBase = baseUrl.endsWith('/') ? baseUrl : '$baseUrl/';
       final refreshUrl = '$normalizedBase$refreshEndpoint';
 
+      final deviceUuid = await InstallIdStorage.instance.getOrCreate();
       final resp = await _refreshClient.post<Map<String, dynamic>>(
         refreshUrl,
-        data: {'refresh_token': refreshToken},
+        data: {
+          'refresh_token': refreshToken,
+          'device_uuid': deviceUuid,
+        },
         options: Options(
           receiveTimeout: const Duration(seconds: 8),
           validateStatus: (status) => status != null && status < 500,

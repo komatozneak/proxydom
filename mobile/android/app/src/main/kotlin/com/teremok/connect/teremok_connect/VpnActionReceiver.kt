@@ -5,14 +5,10 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 
-/** Disconnect action from VPN foreground notification. */
+/** Shade action: always stop the session (Amnezia contract). */
 class VpnActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         if (intent?.action != ACTION_DISCONNECT) return
-        if (!TeremokVpnService.allowUserDisconnect(context)) {
-            Log.i(TAG, "notification disconnect ignored (always-on/lockdown)")
-            return
-        }
         Log.i(TAG, "notification disconnect tapped")
         TeremokVpnService.stopVpnService(context)
     }

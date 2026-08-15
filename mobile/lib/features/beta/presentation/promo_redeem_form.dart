@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../session/application/session_provider.dart';
 import '../application/beta_providers.dart';
 import '../data/beta_redeem_outcome.dart';
 
@@ -65,6 +66,10 @@ class _PromoRedeemFormState extends ConsumerState<PromoRedeemForm> {
       final result = await ref.read(betaApiProvider).redeem(code);
       if (!mounted) return;
       if (result.outcome.isSuccess && result.hasAccess) {
+        final snap = result.session;
+        if (snap != null) {
+          await ref.read(sessionProvider.notifier).apply(snap);
+        }
         await widget.onSuccess();
         return;
       }

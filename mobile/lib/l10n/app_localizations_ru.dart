@@ -503,7 +503,35 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get devicesHint =>
-      'Каждая установка приложения получает свой VPN-ключ. Можно отозвать доступ к отдельному устройству.';
+      'Можно выйти с других устройств, если нет к ним доступа.';
+
+  @override
+  String devicesCreated(String date) {
+    return 'Создано: $date';
+  }
+
+  @override
+  String get devicesCurrentDevice => 'Это устройство';
+
+  @override
+  String get devicesSectionThis => 'Эта установка';
+
+  @override
+  String get devicesSectionGroup => 'В группе';
+
+  @override
+  String get devicesSectionActions => 'Группа';
+
+  @override
+  String get devicesInGroupLabel => 'В группе';
+
+  @override
+  String devicesGroupEmpty(int count) {
+    return 'Пока одно устройство · ещё $count мест';
+  }
+
+  @override
+  String get devicesLimitReached => 'Лимит устройств достигнут';
 
   @override
   String devicesCount(int active, int max) {
@@ -521,7 +549,13 @@ class AppL10nRu extends AppL10n {
   String get devicesUntitled => 'Устройство';
 
   @override
-  String get devicesThisDevice => 'это устройство';
+  String get devicesThisDevice => 'Вы';
+
+  @override
+  String get devicesOwnerLabel => 'Владелец подписки';
+
+  @override
+  String get devicesInvitedLabel => 'Приглашённое устройство';
 
   @override
   String get devicesRevoke => 'Отозвать';
@@ -546,14 +580,18 @@ class AppL10nRu extends AppL10n {
   String get devicesRevokeFailed => 'Не удалось отозвать устройство';
 
   @override
-  String get devicesLeave => 'Покинуть аккаунт';
+  String get devicesLeaveHint =>
+      'Это устройство станет отдельным бесплатным аккаунтом';
 
   @override
-  String get devicesLeaveTitle => 'Покинуть общий аккаунт?';
+  String get devicesLeave => 'Покинуть чужую подписку';
+
+  @override
+  String get devicesLeaveTitle => 'Покинуть чужую подписку?';
 
   @override
   String get devicesLeaveBody =>
-      'Это устройство станет отдельным аккаунтом. Подписка останется на старом аккаунте. Сохраните новый код восстановления, если он появится.';
+      'Это устройство станет отдельным бесплатным аккаунтом. Оплаченная подписка останется у владельца. Сохраните новый код восстановления, если он появится.';
 
   @override
   String get devicesLeaveConfirm => 'Покинуть';
@@ -563,6 +601,26 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get devicesLeaveFailed => 'Не удалось покинуть аккаунт';
+
+  @override
+  String get devicesLogoutAll => 'Выйти на всех устройствах';
+
+  @override
+  String get devicesLogoutAllHint =>
+      'Отозвать все устройства аккаунта, включая этот телефон';
+
+  @override
+  String get devicesLogoutAllTitle => 'Выйти на всех устройствах?';
+
+  @override
+  String get devicesLogoutAllBody =>
+      'Все устройства этого аккаунта потеряют доступ, включая этот телефон. Нужно будет восстановить аккаунт по коду или зарегистрироваться заново.';
+
+  @override
+  String get devicesLogoutAllConfirm => 'Выйти везде';
+
+  @override
+  String get devicesLogoutAllFailed => 'Не удалось выйти на всех устройствах';
 
   @override
   String get devicesLimitOpenManage => 'Управление устройствами';
@@ -717,7 +775,7 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get settingsSendReportHint =>
-      'Сначала сохраняется на устройстве и копируется. Потом уходит владельцу, если сеть есть. Номер телефона маскируется на сервере.';
+      'Сначала сохраняется на устройстве и копируется. Потом уходит владельцу, если сеть есть.';
 
   @override
   String get settingsSendReportConfirm => 'Отправить';
@@ -746,14 +804,14 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get settingsVpnNotificationHint =>
-      'Подробная карточка: регион и скорость. Отключить — в уведомлении.';
+      'Карточка с кнопкой «Отключить». Выключите — карточка спрячется, VPN останется.';
 
   @override
   String get settingsQsTileTitle => 'Плитка в шторке';
 
   @override
   String get settingsQsTileHint =>
-      'Быстрое подключение и отключение из панели быстрых настроек Android';
+      'Добавить плитку: включение и отключение из панели быстрых настроек';
 
   @override
   String get settingsQsTileAdd => 'Добавить в шторку';
@@ -1211,45 +1269,75 @@ class AppL10nRu extends AppL10n {
       'После переустановки введите код, сохранённый при первом доступе.';
 
   @override
-  String get settingsInviteDevice => 'Пригласить устройство';
+  String get settingsInviteDevice => 'Добавить устройство в подписку';
 
   @override
-  String get settingsInviteDeviceHint => 'Создать короткий код места';
+  String get settingsInviteDeviceHint => 'Код для входа в группу';
 
   @override
-  String get settingsAcceptSeat => 'Ввести код места';
+  String get settingsAcceptSeat => 'Войти в группу';
 
   @override
-  String get settingsAcceptSeatHint => 'Присоединиться к аккаунту';
+  String get settingsAcceptSeatHint => 'Присоединиться по приглашению';
 
   @override
-  String get settingsSeatCodeTitle => 'Код места';
+  String get settingsSeatCodeTitle => 'Код приглашения';
 
   @override
   String get settingsSeatCodeCopied => 'Код скопирован';
 
   @override
-  String get settingsSeatInviteFailed => 'Не удалось создать код места';
+  String get settingsSeatInviteFailed => 'Не удалось создать код приглашения';
 
   @override
-  String get settingsAcceptSeatOk => 'Устройство присоединено к аккаунту';
+  String get settingsAcceptSeatOk => 'Устройство добавлено в группу';
 
   @override
   String get settingsSeatPremiumRequired =>
-      'Приглашение устройств доступно в Premium';
+      'Добавление устройств доступно в Premium';
 
   @override
   String get settingsSeatCodeNotFound => 'Код не найден или истёк';
 
   @override
-  String get settingsSeatDeviceLimit => 'Достигнут лимит устройств на аккаунте';
+  String get settingsSeatDeviceLimit => 'Достигнут лимит устройств на подписке';
 
   @override
   String get settingsSeatOwnCode =>
       'Нельзя принять свой код — введите его на другом устройстве';
 
   @override
-  String get settingsSeatAcceptFailed => 'Не удалось принять код места';
+  String get settingsSeatAcceptFailed => 'Не удалось войти в группу';
+
+  @override
+  String get settingsSeatCodeTtl => 'Код действует 30 минут';
+
+  @override
+  String get settingsSeatShowQr => 'Показать код';
+
+  @override
+  String get settingsSeatScanHint =>
+      'Отсканируйте QR-код или перейдите по ссылке';
+
+  @override
+  String get settingsPayOwnerOnly => 'Оплату оформляет владелец подписки';
+
+  @override
+  String get settingsSeatForbidden =>
+      'Это может сделать только владелец подписки';
+
+  @override
+  String get seatAcceptConsentTitle => 'Войти в эту группу?';
+
+  @override
+  String get seatAcceptConsentBody =>
+      'Владелец аккаунта увидит имя устройства, платформу и дату добавления. Выйти из группы можно позже.';
+
+  @override
+  String get seatAcceptConsentConfirm => 'Войти';
+
+  @override
+  String get devicesOwnerCannotLeave => 'Сначала отзовите другие устройства';
 
   @override
   String get settingsRecoverAccess => 'Восстановить доступ';

@@ -4,18 +4,17 @@ import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.graphics.drawable.Icon
 import android.net.VpnService
 import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
-import android.util.Log
 
 /**
  * Quick Settings tile «Теремок VPN».
  *
- * Idle + consent already granted → [TeremokVpnService.startFromPersistedSession].
- * Otherwise collapse into [MainActivity] (VPN prepare dialog / Nest).
- * Connected stop is skipped when Always-on / lockdown owns the session.
+ * Toggle only: ACTIVE while up / bringing up, INACTIVE when idle.
+ * Click always start/stop (Amnezia). Always-on may restart the tunnel.
  */
 class TeremokTileService : TileService() {
 
@@ -39,24 +38,18 @@ class TeremokTileService : TileService() {
     }
 
     private fun handleClick() {
-        val status = VpnStatusBroadcaster.currentStatus()
-        val allowStop = TeremokVpnService.allowUserDisconnect(applicationContext)
+        val status = TeremokVpnService.resolveUiStatus(applicationContext)
         when (status) {
             "connected", "connecting", "preparing" -> {
-                if (!allowStop) {
-                    Log.i(TAG, "tile stop skipped always-on/lockdown status=$status")
-                    updateTileState()
-                    return
-                }
                 TeremokVpnService.stopVpnService(applicationContext)
-                setTile(Tile.STATE_INACTIVE)
+                applyTile(Tile.STATE_INACTIVE, status = "idle")
             }
             else -> {
                 val prepared = VpnService.prepare(this) == null
                 val started = prepared &&
                     TeremokVpnService.startFromPersistedSession(applicationContext)
                 if (started) {
-                    setTile(Tile.STATE_UNAVAILABLE)
+                    applyTile(Tile.STATE_ACTIVE, status = "connecting")
                 } else {
                     collapseToApp()
                 }
@@ -69,6 +62,10 @@ class TeremokTileService : TileService() {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
             action = ACTION_TILE_TOGGLE
         }
+        collapseWith(intent)
+    }
+
+    private fun collapseWith(intent: Intent) {
         @Suppress("DEPRECATION")
         if (Build.VERSION.SDK_INT >= 34) {
             startActivityAndCollapse(
@@ -85,25 +82,34 @@ class TeremokTileService : TileService() {
     }
 
     private fun updateTileState() {
+        val status = TeremokVpnService.resolveUiStatus(applicationContext)
+        applyTile(TeremokVpnService.tileStateFor(status), status)
+    }
+
+    private fun applyTile(state: Int, status: String) {
         val tile = qsTile ?: return
-        val snap = TeremokVpnService.queryAlwaysOnVpnSnapshot(applicationContext)
-        val lockdown = snap["lockdown"] as? Boolean
-        tile.state = TeremokVpnService.tileStateFor(
-            VpnStatusBroadcaster.currentStatus(),
-            lockdown,
+        tile.state = state
+        tile.label = getString(R.string.qs_tile_label)
+        tile.icon = Icon.createWithResource(
+            this,
+            if (state == Tile.STATE_ACTIVE) R.drawable.ic_qs_vpn else R.drawable.ic_qs_vpn_off,
         )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            tile.subtitle = getString(
+                when (status) {
+                    "connected" -> R.string.qs_tile_subtitle_on
+                    "connecting", "preparing" -> R.string.qs_tile_subtitle_busy
+                    else -> R.string.qs_tile_subtitle_off
+                },
+            )
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            tile.stateDescription = tile.subtitle
+        }
         tile.updateTile()
     }
 
-    private fun setTile(state: Int) {
-        qsTile?.let {
-            it.state = state
-            it.updateTile()
-        }
-    }
-
     companion object {
-        private const val TAG = "TeremokTile"
         const val ACTION_TILE_TOGGLE = "com.teremok.connect.QS_TILE_TOGGLE"
 
         fun requestListening(context: Context) {

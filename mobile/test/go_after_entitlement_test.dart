@@ -19,6 +19,11 @@ void main() {
     expect(AppRouter.pendingRecoveryCode, 'ABCD-EFGH');
   });
 
+  test('leave path can set pendingRecoveryCode for /recovery', () {
+    AppRouter.pendingRecoveryCode = 'TRM-LEAVE-CODE';
+    expect(AppRouter.pendingRecoveryCode, 'TRM-LEAVE-CODE');
+  });
+
   test('markShown clears pending storage flag', () async {
     await RecoveryCodeStorage.instance.savePending('CODE-1234');
     expect(await RecoveryCodeStorage.instance.wasShown(), isFalse);

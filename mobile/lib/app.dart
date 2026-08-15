@@ -6,6 +6,7 @@ import 'core/router.dart';
 import 'core/theme.dart';
 import 'core/updates/update_check_service.dart';
 import 'features/settings/application/locale_provider.dart';
+import 'features/settings/application/seat_join_code_provider.dart';
 import 'features/settings/application/theme_mode_provider.dart';
 import 'l10n/app_localizations.dart';
 
@@ -31,9 +32,30 @@ class TeremokApp extends ConsumerWidget {
       localizationsDelegates: AppL10n.localizationsDelegates,
       routerConfig: AppRouter.config,
       builder: (context, child) {
-        return _UpdateCheckHost(child: child ?? const SizedBox.shrink());
+        return _SeatJoinHost(
+          child: _UpdateCheckHost(child: child ?? const SizedBox.shrink()),
+        );
       },
     );
+  }
+}
+
+/// Navigates to Devices when a `teremokconnect://join` code arrives.
+class _SeatJoinHost extends ConsumerWidget {
+  const _SeatJoinHost({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen<String?>(seatJoinCodeProvider, (prev, next) {
+      final code = next?.trim();
+      if (code == null || code.isEmpty) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        AppRouter.config.go('/settings/devices');
+      });
+    });
+    return child;
   }
 }
 

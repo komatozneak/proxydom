@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/widgets/app_icon.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../auth/data/auth_api.dart';
 import '../../settings/application/subscription_status_provider.dart';
 import '../../settings/data/access_status_copy.dart';
 import '../../settings/data/subscription_status.dart';
@@ -189,6 +191,23 @@ class _HubBody extends StatelessWidget {
               title: l.settingsDevices,
               subtitle: '${profile.devicesCount} / ${profile.deviceLimit}',
               onTap: () => context.push('/settings/devices'),
+            ),
+            const Divider(height: 1),
+            _NavTile(
+              icon: AppIcons.info,
+              title: l.accountHubLinkTelegram,
+              subtitle: profile.telegramUsername != null
+                  ? '@${profile.telegramUsername}'
+                  : l.accountHubLinkTelegramHint,
+              onTap: () async {
+                try {
+                  final link = await AuthApi().startTelegramLink();
+                  final uri = Uri.parse(link);
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  }
+                } catch (_) {}
+              },
             ),
           ],
         ),

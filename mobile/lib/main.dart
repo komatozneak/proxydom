@@ -12,6 +12,7 @@ import 'core/diagnostics/app_log_buffer.dart';
 import 'core/diagnostics/diagnostics_service.dart';
 import 'core/jwt_interceptor.dart';
 import 'core/router.dart';
+import 'core/seat_join_links.dart';
 import 'features/auth/application/auth_provider.dart';
 import 'features/auth/application/auth_state.dart';
 import 'features/auth/application/logout_handler.dart';
@@ -69,6 +70,7 @@ void main() async {
   // Warm auth restore before first frame so GoRouter sees tokens on cold start.
   await container.read(authProvider.future);
   await AppRouter.warmWelcomeFlag();
+  await attachSeatJoinLinks(container);
 
   // Связываем GoRouter с authProvider: при смене состояния авторизации
   // вызываем refreshNotifier.notifyAuthChanged(), чтобы GoRouter пересчитал redirect.

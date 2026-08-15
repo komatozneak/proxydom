@@ -7,12 +7,96 @@ import org.junit.Test
 
 class VpnShadePolicyTest {
 
+    private val statuses = listOf(
+        "idle", "connecting", "preparing", "connected", "error", "revoked",
+    )
+    private val flags = listOf(true, false, null)
+    private val sdks = listOf(28, 34)
+
     @Test
-    fun `disconnect allowed for ordinary user session`() {
+    fun `tile is only ACTIVE or INACTIVE for every state combo`() {
+        for (status in statuses) {
+            val state = VpnShadePolicy.tileState(status)
+            assertTrue(
+                "$status → $state",
+                state == VpnShadePolicy.TILE_ACTIVE ||
+                    state == VpnShadePolicy.TILE_INACTIVE,
+            )
+            assertTrue(state != VpnShadePolicy.TILE_UNAVAILABLE)
+        }
+    }
+
+    @Test
+    fun `connected and connecting are ACTIVE even under lockdown flags`() {
+        assertEquals(VpnShadePolicy.TILE_ACTIVE, VpnShadePolicy.tileState("connected"))
+        assertEquals(VpnShadePolicy.TILE_ACTIVE, VpnShadePolicy.tileState("connecting"))
+        assertEquals(VpnShadePolicy.TILE_ACTIVE, VpnShadePolicy.tileState("preparing"))
+        assertEquals(VpnShadePolicy.TILE_INACTIVE, VpnShadePolicy.tileState("idle"))
+    }
+
+    @Test
+    fun `connected notification always has an action`() {
+        assertTrue(VpnShadePolicy.showConnectedAction("connected"))
+        assertFalse(VpnShadePolicy.showConnectedAction("connecting"))
+        assertFalse(VpnShadePolicy.showConnectedAction("idle"))
+        assertEquals(VpnShadePolicy.SHADE_ACTION_STOP, VpnShadePolicy.shadeActionKind())
+    }
+
+    @Test
+    fun `shade action is always STOP across always-on lockdown sdk`() {
+        for (alwaysOn in flags) {
+            for (lockdown in flags) {
+                for (sdk in sdks) {
+                    val owns = VpnShadePolicy.systemOwnsSession(
+                        alwaysOnOnOurInstance = alwaysOn,
+                        sdkInt = sdk,
+                        appInitiated = true,
+                    )
+                    assertTrue(
+                        "alwaysOn=$alwaysOn lockdown=$lockdown sdk=$sdk owns=$owns",
+                        VpnShadePolicy.showConnectedAction("connected"),
+                    )
+                    assertEquals(
+                        "alwaysOn=$alwaysOn lockdown=$lockdown sdk=$sdk owns=$owns",
+                        VpnShadePolicy.SHADE_ACTION_STOP,
+                        VpnShadePolicy.shadeActionKind(),
+                    )
+                    assertTrue(
+                        VpnShadePolicy.shadeActionKind() !=
+                            VpnShadePolicy.SHADE_ACTION_VPN_SETTINGS,
+                    )
+                    assertEquals(
+                        VpnShadePolicy.TILE_ACTIVE,
+                        VpnShadePolicy.tileState("connected"),
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `always-on on our instance owns the session`() {
+        assertTrue(
+            VpnShadePolicy.systemOwnsSession(
+                alwaysOnOnOurInstance = true,
+                sdkInt = 34,
+                appInitiated = true,
+            ),
+        )
+        assertFalse(
+            VpnShadePolicy.allowUserDisconnect(
+                alwaysOnOnOurInstance = true,
+                sdkInt = 34,
+                appInitiated = true,
+            ),
+        )
+    }
+
+    @Test
+    fun `ordinary user session can stop`() {
         assertTrue(
             VpnShadePolicy.allowUserDisconnect(
-                alwaysOn = false,
-                lockdown = false,
+                alwaysOnOnOurInstance = false,
                 sdkInt = 34,
                 appInitiated = true,
             ),
@@ -20,66 +104,20 @@ class VpnShadePolicyTest {
     }
 
     @Test
-    fun `always-on hides disconnect`() {
-        assertFalse(
-            VpnShadePolicy.allowUserDisconnect(
-                alwaysOn = true,
-                lockdown = false,
-                sdkInt = 34,
-                appInitiated = true,
-            ),
-        )
-    }
-
-    @Test
-    fun `lockdown hides disconnect`() {
-        assertFalse(
-            VpnShadePolicy.allowUserDisconnect(
-                alwaysOn = false,
-                lockdown = true,
-                sdkInt = 34,
-                appInitiated = true,
-            ),
-        )
-    }
-
-    @Test
-    fun `pre-Q system start hides disconnect`() {
-        assertFalse(
-            VpnShadePolicy.allowUserDisconnect(
-                alwaysOn = null,
-                lockdown = null,
+    fun `pre-Q unmarked start is system-owned`() {
+        assertTrue(
+            VpnShadePolicy.systemOwnsSession(
+                alwaysOnOnOurInstance = null,
                 sdkInt = 28,
                 appInitiated = false,
             ),
         )
-        assertTrue(
-            VpnShadePolicy.allowUserDisconnect(
-                alwaysOn = null,
-                lockdown = null,
+        assertFalse(
+            VpnShadePolicy.systemOwnsSession(
+                alwaysOnOnOurInstance = null,
                 sdkInt = 28,
                 appInitiated = true,
             ),
-        )
-    }
-
-    @Test
-    fun `tile lockdown is unavailable`() {
-        assertEquals(
-            VpnShadePolicy.TILE_UNAVAILABLE,
-            VpnShadePolicy.tileState("connected", lockdown = true),
-        )
-        assertEquals(
-            VpnShadePolicy.TILE_ACTIVE,
-            VpnShadePolicy.tileState("connected", lockdown = false),
-        )
-        assertEquals(
-            VpnShadePolicy.TILE_UNAVAILABLE,
-            VpnShadePolicy.tileState("connecting", lockdown = false),
-        )
-        assertEquals(
-            VpnShadePolicy.TILE_INACTIVE,
-            VpnShadePolicy.tileState("idle", lockdown = false),
         )
     }
 

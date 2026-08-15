@@ -333,18 +333,31 @@ class TeremokVpnService : VpnService() {
         fun isAppInitiatedSession(context: android.content.Context): Boolean =
             sessionPrefs(context).getBoolean(KEY_APP_INITIATED, true)
 
-        fun allowUserDisconnect(context: android.content.Context): Boolean {
-            val snap = queryAlwaysOnVpnSnapshot(context)
-            return VpnShadePolicy.allowUserDisconnect(
-                alwaysOn = snap["alwaysOn"] as? Boolean,
-                lockdown = snap["lockdown"] as? Boolean,
+        /**
+         * Always-on on *this* VpnService instance (API 29+).
+         * Not [Settings.Secure] — that bit is global / foreign-VPN.
+         */
+        fun ourAlwaysOn(context: android.content.Context): Boolean {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return false
+            val svc = currentInstance() ?: return false
+            return runCatching { svc.isAlwaysOn }.getOrNull() == true
+        }
+
+        fun systemOwnsSession(context: android.content.Context): Boolean =
+            VpnShadePolicy.systemOwnsSession(
+                alwaysOnOnOurInstance = ourAlwaysOn(context),
                 sdkInt = Build.VERSION.SDK_INT,
                 appInitiated = isAppInitiatedSession(context),
             )
-        }
 
-        fun tileStateFor(status: String, lockdown: Boolean?): Int =
-            VpnShadePolicy.tileState(status, lockdown)
+        fun allowUserDisconnect(context: android.content.Context): Boolean =
+            VpnShadePolicy.allowUserDisconnect(
+                alwaysOnOnOurInstance = ourAlwaysOn(context),
+                sdkInt = Build.VERSION.SDK_INT,
+                appInitiated = isAppInitiatedSession(context),
+            )
+
+        fun tileStateFor(status: String): Int = VpnShadePolicy.tileState(status)
 
         fun isVpnRunning(): Boolean {
             val s = VpnStatusBroadcaster.currentStatus()
@@ -496,6 +509,7 @@ class TeremokVpnService : VpnService() {
         super.onCreate()
         instance = this
         VpnStatusBroadcaster.attachAppContext(applicationContext)
+        ShadeNotification.ensureChannels(this)
         DefaultNetworkMonitor.prewarm(this)
         // Do NOT broadcast "idle" here when Always-on is about to restore —
         // Flutter syncFromNative would paint Disconnected while the tunnel is up.
@@ -880,8 +894,8 @@ class TeremokVpnService : VpnService() {
 
         notificationSessionLine = buildNotificationSessionLine(params, protocol)
         startForeground(
-            VpnNotificationHelper.notificationId(),
-            VpnNotificationHelper.startConnecting(this),
+            ShadeNotification.notificationId(),
+            ShadeNotification.connecting(this),
         )
 
         try {
@@ -1497,40 +1511,33 @@ class TeremokVpnService : VpnService() {
         downText: String = "",
         upText: String = "",
     ) {
-        val notification = VpnNotificationHelper.buildConnected(
+        val notification = ShadeNotification.connected(
             context = this,
             sessionLine = notificationSessionLine,
             downText = downText,
             upText = upText,
         )
-        startForeground(VpnNotificationHelper.notificationId(), notification)
+        startForeground(ShadeNotification.notificationId(), notification)
     }
 
-    /** Settings toggled detailed shade card — refresh FGS notification style. */
+    /** Settings toggled shade visibility — refresh the single FGS card. */
     fun onNotificationStyleChanged() {
         if (currentStatus != "connected" && currentStatus != "connecting" &&
             currentStatus != "preparing"
         ) {
             return
         }
-        // Traffic monitor always runs while connected (feeds Home + optional shade).
         if (currentStatus == "connected") {
             startTrafficMonitor()
-            val down = if (VpnNotificationHelper.isDetailedEnabled(this)) {
-                VpnTrafficBroadcaster.lastDownText
-            } else {
-                ""
-            }
-            val up = if (VpnNotificationHelper.isDetailedEnabled(this)) {
-                VpnTrafficBroadcaster.lastUpText
-            } else {
-                ""
-            }
-            showConnectedNotification(downText = down, upText = up)
+            val showSpeeds = ShadeNotification.isVisible(this)
+            showConnectedNotification(
+                downText = if (showSpeeds) VpnTrafficBroadcaster.lastDownText else "",
+                upText = if (showSpeeds) VpnTrafficBroadcaster.lastUpText else "",
+            )
         } else {
             startForeground(
-                VpnNotificationHelper.notificationId(),
-                VpnNotificationHelper.startConnecting(this),
+                ShadeNotification.notificationId(),
+                ShadeNotification.connecting(this),
             )
         }
     }
@@ -1539,9 +1546,7 @@ class TeremokVpnService : VpnService() {
         stopTrafficMonitor()
         trafficMonitor = VpnTrafficMonitor(this) { downBps, upBps, downText, upText ->
             VpnTrafficBroadcaster.emit(downBps, upBps, downText, upText)
-            if (currentStatus == "connected" &&
-                VpnNotificationHelper.isDetailedEnabled(this)
-            ) {
+            if (currentStatus == "connected" && ShadeNotification.isVisible(this)) {
                 showConnectedNotification(downText = downText, upText = upText)
             }
         }.also { it.start() }
@@ -1818,12 +1823,12 @@ object VpnChannelRegistry {
                     "requestNotificationPermission" -> {
                         onNotificationPermissionRequest(result)
                     }
-                    "isVpnNotificationDetailedEnabled" -> {
-                        result.success(VpnNotificationHelper.isDetailedEnabled(appContext))
+                    "isShadeNotificationEnabled" -> {
+                        result.success(ShadeNotification.isVisible(appContext))
                     }
-                    "setVpnNotificationDetailedEnabled" -> {
+                    "setShadeNotificationEnabled" -> {
                         val enabled = call.argument<Boolean>("enabled") ?: true
-                        VpnNotificationHelper.setDetailedEnabled(appContext, enabled)
+                        ShadeNotification.setVisible(appContext, enabled)
                         val svc = serviceProvider() ?: TeremokVpnService.currentInstance()
                         svc?.onNotificationStyleChanged()
                         result.success(true)
@@ -1997,6 +2002,7 @@ object VpnStatusBroadcaster {
     /** Update lastStatus without EventChannel (hop teardown during Auto). */
     fun remember(status: String) {
         lastStatus = status
+        appContext?.let { TeremokTileService.requestListening(it) }
     }
 
     fun emit(status: String) {

@@ -6,6 +6,8 @@ import '../../../core/config.dart';
 import '../../../core/install_id_storage.dart';
 import '../../../core/router.dart';
 import '../../../core/token_storage.dart';
+import '../../session/application/session_provider.dart';
+import '../../session/data/account_session_snapshot.dart';
 import '../data/auth_api.dart';
 import '../data/recovery_code_storage.dart';
 import '../data/seat_invite_local_store.dart';
@@ -130,6 +132,41 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
     state = AsyncData(await _registerDevice());
   }
 
+  /// Recover account via Telegram bot verification polling.
+  Future<bool> recoverWithTelegram({
+    required String token,
+    required Map<String, dynamic> data,
+  }) async {
+    try {
+      final access = data['access_token'] as String;
+      final refresh = data['refresh_token'] as String;
+      final apiSecret = data['api_secret'] as String?;
+      final sessionMap = data['session'] as Map<String, dynamic>?;
+
+      await TokenStorage.instance.saveTokens(
+        accessToken: access,
+        refreshToken: refresh,
+      );
+      if (apiSecret != null && apiSecret.isNotEmpty) {
+        await ApiSecretStorage.instance.save(apiSecret);
+      }
+      if (sessionMap != null) {
+        final snap = AccountSessionSnapshot.fromJson(sessionMap);
+        await ref.read(sessionProvider.notifier).apply(snap);
+      }
+      state = AsyncData(
+        AuthStateAuthenticated(
+          accessToken: access,
+          refreshToken: refresh,
+        ),
+      );
+      return true;
+    } catch (e, st) {
+      debugPrint('auth.recover_tg_apply_failed: $e\n$st');
+      return false;
+    }
+  }
+
   /// Reinstall recovery: bind new install to account via recovery code.
   Future<bool> recoverWithCode(String recoveryCode) async {
     try {
@@ -191,6 +228,10 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
         refreshToken: result.refreshToken,
       );
       await result.persistApiSecret();
+      final snap = result.session;
+      if (snap != null) {
+        await ref.read(sessionProvider.notifier).apply(snap);
+      }
       state = AsyncData(
         AuthStateAuthenticated(
           accessToken: result.accessToken,

@@ -12,6 +12,7 @@ import '../../../core/widgets/app_icon.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../billing/data/billing_api.dart';
 import '../../home/application/vpn_provider.dart';
+import '../../settings/application/devices_list_provider.dart';
 import '../../settings/application/subscription_status_provider.dart';
 import 'promo_redeem_form.dart';
 
@@ -100,6 +101,9 @@ class _LockedAccessScreenState extends ConsumerState<LockedAccessScreen> {
     final l = AppL10n.of(context);
     final theme = Theme.of(context);
     final busy = _payBusy;
+    final devices = ref.watch(devicesListProvider).valueOrNull;
+    final memberCannotPay = devices != null &&
+        devices.devices.any((d) => d.isCurrent && !d.isOwner);
     final muted = theme.colorScheme.onSurface.withValues(alpha: 0.72);
     final buttonStyle = FilledButton.styleFrom(
       minimumSize: const Size.fromHeight(52),
@@ -152,6 +156,16 @@ class _LockedAccessScreenState extends ConsumerState<LockedAccessScreen> {
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 32),
+                        if (memberCannotPay)
+                          Text(
+                            l.settingsPayOwnerOnly,
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              color: muted,
+                              height: 1.45,
+                            ),
+                            textAlign: TextAlign.center,
+                          )
+                        else ...[
                         FilledButton(
                           style: buttonStyle,
                           onPressed: busy ? null : () => _pay('1m'),
@@ -167,6 +181,7 @@ class _LockedAccessScreenState extends ConsumerState<LockedAccessScreen> {
                             '${l.lockedPay3m} — ${AppConfig.plan3mPriceRub} ₽',
                           ),
                         ),
+                        ],
                         const SizedBox(height: 28),
                         if (_error != null) ...[
                           Text(

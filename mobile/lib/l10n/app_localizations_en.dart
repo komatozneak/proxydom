@@ -504,7 +504,35 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get devicesHint =>
-      'Each app install gets its own VPN key. You can revoke access for a single device.';
+      'You can log out other devices if you no longer have them.';
+
+  @override
+  String devicesCreated(String date) {
+    return 'Created: $date';
+  }
+
+  @override
+  String get devicesCurrentDevice => 'Current device';
+
+  @override
+  String get devicesSectionThis => 'This install';
+
+  @override
+  String get devicesSectionGroup => 'In the group';
+
+  @override
+  String get devicesSectionActions => 'Group';
+
+  @override
+  String get devicesInGroupLabel => 'In the group';
+
+  @override
+  String devicesGroupEmpty(int count) {
+    return 'One device so far · $count slots left';
+  }
+
+  @override
+  String get devicesLimitReached => 'Device limit reached';
 
   @override
   String devicesCount(int active, int max) {
@@ -522,7 +550,13 @@ class AppL10nEn extends AppL10n {
   String get devicesUntitled => 'Device';
 
   @override
-  String get devicesThisDevice => 'this device';
+  String get devicesThisDevice => 'You';
+
+  @override
+  String get devicesOwnerLabel => 'Subscription owner';
+
+  @override
+  String get devicesInvitedLabel => 'Invited device';
 
   @override
   String get devicesRevoke => 'Revoke';
@@ -547,14 +581,17 @@ class AppL10nEn extends AppL10n {
   String get devicesRevokeFailed => 'Could not revoke device';
 
   @override
-  String get devicesLeave => 'Leave account';
+  String get devicesLeaveHint => 'This install becomes its own Free account';
 
   @override
-  String get devicesLeaveTitle => 'Leave shared account?';
+  String get devicesLeave => 'Leave external subscription';
+
+  @override
+  String get devicesLeaveTitle => 'Leave this subscription?';
 
   @override
   String get devicesLeaveBody =>
-      'This install becomes its own account. Subscription stays on the old account. Save any new recovery code if shown.';
+      'This install becomes its own Free account. The paid subscription stays with the owner. Save the new recovery code if shown.';
 
   @override
   String get devicesLeaveConfirm => 'Leave';
@@ -564,6 +601,26 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get devicesLeaveFailed => 'Could not leave the account';
+
+  @override
+  String get devicesLogoutAll => 'Sign out everywhere';
+
+  @override
+  String get devicesLogoutAllHint =>
+      'Revoke every device on this account, including this phone';
+
+  @override
+  String get devicesLogoutAllTitle => 'Sign out on all devices?';
+
+  @override
+  String get devicesLogoutAllBody =>
+      'Every device on this account will lose access, including this phone. Recover with your code or register again.';
+
+  @override
+  String get devicesLogoutAllConfirm => 'Sign out everywhere';
+
+  @override
+  String get devicesLogoutAllFailed => 'Could not sign out everywhere';
 
   @override
   String get devicesLimitOpenManage => 'Manage devices';
@@ -717,7 +774,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get settingsSendReportHint =>
-      'Saved on the device and copied. Then sent to the owner if the network allows. Phone number is masked on the server.';
+      'Saved on the device and copied. Then sent to the owner if the network allows.';
 
   @override
   String get settingsSendReportConfirm => 'Send';
@@ -746,14 +803,14 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get settingsVpnNotificationHint =>
-      'Detailed card: region and speed. Disconnect is on the notification.';
+      'Card in the shade with Disconnect. Off hides the card; VPN stays on.';
 
   @override
   String get settingsQsTileTitle => 'Quick Settings tile';
 
   @override
   String get settingsQsTileHint =>
-      'Connect and disconnect from the Android Quick Settings shade';
+      'Add a tile to connect and disconnect from Quick Settings';
 
   @override
   String get settingsQsTileAdd => 'Add to Quick Settings';
@@ -1207,44 +1264,73 @@ class AppL10nEn extends AppL10n {
       'After reinstall, enter the recovery code shown when you first opened the app.';
 
   @override
-  String get settingsInviteDevice => 'Invite another device';
+  String get settingsInviteDevice => 'Add device to my subscription';
 
   @override
-  String get settingsInviteDeviceHint => 'Create a short seat code';
+  String get settingsInviteDeviceHint => 'Create a code to join your group';
 
   @override
-  String get settingsAcceptSeat => 'Enter seat code';
+  String get settingsAcceptSeat => 'Join group';
 
   @override
-  String get settingsAcceptSeatHint => 'Join another account';
+  String get settingsAcceptSeatHint => 'Join a subscription by invitation';
 
   @override
-  String get settingsSeatCodeTitle => 'Seat code';
+  String get settingsSeatCodeTitle => 'Invitation code';
 
   @override
   String get settingsSeatCodeCopied => 'Code copied';
 
   @override
-  String get settingsSeatInviteFailed => 'Couldn’t create a seat code';
+  String get settingsSeatInviteFailed => 'Couldn’t create an invitation code';
 
   @override
-  String get settingsAcceptSeatOk => 'Device joined the account';
+  String get settingsAcceptSeatOk => 'Device added to the group';
 
   @override
-  String get settingsSeatPremiumRequired => 'Inviting devices requires Premium';
+  String get settingsSeatPremiumRequired => 'Adding devices requires Premium';
 
   @override
   String get settingsSeatCodeNotFound => 'Code not found or expired';
 
   @override
-  String get settingsSeatDeviceLimit => 'Device limit reached for this account';
+  String get settingsSeatDeviceLimit =>
+      'Device limit reached for this subscription';
 
   @override
   String get settingsSeatOwnCode =>
       'You can’t accept your own code — enter it on another device';
 
   @override
-  String get settingsSeatAcceptFailed => 'Couldn’t accept the seat code';
+  String get settingsSeatAcceptFailed => 'Couldn’t join the group';
+
+  @override
+  String get settingsSeatCodeTtl => 'Code is valid for 30 minutes';
+
+  @override
+  String get settingsSeatShowQr => 'Show code';
+
+  @override
+  String get settingsSeatScanHint => 'Scan the QR code or follow the link';
+
+  @override
+  String get settingsPayOwnerOnly => 'Only the subscription owner can pay';
+
+  @override
+  String get settingsSeatForbidden => 'Only the subscription owner can do this';
+
+  @override
+  String get seatAcceptConsentTitle => 'Join this group?';
+
+  @override
+  String get seatAcceptConsentBody =>
+      'The account owner will see this device’s name, platform, and the date it was added. You can leave the group later.';
+
+  @override
+  String get seatAcceptConsentConfirm => 'Join';
+
+  @override
+  String get devicesOwnerCannotLeave => 'Revoke other devices before leaving';
 
   @override
   String get settingsRecoverAccess => 'Restore access';

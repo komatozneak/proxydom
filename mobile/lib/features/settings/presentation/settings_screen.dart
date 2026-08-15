@@ -18,7 +18,6 @@ import '../../auth/application/auth_provider.dart';
 import '../../auth/application/auth_state.dart';
 import '../../auth/application/logout_handler.dart';
 import '../../home/application/vpn_provider.dart';
-import '../application/devices_list_provider.dart';
 import '../application/locale_provider.dart';
 import '../application/subscription_status_provider.dart';
 import '../application/theme_mode_provider.dart';
@@ -28,7 +27,6 @@ import '../data/subscription_status.dart';
 import '../data/vpn_notification_prefs.dart';
 import '../data/qs_tile_prefs.dart';
 import 'kill_switch_settings_tile.dart';
-import 'seat_code_entry_dialog.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -83,92 +81,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(AppL10n.of(context).settingsDeviceIdCopied)),
-    );
-  }
-
-  Future<void> _inviteDevice() async {
-    final l = AppL10n.of(context);
-    final outcome = await ref.read(authProvider.notifier).makeSeatCode();
-    if (!mounted) return;
-    if (outcome is SeatMakePremiumRequired) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l.settingsSeatPremiumRequired)),
-      );
-      return;
-    }
-    if (outcome is! SeatMakeOk) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l.settingsSeatInviteFailed)),
-      );
-      return;
-    }
-    final code = outcome.code;
-    final messenger = ScaffoldMessenger.of(context);
-    await showDialog<void>(
-      context: context,
-      useRootNavigator: true,
-      builder: (ctx) => AlertDialog(
-        title: Text(l.settingsSeatCodeTitle),
-        content: SelectableText(
-          code,
-          style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
-                letterSpacing: 1.2,
-                fontWeight: FontWeight.w600,
-                fontFamily: 'monospace',
-              ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              await Clipboard.setData(ClipboardData(text: code));
-              if (!mounted) return;
-              messenger.showSnackBar(
-                SnackBar(content: Text(l.settingsSeatCodeCopied)),
-              );
-            },
-            child: Text(l.recoveryCodeCopy),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx, rootNavigator: true).pop(),
-            child: Text(l.cancel),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _acceptSeat() async {
-    final l = AppL10n.of(context);
-    final code = await showDialog<String>(
-      context: context,
-      useRootNavigator: true,
-      builder: (_) => const SeatCodeEntryDialog(),
-    );
-    if (!mounted || code == null || code.isEmpty) return;
-    final outcome = await ref.read(authProvider.notifier).acceptSeatCode(code);
-    if (!mounted) return;
-    if (outcome == SeatAcceptOutcome.limit) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l.settingsSeatDeviceLimit),
-          action: SnackBarAction(
-            label: l.devicesLimitOpenManage,
-            onPressed: () => context.push('/settings/devices'),
-          ),
-        ),
-      );
-      return;
-    }
-    final message = switch (outcome) {
-      SeatAcceptOutcome.ok => l.settingsAcceptSeatOk,
-      SeatAcceptOutcome.notFound => l.settingsSeatCodeNotFound,
-      SeatAcceptOutcome.limit => l.settingsSeatDeviceLimit,
-      SeatAcceptOutcome.ownCode => l.settingsSeatOwnCode,
-      SeatAcceptOutcome.premiumRequired => l.settingsSeatPremiumRequired,
-      SeatAcceptOutcome.failed => l.settingsSeatAcceptFailed,
-    };
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
     );
   }
 
@@ -487,24 +399,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final l = AppL10n.of(context);
     final theme = Theme.of(context);
     final showNotif = VpnNotificationPrefs.isSupported;
-    final notifOn = _notifEnabled ?? false;
+    final notifOn = _notifEnabled ?? true;
     final autoOn = _autoReconnect ?? false;
     final subAsync = ref.watch(subscriptionStatusProvider);
-    final devicesAsync = ref.watch(devicesListProvider);
     final themeMode =
         ref.watch(themeModeProvider).valueOrNull ?? ThemeMode.system;
     final locale =
         ref.watch(localeProvider).valueOrNull ?? Localizations.localeOf(context);
     final localeLabel = _localeLabel(l, locale);
-    final sub = subAsync.valueOrNull;
-    final premiumFromSub =
-        sub != null && (sub.isPro || sub.isTrial || sub.isAlpha);
-    // Free = device_limit 1 → hide seats (ADR 010). While loading, fall back to sub.
-    final seatsEnabled = devicesAsync.maybeWhen(
-      data: (d) => d.maxDevices > 1,
-      orElse: () => premiumFromSub,
-    );
-
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       body: SafeArea(
@@ -549,22 +451,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   subtitle: l.settingsDevicesHint,
                   onTap: () => context.push('/settings/devices'),
                 ),
-                if (seatsEnabled) ...[
-                  const _CardDivider(),
-                  _SettingsRow(
-                    icon: AppIcons.plus,
-                    title: l.settingsInviteDevice,
-                    subtitle: l.settingsInviteDeviceHint,
-                    onTap: _inviteDevice,
-                  ),
-                  const _CardDivider(),
-                  _SettingsRow(
-                    icon: AppIcons.plus,
-                    title: l.settingsAcceptSeat,
-                    subtitle: l.settingsAcceptSeatHint,
-                    onTap: _acceptSeat,
-                  ),
-                ],
                 const _CardDivider(),
                 _SettingsRow(
                   icon: AppIcons.siteTelegram,

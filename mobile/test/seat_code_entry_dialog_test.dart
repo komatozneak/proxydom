@@ -42,7 +42,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField), ' ab12cd ');
-    await tester.tap(find.widgetWithText(FilledButton, 'Ввести код места'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Войти в группу'));
     await tester.pumpAndSettle();
 
     // Extra frames: IME/focus teardown must not trip disposed TEC.

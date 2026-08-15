@@ -15,6 +15,8 @@ void main() {
           'created_at': '2026-01-01T00:00:00Z',
           'last_seen_at': '2026-08-10T09:00:00Z',
           'is_current': true,
+          'seat_role': 'owner',
+          'is_owner': true,
         },
         {
           'id': 2,
@@ -23,6 +25,8 @@ void main() {
           'status': 'active',
           'created_at': '2026-02-01T00:00:00Z',
           'is_current': false,
+          'seat_role': 'member',
+          'is_owner': false,
         },
       ],
     });
@@ -31,7 +35,10 @@ void main() {
     expect(result.maxDevices, 5);
     expect(result.devices, hasLength(2));
     expect(result.devices.first.isCurrent, isTrue);
+    expect(result.devices.first.isOwner, isTrue);
+    expect(result.devices.first.seatRole, 'owner');
     expect(result.devices.first.deviceName, 'Pixel');
     expect(result.devices.last.isCurrent, isFalse);
+    expect(result.devices.last.isOwner, isFalse);
   });
 }

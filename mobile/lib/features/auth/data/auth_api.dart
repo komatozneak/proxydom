@@ -1,7 +1,11 @@
 import '../../../core/api_client.dart';
 import '../../../core/api_secret_storage.dart';
 import '../../../core/install_id_storage.dart';
+import '../../session/data/account_session_snapshot.dart';
 import 'seat_outcome.dart';
+
+/// Must match backend ``SEAT_ACCEPT_CONSENT_VERSION``.
+const seatAcceptConsentVersion = '2026-08-15';
 
 /// Device-first auth (ADR 008 / Ogon register) + device slots (list/leave/revoke).
 class AuthApi {
@@ -69,6 +73,7 @@ class AuthApi {
     return SeatCodeResult(
       code: data['code'] as String,
       expiresAt: data['expires_at'] as String?,
+      codeDisplay: data['code_display'] as String?,
     );
   }
 
@@ -83,6 +88,7 @@ class AuthApi {
         'code': code,
         'device_uuid': id,
         'platform': 'android',
+        'consent_version': seatAcceptConsentVersion,
       },
     );
     if (resp.statusCode != 200 || resp.data is! Map) {
@@ -108,6 +114,48 @@ class AuthApi {
     return DeviceListResult.fromJson(Map<String, dynamic>.from(resp.data as Map));
   }
 
+  /// Start Telegram account link (deep_link).
+  Future<String> startTelegramLink() async {
+    final resp = await ApiClient.instance.post('/auth/contact/telegram/start');
+    if (resp.statusCode != 200 || resp.data is! Map) {
+      throw Exception('startTelegramLink failed: ${resp.statusCode}');
+    }
+    final data = Map<String, dynamic>.from(resp.data as Map);
+    return data['deep_link'] as String;
+  }
+
+  /// Start Telegram recover session on a clean device.
+  Future<Map<String, String>> startTelegramRecover({String? deviceUuid}) async {
+    final id = deviceUuid ?? await InstallIdStorage.instance.getOrCreate();
+    final resp = await ApiClient.postAuth(
+      '/auth/recover/telegram/start',
+      data: {
+        'device_uuid': id,
+        'platform': 'android',
+      },
+    );
+    if (resp.statusCode != 200 || resp.data is! Map) {
+      throw Exception('startTelegramRecover failed: ${resp.statusCode}');
+    }
+    final data = Map<String, dynamic>.from(resp.data as Map);
+    return {
+      'deep_link': data['deep_link'] as String,
+      'token': data['token'] as String,
+    };
+  }
+
+  /// Poll status of Telegram recover session.
+  Future<Map<String, dynamic>> pollTelegramRecover(String token) async {
+    final resp = await ApiClient.instance.get(
+      '/auth/recover/telegram/poll',
+      queryParameters: {'token': token},
+    );
+    if (resp.statusCode != 200 || resp.data is! Map) {
+      throw Exception('pollTelegramRecover failed: ${resp.statusCode}');
+    }
+    return Map<String, dynamic>.from(resp.data as Map);
+  }
+
   /// Detach this install into a fresh solo account.
   Future<LeaveDeviceResult> leaveDevice({String? deviceUuid}) async {
     final id = deviceUuid ?? await InstallIdStorage.instance.getOrCreate();
@@ -121,11 +169,25 @@ class AuthApi {
     return LeaveDeviceResult.fromJson(Map<String, dynamic>.from(resp.data as Map));
   }
 
-  /// Revoke another install's slot (VPN key stops working).
-  Future<void> revokeDevice(int devicePk) async {
+  /// Revoke another install's slot. Returns session when the API sends one.
+  Future<AccountSessionSnapshot?> revokeDevice(int devicePk) async {
     final resp = await ApiClient.instance.delete('/devices/$devicePk');
     if (resp.statusCode != 204 && resp.statusCode != 200) {
       throw Exception('revoke device failed: ${resp.statusCode}');
+    }
+    if (resp.statusCode == 200 && resp.data is Map) {
+      return AccountSessionSnapshot.fromJson(
+        Map<String, dynamic>.from(resp.data as Map),
+      );
+    }
+    return null;
+  }
+
+  /// Owner: revoke every active install including this phone (ADR 016).
+  Future<void> logoutAll() async {
+    final resp = await ApiClient.instance.post('/session/logout_all');
+    if (resp.statusCode != 200) {
+      throw Exception('logout all failed: ${resp.statusCode}');
     }
   }
 }
@@ -137,6 +199,7 @@ class RegisterResult {
     required this.hasAccess,
     this.recoveryCode,
     this.apiSecret,
+    this.session,
   });
 
   final String accessToken;
@@ -144,6 +207,7 @@ class RegisterResult {
   final bool hasAccess;
   final String? recoveryCode;
   final String? apiSecret;
+  final AccountSessionSnapshot? session;
 
   factory RegisterResult.fromJson(Map<String, dynamic> json) {
     return RegisterResult(
@@ -152,6 +216,11 @@ class RegisterResult {
       hasAccess: json['has_access'] as bool? ?? false,
       recoveryCode: json['recovery_code'] as String?,
       apiSecret: json['api_secret'] as String?,
+      session: json['session'] is Map
+          ? AccountSessionSnapshot.fromJson(
+              Map<String, dynamic>.from(json['session'] as Map),
+            )
+          : null,
     );
   }
 
@@ -167,10 +236,17 @@ class RegisterResult {
 typedef BootstrapResult = RegisterResult;
 
 class SeatCodeResult {
-  const SeatCodeResult({required this.code, this.expiresAt});
+  const SeatCodeResult({required this.code, this.expiresAt, this.codeDisplay});
 
   final String code;
   final String? expiresAt;
+  final String? codeDisplay;
+
+  String get displayCode {
+    final shown = codeDisplay?.trim();
+    if (shown != null && shown.isNotEmpty) return shown;
+    return code;
+  }
 }
 
 class DeviceListResult {
@@ -211,6 +287,8 @@ class DeviceSlot {
     this.platform,
     this.lastSeenAt,
     this.isCurrent = false,
+    this.seatRole = 'member',
+    this.isOwner = false,
   });
 
   final int id;
@@ -220,6 +298,8 @@ class DeviceSlot {
   final DateTime? lastSeenAt;
   final DateTime createdAt;
   final bool isCurrent;
+  final String seatRole;
+  final bool isOwner;
 
   factory DeviceSlot.fromJson(Map<String, dynamic> json) {
     DateTime? parseDt(dynamic v) {
@@ -235,6 +315,9 @@ class DeviceSlot {
       lastSeenAt: parseDt(json['last_seen_at']),
       createdAt: parseDt(json['created_at']) ?? DateTime.now(),
       isCurrent: json['is_current'] as bool? ?? false,
+      seatRole: (json['seat_role'] as String?)?.trim() ?? 'member',
+      isOwner: json['is_owner'] as bool? ??
+          ((json['seat_role'] as String?)?.trim() == 'owner'),
     );
   }
 }
@@ -245,12 +328,16 @@ class LeaveDeviceResult {
     required this.refreshToken,
     required this.hasAccess,
     this.recoveryCode,
+    this.apiSecret,
+    this.session,
   });
 
   final String accessToken;
   final String refreshToken;
   final bool hasAccess;
   final String? recoveryCode;
+  final String? apiSecret;
+  final AccountSessionSnapshot? session;
 
   factory LeaveDeviceResult.fromJson(Map<String, dynamic> json) {
     return LeaveDeviceResult(
@@ -258,6 +345,12 @@ class LeaveDeviceResult {
       refreshToken: json['refresh_token'] as String,
       hasAccess: json['has_access'] as bool? ?? false,
       recoveryCode: json['recovery_code'] as String?,
+      apiSecret: json['api_secret'] as String?,
+      session: json['session'] is Map
+          ? AccountSessionSnapshot.fromJson(
+              Map<String, dynamic>.from(json['session'] as Map),
+            )
+          : null,
     );
   }
 }

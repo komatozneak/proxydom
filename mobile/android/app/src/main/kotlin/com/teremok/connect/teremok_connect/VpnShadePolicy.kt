@@ -1,11 +1,10 @@
 package com.teremok.connect.teremok_connect
 
 /**
- * Pure rules for shade disconnect + Quick Settings tile.
+ * Shade + QS tile: one connection state, two projections.
  *
- * Always-on / lockdown: Android VPN UX requires hiding app-owned disconnect
- * UI when the system owns the session. API 26–28 has no [isAlwaysOn]; unmarked
- * (system) starts are treated as system-managed.
+ * Tile and shade action always start/stop (Amnezia contract). Always-on
+ * does not rewrite the action to system VPN settings.
  */
 object VpnShadePolicy {
     const val TILE_UNAVAILABLE = 0
@@ -17,31 +16,45 @@ object VpnShadePolicy {
     const val ADD_TILE_NOT_ADDED = "not_added"
     const val ADD_TILE_MANUAL = "manual"
 
+    const val SHADE_ACTION_STOP = "stop"
+    const val SHADE_ACTION_VPN_SETTINGS = "vpn_settings"
+
     /** StatusBarManager.requestAddTileService callback codes (API 33). */
     const val TILE_ADD_REQUEST_RESULT_TILE_NOT_ADDED = 0
     const val TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED = 1
     const val TILE_ADD_REQUEST_RESULT_TILE_ADDED = 2
 
-    fun allowUserDisconnect(
-        alwaysOn: Boolean?,
-        lockdown: Boolean?,
+    /**
+     * System owns the session lifecycle (Always-on on *our* instance).
+     * Lockdown alone is not ownership. API 26–28: unmarked starts are system.
+     */
+    fun systemOwnsSession(
+        alwaysOnOnOurInstance: Boolean?,
         sdkInt: Int,
         appInitiated: Boolean,
     ): Boolean {
-        if (lockdown == true) return false
-        if (alwaysOn == true) return false
-        if (sdkInt < 29 && !appInitiated) return false
-        return true
+        if (alwaysOnOnOurInstance == true) return true
+        if (sdkInt < 29 && !appInitiated) return true
+        return false
     }
 
-    fun tileState(status: String, lockdown: Boolean?): Int {
-        if (lockdown == true) return TILE_UNAVAILABLE
-        return when (status) {
-            "connected" -> TILE_ACTIVE
-            "connecting", "preparing" -> TILE_UNAVAILABLE
-            else -> TILE_INACTIVE
-        }
+    fun allowUserDisconnect(
+        alwaysOnOnOurInstance: Boolean?,
+        sdkInt: Int,
+        appInitiated: Boolean,
+    ): Boolean = !systemOwnsSession(alwaysOnOnOurInstance, sdkInt, appInitiated)
+
+    /** VPN tile is a toggle. Connecting is ACTIVE, never UNAVAILABLE. */
+    fun tileState(status: String): Int = when (status) {
+        "connected", "connecting", "preparing" -> TILE_ACTIVE
+        else -> TILE_INACTIVE
     }
+
+    fun shadeActionKind(): String = SHADE_ACTION_STOP
+
+    /** Connected FGS always has an action, including the quiet stub. */
+    fun showConnectedAction(status: String): Boolean =
+        status == "connected"
 
     fun mapAddTileResult(code: Int): String = when (code) {
         TILE_ADD_REQUEST_RESULT_TILE_ADDED -> ADD_TILE_ADDED

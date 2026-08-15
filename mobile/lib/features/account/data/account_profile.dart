@@ -11,6 +11,7 @@ class AccountProfile {
     this.clientId,
     this.telegramUsername,
     this.emailMasked,
+    this.seatRole,
   });
 
   final int accountId;
@@ -23,6 +24,9 @@ class AccountProfile {
   final String? telegramUsername;
   final String? emailMasked;
   final bool hasRecoveryCode;
+  final String? seatRole;
+
+  bool get isAccountOwner => (seatRole ?? 'owner') == 'owner';
 
   factory AccountProfile.fromJson(Map<String, dynamic> json) {
     return AccountProfile(
@@ -36,6 +40,7 @@ class AccountProfile {
       telegramUsername: json['telegram_username'] as String?,
       emailMasked: json['email_masked'] as String?,
       hasRecoveryCode: json['has_recovery_code'] as bool? ?? false,
+      seatRole: json['seat_role'] as String?,
     );
   }
 }

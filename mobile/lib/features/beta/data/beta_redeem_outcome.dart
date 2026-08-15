@@ -1,4 +1,7 @@
 /// Stable machine outcomes from POST /api/v1/beta/redeem.
+
+import '../../session/data/account_session_snapshot.dart';
+
 enum BetaRedeemOutcomeCode {
   redeemed,
   alreadyRedeemed,
@@ -36,12 +39,14 @@ class BetaRedeemResult {
     this.hasAccess = false,
     this.acquisitionSource,
     this.recoveryCode,
+    this.session,
   });
 
   final BetaRedeemOutcomeCode outcome;
   final bool hasAccess;
   final String? acquisitionSource;
   final String? recoveryCode;
+  final AccountSessionSnapshot? session;
 
   factory BetaRedeemResult.fromJson(Map<String, dynamic> json) {
     final wire = (json['outcome'] ?? json['code'])?.toString();
@@ -50,6 +55,11 @@ class BetaRedeemResult {
       hasAccess: json['has_access'] == true,
       acquisitionSource: json['acquisition_source'] as String?,
       recoveryCode: json['recovery_code'] as String?,
+      session: json['session'] is Map
+          ? AccountSessionSnapshot.fromJson(
+              Map<String, dynamic>.from(json['session'] as Map),
+            )
+          : null,
     );
   }
 }

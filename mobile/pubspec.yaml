@@ -26,6 +26,8 @@ dependencies:
   phosphor_flutter: ^2.1.0
   flutter_svg: 2.2.2
   rive: ^0.14.10
+  qr_flutter: ^4.1.0
+  app_links: ^6.4.0
   # Living House Signal Nest — see SignalNestHero + assets/rive/.
   # env-конфиг используем через const — пока без package
 

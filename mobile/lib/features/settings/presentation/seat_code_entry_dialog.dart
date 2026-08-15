@@ -7,7 +7,9 @@ import '../../../l10n/app_localizations.dart';
 /// Disposing the controller from the parent after [showDialog] returns races
 /// IME/focus teardown and throws "used after being disposed".
 class SeatCodeEntryDialog extends StatefulWidget {
-  const SeatCodeEntryDialog({super.key});
+  const SeatCodeEntryDialog({super.key, this.initialCode});
+
+  final String? initialCode;
 
   @override
   State<SeatCodeEntryDialog> createState() => _SeatCodeEntryDialogState();
@@ -19,7 +21,7 @@ class _SeatCodeEntryDialogState extends State<SeatCodeEntryDialog> {
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController();
+    _controller = TextEditingController(text: widget.initialCode ?? '');
   }
 
   @override

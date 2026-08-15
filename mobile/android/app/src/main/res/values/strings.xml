@@ -3,5 +3,9 @@
     <string name="vpn_notification_connecting">Подключение…</string>
     <string name="vpn_notification_connected">Подключено</string>
     <string name="vpn_notification_disconnect">Отключиться</string>
+    <string name="vpn_notification_vpn_settings">Настройки VPN</string>
     <string name="qs_tile_label">Теремок VPN</string>
+    <string name="qs_tile_subtitle_on">Вкл</string>
+    <string name="qs_tile_subtitle_off">Выкл</string>
+    <string name="qs_tile_subtitle_busy">…</string>
 </resources>
