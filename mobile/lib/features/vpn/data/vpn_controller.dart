@@ -299,6 +299,20 @@ class VpnController {
     }
   }
 
+  /// Logout / identity change: stop the tunnel AND wipe persisted native
+  /// session params (dataplane passwords) so the QS tile / Always-on restart
+  /// cannot resurrect the previous account's VPN.
+  Future<bool> wipeSession() async {
+    try {
+      final result = await _methodChannel.invokeMethod<bool>('wipeSession');
+      return result ?? false;
+    } on PlatformException {
+      return false;
+    } on MissingPluginException {
+      return false;
+    }
+  }
+
   Future<VpnNativeStatus> getStatus() async {
     try {
       final result = await _methodChannel.invokeMethod<String>('getStatus');

@@ -7,6 +7,8 @@ import '../../../core/install_id_storage.dart';
 import '../../../core/router.dart';
 import '../../../core/token_storage.dart';
 import '../../home/application/vpn_provider.dart';
+import '../../vpn/data/vpn_controller.dart';
+import '../data/recovery_code_storage.dart';
 import 'auth_provider.dart';
 
 /// Результат logout операции.
@@ -32,7 +34,10 @@ class LogoutHandler {
   /// Prevents SessionExpiredGate → logout → SessionExpired recursion.
   static bool inProgress = false;
 
-  Future<LogoutResult> logout() async {
+  /// Full local wipe. [autoRegister] stays false: after logout / session
+  /// expiry the user lands on Welcome (new account vs restore) instead of
+  /// silently minting a fresh anonymous account and orphaning the old one.
+  Future<LogoutResult> logout({bool autoRegister = false}) async {
     if (inProgress) {
       return const LogoutSuccess();
     }
@@ -44,6 +49,14 @@ class LogoutHandler {
         await _stopVpnWithTimeout();
       } catch (e) {
         errors.add('VPN stop: $e');
+      }
+
+      try {
+        // Native prefs hold dataplane passwords (params_json) — stopping the
+        // tunnel alone leaves them for the QS tile / Always-on restart.
+        await VpnController.instance.wipeSession();
+      } catch (e) {
+        errors.add('VPN wipeSession: $e');
       }
 
       try {
@@ -64,6 +77,13 @@ class LogoutHandler {
         errors.add('ApiSecretStorage.clear: $e');
       }
 
+      try {
+        await RecoveryCodeStorage.instance.clear();
+        AppRouter.pendingRecoveryCode = null;
+      } catch (e) {
+        errors.add('RecoveryCodeStorage.clear: $e');
+      }
+
       // ADR 012: install dies whole — wipe id with secret so re-register mints anew.
       try {
         await InstallIdStorage.instance.rotate();
@@ -73,7 +93,9 @@ class LogoutHandler {
 
       AppRouter.postAuthResolved = false;
       try {
-        await _ref.read(authProvider.notifier).unauthenticated();
+        await _ref
+            .read(authProvider.notifier)
+            .unauthenticated(autoRegister: autoRegister);
       } catch (e) {
         errors.add('authProvider: $e');
       }

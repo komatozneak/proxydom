@@ -119,9 +119,15 @@ class AppRouter {
       if (!isAuthed) {
         postAuthResolved = false;
         if (AppConfig.authAnonymous) {
-          // Register runs in AuthNotifier; allow restore while waiting / failed.
+          // Register runs in AuthNotifier on cold start (AsyncLoading → no
+          // redirect). Reaching here unauthenticated means logout / expired
+          // session — offer Welcome (new account vs restore) instead of
+          // silently minting a fresh identity.
           if (goingToWelcome || goingToRestore || goingToBootstrapFail) {
             return null;
+          }
+          if (auth is AuthStateUnauthenticated) {
+            return '/welcome';
           }
           return null;
         }

@@ -128,11 +128,14 @@ final class VpnSessionSnapshot {
 ///
 /// Binding/Proving often report idle while TUN is coming up. ConnectedHealthy
 /// can still flap idle under Always-on / lockdown — do not demote Nest.
+/// After an intentional Nest stop ([userStopping]) Idle is real — demote.
 bool nativeIdleMustNotDemote({
   required bool walkActive,
   required bool sessionOwnsUi,
   required VpnSessionPhase lastPhase,
+  bool userStopping = false,
 }) {
+  if (userStopping) return false;
   if (walkActive || sessionOwnsUi) return true;
   switch (lastPhase) {
     case VpnSessionPhase.binding:
@@ -158,11 +161,13 @@ bool shouldIgnoreRegressiveIdleSnapshot({
   required VpnSessionPhase lastPhase,
   required bool walkActive,
   required bool sessionOwnsUi,
+  bool userStopping = false,
 }) {
   if (incoming != VpnSessionPhase.idle &&
       incoming != VpnSessionPhase.unknown) {
     return false;
   }
+  if (userStopping) return false;
   if (walkActive || sessionOwnsUi) return true;
   switch (lastPhase) {
     case VpnSessionPhase.binding:
@@ -185,15 +190,33 @@ bool connectingIdleShouldDrop({
   required bool walkActive,
   required bool sessionOwnsUi,
   required VpnSessionPhase lastPhase,
+  bool userStopping = false,
 }) {
   if (nativeIdleMustNotDemote(
         walkActive: walkActive,
         sessionOwnsUi: sessionOwnsUi,
         lastPhase: lastPhase,
+        userStopping: userStopping,
       )) {
     return false;
   }
-  return lastPhase == VpnSessionPhase.idle;
+  return lastPhase == VpnSessionPhase.idle || userStopping;
+}
+
+/// Nest Connected paint: abort stale restore-connect and require a live TUN
+/// unless Auto/manual walk still owns the UI.
+bool shouldRefuseEnterConnected({
+  required bool sessionProving,
+  required int? connectGen,
+  required int currentGen,
+  required bool walkActive,
+  required bool sessionOwnsUi,
+  required bool nativeConnected,
+}) {
+  if (sessionProving) return true;
+  if (connectGen != null && connectGen != currentGen) return true;
+  if (walkActive || sessionOwnsUi) return false;
+  return !nativeConnected;
 }
 
 VpnSessionPhase parseVpnSessionPhase(String? raw) {

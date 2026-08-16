@@ -2,6 +2,7 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
 
+import '../../../core/device_info_helper.dart';
 import '../../../core/install_id_storage.dart';
 
 /// Envelope sent with GET /vpn/config for per-device slots.
@@ -28,9 +29,10 @@ Future<DeviceEnvelope> buildDeviceEnvelope({
   InstallIdStorage? storage,
 }) async {
   final id = await (storage ?? InstallIdStorage.instance).getOrCreate();
+  final model = await DeviceInfoHelper.getDeviceModelName();
   return DeviceEnvelope(
     deviceId: id,
-    deviceName: _defaultDeviceName(),
+    deviceName: model,
     platform: _platformCode(),
   );
 }
@@ -43,22 +45,4 @@ String _platformCode() {
   if (Platform.isWindows) return 'windows';
   if (Platform.isLinux) return 'linux';
   return 'unknown';
-}
-
-String _defaultDeviceName() {
-  final code = _platformCode();
-  switch (code) {
-    case 'android':
-      return 'Android';
-    case 'ios':
-      return 'iPhone';
-    case 'macos':
-      return 'Mac';
-    case 'windows':
-      return 'Windows';
-    case 'linux':
-      return 'Linux';
-    default:
-      return 'Device';
-  }
 }

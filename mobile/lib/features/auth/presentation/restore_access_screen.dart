@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/router.dart';
+import '../../../core/device_info_helper.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../l10n/app_localizations.dart';
@@ -69,9 +70,10 @@ class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
     try {
       final auth = ref.read(authProvider).valueOrNull;
       final authed = auth is AuthStateAuthenticated;
+      final model = await DeviceInfoHelper.getDeviceModelName();
       final res = authed
-          ? await AuthApi().startTelegramLink()
-          : await AuthApi().startTelegramRecover();
+          ? await AuthApi().startTelegramLink(deviceName: model)
+          : await AuthApi().startTelegramRecover(deviceName: model);
       final deepLink = res['deep_link']!;
       final token = res['token']!;
 
@@ -194,6 +196,7 @@ class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
         });
         return;
       }
+      unawaited(reconnectVpnAfterIdentityChange(ref));
       AppRouter.postAuthResolved = true;
       context.go('/gate');
     } on NeedsDeviceSlotException catch (e) {
@@ -222,6 +225,7 @@ class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
         });
         return;
       }
+      unawaited(reconnectVpnAfterIdentityChange(ref));
       AppRouter.postAuthResolved = true;
       context.go('/gate');
     }

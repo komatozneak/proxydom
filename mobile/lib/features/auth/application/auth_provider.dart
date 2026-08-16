@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api_secret_storage.dart';
 import '../../../core/config.dart';
+import '../../../core/device_info_helper.dart';
 import '../../../core/install_id_storage.dart';
 import '../../../core/router.dart';
 import '../../../core/token_storage.dart';
@@ -54,7 +55,10 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
 
   Future<AuthState> _registerDevice({bool allowInstallRotate = true}) async {
     try {
-      final result = await AuthApi().register(platform: 'android').timeout(
+      final model = await DeviceInfoHelper.getDeviceModelName();
+      final result = await AuthApi()
+          .register(platform: 'android', deviceName: model)
+          .timeout(
             const Duration(seconds: 45),
           );
       await TokenStorage.instance.saveTokens(
@@ -106,9 +110,13 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
   }
 
   /// After logout / failed refresh.
-  Future<void> unauthenticated() async {
+  ///
+  /// [autoRegister] — silent fresh anonymous account. False on logout/expiry:
+  /// the old account may still be recoverable, so the user chooses on Welcome
+  /// instead of us orphaning it by minting a new identity.
+  Future<void> unauthenticated({bool autoRegister = true}) async {
     await TokenStorage.instance.clear();
-    if (AppConfig.authAnonymous) {
+    if (AppConfig.authAnonymous && autoRegister) {
       state = AsyncData(await _registerDevice());
       return;
     }
@@ -174,9 +182,11 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
     int? replaceDeviceId,
   }) async {
     try {
+      final model = await DeviceInfoHelper.getDeviceModelName();
       final result = await AuthApi()
           .recover(
             recoveryCode: recoveryCode,
+            deviceName: model,
             replaceDeviceId: replaceDeviceId,
           )
           .timeout(const Duration(seconds: 45));
@@ -231,7 +241,8 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
       return SeatAcceptOutcome.ownCode;
     }
     try {
-      final result = await AuthApi().acceptSeatCode(code: code);
+      final model = await DeviceInfoHelper.getDeviceModelName();
+      final result = await AuthApi().acceptSeatCode(code: code, deviceName: model);
       await TokenStorage.instance.saveTokens(
         accessToken: result.accessToken,
         refreshToken: result.refreshToken,

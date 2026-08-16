@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/device_info_helper.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../l10n/app_localizations.dart';
@@ -143,7 +144,8 @@ class _TelegramLinkDialogState extends ConsumerState<TelegramLinkDialog>
     });
 
     try {
-      final started = await AuthApi().startTelegramLink();
+      final model = await DeviceInfoHelper.getDeviceModelName();
+      final started = await AuthApi().startTelegramLink(deviceName: model);
       if (!mounted) return;
       setState(() {
         _starting = false;

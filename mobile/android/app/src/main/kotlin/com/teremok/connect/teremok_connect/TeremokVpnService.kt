@@ -404,6 +404,16 @@ class TeremokVpnService : VpnService() {
             }
             context.startService(intent)
         }
+
+        /**
+         * Logout / identity change: wipe persisted VPN params so the QS tile
+         * or an Always-on restart cannot resurrect the previous account's
+         * tunnel (params_json contains dataplane passwords).
+         */
+        fun wipePersistedSession(context: android.content.Context) {
+            sessionPrefs(context).edit().clear().apply()
+            Log.i(TAG, "wipePersistedSession: cleared stored VPN params")
+        }
     }
 
     /** Sole Kotlin owner of the VpnService TUN PFD (null = transferred or closed). */
@@ -1757,6 +1767,11 @@ object VpnChannelRegistry {
                             action = TeremokVpnService.ACTION_STOP
                         }
                         appContext.startService(intent)
+                        result.success(true)
+                    }
+                    "wipeSession" -> {
+                        TeremokVpnService.stopVpnService(appContext)
+                        TeremokVpnService.wipePersistedSession(appContext)
                         result.success(true)
                     }
                     "getStatus" -> {

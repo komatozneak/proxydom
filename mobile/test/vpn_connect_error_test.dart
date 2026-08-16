@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:teremok_connect/features/home/application/vpn_status.dart';
+import 'package:teremok_connect/features/session/application/identity_reconnect.dart';
 import 'package:teremok_connect/features/vpn/data/vpn_session_snapshot.dart';
 import 'package:teremok_connect/features/vpn/domain/vpn_connect_error.dart';
 
@@ -222,6 +223,34 @@ void main() {
         ),
         isFalse,
       );
+      expect(
+        nativeIdleMustNotDemote(
+          walkActive: false,
+          sessionOwnsUi: false,
+          lastPhase: VpnSessionPhase.connectedHealthy,
+          userStopping: true,
+        ),
+        isFalse,
+      );
+      expect(
+        shouldIgnoreRegressiveIdleSnapshot(
+          incoming: VpnSessionPhase.idle,
+          lastPhase: VpnSessionPhase.connectedHealthy,
+          walkActive: false,
+          sessionOwnsUi: false,
+          userStopping: true,
+        ),
+        isFalse,
+      );
+      expect(
+        connectingIdleShouldDrop(
+          walkActive: false,
+          sessionOwnsUi: false,
+          lastPhase: VpnSessionPhase.connectedHealthy,
+          userStopping: true,
+        ),
+        isTrue,
+      );
     });
 
     test('ignoresNativeConnected only while proving', () {
@@ -286,6 +315,70 @@ void main() {
         ),
         isFalse,
       );
+    });
+  });
+
+  group('shouldRefuseEnterConnected', () {
+    test('aborts stale connect generation after Nest stop', () {
+      expect(
+        shouldRefuseEnterConnected(
+          sessionProving: false,
+          connectGen: 3,
+          currentGen: 4,
+          walkActive: false,
+          sessionOwnsUi: false,
+          nativeConnected: true,
+        ),
+        isTrue,
+      );
+    });
+
+    test('refuses Connected paint when native is idle and walk is over', () {
+      expect(
+        shouldRefuseEnterConnected(
+          sessionProving: false,
+          connectGen: 2,
+          currentGen: 2,
+          walkActive: false,
+          sessionOwnsUi: false,
+          nativeConnected: false,
+        ),
+        isTrue,
+      );
+    });
+
+    test('allows paint during walk even if getStatus flaps idle', () {
+      expect(
+        shouldRefuseEnterConnected(
+          sessionProving: false,
+          connectGen: 2,
+          currentGen: 2,
+          walkActive: true,
+          sessionOwnsUi: false,
+          nativeConnected: false,
+        ),
+        isFalse,
+      );
+    });
+
+    test('allows paint when native is connected and generation matches', () {
+      expect(
+        shouldRefuseEnterConnected(
+          sessionProving: false,
+          connectGen: 2,
+          currentGen: 2,
+          walkActive: false,
+          sessionOwnsUi: false,
+          nativeConnected: true,
+        ),
+        isFalse,
+      );
+    });
+  });
+
+  group('shouldAutoConnectAfterIdentityChange', () {
+    test('restore/link never auto-starts a connect walk', () {
+      expect(shouldAutoConnectAfterIdentityChange(), isFalse);
     });
   });
 }

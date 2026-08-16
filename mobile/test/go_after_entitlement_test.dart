@@ -3,11 +3,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:teremok_connect/core/router.dart';
 import 'package:teremok_connect/features/auth/data/recovery_code_storage.dart';
 
+import 'helpers/secure_storage_mock.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    mockSecureStorage();
     AppRouter.pendingRecoveryCode = null;
     AppRouter.postAuthResolved = false;
   });

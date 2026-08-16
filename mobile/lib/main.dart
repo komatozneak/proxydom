@@ -66,6 +66,13 @@ void main() async {
     AppLogBuffer.instance.warn('[auth] session expired — forcing logout');
     await container.read(logoutHandlerProvider).logout();
   };
+  // Owner revoked this install on another device → same wipe, no silent
+  // re-register (the account may still be recoverable via code/Telegram).
+  SessionExpiredGate.onDeviceRevoked = () async {
+    if (LogoutHandler.inProgress) return;
+    AppLogBuffer.instance.warn('[auth] device revoked — forcing logout');
+    await container.read(logoutHandlerProvider).logout();
+  };
 
   // Warm auth restore before first frame so GoRouter sees tokens on cold start.
   await container.read(authProvider.future);

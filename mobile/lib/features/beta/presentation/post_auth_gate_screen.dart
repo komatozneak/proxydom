@@ -218,6 +218,14 @@ Future<void> markWelcomeAndGoLogin(BuildContext context) async {
   AppRouter.welcomeSeenCache = true;
   if (!context.mounted) return;
   if (AppConfig.authAnonymous) {
+    // Post-logout/expiry landing: nothing auto-registers anymore, so the
+    // Continue CTA explicitly starts a fresh anonymous account.
+    final container = ProviderScope.containerOf(context, listen: false);
+    final auth = container.read(authProvider).valueOrNull;
+    if (auth is! AuthStateAuthenticated) {
+      await container.read(authProvider.notifier).retryBootstrap();
+    }
+    if (!context.mounted) return;
     context.go('/home');
     return;
   }

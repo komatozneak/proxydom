@@ -9,7 +9,7 @@ import '../../../core/api_secret_storage.dart';
 import '../../../core/diagnostics/app_log_buffer.dart';
 import '../../../core/diagnostics/egress_verify.dart';
 import '../../../core/diagnostics/product_log.dart';
-import '../../../core/install_id_storage.dart';
+import '../../../core/jwt_interceptor.dart';
 import '../../../core/retry_policy.dart';
 import '../../auth/application/auth_provider.dart';
 import '../../auth/application/auth_state.dart';
@@ -105,6 +105,15 @@ class VpnNotifier extends Notifier<VpnStatus> {
 
   VpnSessionPhase _lastSessionPhase = VpnSessionPhase.unknown;
 
+  /// Bumped on each [connect] and [disconnect]. In-flight `_connectBody`
+  /// must not paint Nest Connected after a newer Nest stop.
+  int _connectGeneration = 0;
+
+  /// Generation captured by the in-flight [connect] (null when idle).
+  int? _activeConnectGen;
+
+  int get connectGeneration => _connectGeneration;
+
   void _beginSessionWalk() {
     _sessionWalkActive = true;
   }
@@ -119,7 +128,50 @@ class VpnNotifier extends Notifier<VpnStatus> {
       walkActive: _sessionWalkActive,
       sessionOwnsUi: _sessionOwnsUi,
       lastPhase: _lastSessionPhase,
+      userStopping: _suppressAutoReconnect,
     );
+  }
+
+  bool _isConnectStale(int gen) => gen != _connectGeneration;
+
+  bool _idleMustNotDemote() {
+    return nativeIdleMustNotDemote(
+      walkActive: _sessionWalkActive,
+      sessionOwnsUi: _sessionOwnsUi,
+      lastPhase: _lastSessionPhase,
+      userStopping: _suppressAutoReconnect,
+    );
+  }
+
+  Future<bool> _abortStaleConnect(int gen) async {
+    if (!_isConnectStale(gen)) return false;
+    _vpnLog('[VPN] connect aborted gen=$gen now=$_connectGeneration');
+    _endSessionWalk();
+    _cancelConnectingWatchdog();
+    if (_suppressAutoReconnect &&
+        (state is VpnConnecting || state is VpnConnected)) {
+      _lastSessionPhase = VpnSessionPhase.idle;
+      state = const VpnDisconnected();
+    }
+    return true;
+  }
+
+  /// After restore teardown: wait until native is idle so Home can paint rest.
+  /// Returns false if still Stopping/Connected after [timeout].
+  Future<bool> waitUntilNativeIdle({
+    Duration timeout = const Duration(seconds: 3),
+  }) async {
+    final deadline = DateTime.now().add(timeout);
+    while (DateTime.now().isBefore(deadline)) {
+      final native = await VpnController.instance.getStatus();
+      if (native == VpnNativeStatus.idle ||
+          native == VpnNativeStatus.unknown ||
+          native == VpnNativeStatus.error) {
+        return true;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+    }
+    return false;
   }
 
   StreamSubscription<VpnNativeStatus>? _statusSubscription;
@@ -179,11 +231,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
       case VpnNativeStatus.idle:
       case VpnNativeStatus.unknown:
         if (_sessionWalkActive || _sessionOwnsUi) return;
-        if (nativeIdleMustNotDemote(
-          walkActive: _sessionWalkActive,
-          sessionOwnsUi: _sessionOwnsUi,
-          lastPhase: _lastSessionPhase,
-        )) {
+        if (_idleMustNotDemote()) {
           return;
         }
         if (state is VpnConnecting && _connectInFlight == null) {
@@ -233,11 +281,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
     }
     if (_sessionWalkActive) return;
     if (native == VpnNativeStatus.idle && _connectInFlight == null) {
-      if (nativeIdleMustNotDemote(
-        walkActive: _sessionWalkActive,
-        sessionOwnsUi: _sessionOwnsUi,
-        lastPhase: _lastSessionPhase,
-      )) {
+      if (_idleMustNotDemote()) {
         return;
       }
       await _failConnectingIdle();
@@ -317,10 +361,26 @@ class VpnNotifier extends Notifier<VpnStatus> {
     _selectedNodeProtocol = mint.protocol;
   }
 
-  Future<void> _enterConnected({required bool freshSession}) async {
+  Future<void> _enterConnected({required bool freshSession, int? gen}) async {
     // Auto SOCKS prove: session snapshot is SoT. Binding+TUN in the shade
     // must still paint Nest Connected (ConnectedHealthy can lag / miss).
     if (_sessionProving) return;
+    final native = await VpnController.instance.getStatus();
+    if (shouldRefuseEnterConnected(
+      sessionProving: _sessionProving,
+      connectGen: gen ?? _activeConnectGen,
+      currentGen: _connectGeneration,
+      walkActive: _sessionWalkActive,
+      sessionOwnsUi: _sessionOwnsUi,
+      nativeConnected: native == VpnNativeStatus.connected,
+    )) {
+      _vpnLog(
+        '[VPN] enter_connected refused native=$native '
+        'gen=${gen ?? _activeConnectGen} now=$_connectGeneration '
+        'walk=$_sessionWalkActive owns=$_sessionOwnsUi',
+      );
+      return;
+    }
     await _hydrateConnectedUi();
     final winner = _autoActiveNodeId;
     if (winner != null) {
@@ -360,17 +420,17 @@ class VpnNotifier extends Notifier<VpnStatus> {
     }
     final since = await _resolveConnectedSince(freshSession: freshSession);
     if (_sessionProving) return;
-    // Cold start / Always-on / sticky Error: UI may lag the live TUN.
-    // Session ConnectedHealthy is SoT — getStatus() idle must not block paint.
-    if (state is VpnDisconnected || state is VpnError) {
-      if (!nativeIdleMustNotDemote(
-            walkActive: _sessionWalkActive,
-            sessionOwnsUi: _sessionOwnsUi,
-            lastPhase: _lastSessionPhase,
-          )) {
-        final native = await VpnController.instance.getStatus();
-        if (native != VpnNativeStatus.connected) return;
-      }
+    if (gen != null && gen != _connectGeneration) return;
+    final nativeAfter = await VpnController.instance.getStatus();
+    if (shouldRefuseEnterConnected(
+      sessionProving: _sessionProving,
+      connectGen: gen ?? _activeConnectGen,
+      currentGen: _connectGeneration,
+      walkActive: _sessionWalkActive,
+      sessionOwnsUi: _sessionOwnsUi,
+      nativeConnected: nativeAfter == VpnNativeStatus.connected,
+    )) {
+      return;
     }
     _endSessionWalk();
     _cancelConnectingWatchdog();
@@ -622,24 +682,13 @@ class VpnNotifier extends Notifier<VpnStatus> {
       }
       if (native == VpnNativeStatus.idle || native == VpnNativeStatus.unknown) {
         if (_sessionWalkActive || _sessionOwnsUi) return;
-        if (nativeIdleMustNotDemote(
-          walkActive: _sessionWalkActive,
-          sessionOwnsUi: _sessionOwnsUi,
-          lastPhase: _lastSessionPhase,
-        )) {
-          _vpnLog(
-            '[VPN] syncFromNative idle ignored phase=$_lastSessionPhase ui=$state',
-          );
-          final liveConnected =
-              _lastSessionPhase == VpnSessionPhase.connectedHealthy ||
-                  _lastSessionPhase == VpnSessionPhase.connectedDegraded;
-          if (liveConnected && state is! VpnConnected) {
-            await _enterConnected(freshSession: state is VpnConnecting);
-          }
-          return;
-        }
+        // After 5 getStatus probes the TUN is down. Do not keep or re-paint
+        // Nest Connected from a stale ConnectedHealthy (restore / resume).
         if (state is VpnConnected) {
-          await _confirmIdleDrop();
+          _vpnLog(
+            '[VPN] syncFromNative idle drop phase=$_lastSessionPhase ui=$state',
+          );
+          await _confirmIdleDrop(force: true);
           return;
         }
         if (state is VpnConnecting) {
@@ -790,11 +839,11 @@ class VpnNotifier extends Notifier<VpnStatus> {
         },
       );
     } on DioException catch (e) {
-      if (e.error == 'device_revoked' || e.error == 'hmac_required') {
-        _vpnLog(
-          '[VPN] ${e.error} → rotate install + cold register, then retry once',
-        );
-        await InstallIdStorage.instance.rotate();
+      if (e.error == 'hmac_required') {
+        // Lost local api_secret while the server still knows this install:
+        // re-register with the SAME install id re-returns the secret (ADR 012).
+        // Never rotate here — that would orphan the install.
+        _vpnLog('[VPN] hmac_required → heal register (same install), retry once');
         await ApiSecretStorage.instance.clear();
         ref.read(vpnConfigRepositoryProvider).clearCache();
         await ref.read(authProvider.notifier).retryBootstrap();
@@ -806,6 +855,13 @@ class VpnNotifier extends Notifier<VpnStatus> {
               forceRefresh: true,
               nodeId: apiNodeId == kRegionAutoId ? null : apiNodeId,
             );
+      }
+      if (e.error == 'device_revoked') {
+        // The account owner revoked this install. Do NOT rotate + silently
+        // mint a fresh anonymous account — the subscription stays on the old
+        // one. Log out to Welcome, where restore is one tap away.
+        _vpnLog('[VPN] device_revoked → logout to Welcome (no silent register)');
+        await SessionExpiredGate.onDeviceRevoked?.call();
       }
       rethrow;
     }
@@ -832,9 +888,11 @@ class VpnNotifier extends Notifier<VpnStatus> {
     }
   }
 
-  Future<void> _runAutoProveLoop() async {
+  Future<void> _runAutoProveLoop({int? gen}) async {
+    if (gen != null && await _abortStaleConnect(gen)) return;
     final nodesRepo = ref.read(vpnNodesRepositoryProvider);
     final catalog = await nodesRepo.listNodes();
+    if (gen != null && await _abortStaleConnect(gen)) return;
     final sub = ref.read(subscriptionStatusProvider).valueOrNull;
     final isPremium = sub?.unlocksPremium ?? false;
     final pool = autoPoolFor(catalog, isPremium: isPremium);
@@ -866,6 +924,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
     _autoMints.clear();
     _autoActiveNodeId = null;
     for (final node in pool) {
+      if (gen != null && await _abortStaleConnect(gen)) return;
       final candidateHint = autoCandidateHintLabel(node);
       state = VpnConnecting(
         progress: 0.55,
@@ -1031,10 +1090,16 @@ class VpnNotifier extends Notifier<VpnStatus> {
     if (_connectInFlight != null) return _connectInFlight!;
     if (!forceRestart && state is VpnConnected) return;
 
+    final gen = ++_connectGeneration;
+    _activeConnectGen = gen;
     _connectInFlight = _connectBody(
       forceRestart: forceRestart,
       reuseConfig: reuseConfig,
+      gen: gen,
     ).whenComplete(() {
+      if (_activeConnectGen == gen) {
+        _activeConnectGen = null;
+      }
       _connectInFlight = null;
       _autoReconnectArmed = false;
     });
@@ -1044,6 +1109,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
   Future<void> _connectBody({
     bool forceRestart = false,
     bool reuseConfig = false,
+    required int gen,
   }) async {
     // Error Nest must not stay a frozen screenshot while we probe native.
     if (state is VpnError || state is VpnDisconnected) {
@@ -1051,6 +1117,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
     }
     // Already up in the system tray (UI lost state after Activity recreate).
     final existing = await VpnController.instance.getStatus();
+    if (await _abortStaleConnect(gen)) return;
     if (!forceRestart && existing == VpnNativeStatus.connected) {
       await _syncFromNative();
       return;
@@ -1059,6 +1126,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
       try {
         await VpnController.instance.stop();
       } catch (_) {}
+      if (await _abortStaleConnect(gen)) return;
     }
 
 // Allow retry after a stuck VpnConnecting (e.g. hung fetchConfig).
@@ -1068,6 +1136,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
       // Provider disposed in tests.
     }
 
+    if (await _abortStaleConnect(gen)) return;
     _beginSessionWalk();
     state = const VpnConnecting(progress: 0.0);
     _armConnectingPoll();
@@ -1075,6 +1144,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
     try {
       final nodesRepo = ref.read(vpnNodesRepositoryProvider);
       final stored = await nodesRepo.getSelectedNodeId();
+      if (await _abortStaleConnect(gen)) return;
       final useAuto =
           stored == null || stored.isEmpty || stored == kRegionAutoId;
 
@@ -1082,16 +1152,18 @@ class VpnNotifier extends Notifier<VpnStatus> {
 
       // 2. Проверяем permission (на Android открывает системный диалог)
       final hasPermission = await VpnController.instance.requestPermission();
+      if (await _abortStaleConnect(gen)) return;
       if (!hasPermission) {
         state = await _errorForPermissionFailure();
         return;
       }
       // Android 13+: without this the Amnezia-style VPN card stays hidden.
       await VpnController.instance.requestNotificationPermission();
+      if (await _abortStaleConnect(gen)) return;
       state = const VpnConnecting(progress: 0.5);
 
       if (useAuto) {
-        await _runAutoProveLoop();
+        await _runAutoProveLoop(gen: gen);
         return;
       }
 
@@ -1103,6 +1175,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
         _config = await fetchConfig();
         _vpnLog('[VPN] connect: fetchConfig ok');
       }
+      if (await _abortStaleConnect(gen)) return;
       ProductLog.event('vpn.connect_attempt', {
         'mode': 'manual',
         'id': _config?.hysteriaProfile?.nodeId ??
@@ -1166,14 +1239,17 @@ class VpnNotifier extends Notifier<VpnStatus> {
           _vpnLog('[VPN] start retry $attempt after error: $e');
         },
       );
+      if (await _abortStaleConnect(gen)) return;
       if (!started) {
         ProductLog.event('vpn.connect_fail', {'code': 'start_false'});
         state = await _errorForStartFailure();
         return;
       }
       // EventChannel + connecting poll complete the session (ADR 014).
+      if (await _abortStaleConnect(gen)) return;
       state = const VpnConnecting(progress: 0.8);
     } catch (e, st) {
+      if (await _abortStaleConnect(gen)) return;
       _cancelConnectingWatchdog();
       _vpnLog('[VPN] connect failed: $e\n$st', warn: true);
       ProductLog.event('vpn.connect_fail', {
@@ -1264,12 +1340,15 @@ class VpnNotifier extends Notifier<VpnStatus> {
   }
 
   Future<void> disconnect() async {
+    _connectGeneration++;
+    _activeConnectGen = null;
     _cancelConnectingWatchdog();
     _reconnectTimer?.cancel();
     _suppressAutoReconnect = true;
     _endSessionWalk();
     _sessionOwnsUi = false;
     _sessionProving = false;
+    _lastSessionPhase = VpnSessionPhase.stopping;
     // Always allow cancel while UI shows connecting (incl. stuck preparing).
     final native = await VpnController.instance.getStatus();
     final uiBusy = state is VpnConnected || state is VpnConnecting;
@@ -1277,6 +1356,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
         native == VpnNativeStatus.connecting ||
         native == VpnNativeStatus.preparing;
     if (!uiBusy && !nativeBusy) {
+      _lastSessionPhase = VpnSessionPhase.idle;
       state = const VpnDisconnected();
       return;
     }
@@ -1295,6 +1375,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
         await _enterConnected(freshSession: false);
       } else if (state is VpnConnecting) {
         await _clearConnectedSince();
+        _lastSessionPhase = VpnSessionPhase.idle;
         state = const VpnDisconnected();
       }
     });
@@ -1318,6 +1399,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
       } else {
         await _clearConnectedSince();
         _subscribeToStatus();
+        _lastSessionPhase = VpnSessionPhase.idle;
         state = const VpnDisconnected();
       }
     }
@@ -1388,6 +1470,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
       lastPhase: _lastSessionPhase,
       walkActive: _sessionWalkActive,
       sessionOwnsUi: _sessionOwnsUi,
+      userStopping: _suppressAutoReconnect,
     )) {
       _vpnLog(
         '[VPN] ignore regressive ${snap.phase.name} last=$_lastSessionPhase ui=$state',
@@ -1445,6 +1528,12 @@ class VpnNotifier extends Notifier<VpnStatus> {
       unawaited(_failConnectingIdle());
       return;
     }
+    if (snap.phase == VpnSessionPhase.idle &&
+        _suppressAutoReconnect &&
+        state is VpnConnected) {
+      unawaited(_confirmIdleDrop());
+      return;
+    }
     if (!snap.ownsConnectUi) return;
     if (state is! VpnConnecting) {
       state = const VpnConnecting(progress: 0.55);
@@ -1490,11 +1579,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
         break;
       case VpnNativeStatus.idle:
         if (_sessionWalkActive || _sessionOwnsUi) return;
-        if (nativeIdleMustNotDemote(
-          walkActive: _sessionWalkActive,
-          sessionOwnsUi: _sessionOwnsUi,
-          lastPhase: _lastSessionPhase,
-        )) {
+        if (_idleMustNotDemote()) {
           return;
         }
         if (state is VpnConnecting && _connectInFlight == null) {
@@ -1592,21 +1677,17 @@ class VpnNotifier extends Notifier<VpnStatus> {
   }
 
   /// Don't flip UI to disconnected on a single idle event — re-check native.
-  Future<void> _confirmIdleDrop() async {
-    if (nativeIdleMustNotDemote(
-      walkActive: _sessionWalkActive,
-      sessionOwnsUi: _sessionOwnsUi,
-      lastPhase: _lastSessionPhase,
-    )) {
+  /// [force] skips Always-on flap protection after syncFromNative already
+  /// probed idle several times (restore / resume fake Connected).
+  Future<void> _confirmIdleDrop({bool force = false}) async {
+    if (!force && _idleMustNotDemote()) {
       return;
     }
-    await Future<void>.delayed(const Duration(milliseconds: 400));
-    if (nativeIdleMustNotDemote(
-      walkActive: _sessionWalkActive,
-      sessionOwnsUi: _sessionOwnsUi,
-      lastPhase: _lastSessionPhase,
-    )) {
-      return;
+    if (!force) {
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+      if (_idleMustNotDemote()) {
+        return;
+      }
     }
     final native = await VpnController.instance.getStatus();
     if (native == VpnNativeStatus.connected ||
@@ -1620,6 +1701,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
     if (state is VpnConnected) {
       _recordSessionEnd();
       await _clearConnectedSince();
+      _lastSessionPhase = VpnSessionPhase.idle;
       _logUiTransition('disconnected', 'idle_connected');
       state = const VpnDisconnected();
     }

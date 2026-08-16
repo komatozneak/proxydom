@@ -39,6 +39,7 @@ class AuthApi {
   Future<RegisterResult> recover({
     required String recoveryCode,
     String? deviceUuid,
+    String? deviceName,
     int? replaceDeviceId,
   }) async {
     final id = deviceUuid ?? await InstallIdStorage.instance.getOrCreate();
@@ -47,6 +48,9 @@ class AuthApi {
       data: {
         'recovery_code': recoveryCode,
         'device_uuid': id,
+        'platform': 'android',
+        if (deviceName != null && deviceName.isNotEmpty)
+          'device_name': deviceName,
         if (replaceDeviceId != null) 'replace_device_id': replaceDeviceId,
       },
     );
@@ -89,6 +93,7 @@ class AuthApi {
   Future<RegisterResult> acceptSeatCode({
     required String code,
     String? deviceUuid,
+    String? deviceName,
   }) async {
     final id = deviceUuid ?? await InstallIdStorage.instance.getOrCreate();
     final resp = await ApiClient.instance.post(
@@ -97,6 +102,8 @@ class AuthApi {
         'code': code,
         'device_uuid': id,
         'platform': 'android',
+        if (deviceName != null && deviceName.isNotEmpty)
+          'device_name': deviceName,
         'consent_version': seatAcceptConsentVersion,
       },
     );
@@ -124,8 +131,15 @@ class AuthApi {
   }
 
   /// Start Telegram account link (deep_link + poll token).
-  Future<Map<String, String>> startTelegramLink() async {
-    final resp = await ApiClient.instance.post('/auth/contact/telegram/start');
+  Future<Map<String, String>> startTelegramLink({String? deviceName}) async {
+    final resp = await ApiClient.instance.post(
+      '/auth/contact/telegram/start',
+      data: {
+        'platform': 'android',
+        if (deviceName != null && deviceName.isNotEmpty)
+          'device_name': deviceName,
+      },
+    );
     if (resp.statusCode != 200 || resp.data is! Map) {
       throw Exception('startTelegramLink failed: ${resp.statusCode}');
     }
@@ -149,13 +163,18 @@ class AuthApi {
   }
 
   /// Start Telegram recover session on a clean device.
-  Future<Map<String, String>> startTelegramRecover({String? deviceUuid}) async {
+  Future<Map<String, String>> startTelegramRecover({
+    String? deviceUuid,
+    String? deviceName,
+  }) async {
     final id = deviceUuid ?? await InstallIdStorage.instance.getOrCreate();
     final resp = await ApiClient.postAuth(
       '/auth/recover/telegram/start',
       data: {
         'device_uuid': id,
         'platform': 'android',
+        if (deviceName != null && deviceName.isNotEmpty)
+          'device_name': deviceName,
       },
     );
     if (resp.statusCode != 200 || resp.data is! Map) {

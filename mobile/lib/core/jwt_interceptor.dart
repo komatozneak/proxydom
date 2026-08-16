@@ -8,6 +8,10 @@ import 'token_storage.dart';
 /// Late-bound logout hook — set from `main.dart` before first API call.
 class SessionExpiredGate {
   static Future<void> Function()? onExpired;
+
+  /// Server revoked this install (owner action on another device). Set from
+  /// `main.dart`; routes through the same logout wipe as [onExpired].
+  static Future<void> Function()? onDeviceRevoked;
 }
 
 /// Перехватчик 401-ответов с автоматической ротацией токенов.

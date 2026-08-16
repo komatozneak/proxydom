@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
@@ -71,6 +72,12 @@ class WelcomeScreen extends StatelessWidget {
               TextButton(
                 onPressed: () => markWelcomeAndGoLogin(context),
                 child: Text(l.welcomeSkip),
+              ),
+              // Post-logout / expired session lands here too — recovery code
+              // and Telegram restore live behind this link.
+              TextButton(
+                onPressed: () => context.go('/restore'),
+                child: Text(l.restoreTitle),
               ),
               const SizedBox(height: 16),
             ],
