@@ -19,6 +19,7 @@ import java.net.InetSocketAddress
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import com.adguard.trusttunnel.VpnClient
 import com.adguard.trusttunnel.VpnState
 import com.adguard.trusttunnel.VpnServiceConfig as TtVpnServiceConfig
@@ -405,11 +406,14 @@ class TeremokVpnService : VpnService() {
         }
     }
 
-    private var tunInterface: ParcelFileDescriptor? = null
+    /** Sole Kotlin owner of the VpnService TUN PFD (null = transferred or closed). */
+    private val tunInterface = AtomicReference<ParcelFileDescriptor?>(null)
     private var isRunning = false
     /** True only while [startVpn] is establishing TUN/core (not onCreate hint). */
     @Volatile
     private var establishInProgress = false
+    /** Prevents concurrent [teardownCores] from main + session dispatcher (fdsan). */
+    private val teardownInFlight = AtomicBoolean(false)
     private var trafficMonitor: VpnTrafficMonitor? = null
     private var notificationSessionLine: String = "Теремок VPN"
 
@@ -499,7 +503,7 @@ class TeremokVpnService : VpnService() {
         private set
 
     /** TUN established — Home must not treat this as idle even if [currentStatus] lagged. */
-    fun hasLiveTun(): Boolean = isRunning || tunInterface != null
+    fun hasLiveTun(): Boolean = isRunning || tunInterface.get() != null
 
     /** Auto SOCKS prove must not [stopSelf] on a single candidate fail. */
     @Volatile
@@ -1022,8 +1026,8 @@ class TeremokVpnService : VpnService() {
             }
         }
 
-        tunInterface = builder.establish()
-        val activeTun = tunInterface
+        tunInterface.set(builder.establish())
+        val activeTun = tunInterface.get()
         if (activeTun == null) {
             ProtectGuard.onFailure = null
             failStart("VPN permission denied or establish() returned null")
@@ -1048,6 +1052,8 @@ class TeremokVpnService : VpnService() {
             failStart("${selected.id}@${selected.host}: $detail")
             return
         }
+        // libXray gVisor holds the raw fd number; Kotlin keeps the PFD until
+        // teardownCores (closed once after stopXray).
         if (ProtectGuard.hasFailed()) {
             failStart("VpnService.protect() failed during Xray start")
             return
@@ -1157,7 +1163,7 @@ class TeremokVpnService : VpnService() {
             failStart("VPN permission denied or establish() returned null")
             return
         }
-        tunInterface = tun
+        tunInterface.set(tun)
         VpnUnderlyingNetworkPolicy.applyTo(this)
 
         val bridge = TrustTunnelBridge.instance
@@ -1186,12 +1192,14 @@ class TeremokVpnService : VpnService() {
         }
 
         if (!bridge.start(toml, tun, host)) {
+            // Native may already have closed [tun] on failure — drop our ref.
+            tunInterface.compareAndSet(tun, null)
             val detail = bridge.lastErrorMessage ?: "TrustTunnel start failed"
             failStart(detail)
             return
         }
         // VpnClient.start takes ownership of the TUN fd.
-        tunInterface = null
+        tunInterface.compareAndSet(tun, null)
 
         if (ProtectGuard.hasFailed()) {
             failStart("VpnService.protect() failed during TrustTunnel start")
@@ -1296,8 +1304,8 @@ class TeremokVpnService : VpnService() {
         currentStatus = "connecting"
         VpnStatusBroadcaster.emit(currentStatus)
 
-        tunInterface = builder.establish()
-        val activeTun = tunInterface
+        tunInterface.set(builder.establish())
+        val activeTun = tunInterface.get()
         if (activeTun == null) {
             ProtectGuard.onFailure = null
             failStart("VPN permission denied or establish() returned null")
@@ -1326,9 +1334,12 @@ class TeremokVpnService : VpnService() {
             return
         }
         if (!hy.startTun(tunFd = tunFd, mtu = mtu)) {
+            // Go closes the detached dup on failure; establish PFD stays for teardown.
             failStart(hy.lastErrorMessage ?: "Hysteria tun pump failed")
             return
         }
+        // Go owns the detached dup; Kotlin keeps the establish PFD until
+        // [closeTunOnce] in teardownCores (closing establish early tears down VPN).
 
         val probeCandidate = XrayRuntimeCandidate(
             id = nodeId,
@@ -1446,22 +1457,45 @@ class TeremokVpnService : VpnService() {
         stopVpn()
     }
 
+    /**
+     * Close the Kotlin-owned TUN PFD at most once. Safe under concurrent
+     * [teardownCores] / failStart (main + session dispatcher).
+     */
+    private fun closeTunOnce(reason: String) {
+        val pfd = tunInterface.getAndSet(null) ?: return
+        val fd = try {
+            pfd.fd
+        } catch (_: Exception) {
+            -1
+        }
+        Log.i(TAG, "closeTunOnce reason=$reason fd=$fd")
+        try {
+            pfd.close()
+        } catch (e: Exception) {
+            Log.w(TAG, "closeTunOnce: close failed fd=$fd", e)
+        }
+    }
+
     /** Stop cores + TUN without [stopSelf] (engine re-establish). */
     private fun teardownCores() {
+        if (!teardownInFlight.compareAndSet(false, true)) {
+            Log.w(TAG, "teardownCores: already in flight — skip")
+            return
+        }
         try {
             stopTrafficMonitor()
             HysteriaBridge.instance.stop()
             TrustTunnelBridge.instance.stop()
             XrayBridge.instance.stop()
-            tunInterface?.close()
+            closeTunOnce("teardownCores")
             Log.i(TAG, "teardownCores: cores stopped, TUN closed if any")
         } catch (e: Exception) {
             Log.e(TAG, "teardownCores: error", e)
         } finally {
             ProtectGuard.onFailure = null
-            tunInterface = null
             isRunning = false
             establishInProgress = false
+            teardownInFlight.set(false)
             // TUN is gone — never leave Flutter/getStatus on "connected"
             // after a real stop. Auto hops (Binding/Proving) must keep
             // connecting/probing: idle here paints Nest rest while Hy2 is live.

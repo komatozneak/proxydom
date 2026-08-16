@@ -55,7 +55,7 @@ class VpnController {
         'sessionName': kVpnBrandSessionName,
         'displayLabel': (displayLabel?.trim().isNotEmpty == true)
             ? displayLabel!.trim()
-            : 'TrustTunnel · ${profile.hostname}',
+            : kVpnBrandSessionName,
         'outboundType': 'trusttunnel',
         'trusttunnelToml': profile.toml,
         'trusttunnelHost': profile.hostname,
@@ -79,7 +79,7 @@ class VpnController {
         'sessionName': kVpnBrandSessionName,
         'displayLabel': (displayLabel?.trim().isNotEmpty == true)
             ? displayLabel!.trim()
-            : 'Hysteria · ${profile.server}',
+            : kVpnBrandSessionName,
         'outboundType': 'hysteria2',
         'hysteriaServer': profile.server,
         'hysteriaAuth': profile.auth,
@@ -116,10 +116,12 @@ class VpnController {
       // ignore: avoid_print
       print('[VPN] youtube-google.cidr skipped: $e');
     }
+    // Auto mints every pool member; last row must not overwrite the winner's
+    // expected host (that made reports claim hy2-us while Latvia was live).
     await VpnSessionMeta.saveConnectMeta(
       ruRulesLoaded: bundledRu,
       ruRuleTags: const [],
-      expectedEgressHost: config.expectedEgressHost,
+      updateExpectedHost: false,
     );
     final inputs = VpnSessionInputs.fromVpnConfig(
       config: config,
@@ -208,7 +210,7 @@ class VpnController {
         'sessionName': kVpnBrandSessionName,
         'displayLabel': (displayLabel?.trim().isNotEmpty == true)
             ? displayLabel!.trim()
-            : 'TrustTunnel · ${profile.hostname}',
+            : kVpnBrandSessionName,
         'outboundType': 'trusttunnel',
         'trusttunnelToml': profile.toml,
         'trusttunnelHost': profile.hostname,
@@ -247,7 +249,7 @@ class VpnController {
         'sessionName': kVpnBrandSessionName,
         'displayLabel': (displayLabel?.trim().isNotEmpty == true)
             ? displayLabel!.trim()
-            : 'Hysteria · ${profile.server}',
+            : kVpnBrandSessionName,
         'outboundType': 'hysteria2',
         'hysteriaServer': profile.server,
         'hysteriaAuth': profile.auth,

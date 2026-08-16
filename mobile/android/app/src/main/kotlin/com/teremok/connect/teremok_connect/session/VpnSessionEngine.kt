@@ -379,6 +379,15 @@ class VpnSessionEngine(
     }
 
     private fun runStop(gen: Long) {
+        if (snapshot.phase == SessionPhase.Stopping ||
+            snapshot.phase == SessionPhase.Idle
+        ) {
+            Log.i(TAG, "runStop skipped already phase=${snapshot.phase} gen=$gen")
+            if (isAlive(gen) && snapshot.phase != SessionPhase.Idle) {
+                publish(SessionSnapshot.idle(gen))
+            }
+            return
+        }
         publish(
             SessionSnapshot(
                 phase = SessionPhase.Stopping,

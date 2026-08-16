@@ -184,6 +184,10 @@ func StartTun(fd int, mtu int) string {
 }
 
 // StopTun tears down the gVisor stack. Safe if TUN was never started.
+//
+// Close the stack first — it owns the LinkEndpoint and closes the TUN fd.
+// Calling both st.Close() and dev.Close() double-closes the same fd (fdsan
+// abort on Pixel: "double-close of file descriptor N").
 func StopTun() {
 	mu.Lock()
 	dev := tunDev
@@ -191,12 +195,13 @@ func StopTun() {
 	tunDev = nil
 	tunStk = nil
 	mu.Unlock()
-	if dev != nil {
-		dev.Close()
-	}
 	if st != nil {
 		st.Close()
 		st.Wait()
+		return
+	}
+	if dev != nil {
+		dev.Close()
 	}
 }
 

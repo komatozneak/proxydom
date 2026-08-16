@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api_client.dart';
@@ -19,18 +20,29 @@ class SubscriptionStatusNotifier
     extends AutoDisposeAsyncNotifier<SubscriptionStatus> {
   @override
   Future<SubscriptionStatus> build() async {
+    // Listen (do not watch) session: a 304/refresh must not rebuild Free quota
+    // into AsyncLoading. Paid upgrades still project immediately.
+    ref.listen(sessionProvider, (previous, next) {
+      final snap = next.valueOrNull;
+      if (snap != null && snap.tier != 'free') {
+        state = AsyncData(subscriptionFromSession(snap));
+      }
+    });
+
     final auth = await ref.watch(authProvider.future);
     if (auth is! AuthStateAuthenticated) {
       return SubscriptionStatus.empty;
     }
-    final session = ref.watch(sessionProvider).valueOrNull;
-    if (session != null) {
+    final session = ref.read(sessionProvider).valueOrNull;
+    if (session != null && session.tier != 'free') {
       return subscriptionFromSession(session);
     }
-    return _fetch();
+    return loadFreeQuota();
   }
 
-  Future<SubscriptionStatus> _fetch() async {
+  /// Free-tier source: GET `/billing/subscription` (session has no quota).
+  @visibleForTesting
+  Future<SubscriptionStatus> loadFreeQuota() async {
     // Leading slash required: Dio joins as baseUrl + path (no separator).
     // Without it → /api/v1billing/subscription → 404 → Settings load error.
     final resp = await ApiClient.instance.get<Map<String, dynamic>>(
@@ -54,14 +66,32 @@ class SubscriptionStatusNotifier
     return SubscriptionStatus.fromJson(resp.data!);
   }
 
+  /// Reload this notifier's source only. Does not refresh [sessionProvider]
+  /// (that would invalidate watchers / this notifier mid-await).
   Future<void> refresh() async {
-    await ref.read(sessionProvider.notifier).refresh();
+    final previous = state.asData?.value;
     final session = ref.read(sessionProvider).valueOrNull;
-    if (session != null) {
+    if (session != null && session.tier != 'free') {
       state = AsyncData(subscriptionFromSession(session));
       return;
     }
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(_fetch);
+    final next = await AsyncValue.guard(loadFreeQuota);
+    if (next.hasValue) {
+      _setIfAlive(next);
+    } else if (previous != null) {
+      _setIfAlive(AsyncData(previous));
+    } else {
+      _setIfAlive(next);
+    }
+  }
+
+  void _setIfAlive(AsyncValue<SubscriptionStatus> next) {
+    try {
+      state = next;
+    } on StateError {
+      // Notifier disposed while the request was in flight.
+    } on AssertionError {
+      // Provider invalidated (e.g. auth) while refresh awaited.
+    }
   }
 }

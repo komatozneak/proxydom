@@ -132,7 +132,7 @@ class HysteriaBridge private constructor() {
     fun stop() {
         if (!isRunning.getAndSet(false)) return
         try {
-            Hy2bind.stopTun()
+            // Stop() already calls StopTun — do not stopTun()+stop() (double teardown).
             Hy2bind.stop()
         } catch (t: Throwable) {
             Log.w(TAG, "stop: ${t.message}")

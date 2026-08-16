@@ -1,3 +1,4 @@
+import '../../../l10n/app_localizations.dart';
 import 'geo_ip_service.dart';
 import 'vpn_node.dart';
 
@@ -49,23 +50,23 @@ const Map<String, NodePlace> kKnownNodePlaces = {
     flag: '🇳🇱',
   ),
   '45.91.248.91': NodePlace(
-    title: 'США · Бесплатно',
+    title: 'США',
     subtitle: '',
-    titleEn: 'USA · Free',
+    titleEn: 'USA',
     subtitleEn: '',
     flag: '🇺🇸',
   ),
   '217.60.3.9': NodePlace(
-    title: 'Европа · Бесплатно',
-    subtitle: '',
-    titleEn: 'Europe · Free',
-    subtitleEn: '',
-    flag: '🇪🇺',
+    title: 'Латвия',
+    subtitle: 'Низкий пинг',
+    titleEn: 'Latvia',
+    subtitleEn: 'Low ping',
+    flag: '🇱🇻',
   ),
   '107.181.139.193': NodePlace(
-    title: 'Индия · Premium',
+    title: 'Индия',
     subtitle: '',
-    titleEn: 'India · Premium',
+    titleEn: 'India',
     subtitleEn: '',
     flag: '🇮🇳',
   ),
@@ -107,49 +108,93 @@ bool isResolvedPlace(NodePlace place) {
 
 /// Product label for YouTube / Premium egress (never country name).
 const NodePlace kYoutubePremiumPlace = NodePlace(
-  title: 'YouTube · Premium',
-  titleEn: 'YouTube · Premium',
+  title: 'YouTube',
+  titleEn: 'YouTube',
   subtitle: '',
-  flag: '👑',
+  flag: 'youtube',
 );
 
 /// Premium gaming TT (DE ping for RF clients) — never country name.
 const NodePlace kGamingPremiumPlace = NodePlace(
-  title: 'Игровой · Premium',
-  titleEn: 'Gaming · Premium',
+  title: 'Игровой',
+  titleEn: 'Gaming',
   subtitle: '',
-  flag: '🎮',
+  flag: 'gaming',
 );
 
 /// Premium India geo (local apps / prices) — country is the product.
 const NodePlace kIndiaPremiumPlace = NodePlace(
-  title: 'Индия · Premium',
-  titleEn: 'India · Premium',
+  title: 'Индия',
+  titleEn: 'India',
   subtitle: '',
   flag: '🇮🇳',
 );
 
-const String kFlagEurope = '🇪🇺';
+const String kFlagEurope = '🇱🇻';
 const String kFlagUsa = '🇺🇸';
 const String kFlagIndia = '🇮🇳';
 const String kFlagGlobe = '🌐';
-const String kFlagGaming = '🎮';
+const String kFlagGaming = 'gaming';
 
 /// Visible Free Hy2 row if a live Hy2 node is in the catalog (not on 204.11).
 const NodePlace kHysteriaMobilePlace = NodePlace(
-  title: 'Европа · Бесплатно',
-  titleEn: 'Europe · Free',
-  subtitle: '',
-  subtitleEn: '',
+  title: 'Латвия',
+  titleEn: 'Latvia',
+  subtitle: 'Низкий пинг',
+  subtitleEn: 'Low ping',
   flag: kFlagEurope,
 );
 
+const NodePlace kUsaMobilePlace = NodePlace(
+  title: 'США',
+  titleEn: 'USA',
+  subtitle: '',
+  subtitleEn: '',
+  flag: kFlagUsa,
+);
+
 /// Locations list section for grouping (Auto is separate UI row).
-enum LocationSection { premium, europe, usa, other }
+enum LocationSection { premium, general, other }
+
+/// Drop catalog «· Free / · Premium» — country or product name only.
+String stripTierRole(String raw) {
+  return raw.trim().replaceFirst(
+        RegExp(
+          r'\s*[·•]\s*(Бесплатно|Free|Premium|Премиум)\s*$',
+          caseSensitive: false,
+        ),
+        '',
+      );
+}
+
+/// Locations / Home blurb when [NodePlace.subtitle] is empty.
+String displaySubtitleForNode(VpnNode node, AppL10n l) {
+  if (node.isYoutube) return l.regionBlurbYoutube;
+  if (node.isGaming) return l.regionBlurbGaming;
+  if (node.isGeoIn) return l.regionBlurbIndia;
+  return l.regionBlurbFree;
+}
+
+/// Strip tier suffixes and reject ops/FQDN labels for Home fallback copy.
+String sanitizeHomeLabel(String raw) {
+  final t = raw.trim();
+  if (t.isEmpty || _isUnsafeUserFacingLabel(t)) return '';
+  return stripTierRole(t);
+}
+
+/// First catalog node whose host matches [host] (port-normalized).
+VpnNode? catalogNodeForHost(Iterable<VpnNode> catalog, String? host) {
+  final key = normalizeNodeHost(host ?? '');
+  if (key.isEmpty) return null;
+  for (final n in catalog) {
+    if (normalizeNodeHost(n.host) == key) return n;
+  }
+  return null;
+}
 
 /// Flag for catalog product labels / node.region (not GeoIP).
 String flagForNode(VpnNode node, {String? productLabel}) {
-  if (node.isYoutube) return '👑';
+  if (node.isYoutube) return 'youtube';
   if (node.isGaming) return kFlagGaming;
   if (node.isGeoIn) return kFlagIndia;
   final region = (node.region ?? '').trim().toLowerCase();
@@ -158,10 +203,10 @@ String flagForNode(VpnNode node, {String? productLabel}) {
   if (region == 'in' || region == 'india') return kFlagIndia;
   if (node.isGeoUs) return kFlagUsa;
 
-  final label = (productLabel ??
-          (node.label.isNotEmpty ? node.label : node.name))
-      .trim()
-      .toLowerCase();
+  final label =
+      (productLabel ?? (node.label.isNotEmpty ? node.label : node.name))
+          .trim()
+          .toLowerCase();
   return flagForProductLabel(label);
 }
 
@@ -181,6 +226,29 @@ String flagForProductLabel(String label) {
   return kFlagGlobe;
 }
 
+/// Unique location flags in Auto pool order (for Home connecting animation).
+List<String> uniqueAutoPoolFlags(Iterable<VpnNode> pool) {
+  final seen = <String>{};
+  final out = <String>[];
+  for (final node in pool) {
+    final flag = flagForNode(node);
+    if (flag == kFlagGlobe) continue;
+    if (seen.add(flag)) out.add(flag);
+  }
+  if (out.isEmpty) return [kFlagEurope, kFlagUsa];
+  return out;
+}
+
+/// Period for cycling Auto-pool flags on Home while connecting.
+const Duration kAutoFlagCyclePeriod = Duration(milliseconds: 700);
+
+/// Flag shown on ServerCard during Auto connect (tick advances ~700ms).
+String autoConnectingDisplayFlag(List<String> poolFlags, int tick) {
+  final flags = poolFlags.isEmpty ? [kFlagEurope, kFlagUsa] : poolFlags;
+  final i = tick % flags.length;
+  return flags[i < 0 ? i + flags.length : i];
+}
+
 /// Which Locations section a node belongs to (first match wins).
 LocationSection locationSectionFor(VpnNode node) {
   if (node.isYoutube || node.isGaming || node.requiresPremium) {
@@ -191,25 +259,31 @@ LocationSection locationSectionFor(VpnNode node) {
   if (region == 'eu' ||
       region == 'europe' ||
       label.contains('европа') ||
-      label.contains('europe')) {
-    return LocationSection.europe;
-  }
-  if (region == 'us' ||
+      label.contains('europe') ||
+      label.contains('латвия') ||
+      label.contains('latvia') ||
+      region == 'us' ||
       region == 'usa' ||
       node.isGeoUs ||
       label.contains('сша') ||
       label.contains('usa') ||
       label.contains('united states')) {
-    return LocationSection.usa;
+    return LocationSection.general;
   }
   // Fallback: product flag heuristics.
   final flag = flagForNode(node);
-  if (flag == kFlagEurope) return LocationSection.europe;
-  if (flag == kFlagUsa) return LocationSection.usa;
+  if (flag == kFlagEurope || flag == kFlagUsa) return LocationSection.general;
   return LocationSection.other;
 }
 
-/// Partition online nodes into Premium → Europe → USA → Other (stable by label).
+int _generalRank(VpnNode node) {
+  final flag = flagForNode(node);
+  if (flag == kFlagEurope) return 0;
+  if (flag == kFlagUsa) return 1;
+  return 2;
+}
+
+/// Partition online nodes into Premium → General (EU then US) → Other.
 Map<LocationSection, List<VpnNode>> groupNodesByLocationSection(
   Iterable<VpnNode> nodes,
 ) {
@@ -219,8 +293,12 @@ Map<LocationSection, List<VpnNode>> groupNodesByLocationSection(
   for (final n in nodes) {
     out[locationSectionFor(n)]!.add(n);
   }
-  for (final list in out.values) {
-    list.sort((a, b) {
+  for (final entry in out.entries) {
+    entry.value.sort((a, b) {
+      if (entry.key == LocationSection.general) {
+        final rank = _generalRank(a).compareTo(_generalRank(b));
+        if (rank != 0) return rank;
+      }
       final la = a.label.isNotEmpty ? a.label : a.name;
       final lb = b.label.isNotEmpty ? b.label : b.name;
       return la.toLowerCase().compareTo(lb.toLowerCase());
@@ -236,7 +314,7 @@ NodePlace placeForHost(String host, {int index = 0, String? fallbackLabel}) {
   final raw = fallbackLabel?.trim() ?? '';
   if (raw.isNotEmpty && _isSafeProductLabel(raw)) {
     return NodePlace(
-      title: raw,
+      title: stripTierRole(raw),
       subtitle: '',
       flag: flagForProductLabel(raw),
     );
@@ -270,27 +348,21 @@ NodePlace placeForNode(VpnNode node, {int index = 0}) {
   if (node.isGeoIn) return kIndiaPremiumPlace;
   if (node.isHysteria) {
     final hyLabel = node.label.isNotEmpty ? node.label : node.name;
-    if (hyLabel.isNotEmpty && _isSafeProductLabel(hyLabel)) {
+    final lowerLabel = hyLabel.toLowerCase();
+    if (hyLabel.isNotEmpty &&
+        _isSafeProductLabel(hyLabel) &&
+        !lowerLabel.contains('европа') &&
+        !lowerLabel.contains('europe')) {
       return NodePlace(
-        title: hyLabel,
+        title: stripTierRole(hyLabel),
         subtitle: '',
         flag: flagForNode(node, productLabel: hyLabel),
       );
     }
     if (node.isGeoUs) {
-      return const NodePlace(
-        title: 'США · Бесплатно',
-        titleEn: 'USA · Free',
-        subtitle: '',
-        flag: kFlagUsa,
-      );
+      return kUsaMobilePlace;
     }
-    return const NodePlace(
-      title: 'Европа · Бесплатно',
-      titleEn: 'Europe · Free',
-      subtitle: '',
-      flag: kFlagEurope,
-    );
+    return kHysteriaMobilePlace;
   }
 
   final raw = node.label.isNotEmpty
@@ -299,7 +371,7 @@ NodePlace placeForNode(VpnNode node, {int index = 0}) {
   // Catalog product labels beat IP-geo known map (EU → not Frankfurt).
   if (raw.isNotEmpty && _isSafeProductLabel(raw)) {
     return NodePlace(
-      title: raw,
+      title: stripTierRole(raw),
       subtitle: '',
       flag: flagForNode(node, productLabel: raw),
     );
@@ -320,7 +392,7 @@ NodePlace placeForNode(VpnNode node, {int index = 0}) {
     );
   }
   return NodePlace(
-    title: raw,
+    title: stripTierRole(raw),
     subtitle: '',
     flag: flagForNode(node, productLabel: raw),
   );

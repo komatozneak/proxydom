@@ -3,7 +3,10 @@ import '../../auth/data/auth_api.dart';
 import '../../settings/data/subscription_status.dart';
 import '../data/account_session_snapshot.dart';
 
-/// Map session entitlement → Settings subscription model (no extra GET).
+/// Map session entitlement → Settings subscription model.
+///
+/// Session snapshot carries no quota — Free meter must still come from
+/// `/billing/subscription` (see [SubscriptionStatusNotifier]).
 SubscriptionStatus subscriptionFromSession(AccountSessionSnapshot snap) {
   final tier = snap.tier;
   if (tier == 'free') {

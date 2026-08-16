@@ -78,7 +78,12 @@ class AppRouter {
   static final GoRouterRefreshNotifier refreshNotifier =
       GoRouterRefreshNotifier();
 
+  /// Root navigator — billing routes sit above [StatefulShellRoute].
+  static final GlobalKey<NavigatorState> rootNavigatorKey =
+      GlobalKey<NavigatorState>(debugLabel: 'root');
+
   static final GoRouter config = GoRouter(
+    navigatorKey: rootNavigatorKey,
     // Prefer /home: with tokens restored in main() before runApp, redirect
     // sends authed users through /gate instead of flashing /login.
     initialLocation: '/home',
@@ -149,7 +154,11 @@ class AppRouter {
       GoRoute(path: '/welcome', builder: (c, s) => const WelcomeScreen()),
       GoRoute(path: '/gate', builder: (c, s) => const PostAuthGateScreen()),
       GoRoute(path: '/promo', builder: (c, s) => const PromoCodeScreen()),
-      GoRoute(path: '/locked', builder: (c, s) => const LockedAccessScreen()),
+      GoRoute(
+        path: '/locked',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (c, s) => const LockedAccessScreen(),
+      ),
       GoRoute(
         path: '/recovery',
         builder: (c, s) => RecoveryCodeScreen(
@@ -168,13 +177,16 @@ class AppRouter {
         path: '/onboarding',
         builder: (c, s) => const OnboardingScreen(),
       ),
-      // Parked for later (not in bottom nav).
+      // Parked for later (not in bottom nav). Root navigator so push from
+      // a shell branch cannot duplicate the page key.
       GoRoute(
         path: '/subscription',
+        parentNavigatorKey: rootNavigatorKey,
         builder: (c, s) => const SubscriptionTabScreen(),
       ),
       GoRoute(
         path: '/premium',
+        parentNavigatorKey: rootNavigatorKey,
         builder: (c, s) => const PremiumTabScreen(),
       ),
       StatefulShellRoute.indexedStack(

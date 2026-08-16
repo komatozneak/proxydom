@@ -137,7 +137,7 @@ func TestEgressAddrRewritesPrivateDNS(t *testing.T) {
 func TestHyPacketConnHijackPreservesOrigAddr(t *testing.T) {
 	orig := &net.UDPAddr{IP: net.ParseIP("10.255.255.2").To4(), Port: 53}
 	u := &fakeUDPConn{recv: make(chan udpMsg, 1)}
-	pc := newHyPacketConn(u, orig, "1.1.1.1:53")
+	pc := newHyPacketConn(u, orig, "1.1.1.1:53", true)
 	defer pc.Close()
 	if _, err := pc.WriteTo([]byte("q"), orig); err != nil {
 		t.Fatal(err)

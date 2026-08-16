@@ -45,6 +45,7 @@ abstract final class AppIcons {
   static const IconData info = PhosphorIconsRegular.info;
   static const IconData question = PhosphorIconsRegular.question;
   static const IconData logout = PhosphorIconsRegular.signOut;
+  static const IconData signIn = PhosphorIconsRegular.signIn;
   static const IconData back = PhosphorIconsRegular.arrowLeft;
   static const IconData backBold = PhosphorIconsBold.arrowLeft;
   static const IconData download = PhosphorIconsRegular.cloudArrowDown;
@@ -58,6 +59,7 @@ abstract final class AppIcons {
   static const IconData phone = PhosphorIconsRegular.phone;
   static const IconData devices = PhosphorIconsRegular.devices;
   static const IconData crown = PhosphorIconsRegular.crown;
+  static const IconData gamepad = PhosphorIconsRegular.gameController;
   static const IconData creditCard = PhosphorIconsRegular.creditCard;
   static const IconData mapPin = PhosphorIconsRegular.mapPin;
   static const IconData sliders = PhosphorIconsRegular.sliders;

@@ -1,15 +1,17 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:teremok_connect/features/vpn/data/node_display.dart';
 import 'package:teremok_connect/features/vpn/data/vpn_node.dart';
+import 'package:teremok_connect/l10n/app_localizations.dart';
 
 void main() {
   group('real server pool labels', () {
     test('known hosts resolve to country/city with flags', () {
       const cases = <String, (String, String, String)>{
         '185.139.228.192': ('Нидерланды', 'Амстердам', '🇳🇱'),
-        '45.91.248.91': ('США · Бесплатно', '', '🇺🇸'),
-        '217.60.3.9': ('Европа · Бесплатно', '', '🇪🇺'),
-        '107.181.139.193': ('Индия · Premium', '', '🇮🇳'),
+        '45.91.248.91': ('США', '', '🇺🇸'),
+        '217.60.3.9': ('Латвия', 'Низкий пинг', '🇱🇻'),
+        '107.181.139.193': ('Индия', '', '🇮🇳'),
       };
 
       for (final entry in cases.entries) {
@@ -61,11 +63,11 @@ void main() {
         name: 'node-usa',
       );
       final place = placeForNode(usa, index: 3);
-      expect(place.title, 'США · Бесплатно');
+      expect(place.title, 'США');
       expect(place.flag, '🇺🇸');
     });
 
-    test('Hy2 place uses Europe free copy not Восточная Европа Xray', () {
+    test('Hy2 place uses Latvia free copy not Восточная Европа Xray', () {
       const hy2 = VpnNode(
         id: 'eu-hy2-1',
         label: 'Европа · Бесплатно',
@@ -77,12 +79,12 @@ void main() {
         region: 'eu',
       );
       final place = placeForNode(hy2, index: 0);
-      expect(place.title, 'Европа · Бесплатно');
+      expect(place.title, 'Латвия');
       expect(place.title.toLowerCase(), isNot(contains('восточная')));
-      expect(place.flag, kFlagEurope);
+      expect(place.flag, '🇱🇻');
     });
 
-    test('catalog Europe label beats EU IP geo and uses EU flag', () {
+    test('catalog Europe label beats EU IP geo and uses LV flag', () {
       const eu = VpnNode(
         id: 'eu-hy2-1',
         label: 'Европа · Бесплатно',
@@ -95,10 +97,10 @@ void main() {
         protocol: kVpnNodeProtocolHysteria2,
       );
       final place = placeForNode(eu, index: 0);
-      expect(place.title, 'Европа · Бесплатно');
+      expect(place.title, 'Латвия');
       expect(place.title.toLowerCase(), isNot(contains('франкфурт')));
       expect(place.title.toLowerCase(), isNot(contains('германия')));
-      expect(place.flag, kFlagEurope);
+      expect(place.flag, '🇱🇻');
       expect(place.flag, isNot(kFlagGlobe));
       expect(place.flag, isNot(kFlagUsa));
     });
@@ -116,10 +118,46 @@ void main() {
         purpose: 'geo-us',
       );
       final place = placeForNode(usa, index: 0);
-      expect(place.title, 'США · Бесплатно');
+      expect(place.title, 'США');
       expect(place.flag, kFlagUsa);
-      expect(place.flag, isNot(kFlagEurope));
+      expect(place.flag, isNot('🇱🇻'));
       expect(place.flag, isNot(kFlagGlobe));
+    });
+
+    test('stripTierRole drops catalog Free and Premium suffixes', () {
+      expect(stripTierRole('США · Бесплатно'), 'США');
+      expect(stripTierRole('USA · Free'), 'USA');
+      expect(stripTierRole('Латвия'), 'Латвия');
+      expect(stripTierRole('YouTube · Premium'), 'YouTube');
+      expect(stripTierRole('Индия · Премиум'), 'Индия');
+    });
+
+    test('displaySubtitleForNode keeps marketing blurb (no lock disclaimer)',
+        () {
+      final l = lookupAppL10n(const Locale('ru'));
+      const yt = VpnNode(
+        id: 'al-youtube',
+        label: 'YouTube · Premium',
+        host: '85.155.228.235',
+        port: 443,
+        status: 'connected',
+        isDefault: false,
+        purpose: 'youtube',
+        requiresPremium: true,
+      );
+      const game = VpnNode(
+        id: 'eu-gaming',
+        label: 'Игровой · Premium',
+        host: '204.11.2.216',
+        port: 443,
+        status: 'connected',
+        isDefault: false,
+        purpose: 'gaming',
+        requiresPremium: true,
+      );
+      expect(displaySubtitleForNode(yt, l), l.regionBlurbYoutube);
+      expect(displaySubtitleForNode(game, l), l.regionBlurbGaming);
+      expect(displaySubtitleForNode(yt, l), isNot(l.locationsPremiumUnavailable));
     });
 
     test('normalizeNodeHost strips IPv4 port', () {
@@ -147,7 +185,8 @@ void main() {
       expect(place.subtitle, isEmpty);
     });
 
-    test('gaming purpose shows Игровой · Premium with gamepad, not Germany', () {
+    test('gaming purpose shows Игровой with gamepad, not Germany',
+        () {
       const game = VpnNode(
         id: 'eu-gaming',
         label: 'Германия',
@@ -162,13 +201,13 @@ void main() {
         requiresPremium: true,
       );
       final place = placeForNode(game, index: 1);
-      expect(place.title, 'Игровой · Premium');
-      expect(place.flag, '🎮');
+      expect(place.title, 'Игровой');
+      expect(place.flag, 'gaming');
       expect(place.title.toLowerCase(), isNot(contains('германия')));
       expect(place.title.toLowerCase(), isNot(contains('germany')));
     });
 
-    test('Free EU Xray host uses Europe free copy not Frankfurt', () {
+    test('Free EU Xray host uses Latvia free copy not Frankfurt', () {
       const eu = VpnNode(
         id: 'eu-geo-1',
         label: 'Node EU',
@@ -180,12 +219,14 @@ void main() {
         region: 'eu',
       );
       final place = placeForNode(eu, index: 0);
-      expect(place.title, 'Европа · Бесплатно');
-      expect(place.flag, kFlagEurope);
+      expect(place.title, 'Латвия');
+      expect(place.subtitle, 'Низкий пинг');
+      expect(place.subtitleEn, 'Low ping');
+      expect(place.flag, '🇱🇻');
       expect(place.title.toLowerCase(), isNot(contains('франкфурт')));
     });
 
-    test('youtube purpose shows YouTube · Premium with crown, not Albania', () {
+    test('youtube purpose shows YouTube with crown, not Albania', () {
       const yt = VpnNode(
         id: 'al-youtube-tt',
         label: 'Албания · YouTube',
@@ -200,14 +241,14 @@ void main() {
         requiresPremium: true,
       );
       final place = placeForNode(yt, index: 2);
-      expect(place.title, 'YouTube · Premium');
-      expect(place.flag, '👑');
+      expect(place.title, 'YouTube');
+      expect(place.flag, 'youtube');
       expect(place.title.toLowerCase(), isNot(contains('албания')));
       expect(place.title.toLowerCase(), isNot(contains('albania')));
       expect(place.subtitle, isEmpty);
     });
 
-    test('geo-in purpose shows Индия · Premium with India flag', () {
+    test('geo-in purpose shows Индия with India flag', () {
       const india = VpnNode(
         id: 'in-geo-1',
         label: 'Node IN',
@@ -222,12 +263,12 @@ void main() {
         requiresPremium: true,
       );
       final place = placeForNode(india, index: 0);
-      expect(place.title, 'Индия · Premium');
+      expect(place.title, 'Индия');
       expect(place.flag, '🇮🇳');
       expect(locationSectionFor(india), LocationSection.premium);
     });
 
-    test('groupNodesByLocationSection order Premium Europe USA', () {
+    test('groupNodesByLocationSection order Premium then General EU+US', () {
       const yt = VpnNode(
         id: 'yt',
         label: 'YouTube · Premium',
@@ -259,9 +300,51 @@ void main() {
       );
       final g = groupNodesByLocationSection([us, eu, yt]);
       expect(g[LocationSection.premium]!.single.id, 'yt');
-      expect(g[LocationSection.europe]!.single.id, 'eu');
-      expect(g[LocationSection.usa]!.single.id, 'us');
+      expect(g[LocationSection.general]!.map((n) => n.id), ['eu', 'us']);
       expect(g[LocationSection.other], isEmpty);
     });
+  });
+
+  test('uniqueAutoPoolFlags keeps Auto order and skips globe', () {
+    const eu = VpnNode(
+      id: 'eu-hy2-1',
+      label: 'Европа · Бесплатно',
+      host: '217.60.3.9',
+      port: 443,
+      status: 'connected',
+      isDefault: false,
+      protocol: kVpnNodeProtocolHysteria2,
+      region: 'eu',
+    );
+    const us = VpnNode(
+      id: 'us-hy2-1',
+      label: 'США · Бесплатно',
+      host: '45.91.248.91',
+      port: 443,
+      status: 'connected',
+      isDefault: false,
+      protocol: kVpnNodeProtocolHysteria2,
+      purpose: 'geo-us',
+    );
+    const eu2 = VpnNode(
+      id: 'eu-hy2-2',
+      label: 'Европа · Бесплатно',
+      host: '217.60.3.10',
+      port: 443,
+      status: 'connected',
+      isDefault: false,
+      protocol: kVpnNodeProtocolHysteria2,
+      region: 'eu',
+    );
+    expect(uniqueAutoPoolFlags([eu, us, eu2]), [kFlagEurope, kFlagUsa]);
+    expect(uniqueAutoPoolFlags(const []), [kFlagEurope, kFlagUsa]);
+  });
+
+  test('autoConnectingDisplayFlag cycles the pool', () {
+    const flags = [kFlagEurope, kFlagUsa];
+    expect(autoConnectingDisplayFlag(flags, 0), kFlagEurope);
+    expect(autoConnectingDisplayFlag(flags, 1), kFlagUsa);
+    expect(autoConnectingDisplayFlag(flags, 2), kFlagEurope);
+    expect(autoConnectingDisplayFlag(const [], 0), kFlagEurope);
   });
 }

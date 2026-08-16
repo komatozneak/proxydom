@@ -136,7 +136,7 @@ class TrustTunnelBridge private constructor() {
             if (!newClient.start(tun)) {
                 lastErrorMessage = "native start returned false"
                 Log.e(TAG, "start: $lastErrorMessage")
-                newClient.close()
+                runCatching { newClient.close() }
                 client = null
                 return false
             }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
+import '../../../core/widgets/teremok_snackbar.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../vpn/data/vpn_controller.dart';
 
@@ -123,9 +124,7 @@ class KillSwitchSettingsTileState extends State<KillSwitchSettingsTile>
     if (!ok) {
       _sawBackground = false;
       final l = AppL10n.of(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l.settingsKillSwitchOpenFailed)),
-      );
+      showTeremokSnackBar(context, l.settingsKillSwitchOpenFailed);
     }
   }
 

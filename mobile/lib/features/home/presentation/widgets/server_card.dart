@@ -5,27 +5,24 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme.dart';
 import '../../../../core/widgets/app_icon.dart';
+import '../../../../core/widgets/location_flag_icon.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../application/vpn_provider.dart';
 import '../../application/vpn_status.dart';
 
-/// Server pill: region left | session+ms column right. Tappable → Locations.
+/// Server pill: region left | session column right. Tappable → Locations.
 class ServerCard extends ConsumerWidget {
   const ServerCard({
     super.key,
     required this.title,
     required this.subtitle,
     required this.flagEmoji,
-    this.pingMs,
     this.onTap,
   });
 
   final String title;
   final String subtitle;
   final String flagEmoji;
-
-  /// Live path RTT when connected; null when unknown / disconnected.
-  final int? pingMs;
 
   final VoidCallback? onTap;
 
@@ -37,13 +34,6 @@ class ServerCard extends ConsumerWidget {
     final line = theme.colorScheme.outline;
     final connected = ref.watch(vpnProvider) is VpnConnected;
 
-    final String? pingLabel;
-    if (connected) {
-      pingLabel = pingMs != null ? '$pingMs ms' : '— ms';
-    } else {
-      pingLabel = null;
-    }
-
     return Material(
       color: elevated,
       shape: RoundedRectangleBorder(
@@ -54,7 +44,7 @@ class ServerCard extends ConsumerWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(AppBrand.radiusPill),
         child: ConstrainedBox(
-          constraints: BoxConstraints(minHeight: connected ? 80 : 60),
+          constraints: BoxConstraints(minHeight: connected ? 72 : 60),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
@@ -64,24 +54,7 @@ class ServerCard extends ConsumerWidget {
                 Expanded(
                   child: Row(
                     children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.surface,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: theme.colorScheme.outline.withValues(
-                              alpha: 0.35,
-                            ),
-                          ),
-                        ),
-                        child: Text(
-                          flagEmoji,
-                          style: const TextStyle(fontSize: 28, height: 1.0),
-                        ),
-                      ),
+                      LocationFlagIcon(flag: flagEmoji, size: 48),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
@@ -113,12 +86,12 @@ class ServerCard extends ConsumerWidget {
                     ],
                   ),
                 ),
-                // Right: session above ms (connected only)
+                // Right: session timer (connected only)
                 if (connected) ...[
                   const SizedBox(width: 12),
-                  SizedBox(
+                  const SizedBox(
                     width: 108,
-                    child: _SessionPingColumn(pingLabel: pingLabel!),
+                    child: _SessionColumn(),
                   ),
                 ],
                 if (onTap != null) ...[
@@ -138,17 +111,15 @@ class ServerCard extends ConsumerWidget {
   }
 }
 
-/// Right column: СЕССИЯ + timer on top, ms below.
-class _SessionPingColumn extends ConsumerStatefulWidget {
-  const _SessionPingColumn({required this.pingLabel});
-
-  final String pingLabel;
+/// Right column: СЕССИЯ + timer.
+class _SessionColumn extends ConsumerStatefulWidget {
+  const _SessionColumn();
 
   @override
-  ConsumerState<_SessionPingColumn> createState() => _SessionPingColumnState();
+  ConsumerState<_SessionColumn> createState() => _SessionColumnState();
 }
 
-class _SessionPingColumnState extends ConsumerState<_SessionPingColumn> {
+class _SessionColumnState extends ConsumerState<_SessionColumn> {
   Timer? _timer;
   Duration _elapsed = Duration.zero;
 
@@ -206,16 +177,6 @@ class _SessionPingColumnState extends ConsumerState<_SessionPingColumn> {
             letterSpacing: 0.6,
             height: 1.05,
             color: AppBrand.secondary.withValues(alpha: 0.92),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          widget.pingLabel,
-          textAlign: TextAlign.right,
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontFeatures: const [FontFeature.tabularFigures()],
-            fontWeight: FontWeight.w600,
-            color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
       ],

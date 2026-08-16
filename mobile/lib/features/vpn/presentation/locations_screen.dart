@@ -8,6 +8,8 @@ import 'package:go_router/go_router.dart';
 import '../../../core/busy/busy_overlay.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
+import '../../../core/widgets/location_flag_icon.dart';
+import '../../../core/widgets/teremok_snackbar.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../home/application/vpn_provider.dart';
 import '../../settings/application/subscription_status_provider.dart';
@@ -146,7 +148,8 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       } catch (e) {
         lastError = e;
         if (attempt < 2 && _isTransientNetwork(e)) {
-          await Future<void>.delayed(Duration(milliseconds: 400 * (attempt + 1)));
+          await Future<void>.delayed(
+              Duration(milliseconds: 400 * (attempt + 1)));
           continue;
         }
         break;
@@ -202,17 +205,12 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       final msg = _isTransientNetwork(e)
           ? AppL10n.of(context).networkErrorFriendly
           : l.regionChangeFailed(e.toString());
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(msg)),
-      );
+      showTeremokSnackBar(context, msg);
     }
   }
 
   void _onLockedPremiumTap() {
-    final l = AppL10n.of(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(l.locationsPremiumUnavailable)),
-    );
+    context.push('/subscription');
   }
 
   /// Free/online egress + always keep Premium/locked rows in the pool (gray).
@@ -227,14 +225,6 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     if (n.requiresPremium && !userPremium) return true;
     if (!userPremium && n.locked) return true;
     return false;
-  }
-
-  String _subtitleFor(VpnNode node, AppL10n l, {required bool locked}) {
-    if (locked) return l.locationsPremiumUnavailable;
-    if (node.isYoutube) return l.regionBlurbYoutube;
-    if (node.isGaming) return l.regionBlurbGaming;
-    if (node.isGeoIn) return l.regionBlurbIndia;
-    return l.regionBlurbFree;
   }
 
   String _friendlyError(AppL10n l) {
@@ -319,30 +309,24 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
         final place = placeForNode(node, index: i);
         final locked = _isTileLocked(node, userPremium: userPremium);
         final selected = !locked && selectedId == node.id;
-        final subtitle = _subtitleFor(node, l, locked: locked);
+        final placeSubtitle = place.displaySubtitle(locale).trim();
+        // Locked Premium tiles still show the real marketing blurb — the
+        // lock is communicated by the badge + gray styling, not the subtitle.
+        final subtitle = placeSubtitle.isNotEmpty
+            ? placeSubtitle
+                : displaySubtitleForNode(node, l);
         out.add(
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: RegionTile(
               selected: selected,
               enabled: !locked,
-              leading: CircleAvatar(
-                backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                child: Text(
-                  place.flag,
-                  style: TextStyle(
-                    fontSize: 22,
-                    color: locked ? theme.colorScheme.outline : null,
-                  ),
-                ),
-              ),
+              leading: LocationFlagIcon(flag: place.flag, size: 40),
               title: place.displayTitle(locale),
               subtitle: subtitle,
-              trailingBadge: node.isYoutube || node.requiresPremium
-                  ? l.locationsPremiumLocked
-                  : l.regionFree,
-              showBadge: selected ||
-                  (locked && (node.requiresPremium || node.isYoutube)),
+              trailingBadge:
+                  selected ? l.regionSelected : l.locationsPremiumLocked,
+              showBadge: selected || locked,
               signalGood: !locked,
               onTap: locked ? _onLockedPremiumTap : () => _pick(node.id),
             ),
@@ -373,14 +357,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
         const SizedBox(height: 16),
         RegionTile(
           selected: selectedId == kRegionAutoId,
-          leading: CircleAvatar(
-            backgroundColor: AppBrand.inkWithOpacity(0.08),
-            child: const AppIcon(
-              AppIcons.servers,
-              size: 22,
-              color: AppBrand.primary,
-            ),
-          ),
+          leading: const LocationFlagIcon(flag: kFlagEurope, size: 40),
           title: l.regionAutoTitle,
           subtitle: l.regionAutoSubtitle,
           trailingBadge: l.regionSelected,
@@ -391,13 +368,9 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
           sectionHeader(l.regionSectionYoutube),
           ...sectionTiles(sections[LocationSection.premium]!),
         ],
-        if (sections[LocationSection.europe]!.isNotEmpty) ...[
-          sectionHeader(l.regionSectionEurope),
-          ...sectionTiles(sections[LocationSection.europe]!),
-        ],
-        if (sections[LocationSection.usa]!.isNotEmpty) ...[
-          sectionHeader(l.regionSectionUsa),
-          ...sectionTiles(sections[LocationSection.usa]!),
+        if (sections[LocationSection.general]!.isNotEmpty) ...[
+          sectionHeader(l.regionSectionGeneral),
+          ...sectionTiles(sections[LocationSection.general]!),
         ],
         if (sections[LocationSection.other]!.isNotEmpty) ...[
           sectionHeader(l.regionSectionServers),
@@ -474,23 +447,27 @@ class RegionTile extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: theme.textTheme.titleMedium?.copyWith(
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
                         color: enabled
                             ? theme.colorScheme.onSurface
                             : theme.colorScheme.outline,
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                    if (subtitle.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
-              if (showBadge)
+              if (showBadge) ...[
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -505,21 +482,9 @@ class RegionTile extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                )
-              else
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    trailingBadge,
-                    style: theme.textTheme.labelSmall,
-                  ),
                 ),
-              const SizedBox(width: 8),
+                const SizedBox(width: 8),
+              ],
               _SignalBars(good: signalGood && enabled),
             ],
           ),
@@ -548,9 +513,7 @@ class _SignalBars extends StatelessWidget {
             width: 4,
             height: h,
             decoration: BoxDecoration(
-              color: i < (good ? 4 : 2)
-                  ? color
-                  : color.withValues(alpha: 0.25),
+              color: i < (good ? 4 : 2) ? color : color.withValues(alpha: 0.25),
               borderRadius: BorderRadius.circular(1),
             ),
           ),

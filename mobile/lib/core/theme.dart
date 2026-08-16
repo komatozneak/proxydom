@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 /// Hex values live only here. Widget code must use [AppBrand] or
 /// `Theme.of(context).colorScheme.*`, never raw `Color(0xFF…)`.
 ///
+/// Typeface: Inter (rsms/inter, SIL OFL) bundled in `assets/fonts/`.
+///
 /// [livingHouse] is Nest/glyph only — not UI chrome.
 class AppBrand {
   AppBrand._();
@@ -135,6 +137,7 @@ class AppTheme {
       brightness: brightness,
       colorScheme: scheme,
       scaffoldBackgroundColor: bg,
+      fontFamily: 'Inter',
       iconTheme: IconThemeData(color: onSurface, size: 24),
       textTheme: _buildTextTheme(scheme),
       appBarTheme: AppBarTheme(
@@ -144,6 +147,7 @@ class AppTheme {
         scrolledUnderElevation: 0,
         centerTitle: false,
         titleTextStyle: TextStyle(
+          fontFamily: 'Inter',
           color: onSurface,
           fontSize: 28,
           fontWeight: FontWeight.w800,
@@ -262,54 +266,64 @@ class AppTheme {
   static TextTheme _buildTextTheme(ColorScheme scheme) {
     return TextTheme(
       displayLarge: TextStyle(
+        fontFamily: 'Inter',
         fontSize: 32,
         fontWeight: FontWeight.w800,
         letterSpacing: -0.5,
         color: scheme.onSurface,
       ),
       displayMedium: TextStyle(
+        fontFamily: 'Inter',
         fontSize: 28,
         fontWeight: FontWeight.w800,
         color: scheme.onSurface,
       ),
       headlineLarge: TextStyle(
+        fontFamily: 'Inter',
         fontSize: 24,
         fontWeight: FontWeight.w700,
         color: scheme.onSurface,
       ),
       headlineMedium: TextStyle(
+        fontFamily: 'Inter',
         fontSize: 20,
         fontWeight: FontWeight.w700,
         color: scheme.onSurface,
       ),
       titleLarge: TextStyle(
+        fontFamily: 'Inter',
         fontSize: 18,
         fontWeight: FontWeight.w700,
         color: scheme.onSurface,
       ),
       titleMedium: TextStyle(
+        fontFamily: 'Inter',
         fontSize: 16,
         fontWeight: FontWeight.w600,
         color: scheme.onSurface,
       ),
       bodyLarge: TextStyle(
+        fontFamily: 'Inter',
         fontSize: 16,
         fontWeight: FontWeight.w400,
         color: scheme.onSurface,
         height: 1.5,
       ),
       bodyMedium: TextStyle(
+        fontFamily: 'Inter',
         fontSize: 14,
         fontWeight: FontWeight.w400,
         color: scheme.onSurfaceVariant,
         height: 1.4,
       ),
       labelLarge: TextStyle(
+        fontFamily: 'Inter',
         fontSize: 14,
         fontWeight: FontWeight.w600,
         color: scheme.onSurface,
       ),
       labelSmall: TextStyle(
+        fontFamily: 'Inter',
         fontSize: 11,
         fontWeight: FontWeight.w600,
         color: scheme.onSurfaceVariant,

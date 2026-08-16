@@ -6,24 +6,24 @@ import '../../../core/theme.dart';
 import '../../../l10n/app_localizations.dart';
 import '../data/vpn_disclosure_prefs.dart';
 
-/// Play VPN policy: prominent disclosure + consent before first Connect.
+/// Play VpnService prominent disclosure (Ogon-style: first in-app Connect).
 ///
-/// Returns `true` if the user accepted (or already accepted earlier).
-Future<bool> ensureVpnDisclosureAccepted(BuildContext context) async {
-  if (await VpnDisclosurePrefs.isAccepted()) return true;
-  if (!context.mounted) return false;
-
-  final accepted = await showDialog<bool>(
-    context: context,
-    barrierDismissible: false,
-    useSafeArea: true,
-    builder: (ctx) => const VpnDisclosureDialog(),
-  );
-  return accepted == true;
-}
-
+/// Shown from Home Nest tap before [VpnService.prepare]. OS VPN prompt is next.
 class VpnDisclosureDialog extends StatelessWidget {
   const VpnDisclosureDialog({super.key});
+
+  /// Returns true if the user already accepted, or accepts now.
+  /// Decline leaves prefs unset so the next Nest tap shows this again.
+  static Future<bool> ensureAccepted(BuildContext context) async {
+    if (await VpnDisclosurePrefs.isAccepted()) return true;
+    if (!context.mounted) return false;
+    final ok = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const VpnDisclosureDialog(),
+    );
+    return ok == true;
+  }
 
   @override
   Widget build(BuildContext context) {

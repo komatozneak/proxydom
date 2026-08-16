@@ -301,6 +301,18 @@ abstract class AppL10n {
   /// **'Data left'**
   String get homeTrafficRemainder;
 
+  /// No description provided for @homeQuotaUnlimitedTeaser.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlimited with Premium'**
+  String get homeQuotaUnlimitedTeaser;
+
+  /// No description provided for @homeQuotaUnlimitedCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Get unlimited'**
+  String get homeQuotaUnlimitedCta;
+
   /// No description provided for @homeTrafficExhausted.
   ///
   /// In en, this message translates to:
@@ -322,7 +334,7 @@ abstract class AppL10n {
   /// No description provided for @premiumHeadline.
   ///
   /// In en, this message translates to:
-  /// **'YouTube without ads'**
+  /// **'Without ads'**
   String get premiumHeadline;
 
   /// No description provided for @premiumBody.
@@ -366,6 +378,12 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Manage plans and promo codes. Premium unlocks YouTube locations.'**
   String get subscriptionTabHint;
+
+  /// No description provided for @subscriptionPay.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay'**
+  String get subscriptionPay;
 
   /// No description provided for @locationsPremiumLocked.
   ///
@@ -1510,7 +1528,7 @@ abstract class AppL10n {
   /// No description provided for @settingsSendReportHint.
   ///
   /// In en, this message translates to:
-  /// **'Saved on the device and copied. Then sent to the owner if the network allows.'**
+  /// **'Prepares a text dump of network and protocol diagnostics for Telegram support.'**
   String get settingsSendReportHint;
 
   /// No description provided for @settingsSendReportConfirm.
@@ -1522,7 +1540,7 @@ abstract class AppL10n {
   /// No description provided for @settingsReportSent.
   ///
   /// In en, this message translates to:
-  /// **'Report sent'**
+  /// **'Report sent to support via the bot. Also copied.'**
   String get settingsReportSent;
 
   /// No description provided for @settingsReportSaved.
@@ -1534,8 +1552,14 @@ abstract class AppL10n {
   /// No description provided for @settingsReportFailed.
   ///
   /// In en, this message translates to:
-  /// **'Couldn\'t send the report'**
+  /// **'Couldn\'t build the report'**
   String get settingsReportFailed;
+
+  /// No description provided for @settingsReportTelegramFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t send via the bot. The report is copied.'**
+  String get settingsReportTelegramFailed;
 
   /// No description provided for @settingsReportUnauthorized.
   ///
@@ -1708,7 +1732,7 @@ abstract class AppL10n {
   /// No description provided for @regionAutoSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'EU Hy2 → US Hy2'**
+  /// **'Nearest available location'**
   String get regionAutoSubtitle;
 
   /// No description provided for @regionSelected.
@@ -1744,7 +1768,7 @@ abstract class AppL10n {
   /// No description provided for @regionSectionEurope.
   ///
   /// In en, this message translates to:
-  /// **'Europe'**
+  /// **'Latvia'**
   String get regionSectionEurope;
 
   /// No description provided for @regionSectionUsa.
@@ -1780,25 +1804,25 @@ abstract class AppL10n {
   /// No description provided for @regionBlurbFree.
   ///
   /// In en, this message translates to:
-  /// **'Hysteria2 · apps, AI, websites'**
+  /// **'Apps, AI, websites'**
   String get regionBlurbFree;
 
   /// No description provided for @regionBlurbGaming.
   ///
   /// In en, this message translates to:
-  /// **'TrustTunnel · low ping'**
+  /// **'Low ping'**
   String get regionBlurbGaming;
 
   /// No description provided for @regionBlurbYoutube.
   ///
   /// In en, this message translates to:
-  /// **'TrustTunnel · ad-free'**
+  /// **'Without ads'**
   String get regionBlurbYoutube;
 
   /// No description provided for @regionBlurbIndia.
   ///
   /// In en, this message translates to:
-  /// **'Hysteria2 · local apps and prices'**
+  /// **'Local apps and prices'**
   String get regionBlurbIndia;
 
   /// No description provided for @regionOffline.
@@ -2176,7 +2200,7 @@ abstract class AppL10n {
   /// No description provided for @lockedBody.
   ///
   /// In en, this message translates to:
-  /// **'Get a subscription or enter a promo code — then connect in one tap.'**
+  /// **'Get a subscription — then connect in one tap.'**
   String get lockedBody;
 
   /// No description provided for @lockedCta.

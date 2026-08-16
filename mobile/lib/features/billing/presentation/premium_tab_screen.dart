@@ -6,7 +6,7 @@ import '../../../core/theme.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../settings/application/subscription_status_provider.dart';
 
-/// Огонь-style «Премиум» tab — YouTube without ads upsell.
+/// Огонь-style «Премиум» tab — no-ads / YouTube locations upsell.
 class PremiumTabScreen extends ConsumerWidget {
   const PremiumTabScreen({super.key});
 

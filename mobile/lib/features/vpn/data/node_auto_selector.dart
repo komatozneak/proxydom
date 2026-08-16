@@ -4,7 +4,7 @@ import 'vpn_node.dart';
 /// Ordered Auto pool (ADR 015 / honest prove).
 ///
 /// Free: EU Hy2 → US Hy2.
-/// Premium: Free pool then gaming TT then YouTube TT.
+/// Premium: YouTube (if unlocked) → EU Hy2 → US Hy2 → gaming.
 /// SOCKS CONNECT :443 through the tunnel — not Cloudflare generate_204.
 List<VpnNode> autoPoolFor(
   Iterable<VpnNode> catalog, {
@@ -12,8 +12,8 @@ List<VpnNode> autoPoolFor(
 }) {
   final pool = catalog.where((n) => n.inAutoPool(isPremium: isPremium)).toList();
   pool.sort((a, b) {
-    final ra = autoPoolRank(a);
-    final rb = autoPoolRank(b);
+    final ra = autoPoolRank(a, isPremium: isPremium);
+    final rb = autoPoolRank(b, isPremium: isPremium);
     if (ra != rb) return ra.compareTo(rb);
     final la = a.label.isNotEmpty ? a.label : a.id;
     final lb = b.label.isNotEmpty ? b.label : b.id;
@@ -22,35 +22,23 @@ List<VpnNode> autoPoolFor(
   return pool;
 }
 
-/// EU Free Hy2 → US Hy2 → gaming TT → YouTube. Not RTT. India geo never Auto.
-int autoPoolRank(VpnNode node) {
+/// Free: EU → US. Premium: YouTube first, then the rest. India geo never Auto.
+int autoPoolRank(VpnNode node, {required bool isPremium}) {
   if (node.isGeoIn) return 99;
+  if (isPremium) {
+    if (node.isYoutube) return 0;
+    if (node.isGaming) return 3;
+    if (node.isGeoUs) return 2;
+    return 1;
+  }
   if (node.isYoutube) return 4;
   if (node.isGaming) return 3;
   if (node.isGeoUs) return 1;
   return 0;
 }
 
-/// Short Auto status label: США / Европа / Игровой / YouTube / Индия.
-String autoCandidateHintLabel(VpnNode node) {
-  if (node.isGeoIn) return 'Индия';
-  if (node.isYoutube) return 'YouTube';
-  if (node.isGaming) return 'Игровой';
-  if (node.isGeoUs) return 'США';
-  if (node.isHysteria) return 'Европа';
-  final label = node.label.isNotEmpty ? node.label : node.id;
-  final lower = label.toLowerCase();
-  if (lower.contains('youtube')) return 'YouTube';
-  if (lower.contains('индия') || lower.contains('india')) return 'Индия';
-  if (lower.contains('игров') || lower.contains('gaming')) return 'Игровой';
-  if (lower.contains('европ') || lower.contains('europe')) {
-    return 'Европа';
-  }
-  if (lower.contains('сша') || lower.contains('usa')) {
-    return 'США';
-  }
-  return label;
-}
+/// Short Auto status label — same titles as Locations (`placeForNode`).
+String autoCandidateHintLabel(VpnNode node) => placeForNode(node).title;
 
 /// Manual Locations id, or null when the user chose Auto (engine prove loop).
 String? resolveNodeIdForConfig({

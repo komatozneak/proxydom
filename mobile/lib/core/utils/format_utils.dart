@@ -26,14 +26,6 @@ String formatBytesPerSec(int bytesPerSec, {bool russian = true}) {
   return russian ? '$bytesPerSec Б/с' : '$bytesPerSec B/s';
 }
 
-/// Returns null when ping should be hidden (not ready / invalid).
-/// Kept for a future verified native urlTest spike — Home no longer polls it.
-String? formatPingMs(int? ms, {bool russian = true}) {
-  if (ms == null || ms <= 0) return null;
-  if (ms > 9999) return russian ? '>9 с' : '>9s';
-  return russian ? '$ms мс' : '$ms ms';
-}
-
 /// Relative age of last VPN status / traffic heartbeat for Home link cell.
 String formatLinkAge(DateTime? lastSeenAt, {required bool russian}) {
   if (lastSeenAt == null) return russian ? 'сейчас' : 'just now';

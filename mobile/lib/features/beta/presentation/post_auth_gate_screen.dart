@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/config.dart';
 import '../../../core/router.dart';
 import '../../../core/widgets/app_icon.dart';
+import '../../../core/widgets/teremok_snackbar.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../auth/application/auth_provider.dart';
 import '../../auth/application/auth_state.dart';
@@ -182,10 +183,9 @@ class _PostAuthGateScreenState extends ConsumerState<PostAuthGateScreen> {
                               await VpnController.instance.openVpnSettings();
                           if (!context.mounted) return;
                           if (!opened) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(l.settingsKillSwitchOpenFailed),
-                              ),
+                            showTeremokSnackBar(
+                              context,
+                              l.settingsKillSwitchOpenFailed,
                             );
                           }
                         },

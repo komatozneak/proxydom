@@ -78,6 +78,16 @@ String resolveVpnDisplayLabel(VpnConfig config, {String? displayLabel}) {
   return kVpnBrandSessionName;
 }
 
+/// Home card / logs: catalog label wins even when Flutter has no live mint yet.
+String connectedServerName({VpnConfig? config, String? displayLabel}) {
+  final explicit = displayLabel?.trim();
+  if (explicit != null && explicit.isNotEmpty) return explicit;
+  if (config != null) {
+    return resolveVpnDisplayLabel(config);
+  }
+  return kVpnBrandSessionName;
+}
+
 bool _isGenericServerPlaceholder(String title) =>
     RegExp(r'^(Сервер|Server) \d+$').hasMatch(title);
 

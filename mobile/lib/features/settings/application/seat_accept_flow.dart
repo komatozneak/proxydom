@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/widgets/teremok_snackbar.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../auth/application/auth_provider.dart';
 import '../../auth/data/seat_outcome.dart';
@@ -59,7 +60,5 @@ Future<void> runSeatAcceptFlow({
     SeatAcceptOutcome.premiumRequired => l.settingsSeatPremiumRequired,
     SeatAcceptOutcome.failed => l.settingsSeatAcceptFailed,
   };
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text(message)),
-  );
+  showTeremokSnackBar(context, message);
 }

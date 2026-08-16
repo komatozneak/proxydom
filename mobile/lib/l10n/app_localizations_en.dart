@@ -111,6 +111,12 @@ class AppL10nEn extends AppL10n {
   String get homeTrafficRemainder => 'Data left';
 
   @override
+  String get homeQuotaUnlimitedTeaser => 'Unlimited with Premium';
+
+  @override
+  String get homeQuotaUnlimitedCta => 'Get unlimited';
+
+  @override
   String get homeTrafficExhausted => 'Traffic used up';
 
   @override
@@ -122,7 +128,7 @@ class AppL10nEn extends AppL10n {
   String get homeNoVpnRow => 'What works without VPN?';
 
   @override
-  String get premiumHeadline => 'YouTube without ads';
+  String get premiumHeadline => 'Without ads';
 
   @override
   String get premiumBody =>
@@ -146,6 +152,9 @@ class AppL10nEn extends AppL10n {
   @override
   String get subscriptionTabHint =>
       'Manage plans and promo codes. Premium unlocks YouTube locations.';
+
+  @override
+  String get subscriptionPay => 'Pay';
 
   @override
   String get locationsPremiumLocked => 'Premium';
@@ -774,13 +783,14 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get settingsSendReportHint =>
-      'Saved on the device and copied. Then sent to the owner if the network allows.';
+      'Prepares a text dump of network and protocol diagnostics for Telegram support.';
 
   @override
   String get settingsSendReportConfirm => 'Send';
 
   @override
-  String get settingsReportSent => 'Report sent';
+  String get settingsReportSent =>
+      'Report sent to support via the bot. Also copied.';
 
   @override
   String settingsReportSaved(String id) {
@@ -788,7 +798,11 @@ class AppL10nEn extends AppL10n {
   }
 
   @override
-  String get settingsReportFailed => 'Couldn\'t send the report';
+  String get settingsReportFailed => 'Couldn\'t build the report';
+
+  @override
+  String get settingsReportTelegramFailed =>
+      'Couldn\'t send via the bot. The report is copied.';
 
   @override
   String get settingsReportUnauthorized =>
@@ -891,7 +905,7 @@ class AppL10nEn extends AppL10n {
   String get regionAutoTitle => 'Automatic';
 
   @override
-  String get regionAutoSubtitle => 'EU Hy2 → US Hy2';
+  String get regionAutoSubtitle => 'Nearest available location';
 
   @override
   String get regionSelected => 'Selected';
@@ -909,7 +923,7 @@ class AppL10nEn extends AppL10n {
   String get regionSectionFree => 'Free';
 
   @override
-  String get regionSectionEurope => 'Europe';
+  String get regionSectionEurope => 'Latvia';
 
   @override
   String get regionSectionUsa => 'USA';
@@ -927,16 +941,16 @@ class AppL10nEn extends AppL10n {
   String get regionOnline => 'online';
 
   @override
-  String get regionBlurbFree => 'Hysteria2 · apps, AI, websites';
+  String get regionBlurbFree => 'Apps, AI, websites';
 
   @override
-  String get regionBlurbGaming => 'TrustTunnel · low ping';
+  String get regionBlurbGaming => 'Low ping';
 
   @override
-  String get regionBlurbYoutube => 'TrustTunnel · ad-free';
+  String get regionBlurbYoutube => 'Without ads';
 
   @override
-  String get regionBlurbIndia => 'Hysteria2 · local apps and prices';
+  String get regionBlurbIndia => 'Local apps and prices';
 
   @override
   String get regionOffline => 'offline';
@@ -1145,8 +1159,7 @@ class AppL10nEn extends AppL10n {
   String get lockedHeadline => 'Welcome!';
 
   @override
-  String get lockedBody =>
-      'Get a subscription or enter a promo code — then connect in one tap.';
+  String get lockedBody => 'Get a subscription — then connect in one tap.';
 
   @override
   String get lockedCta => 'Get a subscription or enter a promo code';

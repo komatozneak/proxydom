@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/api_secret_storage.dart';
 import '../../../core/diagnostics/app_log_buffer.dart';
+import '../../../core/diagnostics/egress_verify.dart';
 import '../../../core/diagnostics/product_log.dart';
 import '../../../core/install_id_storage.dart';
 import '../../../core/retry_policy.dart';
@@ -19,6 +20,7 @@ import '../../vpn/data/vpn_config.dart';
 import '../../vpn/data/vpn_config_repository.dart';
 import '../../vpn/data/vpn_controller.dart';
 import '../../vpn/data/vpn_node.dart';
+import '../../vpn/data/vpn_session_meta.dart';
 import '../../vpn/data/vpn_session_snapshot.dart';
 import '../../vpn/data/vpn_nodes_repository.dart';
 import '../../vpn/data/vpn_service_config.dart';
@@ -304,6 +306,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
   Future<void> _clearConnectedSince() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_connectedSinceKey);
+    await VpnSessionMeta.clear();
   }
 
   void _applyAutoMint(String nodeId) {
@@ -318,22 +321,43 @@ class VpnNotifier extends Notifier<VpnStatus> {
     // Auto SOCKS prove: session snapshot is SoT. Binding+TUN in the shade
     // must still paint Nest Connected (ConnectedHealthy can lag / miss).
     if (_sessionProving) return;
-    if (state is VpnConnected && !freshSession) {
-      _endSessionWalk();
-      return;
-    }
+    await _hydrateConnectedUi();
     final winner = _autoActiveNodeId;
     if (winner != null) {
       _applyAutoMint(winner);
     }
     final config = _config;
-    final serverName = config != null
-        ? resolveVpnDisplayLabel(config, displayLabel: _displayLabel)
-        : kVpnBrandSessionName;
+    final serverName = connectedServerName(
+      config: config,
+      displayLabel: _displayLabel,
+    );
     final protocol = sessionProtocolLabel(
       config: config,
       selectedNodeProtocol: _selectedNodeProtocol,
     );
+    if (state is VpnConnected && !freshSession) {
+      final cur = state as VpnConnected;
+      if (cur.serverName == serverName && cur.protocol == protocol) {
+        _endSessionWalk();
+        return;
+      }
+      _endSessionWalk();
+      _cancelConnectingWatchdog();
+      _logUiTransition('connected', 'enter_connected');
+      state = VpnConnected(
+        serverName: serverName,
+        protocol: protocol,
+        connectedSince: cur.connectedSince,
+      );
+      ProductLog.event('vpn.connected', {
+        'winner_id': _autoActiveNodeId,
+        'core': config?.activeCore.name,
+        'label': serverName,
+        'protocol': protocol,
+      });
+      unawaited(_persistConnectedUi(serverName: serverName, protocol: protocol));
+      return;
+    }
     final since = await _resolveConnectedSince(freshSession: freshSession);
     if (_sessionProving) return;
     // Cold start / Always-on / sticky Error: UI may lag the live TUN.
@@ -362,6 +386,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
       'label': serverName,
       'protocol': protocol,
     });
+    unawaited(_persistConnectedUi(serverName: serverName, protocol: protocol));
     unawaited(_logEgressProbe());
     unawaited(
       VpnController.instance.getUnderlyingNetworkInterface().then((iface) {
@@ -375,6 +400,76 @@ class VpnNotifier extends Notifier<VpnStatus> {
         // Provider disposed in tests.
       }
     }
+  }
+
+  Future<void> _hydrateConnectedUi({String? winnerId}) async {
+    final fromSnap = winnerId?.trim();
+    if (fromSnap != null &&
+        fromSnap.isNotEmpty &&
+        fromSnap != kRegionAutoId) {
+      _autoActiveNodeId = fromSnap;
+      _applyAutoMint(fromSnap);
+    }
+    if (_displayLabel != null &&
+        _displayLabel!.trim().isNotEmpty &&
+        _selectedNodeProtocol != null &&
+        _selectedNodeProtocol!.trim().isNotEmpty) {
+      return;
+    }
+    try {
+      final meta = await VpnSessionMeta.load();
+      _displayLabel ??= meta.displayLabel;
+      _selectedNodeProtocol ??= meta.protocol;
+      if (_autoActiveNodeId == null || _autoActiveNodeId!.isEmpty) {
+        final stored = meta.winnerNodeId?.trim();
+        if (stored != null && stored.isNotEmpty && stored != kRegionAutoId) {
+          _autoActiveNodeId = stored;
+          _applyAutoMint(stored);
+        }
+      }
+    } catch (_) {}
+    final id = _autoActiveNodeId;
+    if (id == null || id.isEmpty || id == kRegionAutoId) return;
+    if (_displayLabel != null &&
+        _displayLabel!.trim().isNotEmpty &&
+        _selectedNodeProtocol != null &&
+        _selectedNodeProtocol!.trim().isNotEmpty) {
+      return;
+    }
+    try {
+      final repo = ref.read(vpnNodesRepositoryProvider);
+      // Disk cache only — listNodes here stampeded /app/nodes/v2 and jammed Nest.
+      final catalog = await repo.loadCachedNodes();
+      if (catalog == null || catalog.isEmpty) return;
+      for (final n in catalog) {
+        if (n.id != id) continue;
+        _selectedNodeProtocol ??= n.protocol;
+        _displayLabel ??= await _labelForNodeId(id, catalog: catalog);
+        break;
+      }
+    } on StateError {
+      // tests
+    } catch (_) {}
+  }
+
+  Future<void> _persistConnectedUi({
+    required String serverName,
+    required String protocol,
+  }) async {
+    try {
+      await VpnSessionMeta.saveConnectMeta(
+        expectedEgressHost: _config?.expectedEgressHost,
+        updateExpectedHost: _config?.expectedEgressHost != null,
+        winnerNodeId: _autoActiveNodeId,
+        displayLabel: serverName,
+        protocol: _selectedNodeProtocol ??
+            switch (protocol) {
+              'HYSTERIA2' => kVpnNodeProtocolHysteria2,
+              'TRUSTTUNNEL' => kVpnNodeProtocolTrusttunnel,
+              _ => 'vless',
+            },
+      );
+    } catch (_) {}
   }
 
   /// After TUN is up: icanhazip vs catalog IPv4 (not SNI / expected_egress_host).
@@ -403,12 +498,15 @@ class VpnNotifier extends Notifier<VpnStatus> {
       final catalogHost = await _lookupCatalogHost(winnerId);
       _catalogHost = catalogHost;
       final ip = await fetchExternalIp();
+      final check = egressCheckLabel(externalIp: ip, catalogHost: catalogHost);
       ProductLog.event('vpn.egress_probe', {
         'external_ip': ip,
         'winner_id': winnerId,
         'catalog_host': catalogHost,
         'phase': _lastSessionPhase.name,
+        'egress_check': check,
       });
+      // `nat` = Hy2/VLESS egress IP ≠ catalog inbound. Not a TUN leak.
     } catch (e) {
       _vpnLog('[VPN] egress_probe failed: $e', warn: true);
     }
@@ -421,9 +519,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
     try {
       final repo = ref.read(vpnNodesRepositoryProvider);
       final cached = await repo.loadCachedNodes();
-      final nodes = (cached != null && cached.isNotEmpty)
-          ? cached
-          : await repo.listNodes();
+      final nodes = cached ?? const <VpnNode>[];
       for (final n in nodes) {
         if (n.id == nodeId) {
           final host = n.host.trim();
@@ -484,17 +580,28 @@ class VpnNotifier extends Notifier<VpnStatus> {
 
       if (native == VpnNativeStatus.connected) {
         _autoReconnectArmed = false;
-        if (state is VpnConnected) return;
+        await _hydrateConnectedUi();
         if (!shouldApplyNativeConnected(
-          ui: state,
-          sessionProving: _sessionProving,
-        )) {
+              ui: state,
+              sessionProving: _sessionProving,
+            ) &&
+            state is! VpnConnected) {
           return;
         }
-        try {
-          _config ??= await fetchConfig();
-        } catch (e) {
-          _vpnLog('[VPN] syncFromNative fetchConfig soft-fail: $e');
+        final winner = _autoActiveNodeId;
+        if (_config == null &&
+            winner != null &&
+            winner.isNotEmpty &&
+            winner != kRegionAutoId) {
+          final keepLabel = _displayLabel;
+          final keepProto = _selectedNodeProtocol;
+          try {
+            _config = await fetchConfig(nodeId: winner);
+          } catch (e) {
+            _vpnLog('[VPN] syncFromNative fetchConfig soft-fail: $e');
+          }
+          _displayLabel ??= keepLabel;
+          _selectedNodeProtocol ??= keepProto;
         }
         await _enterConnected(freshSession: false);
         return;
@@ -752,7 +859,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
     final firstHint = autoCandidateHintLabel(pool.first);
     state = VpnConnecting(
       progress: 0.55,
-      hint: 'Подбираем сервер… $firstHint',
+      hint: _pickingHint(firstHint),
     );
 
     final payloads = <String>[];
@@ -762,7 +869,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
       final candidateHint = autoCandidateHintLabel(node);
       state = VpnConnecting(
         progress: 0.55,
-        hint: 'Подбираем сервер… $candidateHint',
+        hint: _pickingHint(candidateHint),
       );
       try {
         final cfg = await _connectProvisionRetryPolicy.execute(
@@ -786,7 +893,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
             return e is! FormatException;
           },
         );
-        final label = node.label.isNotEmpty ? node.label : node.id;
+        final label = autoCandidateHintLabel(node);
         _autoMints[node.id] = _AutoMint(
           config: cfg,
           label: label,
@@ -851,7 +958,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
     }
     state = VpnConnecting(
       progress: 0.8,
-      hint: 'Подбираем сервер… $firstHint',
+      hint: _pickingHint(firstHint),
     );
   }
 
@@ -1306,19 +1413,18 @@ class VpnNotifier extends Notifier<VpnStatus> {
     if (snap.isConnected) {
       final proveId = snap.candidateId ?? _autoActiveNodeId ?? '';
       _lastProveSummary = 'id=$proveId ok reason=${snap.reason.name}';
-      ProductLog.event('vpn.prove', {
-        'id': proveId,
-        'ok': true,
-        'reason': snap.reason.name,
-      });
       _cancelConnectingWatchdog();
-      if (state is! VpnConnected) {
-        // Keep walk until VpnConnected is painted — idle between
-        // ConnectedHealthy and _enterConnected must not drop Nest.
-        unawaited(_enterConnected(freshSession: state is VpnConnecting));
-      } else {
-        _endSessionWalk();
+      final alreadyOn = state is VpnConnected;
+      if (!alreadyOn) {
+        ProductLog.event('vpn.prove', {
+          'id': proveId,
+          'ok': true,
+          'reason': snap.reason.name,
+        });
       }
+      unawaited(
+        _enterConnected(freshSession: !alreadyOn && state is VpnConnecting),
+      );
       return;
     }
     if (snap.phase == VpnSessionPhase.error) {
@@ -1343,13 +1449,27 @@ class VpnNotifier extends Notifier<VpnStatus> {
     if (state is! VpnConnecting) {
       state = const VpnConnecting(progress: 0.55);
     }
-    final label = (snap.detail ?? '').trim();
-    if (label.isEmpty) return;
+    final mintLabel = (winnerId != null && winnerId.isNotEmpty)
+        ? _autoMints[winnerId]?.label.trim()
+        : null;
+    final label = (mintLabel != null && mintLabel.isNotEmpty)
+        ? mintLabel
+        : autoCandidateHintLabelFromId(winnerId);
+    if (label == null || label.isEmpty) return;
     final current = state as VpnConnecting;
     state = VpnConnecting(
       progress: current.progress,
-      hint: 'Подбираем сервер… $label',
+      hint: _pickingHint(label),
     );
+  }
+
+  static String _pickingHint(String label) => 'Подбираем сервер… $label';
+
+  String? autoCandidateHintLabelFromId(String? nodeId) {
+    if (nodeId == null || nodeId.isEmpty) return null;
+    final mint = _autoMints[nodeId];
+    if (mint != null && mint.label.trim().isNotEmpty) return mint.label.trim();
+    return null;
   }
 
   void _onNativeStatus(VpnNativeStatus nativeStatus) {

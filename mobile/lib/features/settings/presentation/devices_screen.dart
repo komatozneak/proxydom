@@ -8,6 +8,7 @@ import '../../../core/api_secret_storage.dart';
 import '../../../core/router.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
+import '../../../core/widgets/teremok_snackbar.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../auth/application/auth_provider.dart';
 import '../../auth/application/logout_handler.dart';
@@ -85,14 +86,10 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
       }
       await teardownVpnAfterIdentityChange(ref);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l.devicesRevoked)),
-      );
+      showTeremokSnackBar(context, l.devicesRevoked);
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l.devicesRevokeFailed)),
-      );
+      showTeremokSnackBar(context, l.devicesRevokeFailed);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -141,9 +138,7 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
         AppRouter.pendingRecoveryCode = code;
       }
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l.devicesLeft)),
-      );
+      showTeremokSnackBar(context, l.devicesLeft);
       if (code != null && code.isNotEmpty) {
         context.go('/recovery');
       } else {
@@ -151,9 +146,7 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
       }
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l.devicesLeaveFailed)),
-      );
+      showTeremokSnackBar(context, l.devicesLeaveFailed);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -190,9 +183,16 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
       }
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l.devicesLogoutAllFailed)),
-      );
+      showTeremokSnackBar(context, l.devicesLogoutAllFailed);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _inviteDevice() async {
+    setState(() => _busy = true);
+    try {
+      await runSeatInviteFlow(context: context, ref: ref);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -327,15 +327,13 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
                   icon: AppIcons.plus,
                   title: l.settingsInviteDevice,
                   subtitle: l.settingsInviteDeviceHint,
-                  onTap: _busy
-                      ? null
-                      : () => runSeatInviteFlow(context: context, ref: ref),
+                  onTap: _busy ? null : _inviteDevice,
                 ),
               if (showInvite && (showJoin || showLeave || showLogoutAll))
                 const _HubDivider(),
               if (showJoin)
                 _ActionRow(
-                  icon: AppIcons.plus,
+                  icon: AppIcons.signIn,
                   title: l.settingsAcceptSeat,
                   subtitle: l.settingsAcceptSeatHint,
                   onTap: _busy

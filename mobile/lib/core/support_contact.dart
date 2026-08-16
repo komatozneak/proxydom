@@ -22,12 +22,37 @@ class SupportContact {
       version: version,
       screen: screen,
     );
-    final uri = Uri.https(
+    return launchUrl(composeChatUri(text), mode: LaunchMode.externalApplication);
+  }
+
+  /// Opens the product bot. Do not put a diagnostic dump in ``text=`` —
+  /// Telegram returns HTTP 400 on oversized share URLs.
+  static Future<bool> openBot() async {
+    return launchUrl(composeBotUri(), mode: LaunchMode.externalApplication);
+  }
+
+  static Uri composeBotUri() {
+    return Uri.https('t.me', AppConfig.telegramBotUsername);
+  }
+
+  /// `https://t.me/<support>?text=` — same path as [open].
+  static Uri composeChatUri(String text) {
+    return Uri.https(
       't.me',
       AppConfig.supportTelegramUsername,
       {'text': text},
     );
-    return launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  /// Telegram share `text=` is much smaller than Bot API POST (4096).
+  static const int telegramShareMaxChars = 3500;
+
+  static String clipForChat(String text) {
+    const note = '… (обрезано, полный отчёт в буфере обмена)\n';
+    if (text.length <= telegramShareMaxChars) return text;
+    final budget = telegramShareMaxChars - note.length;
+    if (budget <= 0) return text.substring(0, telegramShareMaxChars);
+    return '$note${text.substring(text.length - budget)}';
   }
 
   static String _template({

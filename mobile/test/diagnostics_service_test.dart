@@ -87,13 +87,13 @@ void main() {
       );
     });
 
-    test('mismatch when both are IPv4', () {
+    test('unequal IPv4 is NAT not a dead tunnel', () {
       expect(
         egressCheckLabel(
           externalIp: '212.164.38.47',
           catalogHost: '217.60.3.9',
         ),
-        'mismatch',
+        'nat',
       );
     });
   });

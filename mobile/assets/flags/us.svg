@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480">
+  <path fill="#bd3d44" d="M0 0h640v480H0"/>
+  <path stroke="#fff" stroke-width="37" d="M0 55.3h640M0 129h640M0 203h640M0 277h640M0 351h640M0 425h640"/>
+  <path fill="#192f5d" d="M0 0h364.8v258.5H0"/>
+  <g fill="#fff">
+    <circle cx="30" cy="22" r="8"/><circle cx="90" cy="22" r="8"/><circle cx="150" cy="22" r="8"/><circle cx="210" cy="22" r="8"/><circle cx="270" cy="22" r="8"/><circle cx="330" cy="22" r="8"/>
+    <circle cx="60" cy="50" r="8"/><circle cx="120" cy="50" r="8"/><circle cx="180" cy="50" r="8"/><circle cx="240" cy="50" r="8"/><circle cx="300" cy="50" r="8"/>
+    <circle cx="30" cy="78" r="8"/><circle cx="90" cy="78" r="8"/><circle cx="150" cy="78" r="8"/><circle cx="210" cy="78" r="8"/><circle cx="270" cy="78" r="8"/><circle cx="330" cy="78" r="8"/>
+    <circle cx="60" cy="106" r="8"/><circle cx="120" cy="106" r="8"/><circle cx="180" cy="106" r="8"/><circle cx="240" cy="106" r="8"/><circle cx="300" cy="106" r="8"/>
+    <circle cx="30" cy="134" r="8"/><circle cx="90" cy="134" r="8"/><circle cx="150" cy="134" r="8"/><circle cx="210" cy="134" r="8"/><circle cx="270" cy="134" r="8"/><circle cx="330" cy="134" r="8"/>
+    <circle cx="60" cy="162" r="8"/><circle cx="120" cy="162" r="8"/><circle cx="180" cy="162" r="8"/><circle cx="240" cy="162" r="8"/><circle cx="300" cy="162" r="8"/>
+    <circle cx="30" cy="190" r="8"/><circle cx="90" cy="190" r="8"/><circle cx="150" cy="190" r="8"/><circle cx="210" cy="190" r="8"/><circle cx="270" cy="190" r="8"/><circle cx="330" cy="190" r="8"/>
+    <circle cx="60" cy="218" r="8"/><circle cx="120" cy="218" r="8"/><circle cx="180" cy="218" r="8"/><circle cx="240" cy="218" r="8"/><circle cx="300" cy="218" r="8"/>
+    <circle cx="30" cy="246" r="8"/><circle cx="90" cy="246" r="8"/><circle cx="150" cy="246" r="8"/><circle cx="210" cy="246" r="8"/><circle cx="270" cy="246" r="8"/><circle cx="330" cy="246" r="8"/>
+  </g>
+</svg>

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:teremok_connect/core/theme.dart';
+import 'package:teremok_connect/core/widgets/app_icon.dart';
 import 'package:teremok_connect/features/auth/data/auth_api.dart';
 import 'package:teremok_connect/features/settings/application/devices_list_provider.dart';
 import 'package:teremok_connect/features/settings/presentation/devices_screen.dart';
@@ -65,6 +66,7 @@ void main() {
 
     expect(find.text('Войти в группу'), findsOneWidget);
     expect(find.text('Присоединиться по приглашению'), findsOneWidget);
+    expect(find.byIcon(AppIcons.signIn), findsOneWidget);
     expect(find.text('Добавить устройство в подписку'), findsNothing);
     expect(find.text('Выйти на всех устройствах'), findsNothing);
     expect(find.text('Android'), findsOneWidget);

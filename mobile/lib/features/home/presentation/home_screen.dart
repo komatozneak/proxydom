@@ -11,23 +11,29 @@ import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/connect_button.dart';
 import '../../../core/widgets/signal_nest_hero.dart';
+import '../../../core/widgets/teremok_snackbar.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../settings/application/subscription_status_provider.dart';
+import '../../settings/data/subscription_status.dart';
 import '../../settings/data/installed_apps_channel.dart';
 import '../../settings/data/split_tunnel_prefs.dart';
+import '../../vpn/data/node_auto_selector.dart';
 import '../../vpn/data/node_display.dart';
 import '../../vpn/data/vpn_controller.dart';
 import '../../vpn/data/vpn_node.dart';
 import '../../vpn/domain/vpn_connect_error.dart';
 import '../../vpn/presentation/vpn_disclosure_dialog.dart';
-import '../application/home_stats_provider.dart';
 import '../application/vpn_provider.dart';
 import '../application/vpn_status.dart';
 import 'widgets/free_quota_bar.dart';
 import 'widgets/radial_gradient_ground.dart';
 import 'widgets/server_card.dart';
 
-/// Variant 4 Home: Nest CTA + NoVPN row + Server card (location | session | ping).
+/// Test keys: quota meter sits above Living House.
+const kHomeQuotaBarKey = ValueKey<String>('home_quota_bar');
+const kHomeSignalNestKey = ValueKey<String>('home_signal_nest');
+
+/// Variant 4 Home: Nest CTA + NoVPN row + Server card (location | session).
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
@@ -39,14 +45,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     with WidgetsBindingObserver {
   String _serverTitle = '…';
   String _serverSubtitle = '';
-  String _serverFlag = '🌐';
+  String _serverFlag = kFlagEurope;
   bool _selectionIsAuto = true;
+  List<String> _autoPoolFlags = const [kFlagEurope, kFlagUsa];
 
   /// Sticky key for last good Server card (selected id or egress).
   String? _placeStickyKey;
 
   int _noVpnEnabled = 0;
   int _noVpnTotal = 0;
+  bool _openingSubscription = false;
 
   @override
   void initState() {
@@ -73,10 +81,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     }
   }
 
+  Future<void> _openSubscription() async {
+    if (_openingSubscription || !mounted) return;
+    // Imperative /subscription can leave matchedLocation on /home; rely on
+    // route currency so a second tap does not push a duplicate page key.
+    final route = ModalRoute.of(context);
+    if (route != null && !route.isCurrent) return;
+    if (GoRouterState.of(context).uri.path == '/subscription') return;
+    _openingSubscription = true;
+    try {
+      await context.push('/subscription');
+    } finally {
+      if (mounted) _openingSubscription = false;
+    }
+  }
+
   Future<void> _onHomeReady() async {
     await _refreshNoVpnCounter();
+    if (!mounted) return;
     await _refreshServerCard();
+    if (!mounted) return;
     await ref.read(vpnProvider.notifier).syncFromNative();
+    if (!mounted) return;
     unawaited(ref.read(subscriptionStatusProvider.notifier).refresh());
   }
 
@@ -98,7 +124,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     });
   }
 
-  Future<void> _refreshServerCard() async {
+  Future<void>? _serverCardInFlight;
+
+  Future<void> _refreshServerCard() {
+    return _serverCardInFlight ??= _refreshServerCardBody().whenComplete(() {
+      _serverCardInFlight = null;
+    });
+  }
+
+  Future<void> _refreshServerCardBody() async {
     final l = AppL10n.of(context);
     final locale = Localizations.localeOf(context).languageCode;
     try {
@@ -111,51 +145,97 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       final selectedId = await nodesRepo.getSelectedNodeId() ?? kRegionAutoId;
       final isAuto = selectedId.isEmpty || selectedId == kRegionAutoId;
 
+      List<VpnNode> catalog = const [];
+      try {
+        catalog = await nodesRepo.loadCachedNodes() ?? const [];
+        if (catalog.isEmpty) {
+          catalog = await nodesRepo.listNodes();
+        }
+      } catch (_) {
+        catalog = await nodesRepo.loadCachedNodes() ?? const [];
+      }
+      final premium =
+          ref.read(subscriptionStatusProvider).asData?.value.unlocksPremium ??
+              false;
+      final poolFlags = uniqueAutoPoolFlags(
+        autoPoolFor(catalog, isPremium: premium),
+      );
+
       NodePlace? place;
+      VpnNode? placeNode;
       String stickyKey;
 
       if (!isAuto) {
-        List<VpnNode> catalog = const [];
-        try {
-          catalog = await nodesRepo.listNodes();
-        } catch (_) {
-          catalog = await nodesRepo.loadCachedNodes() ?? const [];
-        }
-        VpnNode? node;
         for (final n in catalog) {
           if (n.id == selectedId) {
-            node = n;
+            placeNode = n;
             break;
           }
         }
-        if (node != null) {
-          place = placeForNode(node);
-          stickyKey = 'selected:${node.id}';
+        if (placeNode != null) {
+          place = placeForNode(placeNode);
+          stickyKey = 'selected:${placeNode.id}';
         } else {
           stickyKey = 'selected:$selectedId';
         }
       } else {
-        stickyKey = 'auto:${egressHost ?? displayLabel ?? 'none'}';
+        final winnerId = ref.read(vpnProvider.notifier).autoWinnerId;
+        stickyKey = 'auto:${winnerId ?? egressHost ?? displayLabel ?? 'none'}';
+        if (winnerId != null && winnerId.isNotEmpty) {
+          for (final n in catalog) {
+            if (n.id == winnerId) {
+              placeNode = n;
+              break;
+            }
+          }
+        }
+        placeNode ??= catalogNodeForHost(catalog, egressHost);
+        if (placeNode != null) {
+          place = placeForNode(placeNode);
+        }
       }
 
       if (place == null) {
-        if (displayLabel != null &&
-            displayLabel.trim().isNotEmpty &&
-            !_looksLikeRawHost(displayLabel)) {
-          place =
-              NodePlace(title: displayLabel.trim(), subtitle: '', flag: '🌐');
+        final sanitized = displayLabel == null
+            ? ''
+            : sanitizeHomeLabel(displayLabel);
+        final fallbackLabel = sanitized.isNotEmpty
+            ? sanitized
+            : (vpnStatus is VpnConnected
+                ? sanitizeHomeLabel(vpnStatus.serverName)
+                : '');
+        if (fallbackLabel.isNotEmpty && !_looksLikeRawHost(fallbackLabel)) {
+          final productFlag = flagForProductLabel(fallbackLabel);
+          place = NodePlace(
+            title: fallbackLabel,
+            subtitle: '',
+            flag: productFlag == kFlagGlobe && poolFlags.isNotEmpty
+                ? poolFlags.first
+                : productFlag,
+          );
         } else if (egressHost != null && egressHost.isNotEmpty) {
           place = await resolvePlaceForHost(
             egressHost,
             index: 0,
             fallbackLabel:
-                vpnStatus is VpnConnected ? vpnStatus.serverName : displayLabel,
+                fallbackLabel.isNotEmpty ? fallbackLabel : null,
           );
+          // Keep title free of · Premium if resolve used unsanitized meta.
+          final cleaned = sanitizeHomeLabel(place.title);
+          if (cleaned.isNotEmpty && cleaned != place.title) {
+            place = NodePlace(
+              title: cleaned,
+              subtitle: place.subtitle,
+              titleEn: place.titleEn,
+              subtitleEn: place.subtitleEn,
+              flag: place.flag,
+            );
+          }
         } else {
           place = NodePlace(
-            title: displayLabel ?? l.homeRegionAuto,
+            title: sanitized.isNotEmpty ? sanitized : l.homeRegionAuto,
             subtitle: '',
-            flag: '🌐',
+            flag: poolFlags.isNotEmpty ? poolFlags.first : kFlagEurope,
           );
         }
       }
@@ -177,17 +257,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
       setState(() {
         _selectionIsAuto = isAuto;
-        _serverTitle = place!.displayTitle(locale);
-        final city = place.displaySubtitle(locale).trim();
-        if (isAuto) {
-          _serverSubtitle =
-              city.isEmpty ? l.homeRegionAuto : '$city · ${l.homeRegionAuto}';
-        } else {
-          _serverSubtitle = city;
+        if (isAuto && placeNode == null) {
+          _serverTitle = l.regionAutoTitle;
+          _serverSubtitle = l.regionAutoSubtitle;
+          _serverFlag = poolFlags.isNotEmpty ? poolFlags.first : kFlagEurope;
+        } else if (place != null) {
+          _serverTitle = place.displayTitle(locale);
+          final city = place.displaySubtitle(locale).trim();
+          if (placeNode != null) {
+            _serverSubtitle = city.isNotEmpty
+                ? city
+                : displaySubtitleForNode(placeNode, l);
+          } else {
+            _serverSubtitle = city;
+          }
+          _serverFlag = place.flag;
         }
-        _serverFlag = place.flag;
-        if (isResolvedPlace(place) ||
-            place.title.isNotEmpty && place.title != '…') {
+        _autoPoolFlags = poolFlags;
+        if (isAuto && placeNode == null) {
+          _placeStickyKey = stickyKey;
+        } else if (place != null &&
+            (isResolvedPlace(place) ||
+                place.title.isNotEmpty && place.title != '…')) {
           _placeStickyKey = stickyKey;
         }
       });
@@ -205,9 +296,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       setState(() {
         _serverTitle = l.homeRegion;
         _serverSubtitle = l.homeStatServer;
-        _serverFlag = '🌐';
+        _serverFlag = kFlagEurope;
         _placeStickyKey = null;
         _selectionIsAuto = true;
+        _autoPoolFlags = const [kFlagEurope, kFlagUsa];
       });
     }
   }
@@ -234,8 +326,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     }
 
     if (status is VpnDisconnected || status is VpnError) {
-      final ok = await ensureVpnDisclosureAccepted(context);
-      if (!mounted || !ok) return;
+      final allowed = await VpnDisclosureDialog.ensureAccepted(context);
+      if (!allowed || !mounted) return;
       await notifier.connect();
       return;
     }
@@ -250,13 +342,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final l = AppL10n.of(context);
     final theme = Theme.of(context);
     final vpnStatus = ref.watch(vpnProvider);
-    final pingAsync = ref.watch(homePingMsProvider);
-    final pingMs = vpnStatus is VpnConnected ? pingAsync.asData?.value : null;
 
     ref.listen(vpnProvider, (prev, next) {
-      if (prev.runtimeType != next.runtimeType) {
-        unawaited(_refreshServerCard());
+      if (prev is VpnConnected &&
+          next is VpnConnected &&
+          prev.serverName == next.serverName &&
+          prev.protocol == next.protocol) {
+        return;
       }
+      unawaited(_refreshServerCard());
     });
 
     return Scaffold(
@@ -269,17 +363,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               child: _DashboardBody(
                 status: vpnStatus,
                 maxHeight: constraints.maxHeight,
-                serverTitle: _serverTitle,
+                serverTitle: _serverTitle == '…' && _selectionIsAuto
+                    ? l.regionAutoTitle
+                    : _serverTitle,
                 serverSubtitle: _serverSubtitle.isEmpty
-                    ? (_selectionIsAuto ? l.homeRegionAuto : l.homeStatServer)
+                    ? (_selectionIsAuto
+                        ? l.regionAutoSubtitle
+                        : l.homeStatServer)
                     : _serverSubtitle,
                 serverFlag: _serverFlag,
-                pingMs: pingMs,
+                selectionIsAuto: _selectionIsAuto,
+                autoPoolFlags: _autoPoolFlags,
                 noVpnEnabled: _noVpnEnabled,
                 noVpnTotal: _noVpnTotal,
                 onNestTap: _onNestTap,
                 onPlaceRefresh: _refreshServerCard,
                 onOpenLocations: () => context.go('/locations'),
+                onOpenSubscription: _openSubscription,
                 onOpenNoVpn: () async {
                   await context.push('/settings/no-vpn');
                   if (mounted) unawaited(_refreshNoVpnCounter());
@@ -300,12 +400,14 @@ class _DashboardBody extends ConsumerStatefulWidget {
     required this.serverTitle,
     required this.serverSubtitle,
     required this.serverFlag,
-    required this.pingMs,
+    required this.selectionIsAuto,
+    required this.autoPoolFlags,
     required this.noVpnEnabled,
     required this.noVpnTotal,
     required this.onNestTap,
     required this.onPlaceRefresh,
     required this.onOpenLocations,
+    required this.onOpenSubscription,
     required this.onOpenNoVpn,
   });
 
@@ -314,12 +416,14 @@ class _DashboardBody extends ConsumerStatefulWidget {
   final String serverTitle;
   final String serverSubtitle;
   final String serverFlag;
-  final int? pingMs;
+  final bool selectionIsAuto;
+  final List<String> autoPoolFlags;
   final int noVpnEnabled;
   final int noVpnTotal;
   final Future<void> Function() onNestTap;
   final Future<void> Function() onPlaceRefresh;
   final VoidCallback onOpenLocations;
+  final VoidCallback onOpenSubscription;
   final VoidCallback onOpenNoVpn;
 
   @override
@@ -328,6 +432,11 @@ class _DashboardBody extends ConsumerStatefulWidget {
 
 class _DashboardBodyState extends ConsumerState<_DashboardBody> {
   String? _warmingHost;
+  Timer? _autoFlagTimer;
+  int _autoFlagTick = 0;
+
+  /// Last Free meter so a background refresh does not unmount the bar.
+  SubscriptionStatus? _stickyMeteredQuota;
 
   TreeState get _treeState => switch (widget.status) {
         VpnConnecting() => TreeState.connecting,
@@ -347,6 +456,49 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _syncAutoFlagTimer();
+  }
+
+  @override
+  void dispose() {
+    _autoFlagTimer?.cancel();
+    super.dispose();
+  }
+
+  bool get _cycleAutoFlags =>
+      widget.selectionIsAuto && widget.status is VpnConnecting;
+
+  void _syncAutoFlagTimer() {
+    if (_cycleAutoFlags) {
+      _autoFlagTimer ??= Timer.periodic(kAutoFlagCyclePeriod, (_) {
+        if (!mounted) return;
+        setState(() => _autoFlagTick++);
+      });
+    } else {
+      _autoFlagTimer?.cancel();
+      _autoFlagTimer = null;
+      _autoFlagTick = 0;
+    }
+  }
+
+  String get _displayFlag {
+    if (_cycleAutoFlags) {
+      return autoConnectingDisplayFlag(widget.autoPoolFlags, _autoFlagTick);
+    }
+    if (widget.selectionIsAuto) {
+      final flag = widget.serverFlag.trim();
+      if (flag.isEmpty || flag == kFlagGlobe || flag == '🌍') {
+        return widget.autoPoolFlags.isNotEmpty
+            ? widget.autoPoolFlags.first
+            : kFlagEurope;
+      }
+    }
+    return widget.serverFlag;
+  }
+
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     unawaited(_warmGeoIfNeeded());
@@ -358,6 +510,16 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
     if (oldWidget.status != widget.status) {
       _warmingHost = null;
       unawaited(_warmGeoIfNeeded());
+      unawaited(widget.onPlaceRefresh());
+      // Session end → traffic just got scraped server-side; refresh the meter.
+      if (oldWidget.status is VpnConnected &&
+          widget.status is VpnDisconnected) {
+        unawaited(ref.read(subscriptionStatusProvider.notifier).refresh());
+      }
+    }
+    if (oldWidget.status != widget.status ||
+        oldWidget.selectionIsAuto != widget.selectionIsAuto) {
+      _syncAutoFlagTimer();
     }
   }
 
@@ -415,7 +577,14 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
     final showDevicesCta =
         status is VpnError && status.code == 'device_limit_reached';
     final showQuotaCta = status is VpnError && status.code == 'quota_exceeded';
-    final quota = ref.watch(subscriptionStatusProvider).asData?.value;
+    final liveQuota = ref.watch(subscriptionStatusProvider).asData?.value;
+    if (liveQuota != null) {
+      _stickyMeteredQuota =
+          liveQuota.showsMeteredQuotaBar ? liveQuota : null;
+    }
+    final quota = liveQuota != null && liveQuota.showsMeteredQuotaBar
+        ? liveQuota
+        : _stickyMeteredQuota;
     final russian = Localizations.localeOf(context).languageCode == 'ru';
     const gib = 1024.0 * 1024.0 * 1024.0;
 
@@ -426,11 +595,34 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
 
     return Column(
       children: [
+        if (quota != null && quota.showsMeteredQuotaBar) ...[
+          FreeQuotaBar(
+            key: kHomeQuotaBarKey,
+            remainingFraction: quota.quotaRemainingFraction,
+            title: l.homeTrafficRemainder,
+            amountLabel: l.homeTrafficAmount(
+              formatGib(
+                (quota.quotaBytesRemaining ?? 0) / gib,
+                russian: russian,
+              ),
+              formatGib(
+                (quota.quotaBytesLimit ?? 0) / gib,
+                russian: russian,
+              ),
+            ),
+            exhaustedLabel: l.homeTrafficExhausted,
+            teaser: l.homeQuotaUnlimitedTeaser,
+            ctaLabel: l.homeQuotaUnlimitedCta,
+            onTap: widget.onOpenSubscription,
+          ),
+          const SizedBox(height: 8),
+        ],
         Expanded(
           child: Center(
             child: RadialGradientGround(
               state: treeState,
               child: SignalNestHero(
+                key: kHomeSignalNestKey,
                 state: treeState,
                 onTap: () => widget.onNestTap(),
                 size: nestSize,
@@ -459,8 +651,9 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
               final opened = await VpnController.instance.openVpnSettings();
               if (!context.mounted) return;
               if (!opened) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(l.settingsKillSwitchOpenFailed)),
+                showTeremokSnackBar(
+                  context,
+                  l.settingsKillSwitchOpenFailed,
                 );
               }
             },
@@ -482,25 +675,6 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
           ),
         ],
         const SizedBox(height: 16),
-        if (quota != null && quota.showsMeteredQuotaBar) ...[
-          FreeQuotaBar(
-            remainingFraction: quota.quotaRemainingFraction,
-            title: l.homeTrafficRemainder,
-            amountLabel: l.homeTrafficAmount(
-              formatGib(
-                (quota.quotaBytesRemaining ?? 0) / gib,
-                russian: russian,
-              ),
-              formatGib(
-                (quota.quotaBytesLimit ?? 0) / gib,
-                russian: russian,
-              ),
-            ),
-            exhaustedLabel: l.homeTrafficExhausted,
-            onTap: quota.quotaExhausted ? () => context.push('/locked') : null,
-          ),
-          const SizedBox(height: 8),
-        ],
         _NoVpnHomeRow(
           label: l.homeNoVpnRow,
           enabled: widget.noVpnEnabled,
@@ -511,8 +685,7 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
         ServerCard(
           title: widget.serverTitle,
           subtitle: widget.serverSubtitle,
-          flagEmoji: widget.serverFlag,
-          pingMs: widget.pingMs,
+          flagEmoji: _displayFlag,
           onTap: widget.onOpenLocations,
         ),
       ],

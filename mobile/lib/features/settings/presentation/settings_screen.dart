@@ -13,6 +13,7 @@ import '../../../core/install_id_storage.dart';
 import '../../../core/support_contact.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
+import '../../../core/widgets/teremok_snackbar.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../auth/application/auth_provider.dart';
 import '../../auth/application/auth_state.dart';
@@ -79,9 +80,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (id == null || id.isEmpty) return;
     await Clipboard.setData(ClipboardData(text: id));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(AppL10n.of(context).settingsDeviceIdCopied)),
-    );
+    showTeremokSnackBar(context, AppL10n.of(context).settingsDeviceIdCopied);
   }
 
   Future<void> _loadVersion() async {
@@ -129,7 +128,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       'not_added' => l.settingsQsTileNotAdded,
       _ => l.settingsQsTileManual,
     };
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    showTeremokSnackBar(context, message);
   }
 
   Future<void> _onAutoReconnectChanged(bool value) async {
@@ -233,12 +232,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     setState(() => _logoutInProgress = false);
 
     if (result is LogoutPartialFailure) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${l.logoutWarning}: ${result.message}'),
-          duration: const Duration(seconds: 5),
-        ),
-      );
+      showTeremokSnackBar(context, '${l.logoutWarning}: ${result.message}');
     }
     // Anonymous: re-check entitlement → locked if unpaid (not phone login).
     if (AppConfig.authAnonymous) {
@@ -249,25 +243,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _onSendReportPressed() async {
     final l = AppL10n.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l.settingsSendReport),
-        content: Text(l.settingsSendReportHint),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(l.cancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(l.settingsSendReportConfirm),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-
     setState(() => _reportSending = true);
     try {
       final auth = ref.read(authProvider).valueOrNull;
@@ -296,20 +271,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         }
       }
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            delivered
-                ? l.settingsReportSent
-                : l.settingsReportSaved(saved.reportId),
-          ),
-        ),
+      if (delivered) {
+        await SupportContact.openBot();
+      }
+      if (!mounted) return;
+      showTeremokSnackBar(
+        context,
+        delivered
+            ? l.settingsReportSent
+            : l.settingsReportTelegramFailed,
       );
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l.settingsReportFailed)),
-      );
+      showTeremokSnackBar(context, l.settingsReportFailed);
     } finally {
       if (mounted) setState(() => _reportSending = false);
     }

@@ -127,6 +127,9 @@ class AppConfig {
     defaultValue: true,
   );
 
+  /// Product bot (no @). Deep links without a huge ``text=`` query.
+  static const String telegramBotUsername = 'vpn_teremok_bot';
+
   /// Owner support Telegram username (no @). Prefill via [SupportContact].
   static const String supportTelegramUsername = 'deathnkomatoz';
 

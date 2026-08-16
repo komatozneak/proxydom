@@ -4,12 +4,17 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/utils/format_utils.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../beta/presentation/promo_redeem_form.dart';
+import '../../home/application/vpn_provider.dart';
 import '../../home/presentation/widgets/free_quota_bar.dart';
 import '../../settings/application/subscription_status_provider.dart';
 import '../../settings/data/access_status_copy.dart';
 import '../../settings/data/subscription_status.dart';
 
-/// Огонь-style «Подписка» tab — plans / promo / status.
+const kSubscriptionPayKey = ValueKey<String>('subscription_pay');
+const kSubscriptionPromoKey = ValueKey<String>('subscription_promo');
+
+/// Огонь-style «Подписка» — status + pay on top, promo at the bottom.
 class SubscriptionTabScreen extends ConsumerWidget {
   const SubscriptionTabScreen({super.key});
 
@@ -18,66 +23,137 @@ class SubscriptionTabScreen extends ConsumerWidget {
     final l = AppL10n.of(context);
     final theme = Theme.of(context);
     final async = ref.watch(subscriptionStatusProvider);
+    final buttonStyle = FilledButton.styleFrom(
+      minimumSize: const Size.fromHeight(52),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+    );
 
     return Scaffold(
       appBar: AppBar(title: Text(l.navSubscription)),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          async.when(
-            data: (status) => Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Card(
-                  child: ListTile(
-                    title: Text(_titleFor(l, status)),
-                    subtitle: Text(_subtitleFor(l, status)),
-                  ),
-                ),
-                if (status.showsMeteredQuotaBar) ...[
-                  const SizedBox(height: 12),
-                  FreeQuotaBar(
-                    remainingFraction: status.quotaRemainingFraction,
-                    title: l.homeTrafficRemainder,
-                    amountLabel: l.homeTrafficAmount(
-                      formatGib(
-                        (status.quotaBytesRemaining ?? 0) /
-                            (1024 * 1024 * 1024),
-                        russian: Localizations.localeOf(context).languageCode ==
-                            'ru',
-                      ),
-                      formatGib(
-                        (status.quotaBytesLimit ?? 0) / (1024 * 1024 * 1024),
-                        russian: Localizations.localeOf(context).languageCode ==
-                            'ru',
-                      ),
+      body: CustomScrollView(
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+            sliver: SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  async.when(
+                    data: (status) => Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Card(
+                          child: ListTile(
+                            title: Text(_titleFor(l, status)),
+                            subtitle: Text(_subtitleFor(l, status)),
+                          ),
+                        ),
+                        if (status.showsMeteredQuotaBar) ...[
+                          const SizedBox(height: 12),
+                          FreeQuotaBar(
+                            remainingFraction: status.quotaRemainingFraction,
+                            title: l.homeTrafficRemainder,
+                            amountLabel: l.homeTrafficAmount(
+                              formatGib(
+                                (status.quotaBytesRemaining ?? 0) /
+                                    (1024 * 1024 * 1024),
+                                russian:
+                                    Localizations.localeOf(context)
+                                            .languageCode ==
+                                        'ru',
+                              ),
+                              formatGib(
+                                (status.quotaBytesLimit ?? 0) /
+                                    (1024 * 1024 * 1024),
+                                russian:
+                                    Localizations.localeOf(context)
+                                            .languageCode ==
+                                        'ru',
+                              ),
+                            ),
+                            exhaustedLabel: l.homeTrafficExhausted,
+                            onTap: status.quotaExhausted
+                                ? () => context.push('/locked')
+                                : null,
+                          ),
+                        ],
+                      ],
                     ),
-                    exhaustedLabel: l.homeTrafficExhausted,
-                    onTap: status.quotaExhausted
-                        ? () => context.push('/locked')
-                        : null,
+                    loading: () => const LinearProgressIndicator(),
+                    error: (_, __) => Text(l.settingsAccessNoneSubtitle),
+                  ),
+                  const SizedBox(height: 20),
+                  FilledButton(
+                    key: kSubscriptionPayKey,
+                    style: buttonStyle,
+                    onPressed: () => context.push('/locked'),
+                    child: Text(l.subscriptionPay),
                   ),
                 ],
-              ],
+              ),
             ),
-            loading: () => const LinearProgressIndicator(),
-            error: (_, __) => Text(l.settingsAccessNoneSubtitle),
           ),
-          const SizedBox(height: 16),
-          FilledButton(
-            onPressed: () => context.push('/locked'),
-            child: Text(l.lockedPay1m),
-          ),
-          const SizedBox(height: 8),
-          OutlinedButton(
-            onPressed: () => context.push('/settings/account/promo'),
-            child: Text(l.lockedOrPromo),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            l.subscriptionTabHint,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 32, 20, 24),
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: KeyedSubtree(
+                  key: kSubscriptionPromoKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Divider(
+                              color: theme.colorScheme.outline
+                                  .withValues(alpha: 0.55),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            child: Text(
+                              l.lockedOrPromo,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                color: theme.colorScheme.onSurface
+                                    .withValues(alpha: 0.72),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: Divider(
+                              color: theme.colorScheme.outline
+                                  .withValues(alpha: 0.55),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      PromoRedeemForm(
+                        useTonalButton: true,
+                        buttonStyle: buttonStyle,
+                        textFieldContentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 18,
+                        ),
+                        onSuccess: () async {
+                          await ref
+                              .read(vpnNodesRepositoryProvider)
+                              .refreshAfterEntitlementChange();
+                          await ref
+                              .read(subscriptionStatusProvider.notifier)
+                              .refresh();
+                          if (context.mounted) context.go('/locations');
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
         ],

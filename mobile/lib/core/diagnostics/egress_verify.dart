@@ -22,7 +22,8 @@ class EgressVerifyResult {
   }
 }
 
-/// IP↔IP vs catalog host. Hostname/SNI is inconclusive — not a tunnel-dead gate.
+/// IP↔IP vs catalog host. Hostname/SNI and Hy2 NAT (catalog ≠ icanhazip)
+/// are not a tunnel-dead gate — only exact IPv4 equality is `match`.
 String egressCheckLabel({
   required String? externalIp,
   required String? catalogHost,
@@ -33,7 +34,8 @@ String egressCheckLabel({
     return 'inconclusive';
   }
   if (!_looksLikeIpv4(host)) return 'inconclusive';
-  return ip == host ? 'match' : 'mismatch';
+  if (ip == host) return 'match';
+  return 'nat';
 }
 
 bool _looksLikeIpv4(String value) {
@@ -57,9 +59,17 @@ Future<EgressVerifyResult> verifyEgress({String? expectedHost}) async {
       egressOk: null,
     );
   }
+  // Hostname or NAT egress ≠ inbound/catalog IP is not a failed tunnel.
+  if (!_looksLikeIpv4(host) || ip != host) {
+    return EgressVerifyResult(
+      externalIp: ip,
+      expectedHost: host,
+      egressOk: null,
+    );
+  }
   return EgressVerifyResult(
     externalIp: ip,
     expectedHost: host,
-    egressOk: ip == host,
+    egressOk: true,
   );
 }

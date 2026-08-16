@@ -22,4 +22,12 @@ void main() {
       'TRUSTTUNNEL',
     );
   });
+
+  test('connectedServerName uses catalog label without a live config', () {
+    expect(
+      connectedServerName(config: null, displayLabel: 'Латвия'),
+      'Латвия',
+    );
+    expect(connectedServerName(config: null), kVpnBrandSessionName);
+  });
 }

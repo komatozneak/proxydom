@@ -73,7 +73,15 @@ func (d *hyDialer) DialUDP(m *M.Metadata) (net.PacketConn, error) {
 	if shouldHijackDNS(m.DstIP, m.DstPort) {
 		send = "1.1.1.1:53"
 	}
-	return newHyPacketConn(u, orig, send), nil
+	return newHyPacketConn(u, orig, send, isDNSPacketDest(orig, send)), nil
+}
+
+func isDNSPacketDest(orig net.Addr, send string) bool {
+	if ua, ok := orig.(*net.UDPAddr); ok && ua != nil && ua.Port == 53 {
+		return true
+	}
+	_, port, err := net.SplitHostPort(send)
+	return err == nil && port == "53"
 }
 
 func egressAddr(m *M.Metadata) string {
@@ -109,6 +117,7 @@ type hyPacketConn struct {
 	u        client.HyUDPConn
 	orig     net.Addr
 	send     string
+	isDNS    bool
 	incoming chan udpRecv
 	closed   chan struct{}
 	closeMu  sync.Once
@@ -116,11 +125,12 @@ type hyPacketConn struct {
 	deadline time.Time
 }
 
-func newHyPacketConn(u client.HyUDPConn, orig net.Addr, send string) *hyPacketConn {
+func newHyPacketConn(u client.HyUDPConn, orig net.Addr, send string, isDNS bool) *hyPacketConn {
 	c := &hyPacketConn{
 		u:        u,
 		orig:     orig,
 		send:     send,
+		isDNS:    isDNS,
 		incoming: make(chan udpRecv),
 		closed:   make(chan struct{}),
 	}
@@ -132,6 +142,9 @@ func (c *hyPacketConn) recvLoop() {
 	defer close(c.incoming)
 	for {
 		b, addr, err := c.u.Receive()
+		if c.isDNS && err == nil && len(b) > 0 {
+			b = filterDNSResponse(b)
+		}
 		pkt := udpRecv{b: b, addr: addr, err: err}
 		select {
 		case <-c.closed:

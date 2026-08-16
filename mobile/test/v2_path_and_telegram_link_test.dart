@@ -1,0 +1,35 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:teremok_connect/core/v2_path_interceptor.dart';
+import 'package:teremok_connect/features/account/presentation/telegram_link_dialog.dart';
+
+void main() {
+  test('mapLegacyPath remaps /session onto /app/session', () {
+    expect(V2PathInterceptor.mapLegacyPath('/session'), '/app/session');
+    expect(
+      V2PathInterceptor.mapLegacyPath('/session/logout_all'),
+      '/app/session/logout_all',
+    );
+    expect(V2PathInterceptor.mapLegacyPath('/app/session'), isNull);
+    expect(V2PathInterceptor.mapLegacyPath('/me'), '/app/me');
+  });
+
+  test('parseTelegramDeepLink extracts bot and start payload', () {
+    final parsed = parseTelegramDeepLink(
+      'https://t.me/vpn_teremok_bot?start=link_abc123',
+    );
+    expect(parsed, isNotNull);
+    expect(parsed!.bot, 'vpn_teremok_bot');
+    expect(parsed.start, 'link_abc123');
+  });
+
+  test('telegramStartUri uses tg://resolve so browsers cannot drop start=', () {
+    final uri = telegramStartUri(
+      botUsername: 'vpn_teremok_bot',
+      startPayload: 'link_abc123',
+    );
+    expect(uri.scheme, 'tg');
+    expect(uri.host, 'resolve');
+    expect(uri.queryParameters['domain'], 'vpn_teremok_bot');
+    expect(uri.queryParameters['start'], 'link_abc123');
+  });
+}

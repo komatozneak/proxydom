@@ -43,7 +43,8 @@ class V2PathInterceptor extends Interceptor {
         path.contains('/app/plans') ||
         path.contains('/app/payments') ||
         path.contains('/app/usage') ||
-        path.contains('/app/me')) {
+        path.contains('/app/me') ||
+        path.contains('/app/session')) {
       return null;
     }
     if (path == '/vpn/config' || path.endsWith('/vpn/config')) {
@@ -56,6 +57,9 @@ class V2PathInterceptor extends Interceptor {
       return '/app$path';
     }
     if (path.startsWith('/devices/') || path == '/devices') {
+      return '/app$path';
+    }
+    if (path.startsWith('/session/') || path == '/session') {
       return '/app$path';
     }
     if (path == '/me' || path.endsWith('/me')) {

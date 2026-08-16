@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
+import '../../../core/widgets/teremok_snackbar.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../home/application/vpn_provider.dart';
 import '../../home/application/vpn_status.dart';
@@ -101,10 +102,9 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
     try {
       final ok = await ref.read(vpnProvider.notifier).reconnectToApplyRouting();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(ok ? l.splitTunnelApplied : l.splitTunnelApplyFailed),
-        ),
+      showTeremokSnackBar(
+        context,
+        ok ? l.splitTunnelApplied : l.splitTunnelApplyFailed,
       );
       await _afterMutation();
     } finally {

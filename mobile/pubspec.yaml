@@ -1,7 +1,7 @@
 name: teremok_connect
 description: Teremok Connect VPN client
 publish_to: 'none'
-version: 0.1.7+2019
+version: 0.1.8+2020
 
 environment:
   sdk: ^3.5.0
@@ -51,10 +51,23 @@ flutter:
     - assets/icon/nav_vpn_teremok.png
     - assets/icon/logo_mark_nav.png
     - assets/rive/signal_nest_connect.riv
+    - assets/flags/
+    - assets/flags/LICENSE
     # DedProxy-style Google/YouTube force-proxy CIDRs (public goog.json).
     - assets/rules/youtube-google.cidr
     # PR #35 textures/empty_states intentionally NOT bundled (see
     # assets/brand/DEPRECATED-PR35.md — FLUX Klein 9B non-commercial).
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Inter-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Inter-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Inter-ExtraBold.ttf
+          weight: 800
 # Android 13+ themed icons: background + foreground + monochrome.
 # Regenerate:
 #   python tool/generate_adaptive_icon.py

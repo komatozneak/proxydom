@@ -2,16 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/widgets/app_icon.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../auth/data/auth_api.dart';
 import '../../settings/application/subscription_status_provider.dart';
 import '../../settings/data/access_status_copy.dart';
 import '../../settings/data/subscription_status.dart';
 import '../application/account_profile_provider.dart';
 import '../data/account_profile.dart';
+import 'telegram_link_dialog.dart';
 
 /// Settings → Account hub (device ID identity; recovery code + promo).
 class AccountHubScreen extends ConsumerWidget {
@@ -194,19 +193,13 @@ class _HubBody extends StatelessWidget {
             ),
             const Divider(height: 1),
             _NavTile(
-              icon: AppIcons.info,
+              icon: AppIcons.siteTelegram,
               title: l.accountHubLinkTelegram,
               subtitle: profile.telegramUsername != null
                   ? '@${profile.telegramUsername}'
                   : l.accountHubLinkTelegramHint,
               onTap: () async {
-                try {
-                  final link = await AuthApi().startTelegramLink();
-                  final uri = Uri.parse(link);
-                  if (await canLaunchUrl(uri)) {
-                    await launchUrl(uri, mode: LaunchMode.externalApplication);
-                  }
-                } catch (_) {}
+                await TelegramLinkDialog.show(context);
               },
             ),
           ],

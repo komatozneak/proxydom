@@ -91,6 +91,7 @@ class VpnNode {
     if (!isConnected && !isDefault) return false;
     final idLower = id.trim().toLowerCase();
     if (idLower == 'eu-primary') return false;
+    if (locked) return false;
     if (!isPremium) {
       if (isTrustTunnel || isYoutube || isGaming || requiresPremium) {
         return false;

@@ -111,4 +111,103 @@ void main() {
     expect(find.text('Трафик закончился'), findsOneWidget);
     expect(find.text('Остаток трафика'), findsOneWidget);
   });
+
+  testWidgets('exhausted track is a full-width muted bar', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('ru'),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        home: const Scaffold(
+          body: FreeQuotaBar(
+            remainingFraction: 0,
+            title: 'Остаток трафика',
+            amountLabel: '0,00 / 4,20 ГБ',
+            exhaustedLabel: 'Трафик закончился',
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final boxes = tester
+        .widgetList<DecoratedBox>(find.byType(DecoratedBox))
+        .map((d) => d.decoration)
+        .whereType<BoxDecoration>()
+        .toList();
+    final greyFill = boxes.where(
+      (d) => d.color == AppBrand.quotaDepleted && d.gradient == null,
+    );
+    expect(greyFill, isNotEmpty);
+
+    final grey = greyFill.first;
+    final box = find
+        .ancestor(
+          of: find.byWidgetPredicate(
+            (w) => w is DecoratedBox && w.decoration == grey,
+          ),
+          matching: find.byType(SizedBox),
+        )
+        .first;
+    final size = tester.getSize(box);
+    expect(size.width, greaterThan(0));
+  });
+
+  testWidgets('partial bar uses a soft health gradient, not flat grey',
+      (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('ru'),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        home: const Scaffold(
+          body: FreeQuotaBar(
+            remainingFraction: 0.4,
+            title: 'Остаток трафика',
+            amountLabel: '1,68 / 4,20 ГБ',
+            exhaustedLabel: 'Трафик закончился',
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final gradientFills = tester
+        .widgetList<DecoratedBox>(find.byType(DecoratedBox))
+        .map((d) => d.decoration)
+        .whereType<BoxDecoration>()
+        .where((d) => d.gradient is LinearGradient)
+        .toList();
+    expect(gradientFills, isNotEmpty);
+    final gradient = gradientFills.first.gradient! as LinearGradient;
+    expect(gradient.colors.length, 2);
+    // Drain direction: trailing (left) tone is healthier than the tip.
+    expect(
+      gradient.colors.first,
+      isNot(gradient.colors.last),
+    );
+  });
+
+  testWidgets('Home curtain teaser is shown when provided', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('ru'),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        home: Scaffold(
+          body: FreeQuotaBar(
+            remainingFraction: 0.5,
+            title: 'Остаток трафика',
+            amountLabel: '2,10 / 4,20 ГБ',
+            exhaustedLabel: 'Трафик закончился',
+            teaser: 'Безлимит с Premium',
+            ctaLabel: 'Подключить безлимит',
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('Безлимит с Premium'), findsOneWidget);
+    expect(find.text('Подключить безлимит'), findsOneWidget);
+  });
 }

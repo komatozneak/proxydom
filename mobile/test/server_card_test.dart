@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:teremok_connect/core/theme.dart';
+import 'package:teremok_connect/core/widgets/location_flag_icon.dart';
 import 'package:teremok_connect/features/home/application/vpn_provider.dart';
 import 'package:teremok_connect/features/home/application/vpn_status.dart';
 import 'package:teremok_connect/features/home/presentation/widgets/server_card.dart';
@@ -52,10 +53,11 @@ void main() {
     expect(find.text('Нью-Йорк'), findsOneWidget);
     expect(find.text('СЕССИЯ'), findsNothing);
     expect(find.textContaining('ms'), findsNothing);
+    expect(find.byType(LocationFlagIcon), findsOneWidget);
+    expect(find.text('🇺🇸'), findsNothing);
   });
 
-  testWidgets('ServerCard shows session above ms when connected',
-      (tester) async {
+  testWidgets('ServerCard shows session timer when connected', (tester) async {
     final since =
         DateTime.now().subtract(const Duration(minutes: 11, seconds: 9));
     await tester.pumpWidget(
@@ -64,7 +66,6 @@ void main() {
           title: 'США',
           subtitle: 'Нью-Йорк',
           flagEmoji: '🇺🇸',
-          pingMs: 42,
           onTap: null,
         ),
         overrides: [
@@ -84,42 +85,10 @@ void main() {
 
     expect(find.text('СЕССИЯ'), findsOneWidget);
     expect(find.text('11:09'), findsOneWidget);
-    expect(find.text('42 ms'), findsOneWidget);
+    expect(find.textContaining('ms'), findsNothing);
 
-    // Session label appears above the timer; ms is below timer in the column.
     final sessionY = tester.getTopLeft(find.text('СЕССИЯ')).dy;
     final timerY = tester.getTopLeft(find.text('11:09')).dy;
-    final pingY = tester.getTopLeft(find.text('42 ms')).dy;
     expect(sessionY, lessThan(timerY));
-    expect(timerY, lessThan(pingY));
-  });
-
-  testWidgets('ServerCard shows em-dash ping when connected without sample',
-      (tester) async {
-    await tester.pumpWidget(
-      _wrap(
-        const ServerCard(
-          title: 'США',
-          subtitle: 'Нью-Йорк',
-          flagEmoji: '🇺🇸',
-          onTap: null,
-        ),
-        overrides: [
-          vpnProvider.overrideWith(
-            () => _FixedVpnNotifier(
-              VpnConnected(
-                serverName: 'США',
-                protocol: 'VLESS',
-                connectedSince: DateTime.now(),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-    await tester.pump();
-
-    expect(find.text('— ms'), findsOneWidget);
-    expect(find.text('СЕССИЯ'), findsOneWidget);
   });
 }

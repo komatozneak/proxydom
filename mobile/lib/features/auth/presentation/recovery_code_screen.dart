@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/router.dart';
 import '../../../core/theme.dart';
+import '../../../core/widgets/teremok_snackbar.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../beta/data/jwt_subject.dart';
 import '../../onboarding/data/onboarding_prefs.dart';
@@ -38,9 +39,7 @@ class _RecoveryCodeScreenState extends ConsumerState<RecoveryCodeScreen> {
     if (code.isEmpty) return;
     await Clipboard.setData(ClipboardData(text: code));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(AppL10n.of(context).recoveryCodeCopied)),
-    );
+    showTeremokSnackBar(context, AppL10n.of(context).recoveryCodeCopied);
   }
 
   Future<void> _continue() async {

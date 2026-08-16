@@ -89,25 +89,42 @@ void main() {
     expect(euRetired.inAutoPool(isPremium: false), isFalse);
     expect(india.inAutoPool(isPremium: false), isFalse);
     expect(euFree.isAutoEligible, isTrue);
-    expect(autoPoolRank(euFree), 0);
-    expect(autoPoolRank(us), 1);
-    expect(autoPoolRank(gaming), 3);
-    expect(autoPoolRank(youtube), 4);
+    expect(autoPoolRank(euFree, isPremium: false), 0);
+    expect(autoPoolRank(us, isPremium: false), 1);
+    expect(autoPoolRank(gaming, isPremium: false), 3);
+    expect(autoPoolRank(youtube, isPremium: false), 4);
   });
 
-  test('Premium Auto pool is EU Hy2, US Hy2, gaming, then YouTube', () {
+  test('Premium Auto pool tries YouTube first, then EU, US, gaming', () {
     final pool = autoPoolFor(
       [youtube, us, euFree, euRetired, gaming, india],
       isPremium: true,
     );
     expect(
       pool.map((n) => n.id),
-      ['eu-hy2-1', 'us-hy2-1', 'eu-gaming', 'al-youtube'],
+      ['al-youtube', 'eu-hy2-1', 'us-hy2-1', 'eu-gaming'],
     );
     expect(gaming.inAutoPool(isPremium: true), isTrue);
     expect(youtube.inAutoPool(isPremium: true), isTrue);
     expect(euRetired.inAutoPool(isPremium: true), isFalse);
     expect(india.inAutoPool(isPremium: true), isFalse);
+  });
+
+  test('Premium Auto skips locked YouTube and uses other nodes', () {
+    final lockedYt = _node(
+      id: 'al-youtube',
+      label: 'YouTube · Premium',
+      protocol: kVpnNodeProtocolTrusttunnel,
+      purpose: 'youtube',
+      requiresPremium: true,
+      locked: true,
+      host: '85.155.228.235',
+    );
+    final pool = autoPoolFor(
+      [lockedYt, us, euFree, gaming],
+      isPremium: true,
+    );
+    expect(pool.map((n) => n.id), ['eu-hy2-1', 'us-hy2-1', 'eu-gaming']);
   });
 
   test('coming-soon stub and empty host never enter Auto', () {
@@ -117,7 +134,7 @@ void main() {
 
   test('autoCandidateHintLabel is short product copy', () {
     expect(autoCandidateHintLabel(us), 'США');
-    expect(autoCandidateHintLabel(euFree), 'Европа');
+    expect(autoCandidateHintLabel(euFree), 'Латвия');
     expect(autoCandidateHintLabel(gaming), 'Игровой');
     expect(autoCandidateHintLabel(youtube), 'YouTube');
     expect(autoCandidateHintLabel(india), 'Индия');
