@@ -1,4 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Network: INTERNET is prot=dangerous on Android 17 (Pixel) — MainActivity
          also requests it at runtime. Missing grant → SocketException errno 13. -->
@@ -47,6 +48,14 @@
                 <action android:name="android.service.quicksettings.action.QS_TILE_PREFERENCES"/>
             </intent-filter>
         </activity>
+
+        <!-- Override TrustTunnel AAR VpnPrepareActivity so Android 16 does not
+             see a fixed orientation on large screens; app manifest wins merge. -->
+        <activity
+            android:name="com.adguard.trusttunnel.VpnPrepareActivity"
+            android:exported="false"
+            android:resizeableActivity="true"
+            tools:replace="android:resizeableActivity" />
 
         <!-- VpnService as FGS specialUse (targetSdk 34+). systemExempted requires
              privileged FOREGROUND_SERVICE_SYSTEM_EXEMPTED — crashes on normal apps. -->
