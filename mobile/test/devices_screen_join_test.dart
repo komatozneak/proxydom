@@ -52,7 +52,15 @@ DeviceSlot _slot({
 }
 
 void main() {
-  testWidgets('solo member sees Join, not Invite', (tester) async {
+  // CI runs `flutter test --dart-define=AUTH_ANONYMOUS=false`, which hides the
+  // Join row behind AppConfig.authAnonymous. These tests cover the production
+  // anonymous-auth UI, so skip them when the flag is off.
+  const anonymous = bool.fromEnvironment('AUTH_ANONYMOUS', defaultValue: true);
+
+  testWidgets(
+    'solo member sees Join, not Invite',
+    skip: !anonymous,
+    (tester) async {
     await tester.pumpWidget(
       _app(
         DeviceListResult(
@@ -74,7 +82,10 @@ void main() {
     expect(find.byTooltip('Отозвать'), findsNothing);
   });
 
-  testWidgets('solo owner sees Invite and Join', (tester) async {
+  testWidgets(
+    'solo owner sees Invite and Join',
+    skip: !anonymous,
+    (tester) async {
     await tester.pumpWidget(
       _app(
         DeviceListResult(
@@ -92,7 +103,10 @@ void main() {
     expect(find.text('Выйти на всех устройствах'), findsOneWidget);
   });
 
-  testWidgets('owner with others hides Join and can revoke', (tester) async {
+  testWidgets(
+    'owner with others hides Join and can revoke',
+    skip: !anonymous,
+    (tester) async {
     await tester.pumpWidget(
       _app(
         DeviceListResult(

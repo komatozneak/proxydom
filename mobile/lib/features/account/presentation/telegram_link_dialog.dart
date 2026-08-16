@@ -194,6 +194,7 @@ class _TelegramLinkDialogState extends ConsumerState<TelegramLinkDialog>
     try {
       await ref.read(sessionProvider.notifier).refresh();
     } catch (_) {}
+    // ignore: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
     ref.read(accountProfileProvider.notifier).state = AsyncData(profile);
   }
 
