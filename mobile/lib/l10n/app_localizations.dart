@@ -2401,6 +2401,30 @@ abstract class AppL10n {
   /// **'Couldn’t restore access. Try again.'**
   String get restoreFailed;
 
+  /// No description provided for @restoreDeviceLimitTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Device limit reached'**
+  String get restoreDeviceLimitTitle;
+
+  /// No description provided for @restoreDeviceLimitBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose which device to disconnect so this phone can join.'**
+  String get restoreDeviceLimitBody;
+
+  /// No description provided for @restoreDeviceLimitOwner.
+  ///
+  /// In en, this message translates to:
+  /// **'Owner'**
+  String get restoreDeviceLimitOwner;
+
+  /// No description provided for @restoreDeviceLimitPickFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t free a device slot. Try again.'**
+  String get restoreDeviceLimitPickFailed;
+
   /// No description provided for @restoreSettingsHint.
   ///
   /// In en, this message translates to:

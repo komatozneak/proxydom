@@ -9,6 +9,9 @@ import '../../../core/widgets/app_icon.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../auth/application/auth_provider.dart';
 import '../../auth/data/auth_api.dart';
+import '../../auth/data/restore_device_choice.dart';
+import '../../auth/presentation/restore_device_slot_dialog.dart';
+import '../../session/application/identity_reconnect.dart';
 import '../../session/application/session_provider.dart';
 
 /// Interactive dialog for linking Telegram to the user's account.
@@ -178,6 +181,50 @@ class _TelegramLinkDialogState extends ConsumerState<TelegramLinkDialog>
       if (_token != null) {
         final poll = await AuthApi().pollTelegramLink(_token!);
         final status = poll['status'];
+        if (status == 'needs_device_slot') {
+          _pollTimer?.cancel();
+          final devices = RestoreDeviceChoice.listFrom(poll['devices']);
+          if (!mounted) return;
+          final chosen = await RestoreDeviceSlotDialog.show(
+            context,
+            devices: devices,
+          );
+          if (!mounted) return;
+          if (chosen == null) {
+            setState(() {
+              _error = AppL10n.of(context).restoreDeviceLimitPickFailed;
+            });
+            return;
+          }
+          final replaced = await AuthApi().replaceTelegramLink(
+            token: _token!,
+            deviceId: chosen.id,
+          );
+          if (replaced['status'] != 'confirmed') {
+            if (!mounted) return;
+            setState(() {
+              _error = AppL10n.of(context).restoreFailed;
+            });
+            return;
+          }
+          final ok = await ref.read(authProvider.notifier).recoverWithTelegram(
+                token: _token!,
+                data: replaced,
+              );
+          if (!mounted) return;
+          if (ok) {
+            unawaited(reconnectVpnAfterIdentityChange(ref));
+            setState(() {
+              _linked = true;
+              _restored = true;
+            });
+          } else {
+            setState(() {
+              _error = AppL10n.of(context).restoreFailed;
+            });
+          }
+          return;
+        }
         if (status == 'confirmed') {
           _pollTimer?.cancel();
           final ok = await ref.read(authProvider.notifier).recoverWithTelegram(
@@ -186,6 +233,7 @@ class _TelegramLinkDialogState extends ConsumerState<TelegramLinkDialog>
               );
           if (!mounted) return;
           if (ok) {
+            unawaited(reconnectVpnAfterIdentityChange(ref));
             setState(() {
               _linked = true;
               _restored = true;

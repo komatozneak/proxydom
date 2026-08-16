@@ -11,3 +11,11 @@ Future<void> teardownVpnAfterIdentityChange(WidgetRef ref) async {
     await ref.read(vpnNodesRepositoryProvider).refreshAfterEntitlementChange();
   } catch (_) {}
 }
+
+/// Telegram restore rotates account creds — fetch a new config and come back up.
+Future<void> reconnectVpnAfterIdentityChange(WidgetRef ref) async {
+  await teardownVpnAfterIdentityChange(ref);
+  try {
+    await ref.read(vpnProvider.notifier).connect();
+  } catch (_) {}
+}

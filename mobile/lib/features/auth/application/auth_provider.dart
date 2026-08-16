@@ -10,6 +10,7 @@ import '../../session/application/session_provider.dart';
 import '../../session/data/account_session_snapshot.dart';
 import '../data/auth_api.dart';
 import '../data/recovery_code_storage.dart';
+import '../data/restore_device_choice.dart';
 import '../data/seat_invite_local_store.dart';
 import '../data/seat_outcome.dart';
 import 'auth_state.dart';
@@ -168,11 +169,17 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
   }
 
   /// Reinstall recovery: bind new install to account via recovery code.
-  Future<bool> recoverWithCode(String recoveryCode) async {
+  Future<bool> recoverWithCode(
+    String recoveryCode, {
+    int? replaceDeviceId,
+  }) async {
     try {
-      final result = await AuthApi().recover(recoveryCode: recoveryCode).timeout(
-            const Duration(seconds: 45),
-          );
+      final result = await AuthApi()
+          .recover(
+            recoveryCode: recoveryCode,
+            replaceDeviceId: replaceDeviceId,
+          )
+          .timeout(const Duration(seconds: 45));
       await TokenStorage.instance.saveTokens(
         accessToken: result.accessToken,
         refreshToken: result.refreshToken,
@@ -190,6 +197,8 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
         ),
       );
       return true;
+    } on NeedsDeviceSlotException {
+      rethrow;
     } catch (e, st) {
       debugPrint('auth.recover_failed: $e\n$st');
       return false;

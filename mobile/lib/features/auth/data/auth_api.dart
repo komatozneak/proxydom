@@ -2,6 +2,7 @@ import '../../../core/api_client.dart';
 import '../../../core/api_secret_storage.dart';
 import '../../../core/install_id_storage.dart';
 import '../../session/data/account_session_snapshot.dart';
+import 'restore_device_choice.dart';
 import 'seat_outcome.dart';
 
 /// Must match backend ``SEAT_ACCEPT_CONSENT_VERSION``.
@@ -38,6 +39,7 @@ class AuthApi {
   Future<RegisterResult> recover({
     required String recoveryCode,
     String? deviceUuid,
+    int? replaceDeviceId,
   }) async {
     final id = deviceUuid ?? await InstallIdStorage.instance.getOrCreate();
     final resp = await ApiClient.postAuth(
@@ -45,8 +47,15 @@ class AuthApi {
       data: {
         'recovery_code': recoveryCode,
         'device_uuid': id,
+        if (replaceDeviceId != null) 'replace_device_id': replaceDeviceId,
       },
     );
+    if (resp.statusCode == 409 &&
+        parseApiErrorCode(resp.data) == 'needs_device_slot') {
+      throw NeedsDeviceSlotException(
+        RestoreDeviceChoice.listFromResponse(resp.data),
+      );
+    }
     if (resp.statusCode != 200 || resp.data is! Map) {
       throw Exception('recover failed: ${resp.statusCode}');
     }
@@ -167,6 +176,36 @@ class AuthApi {
     );
     if (resp.statusCode != 200 || resp.data is! Map) {
       throw Exception('pollTelegramRecover failed: ${resp.statusCode}');
+    }
+    return Map<String, dynamic>.from(resp.data as Map);
+  }
+
+  /// Revoke one chosen slot then finish Telegram recover (Premium cap picker).
+  Future<Map<String, dynamic>> replaceTelegramRecover({
+    required String token,
+    required int deviceId,
+  }) async {
+    final resp = await ApiClient.postAuth(
+      '/auth/recover/telegram/replace',
+      data: {'token': token, 'device_id': deviceId},
+    );
+    if (resp.statusCode != 200 || resp.data is! Map) {
+      throw Exception('replaceTelegramRecover failed: ${resp.statusCode}');
+    }
+    return Map<String, dynamic>.from(resp.data as Map);
+  }
+
+  /// Same picker for link-token restore (`needs_device_slot` on contact poll).
+  Future<Map<String, dynamic>> replaceTelegramLink({
+    required String token,
+    required int deviceId,
+  }) async {
+    final resp = await ApiClient.postAuth(
+      '/auth/contact/telegram/replace',
+      data: {'token': token, 'device_id': deviceId},
+    );
+    if (resp.statusCode != 200 || resp.data is! Map) {
+      throw Exception('replaceTelegramLink failed: ${resp.statusCode}');
     }
     return Map<String, dynamic>.from(resp.data as Map);
   }

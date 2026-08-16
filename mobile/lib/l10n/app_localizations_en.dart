@@ -1266,6 +1266,20 @@ class AppL10nEn extends AppL10n {
   String get restoreFailed => 'Couldn’t restore access. Try again.';
 
   @override
+  String get restoreDeviceLimitTitle => 'Device limit reached';
+
+  @override
+  String get restoreDeviceLimitBody =>
+      'Choose which device to disconnect so this phone can join.';
+
+  @override
+  String get restoreDeviceLimitOwner => 'Owner';
+
+  @override
+  String get restoreDeviceLimitPickFailed =>
+      'Couldn’t free a device slot. Try again.';
+
+  @override
   String get restoreSettingsHint =>
       'After reinstall — enter your recovery code';
 

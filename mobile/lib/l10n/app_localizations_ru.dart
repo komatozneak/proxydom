@@ -1272,6 +1272,20 @@ class AppL10nRu extends AppL10n {
       'Не удалось восстановить доступ. Попробуйте снова.';
 
   @override
+  String get restoreDeviceLimitTitle => 'Лимит устройств';
+
+  @override
+  String get restoreDeviceLimitBody =>
+      'Выберите, какое устройство отключить, чтобы войти с этого телефона.';
+
+  @override
+  String get restoreDeviceLimitOwner => 'Владелец';
+
+  @override
+  String get restoreDeviceLimitPickFailed =>
+      'Не удалось освободить слот. Попробуйте снова.';
+
+  @override
   String get restoreSettingsHint => 'После переустановки — код восстановления';
 
   @override

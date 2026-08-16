@@ -12,9 +12,12 @@ import '../../../l10n/app_localizations.dart';
 import '../../account/application/telegram_identity.dart';
 import '../../account/presentation/telegram_link_dialog.dart';
 import '../../home/application/vpn_provider.dart';
+import '../../session/application/identity_reconnect.dart';
 import '../application/auth_provider.dart';
 import '../application/auth_state.dart';
 import '../data/auth_api.dart';
+import '../data/restore_device_choice.dart';
+import 'restore_device_slot_dialog.dart';
 
 /// Self-serve recover after reinstall (ADR 008 / Telegram link).
 class RestoreAccessScreen extends ConsumerStatefulWidget {
@@ -81,6 +84,55 @@ class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
               ? await AuthApi().pollTelegramLink(token)
               : await AuthApi().pollTelegramRecover(token);
           final status = poll['status'];
+          if (status == 'needs_device_slot') {
+            timer.cancel();
+            if (!mounted) return;
+            final devices = RestoreDeviceChoice.listFrom(poll['devices']);
+            final chosen = await RestoreDeviceSlotDialog.show(
+              context,
+              devices: devices,
+            );
+            if (!mounted) return;
+            if (chosen == null) {
+              setState(() {
+                _tgBusy = false;
+                _error = AppL10n.of(context).restoreDeviceLimitPickFailed;
+              });
+              return;
+            }
+            final replaced = authed
+                ? await AuthApi().replaceTelegramLink(
+                    token: token,
+                    deviceId: chosen.id,
+                  )
+                : await AuthApi().replaceTelegramRecover(
+                    token: token,
+                    deviceId: chosen.id,
+                  );
+            if (replaced['status'] != 'confirmed') {
+              setState(() {
+                _tgBusy = false;
+                _error = AppL10n.of(context).restoreFailed;
+              });
+              return;
+            }
+            final ok = await ref.read(authProvider.notifier).recoverWithTelegram(
+                  token: token,
+                  data: replaced,
+                );
+            if (!mounted) return;
+            if (ok) {
+              unawaited(reconnectVpnAfterIdentityChange(ref));
+              AppRouter.postAuthResolved = true;
+              context.go('/gate');
+            } else {
+              setState(() {
+                _tgBusy = false;
+                _error = AppL10n.of(context).restoreFailed;
+              });
+            }
+            return;
+          }
           if (status == 'confirmed') {
             timer.cancel();
             final ok = await ref.read(authProvider.notifier).recoverWithTelegram(
@@ -89,6 +141,7 @@ class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
                 );
             if (!mounted) return;
             if (ok) {
+              unawaited(reconnectVpnAfterIdentityChange(ref));
               AppRouter.postAuthResolved = true;
               context.go('/gate');
             } else {
@@ -131,17 +184,47 @@ class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
       _busy = true;
       _error = null;
     });
-    final ok = await ref.read(authProvider.notifier).recoverWithCode(code);
-    if (!mounted) return;
-    if (!ok) {
-      setState(() {
-        _busy = false;
-        _error = AppL10n.of(context).restoreInvalid;
-      });
-      return;
+    try {
+      final ok = await ref.read(authProvider.notifier).recoverWithCode(code);
+      if (!mounted) return;
+      if (!ok) {
+        setState(() {
+          _busy = false;
+          _error = AppL10n.of(context).restoreInvalid;
+        });
+        return;
+      }
+      AppRouter.postAuthResolved = true;
+      context.go('/gate');
+    } on NeedsDeviceSlotException catch (e) {
+      if (!mounted) return;
+      final chosen = await RestoreDeviceSlotDialog.show(
+        context,
+        devices: e.devices,
+      );
+      if (!mounted) return;
+      if (chosen == null) {
+        setState(() {
+          _busy = false;
+          _error = AppL10n.of(context).restoreDeviceLimitPickFailed;
+        });
+        return;
+      }
+      final ok = await ref.read(authProvider.notifier).recoverWithCode(
+            code,
+            replaceDeviceId: chosen.id,
+          );
+      if (!mounted) return;
+      if (!ok) {
+        setState(() {
+          _busy = false;
+          _error = AppL10n.of(context).restoreFailed;
+        });
+        return;
+      }
+      AppRouter.postAuthResolved = true;
+      context.go('/gate');
     }
-    AppRouter.postAuthResolved = true;
-    context.go('/gate');
   }
 
   @override

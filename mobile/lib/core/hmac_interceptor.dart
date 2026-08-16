@@ -73,6 +73,11 @@ class HmacSignatureInterceptor extends Interceptor {
     const exempt = {
       '/v2/auth/register',
       '/v2/auth/recover',
+      '/v2/auth/recover/telegram/start',
+      '/v2/auth/recover/telegram/poll',
+      '/v2/auth/recover/telegram/replace',
+      '/v2/auth/contact/telegram/poll',
+      '/v2/auth/contact/telegram/replace',
       '/v2/auth/bootstrap',
       '/v2/auth/refresh',
       '/v2/app/resources',
