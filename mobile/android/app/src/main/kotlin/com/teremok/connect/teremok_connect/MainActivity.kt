@@ -9,6 +9,7 @@ import android.os.Build
 import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -64,6 +65,8 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
+        // Android 15 edge-to-edge: draw behind system bars; SafeArea keeps insets.
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         // Android 17 (API 37) on this Pixel: INTERNET is prot=dangerous.
         // Without a runtime grant, Dart sockets fail with errno 13 (EACCES).
         ensureInternetPermission()

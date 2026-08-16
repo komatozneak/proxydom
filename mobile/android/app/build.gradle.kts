@@ -139,5 +139,7 @@ dependencies {
     implementation("com.google.android.material:material:1.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     implementation("androidx.core:core-ktx:1.15.0")
+    // EdgeToEdge.enable for MainActivity (Android 15 system-bar insets).
+    implementation("androidx.activity:activity-ktx:1.10.1")
     testImplementation("junit:junit:4.13.2")
 }
