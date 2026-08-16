@@ -3,12 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/router.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../home/application/vpn_provider.dart';
 import '../../settings/application/subscription_status_provider.dart';
 import '../../settings/data/access_status_copy.dart';
 import '../../settings/data/subscription_status.dart';
 import '../application/account_profile_provider.dart';
+import '../application/telegram_identity.dart';
 import '../data/account_profile.dart';
 import 'telegram_link_dialog.dart';
 
@@ -144,7 +147,7 @@ class AccountHubScreen extends ConsumerWidget {
   }
 }
 
-class _HubBody extends StatelessWidget {
+class _HubBody extends ConsumerWidget {
   const _HubBody({
     required this.profile,
     required this.accessTitle,
@@ -156,9 +159,10 @@ class _HubBody extends StatelessWidget {
   final String accessSubtitle;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l = AppL10n.of(context);
     final theme = Theme.of(context);
+    final vpnOk = telegramIdentityAllowed(ref.watch(vpnProvider));
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -197,9 +201,28 @@ class _HubBody extends StatelessWidget {
               title: l.accountHubLinkTelegram,
               subtitle: profile.telegramUsername != null
                   ? '@${profile.telegramUsername}'
-                  : l.accountHubLinkTelegramHint,
+                  : (vpnOk
+                      ? l.accountHubLinkTelegramHint
+                      : l.accountTelegramVpnRequired),
               onTap: () async {
-                await TelegramLinkDialog.show(context);
+                if (profile.telegramUsername != null) {
+                  await TelegramLinkDialog.show(context);
+                  return;
+                }
+                if (!vpnOk) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(l.accountTelegramVpnRequired)),
+                  );
+                  return;
+                }
+                final result = await TelegramLinkDialog.show(context);
+                if (!context.mounted) return;
+                if (result == TelegramLinkDialogResult.restored) {
+                  AppRouter.postAuthResolved = true;
+                  context.go('/gate');
+                  return;
+                }
+                await ref.read(accountProfileProvider.notifier).refresh();
               },
             ),
           ],

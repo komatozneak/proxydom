@@ -114,14 +114,29 @@ class AuthApi {
     return DeviceListResult.fromJson(Map<String, dynamic>.from(resp.data as Map));
   }
 
-  /// Start Telegram account link (deep_link).
-  Future<String> startTelegramLink() async {
+  /// Start Telegram account link (deep_link + poll token).
+  Future<Map<String, String>> startTelegramLink() async {
     final resp = await ApiClient.instance.post('/auth/contact/telegram/start');
     if (resp.statusCode != 200 || resp.data is! Map) {
       throw Exception('startTelegramLink failed: ${resp.statusCode}');
     }
     final data = Map<String, dynamic>.from(resp.data as Map);
-    return data['deep_link'] as String;
+    return {
+      'deep_link': data['deep_link'] as String,
+      'token': data['token'] as String,
+    };
+  }
+
+  /// Poll link token (first bind or restore of an existing account).
+  Future<Map<String, dynamic>> pollTelegramLink(String token) async {
+    final resp = await ApiClient.instance.get(
+      '/auth/contact/telegram/poll',
+      queryParameters: {'token': token},
+    );
+    if (resp.statusCode != 200 || resp.data is! Map) {
+      throw Exception('pollTelegramLink failed: ${resp.statusCode}');
+    }
+    return Map<String, dynamic>.from(resp.data as Map);
   }
 
   /// Start Telegram recover session on a clean device.

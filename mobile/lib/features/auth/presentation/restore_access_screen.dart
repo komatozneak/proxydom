@@ -4,12 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/router.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../account/application/telegram_identity.dart';
+import '../../account/presentation/telegram_link_dialog.dart';
+import '../../home/application/vpn_provider.dart';
 import '../application/auth_provider.dart';
 import '../application/auth_state.dart';
 import '../data/auth_api.dart';
@@ -53,25 +55,31 @@ class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
   }
 
   Future<void> _submitTelegram() async {
+    if (!telegramIdentityAllowed(ref.read(vpnProvider))) {
+      setState(() => _error = AppL10n.of(context).restoreTelegramVpnRequired);
+      return;
+    }
     setState(() {
       _tgBusy = true;
       _error = null;
     });
     try {
-      final res = await AuthApi().startTelegramRecover();
+      final auth = ref.read(authProvider).valueOrNull;
+      final authed = auth is AuthStateAuthenticated;
+      final res = authed
+          ? await AuthApi().startTelegramLink()
+          : await AuthApi().startTelegramRecover();
       final deepLink = res['deep_link']!;
       final token = res['token']!;
 
-      final uri = Uri.parse(deepLink);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
+      await launchTelegramDeepLink(deepLink);
 
-      // Start polling status
       _pollTimer?.cancel();
       _pollTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
         try {
-          final poll = await AuthApi().pollTelegramRecover(token);
+          final poll = authed
+              ? await AuthApi().pollTelegramLink(token)
+              : await AuthApi().pollTelegramRecover(token);
           final status = poll['status'];
           if (status == 'confirmed') {
             timer.cancel();
@@ -89,6 +97,11 @@ class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
                 _error = AppL10n.of(context).restoreFailed;
               });
             }
+          } else if (status == 'linked') {
+            timer.cancel();
+            if (!mounted) return;
+            AppRouter.postAuthResolved = true;
+            context.go('/gate');
           } else if (status == 'failed' || status == 'expired') {
             timer.cancel();
             if (!mounted) return;
@@ -135,6 +148,7 @@ class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
   Widget build(BuildContext context) {
     final l = AppL10n.of(context);
     final theme = Theme.of(context);
+    final vpnOk = telegramIdentityAllowed(ref.watch(vpnProvider));
     return Scaffold(
       appBar: AppBar(
         title: Text(l.restoreTitle),
@@ -187,7 +201,9 @@ class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
               ],
               const Spacer(),
               OutlinedButton(
-                onPressed: (_busy || _tgBusy) ? null : _submitTelegram,
+                onPressed: (_busy || _tgBusy)
+                    ? null
+                    : (vpnOk ? _submitTelegram : null),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size.fromHeight(48),
                 ),
@@ -200,12 +216,22 @@ class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
                     : Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const AppIcon(AppIcons.info, size: 20),
+                          const AppIcon(AppIcons.siteTelegram, size: 20),
                           const SizedBox(width: 8),
-                          Text(l.accountHubLinkTelegram),
+                          Text(l.restoreTelegramCta),
                         ],
                       ),
               ),
+              if (!vpnOk) ...[
+                const SizedBox(height: 8),
+                Text(
+                  l.restoreTelegramVpnRequired,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
               const SizedBox(height: 12),
               FilledButton(
                 onPressed: (_busy || _tgBusy) ? null : _submit,

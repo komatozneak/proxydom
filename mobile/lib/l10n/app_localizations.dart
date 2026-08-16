@@ -2590,7 +2590,7 @@ abstract class AppL10n {
   /// No description provided for @accountHubLinkTelegramHint.
   ///
   /// In en, this message translates to:
-  /// **'Link via the bot'**
+  /// **'Link or restore via the bot'**
   String get accountHubLinkTelegramHint;
 
   /// No description provided for @accountHubLinkEmail.
@@ -2688,6 +2688,36 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Couldn’t start Telegram linking'**
   String get accountTelegramStartFailed;
+
+  /// No description provided for @accountTelegramVpnRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect to Teremok first — Telegram needs the VPN in this region'**
+  String get accountTelegramVpnRequired;
+
+  /// No description provided for @restoreTelegramCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore via Telegram'**
+  String get restoreTelegramCta;
+
+  /// No description provided for @restoreTelegramVpnRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect to Teremok, then open Telegram'**
+  String get restoreTelegramVpnRequired;
+
+  /// No description provided for @homeTelegramRestoreCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Had Teremok before? Restore via Telegram'**
+  String get homeTelegramRestoreCta;
+
+  /// No description provided for @homeTelegramRestoreConnectFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect to Teremok first, then restore via Telegram'**
+  String get homeTelegramRestoreConnectFirst;
 
   /// No description provided for @accountEmailLead.
   ///

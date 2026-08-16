@@ -13,6 +13,8 @@ import '../../../core/widgets/connect_button.dart';
 import '../../../core/widgets/signal_nest_hero.dart';
 import '../../../core/widgets/teremok_snackbar.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../session/application/session_provider.dart';
+import '../../session/data/account_session_snapshot.dart';
 import '../../settings/application/subscription_status_provider.dart';
 import '../../settings/data/subscription_status.dart';
 import '../../settings/data/installed_apps_channel.dart';
@@ -617,6 +619,20 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
           ),
           const SizedBox(height: 8),
         ],
+        if (_showTelegramRestoreBanner(
+          quota: liveQuota,
+          session: ref.watch(sessionProvider).valueOrNull,
+        )) ...[
+          _TelegramRestoreBanner(
+            vpnConnected: status is VpnConnected,
+            onTap: () {
+              if (status is VpnConnected) {
+                context.push('/settings/account/recovery');
+              }
+            },
+          ),
+          const SizedBox(height: 8),
+        ],
         Expanded(
           child: Center(
             child: RadialGradientGround(
@@ -689,6 +705,63 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
           onTap: widget.onOpenLocations,
         ),
       ],
+    );
+  }
+}
+
+bool _showTelegramRestoreBanner({
+  required SubscriptionStatus? quota,
+  required AccountSessionSnapshot? session,
+}) {
+  if (session == null) return false;
+  if (session.telegramUsername != null) return false;
+  if (quota != null && quota.unlocksPremium) return false;
+  if (session.hasAccess) return false;
+  return true;
+}
+
+class _TelegramRestoreBanner extends StatelessWidget {
+  const _TelegramRestoreBanner({
+    required this.vpnConnected,
+    required this.onTap,
+  });
+
+  final bool vpnConnected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppL10n.of(context);
+    final theme = Theme.of(context);
+    return Material(
+      color: theme.colorScheme.surfaceContainerHighest,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppBrand.radiusCard),
+        side: BorderSide(color: theme.colorScheme.outline),
+      ),
+      child: InkWell(
+        onTap: vpnConnected ? onTap : null,
+        borderRadius: BorderRadius.circular(AppBrand.radiusCard),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              const AppIcon(AppIcons.siteTelegram, size: 22),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  vpnConnected
+                      ? l.homeTelegramRestoreCta
+                      : l.homeTelegramRestoreConnectFirst,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

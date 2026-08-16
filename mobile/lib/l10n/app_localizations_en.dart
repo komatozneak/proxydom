@@ -1366,7 +1366,7 @@ class AppL10nEn extends AppL10n {
   String get accountHubLinkTelegram => 'Telegram';
 
   @override
-  String get accountHubLinkTelegramHint => 'Link via the bot';
+  String get accountHubLinkTelegramHint => 'Link or restore via the bot';
 
   @override
   String get accountHubLinkEmail => 'Email';
@@ -1418,6 +1418,25 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get accountTelegramStartFailed => 'Couldn’t start Telegram linking';
+
+  @override
+  String get accountTelegramVpnRequired =>
+      'Connect to Teremok first — Telegram needs the VPN in this region';
+
+  @override
+  String get restoreTelegramCta => 'Restore via Telegram';
+
+  @override
+  String get restoreTelegramVpnRequired =>
+      'Connect to Teremok, then open Telegram';
+
+  @override
+  String get homeTelegramRestoreCta =>
+      'Had Teremok before? Restore via Telegram';
+
+  @override
+  String get homeTelegramRestoreConnectFirst =>
+      'Connect to Teremok first, then restore via Telegram';
 
   @override
   String get accountEmailLead =>

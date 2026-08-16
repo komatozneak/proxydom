@@ -7,17 +7,16 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../auth/application/auth_provider.dart';
 import '../../auth/data/auth_api.dart';
 import '../../session/application/session_provider.dart';
-import '../application/account_profile_provider.dart';
-import '../data/account_profile.dart';
 
 /// Interactive dialog for linking Telegram to the user's account.
 class TelegramLinkDialog extends ConsumerStatefulWidget {
   const TelegramLinkDialog({super.key});
 
-  static Future<bool?> show(BuildContext context) {
-    return showDialog<bool>(
+  static Future<TelegramLinkDialogResult?> show(BuildContext context) {
+    return showDialog<TelegramLinkDialogResult>(
       context: context,
       barrierDismissible: true,
       builder: (context) => const TelegramLinkDialog(),
@@ -64,11 +63,40 @@ Uri telegramHttpsStartUri({
   return null;
 }
 
+Future<void> launchTelegramDeepLink(String deepLink) async {
+  final parsed = parseTelegramDeepLink(deepLink);
+  final uris = <Uri>[];
+  if (parsed != null) {
+    uris.add(
+      telegramStartUri(botUsername: parsed.bot, startPayload: parsed.start),
+    );
+    uris.add(
+      telegramHttpsStartUri(
+        botUsername: parsed.bot,
+        startPayload: parsed.start,
+      ),
+    );
+  } else {
+    uris.add(Uri.parse(deepLink));
+  }
+  for (final uri in uris) {
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      return;
+    }
+  }
+}
+
+/// Result of the Telegram identity dialog.
+enum TelegramLinkDialogResult { linked, restored }
+
 class _TelegramLinkDialogState extends ConsumerState<TelegramLinkDialog>
     with WidgetsBindingObserver {
   bool _starting = true;
   bool _linked = false;
+  bool _restored = false;
   String? _deepLink;
+  String? _token;
   String? _linkedUsername;
   String? _error;
   Timer? _pollTimer;
@@ -95,7 +123,7 @@ class _TelegramLinkDialogState extends ConsumerState<TelegramLinkDialog>
   }
 
   Future<void> _startLink() async {
-    final existing = ref.read(accountProfileProvider).valueOrNull;
+    final existing = ref.read(sessionProvider).valueOrNull;
     if (existing != null && existing.telegramUsername != null) {
       setState(() {
         _starting = false;
@@ -112,11 +140,12 @@ class _TelegramLinkDialogState extends ConsumerState<TelegramLinkDialog>
     });
 
     try {
-      final link = await AuthApi().startTelegramLink();
+      final started = await AuthApi().startTelegramLink();
       if (!mounted) return;
       setState(() {
         _starting = false;
-        _deepLink = link;
+        _deepLink = started['deep_link'];
+        _token = started['token'];
       });
       await _openTelegram();
       _startPolling();
@@ -132,27 +161,7 @@ class _TelegramLinkDialogState extends ConsumerState<TelegramLinkDialog>
   Future<void> _openTelegram() async {
     if (_deepLink == null) return;
     try {
-      final parsed = parseTelegramDeepLink(_deepLink!);
-      final uris = <Uri>[];
-      if (parsed != null) {
-        uris.add(
-          telegramStartUri(botUsername: parsed.bot, startPayload: parsed.start),
-        );
-        uris.add(
-          telegramHttpsStartUri(
-            botUsername: parsed.bot,
-            startPayload: parsed.start,
-          ),
-        );
-      } else {
-        uris.add(Uri.parse(_deepLink!));
-      }
-      for (final uri in uris) {
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-          return;
-        }
-      }
+      await launchTelegramDeepLink(_deepLink!);
     } catch (_) {}
   }
 
@@ -166,36 +175,55 @@ class _TelegramLinkDialogState extends ConsumerState<TelegramLinkDialog>
   Future<void> _checkStatus() async {
     if (!mounted) return;
     try {
-      // Session snapshot is the SoT; it already carries telegram_username.
+      if (_token != null) {
+        final poll = await AuthApi().pollTelegramLink(_token!);
+        final status = poll['status'];
+        if (status == 'confirmed') {
+          _pollTimer?.cancel();
+          final ok = await ref.read(authProvider.notifier).recoverWithTelegram(
+                token: _token!,
+                data: poll,
+              );
+          if (!mounted) return;
+          if (ok) {
+            setState(() {
+              _linked = true;
+              _restored = true;
+            });
+          }
+          return;
+        }
+        if (status == 'linked') {
+          _pollTimer?.cancel();
+          await ref.read(sessionProvider.notifier).refresh();
+          if (!mounted) return;
+          final session = ref.read(sessionProvider).valueOrNull;
+          setState(() {
+            _linked = true;
+            _linkedUsername = session?.telegramUsername;
+          });
+          return;
+        }
+        if (status == 'failed' || status == 'expired') {
+          _pollTimer?.cancel();
+          if (!mounted) return;
+          setState(() {
+            _error = AppL10n.of(context).accountTelegramStartFailed;
+          });
+          return;
+        }
+      }
       await ref.read(sessionProvider.notifier).refresh();
       final session = ref.read(sessionProvider).valueOrNull;
       if (!mounted) return;
       if (session != null && session.telegramUsername != null) {
         _pollTimer?.cancel();
-        final profile = AccountProfile(
-          accountId: session.accountId,
-          hasAccess: session.hasAccess,
-          devicesCount: session.devices.length,
-          deviceLimit: session.deviceLimit,
-          contactLinked: true,
-          hasRecoveryCode: false,
-          telegramUsername: session.telegramUsername,
-        );
         setState(() {
           _linked = true;
           _linkedUsername = session.telegramUsername;
         });
-        unawaited(_refreshAfterLink(profile));
       }
     } catch (_) {}
-  }
-
-  Future<void> _refreshAfterLink(AccountProfile profile) async {
-    try {
-      await ref.read(sessionProvider.notifier).refresh();
-    } catch (_) {}
-    // ignore: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
-    ref.read(accountProfileProvider.notifier).state = AsyncData(profile);
   }
 
   @override
@@ -268,7 +296,11 @@ class _TelegramLinkDialogState extends ConsumerState<TelegramLinkDialog>
               ),
               const SizedBox(height: 16),
               FilledButton(
-                onPressed: () => Navigator.of(context).pop(true),
+                onPressed: () => Navigator.of(context).pop(
+                  _restored
+                      ? TelegramLinkDialogResult.restored
+                      : TelegramLinkDialogResult.linked,
+                ),
                 child: const Text('Готово'),
               ),
             ] else ...[

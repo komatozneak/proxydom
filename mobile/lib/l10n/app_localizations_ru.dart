@@ -1373,7 +1373,8 @@ class AppL10nRu extends AppL10n {
   String get accountHubLinkTelegram => 'Telegram';
 
   @override
-  String get accountHubLinkTelegramHint => 'Привязать через бота';
+  String get accountHubLinkTelegramHint =>
+      'Привязать или восстановить через бота';
 
   @override
   String get accountHubLinkEmail => 'Почта';
@@ -1428,6 +1429,25 @@ class AppL10nRu extends AppL10n {
   @override
   String get accountTelegramStartFailed =>
       'Не удалось начать привязку Telegram';
+
+  @override
+  String get accountTelegramVpnRequired =>
+      'Сначала подключитесь к сети Теремка — Telegram в РФ без VPN недоступен';
+
+  @override
+  String get restoreTelegramCta => 'Восстановить через Telegram';
+
+  @override
+  String get restoreTelegramVpnRequired =>
+      'Подключитесь к Теремку, затем откройте Telegram';
+
+  @override
+  String get homeTelegramRestoreCta =>
+      'Уже был Теремок? Восстановите через Telegram';
+
+  @override
+  String get homeTelegramRestoreConnectFirst =>
+      'Подключитесь к сети Теремка, затем восстановите доступ через Telegram';
 
   @override
   String get accountEmailLead => 'Укажите почту — пришлём одноразовый код.';
