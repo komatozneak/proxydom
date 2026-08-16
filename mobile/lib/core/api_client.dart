@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
+import 'package:flutter/foundation.dart';
 
 import 'config.dart';
 import 'hmac_interceptor.dart';
@@ -44,6 +45,7 @@ class ApiClient {
     );
     _refreshClient = refreshClient;
     _pinControlPlaneDns(refreshClient);
+    configureSignedRetryClient(refreshClient);
 
     final dio = Dio(
       BaseOptions(
@@ -70,22 +72,33 @@ class ApiClient {
       ),
     );
 
-    dio.interceptors.add(
-      LogInterceptor(
-        requestBody: false,
-        // Temporary debug: need statusCode / content-type evidence.
-        responseBody: false,
-        requestHeader: false,
-        responseHeader: true,
-        logPrint: (obj) {
-          // ignore: avoid_print
-          print(obj);
-        },
-      ),
-    );
+    if (shouldInstallHttpLogging(isDebugMode: kDebugMode)) {
+      dio.interceptors.add(
+        LogInterceptor(
+          requestBody: false,
+          responseBody: false,
+          requestHeader: false,
+          responseHeader: true,
+          logPrint: (value) => debugPrint(value.toString()),
+        ),
+      );
+    }
 
     return dio;
   }
+
+  /// The refresh client also performs the post-refresh retry. It must remap
+  /// and re-sign that request so nonce replay protection never sees the stale
+  /// X-Nonce/X-Signature copied from the original 401.
+  @visibleForTesting
+  static void configureSignedRetryClient(Dio client) {
+    client.interceptors.add(V2PathInterceptor());
+    client.interceptors.add(HmacSignatureInterceptor());
+  }
+
+  @visibleForTesting
+  static bool shouldInstallHttpLogging({required bool isDebugMode}) =>
+      isDebugMode;
 
   /// VPN TUN DNS sometimes fails host lookup for the API hostname even though
   /// the control-plane IP is excludeRoute'd.

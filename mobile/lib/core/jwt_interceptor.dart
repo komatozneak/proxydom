@@ -156,11 +156,17 @@ class JwtRefreshInterceptor extends QueuedInterceptor {
     }
 
     final newAccess = await tokenStorage.readAccessToken();
+    final retryHeaders =
+        Map<String, dynamic>.from(response.requestOptions.headers)
+          ..remove('X-Timestamp')
+          ..remove('X-Nonce')
+          ..remove('X-Signature')
+          ..remove('X-Device-UUID')
+          ..['Authorization'] = 'Bearer ${newAccess ?? ''}';
     final retryOptions = response.requestOptions.copyWith(
       extra: Map<String, dynamic>.from(response.requestOptions.extra)
         ..['jwt_retried'] = true,
-      headers: Map<String, dynamic>.from(response.requestOptions.headers)
-        ..['Authorization'] = 'Bearer ${newAccess ?? ''}',
+      headers: retryHeaders,
     );
 
     try {
