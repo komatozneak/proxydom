@@ -2,7 +2,8 @@ import 'package:dio/dio.dart';
 
 import '../../../core/api_client.dart';
 
-/// Platega hosted checkout (APK / web — not Play Billing).
+/// Platega hosted checkout (ADR 017): Free Play listing, not Play Billing.
+/// Do not add BillingClient / com.android.vending.BILLING.
 class BillingApi {
   BillingApi({Dio? dio}) : _dio = dio ?? ApiClient.instance;
 

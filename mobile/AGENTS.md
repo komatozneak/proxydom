@@ -31,8 +31,9 @@ Do **not** bulk-generate AI PNGs without commercial license + owner go (Visual A
 ## Stack
 
 - Flutter + Riverpod + go_router + Dio
-- VPN core: libXray (gVisor TUN) + TrustTunnel dual-core (ADR 005/006), MethodChannel `teremok/vpn`
-- minSdk **26** (hard requirement — do not roll back; TrustTunnel / dual-core)
+- VPN core: libXray (gVisor TUN) + TrustTunnel + Hy2 (ADR 005/006/015), MethodChannel `teremok/vpn`
+- minSdk **26** (hard requirement — do not roll back)
+- Billing: **Platega hosted only** (ADR 017). Do **not** add Play Billing / `com.android.vending.BILLING`
 
 ## Tests
 
