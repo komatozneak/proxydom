@@ -2275,6 +2275,72 @@ abstract class AppL10n {
   /// **'Pay 3 months'**
   String get lockedPay3m;
 
+  /// No description provided for @lockedPlan1m.
+  ///
+  /// In en, this message translates to:
+  /// **'1 month'**
+  String get lockedPlan1m;
+
+  /// No description provided for @lockedPlan3m.
+  ///
+  /// In en, this message translates to:
+  /// **'3 months'**
+  String get lockedPlan3m;
+
+  /// No description provided for @lockedPlan6m.
+  ///
+  /// In en, this message translates to:
+  /// **'6 months'**
+  String get lockedPlan6m;
+
+  /// No description provided for @lockedPlan12m.
+  ///
+  /// In en, this message translates to:
+  /// **'12 months'**
+  String get lockedPlan12m;
+
+  /// No description provided for @lockedPayAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay {price} ₽'**
+  String lockedPayAmount(int price);
+
+  /// No description provided for @lockedPerMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'{price} ₽/mo'**
+  String lockedPerMonth(int price);
+
+  /// No description provided for @lockedSavePercent.
+  ///
+  /// In en, this message translates to:
+  /// **'−{percent}%'**
+  String lockedSavePercent(int percent);
+
+  /// No description provided for @lockedVerifyCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Verification code: {code}'**
+  String lockedVerifyCode(String code);
+
+  /// No description provided for @settingsTerms.
+  ///
+  /// In en, this message translates to:
+  /// **'Agreement'**
+  String get settingsTerms;
+
+  /// No description provided for @settingsPricing.
+  ///
+  /// In en, this message translates to:
+  /// **'Pricing'**
+  String get settingsPricing;
+
+  /// No description provided for @settingsDeleteAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete account'**
+  String get settingsDeleteAccount;
+
   /// No description provided for @lockedOrPromo.
   ///
   /// In en, this message translates to:

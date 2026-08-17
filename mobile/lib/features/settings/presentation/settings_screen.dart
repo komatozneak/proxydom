@@ -548,14 +548,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   Uri.parse(AppConfig.termsOfServiceUrl),
                   mode: LaunchMode.externalApplication,
                 ),
-                child: const Text('Соглашение'),
+                child: Text(l.settingsTerms),
               ),
               TextButton(
                 onPressed: () => launchUrl(
                   Uri.parse(AppConfig.pricingUrl),
                   mode: LaunchMode.externalApplication,
                 ),
-                child: const Text('Тарифы'),
+                child: Text(l.settingsPricing),
               ),
               TextButton(
                 onPressed: () => launchUrl(

@@ -1203,6 +1203,47 @@ class AppL10nRu extends AppL10n {
   String get lockedPay3m => 'Оплатить 3 месяца';
 
   @override
+  String get lockedPlan1m => '1 месяц';
+
+  @override
+  String get lockedPlan3m => '3 месяца';
+
+  @override
+  String get lockedPlan6m => '6 месяцев';
+
+  @override
+  String get lockedPlan12m => '12 месяцев';
+
+  @override
+  String lockedPayAmount(int price) {
+    return 'Оплатить $price ₽';
+  }
+
+  @override
+  String lockedPerMonth(int price) {
+    return '$price ₽/мес';
+  }
+
+  @override
+  String lockedSavePercent(int percent) {
+    return '−$percent%';
+  }
+
+  @override
+  String lockedVerifyCode(String code) {
+    return 'Код проверки: $code';
+  }
+
+  @override
+  String get settingsTerms => 'Соглашение';
+
+  @override
+  String get settingsPricing => 'Тарифы';
+
+  @override
+  String get settingsDeleteAccount => 'Удаление аккаунта';
+
+  @override
   String get lockedOrPromo => 'Или введите промокод';
 
   @override

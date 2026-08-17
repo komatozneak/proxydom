@@ -609,6 +609,37 @@
   "settingsSupportHint": "Telegram — transfer after reinstall",
   "lockedPay1m": "Pay 1 month",
   "lockedPay3m": "Pay 3 months",
+  "lockedPlan1m": "1 month",
+  "lockedPlan3m": "3 months",
+  "lockedPlan6m": "6 months",
+  "lockedPlan12m": "12 months",
+  "lockedPayAmount": "Pay {price} ₽",
+  "@lockedPayAmount": {
+    "placeholders": {
+      "price": {"type": "int"}
+    }
+  },
+  "lockedPerMonth": "{price} ₽/mo",
+  "@lockedPerMonth": {
+    "placeholders": {
+      "price": {"type": "int"}
+    }
+  },
+  "lockedSavePercent": "−{percent}%",
+  "@lockedSavePercent": {
+    "placeholders": {
+      "percent": {"type": "int"}
+    }
+  },
+  "lockedVerifyCode": "Verification code: {code}",
+  "@lockedVerifyCode": {
+    "placeholders": {
+      "code": {"type": "String"}
+    }
+  },
+  "settingsTerms": "Agreement",
+  "settingsPricing": "Pricing",
+  "settingsDeleteAccount": "Delete account",
   "lockedOrPromo": "Or enter a promo code",
   "lockedPayFailed": "Couldn’t start payment. Try again or contact support.",
   "lockedPayReturnTitle": "Payment opened",

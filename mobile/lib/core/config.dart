@@ -149,6 +149,9 @@ class AppConfig {
   static const String supportPageUrl =
       'https://teremokconnect.online/support.html';
 
+  static const String accountDeletionUrl =
+      'https://teremokconnect.online/account-deletion.html';
+
   static const String supportEmail = '27komatozneak@gmail.com';
 
   /// Subscription list prices (RUB) — keep in sync with backend PLAN_*_PRICE_RUB.

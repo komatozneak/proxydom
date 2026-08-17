@@ -1198,6 +1198,47 @@ class AppL10nEn extends AppL10n {
   String get lockedPay3m => 'Pay 3 months';
 
   @override
+  String get lockedPlan1m => '1 month';
+
+  @override
+  String get lockedPlan3m => '3 months';
+
+  @override
+  String get lockedPlan6m => '6 months';
+
+  @override
+  String get lockedPlan12m => '12 months';
+
+  @override
+  String lockedPayAmount(int price) {
+    return 'Pay $price ₽';
+  }
+
+  @override
+  String lockedPerMonth(int price) {
+    return '$price ₽/mo';
+  }
+
+  @override
+  String lockedSavePercent(int percent) {
+    return '−$percent%';
+  }
+
+  @override
+  String lockedVerifyCode(String code) {
+    return 'Verification code: $code';
+  }
+
+  @override
+  String get settingsTerms => 'Agreement';
+
+  @override
+  String get settingsPricing => 'Pricing';
+
+  @override
+  String get settingsDeleteAccount => 'Delete account';
+
+  @override
   String get lockedOrPromo => 'Or enter a promo code';
 
   @override

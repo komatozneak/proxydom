@@ -101,8 +101,23 @@ void main() {
 
     expect(find.byKey(kLockedPayCardKey), findsOneWidget);
     expect(find.byKey(kLockedFooterKey), findsOneWidget);
-    expect(find.text('Тарифы'), findsNothing);
+    expect(find.byKey(kLockedPayCtaKey), findsOneWidget);
+    expect(find.text('Тарифы'), findsOneWidget);
     expect(find.text('Поддержка'), findsOneWidget);
+    expect(find.text('1 месяц'), findsOneWidget);
+    expect(find.text('3 месяца'), findsOneWidget);
+    expect(find.text('6 месяцев'), findsOneWidget);
+    expect(find.text('12 месяцев'), findsOneWidget);
+    expect(find.text('Оплатить 199 ₽'), findsOneWidget);
+    expect(find.text('929 ₽'), findsOneWidget);
+    expect(find.text('1490 ₽'), findsOneWidget);
+    expect(find.text('Код проверки: PLAT'), findsOneWidget);
+    expect(find.text('Удаление аккаунта'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('12 месяцев'));
+    await tester.tap(find.text('12 месяцев'));
+    await tester.pump();
+    expect(find.text('Оплатить 1490 ₽'), findsOneWidget);
 
     final cardY = tester.getTopLeft(find.byKey(kLockedPayCardKey)).dy;
     final footerY = tester.getTopLeft(find.byKey(kLockedFooterKey)).dy;

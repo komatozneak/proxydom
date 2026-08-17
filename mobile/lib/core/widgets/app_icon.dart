@@ -78,6 +78,7 @@ abstract final class AppIcons {
   static const IconData houseFill = PhosphorIconsFill.house;
   static const IconData check = PhosphorIconsRegular.check;
   static const IconData checkCircle = PhosphorIconsRegular.checkCircle;
+  static const IconData circle = PhosphorIconsRegular.circle;
   static const IconData checkCircleFill = PhosphorIconsFill.checkCircle;
   static const IconData x = PhosphorIconsRegular.x;
   static const IconData xCircle = PhosphorIconsRegular.xCircle;
