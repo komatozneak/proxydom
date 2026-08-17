@@ -1,7 +1,7 @@
 package com.teremok.connect.teremok_connect
 
 /**
- * libXray as a local TUN→SOCKS pump for Hysteria (ADR 015).
+ * Dummy SOCKS HTTPS probe JSON for Hy2 PathHealth (not a live core config).
  *
  * Hy2 owns `127.0.0.1:10808`; this JSON must not bind that port.
  */

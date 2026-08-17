@@ -10,20 +10,9 @@
 -keep class android.net.VpnService { *; }
 -keep class com.teremok.connect.teremok_connect.** { *; }
 
-# libXray JNI (Xray-core via gomobile) — ADR 005
--keep class libXray.** { *; }
--keep class go.** { *; }
-
-# Hy2 gomobile AAR (namespaced off libXray's go.Seq / libgojni.so)
+# Hy2 gomobile AAR
 -keep class hy2bind.** { *; }
 -keep class hy.** { *; }
-
-# TrustTunnel native client — ADR 006
--keep class com.adguard.trusttunnel.** { *; }
--keep class ch.qos.** { *; }
--keep class org.slf4j.** { *; }
--keepattributes *Annotation*
--dontwarn ch.qos.logback.core.net.*
 
 # JSON serialization annotations (для будущих моделей)
 -keepclassmembers class * {

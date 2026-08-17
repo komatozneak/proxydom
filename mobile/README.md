@@ -1,6 +1,6 @@
 # Teremok Connect — мобильный клиент
 
-> **SoT 2026-08-17.** Android: Flutter + **libXray + TrustTunnel + Hysteria2** (ADR 005/006/015), minSdk **26**.  
+> **SoT 2026-08-17.** Android: Flutter + **Hysteria2 only** (ADR 018), minSdk **26**.  
 > Auth: anonymous `device_uuid` + recovery. Касса: **Platega hosted** (ADR 017) — не Play Billing, не копировать Billing AAR из Огня.  
 > Правила: [`mobile/AGENTS.md`](./AGENTS.md), корневой [`AGENTS.md`](../AGENTS.md).
 

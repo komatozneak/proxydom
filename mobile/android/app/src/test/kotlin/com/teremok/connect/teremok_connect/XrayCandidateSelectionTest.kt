@@ -6,7 +6,7 @@ import org.junit.Test
 
 class XrayCandidateSelectionTest {
     private fun candidate(id: String) =
-        XrayRuntimeCandidate(id, "$id.example", id, "{}")
+        SocksProbeCandidate(id, "$id.example", id, "{}")
 
     @Test
     fun `nest probes only the primary candidate`() {

@@ -20,9 +20,6 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
-import com.adguard.trusttunnel.VpnClient
-import com.adguard.trusttunnel.VpnState
-import com.adguard.trusttunnel.VpnServiceConfig as TtVpnServiceConfig
 import com.teremok.connect.teremok_connect.session.AutoCandidate
 import com.teremok.connect.teremok_connect.session.PathHealth
 import com.teremok.connect.teremok_connect.session.SessionPhase
@@ -36,10 +33,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Android VpnService with triple-core runtime (ADR 005 / 006 / 015):
- * - Xray: VpnService TUN → libXray setTunFd (gVisor) → VLESS
- * - TrustTunnel: VpnService TUN → TrustTunnelBridge / VpnClient
- * - Hysteria2: VpnService TUN → libXray tun2socks → Hy2 SOCKS (prove on :10808)
+ * Android VpnService, Hysteria2-only (ADR 018):
+ * VpnService TUN → hy2bind startTun + SOCKS prove on :10808.
  */
 class TeremokVpnService : VpnService() {
 
@@ -57,13 +52,8 @@ class TeremokVpnService : VpnService() {
         /** Session payload schema from Flutter VpnServiceConfig / VpnController. */
         const val SESSION_SCHEMA_VERSION = 2
 
-        /** paramsJson["vpnCore"] values — triple-core switch (ADR 015). */
-        const val VPN_CORE_XRAY = "xray"
-        const val VPN_CORE_TRUSTTUNNEL = "trusttunnel"
+        /** paramsJson["vpnCore"] — Hysteria2 only (ADR 018). */
         const val VPN_CORE_HYSTERIA = "hysteria"
-
-        /** TT native CONNECTED wait budget. */
-        private const val TT_CONNECT_TIMEOUT_MS = 20_000L
 
         const val PREFS_NAME = "teremok_vpn_session"
         private const val KEY_PARAMS_JSON = "params_json"
@@ -766,13 +756,12 @@ class TeremokVpnService : VpnService() {
             val params = jsonToMap(obj)
             val nodeId = (params["autoNodeId"] as? String)?.trim().orEmpty()
                 .ifBlank { (params["hysteriaNodeId"] as? String)?.trim().orEmpty() }
-                .ifBlank { (params["trusttunnelNodeId"] as? String)?.trim().orEmpty() }
+                
                 .ifBlank { "auto-$i" }
-            val host = (params["trusttunnelHost"] as? String)?.trim().orEmpty()
-                .ifBlank { (params["hysteriaServer"] as? String)?.substringBefore(':').orEmpty() }
+            val host = (params["hysteriaServer"] as? String)?.substringBefore(':').orEmpty()
                 .ifBlank { (params["outboundServer"] as? String)?.trim().orEmpty() }
             val label = (params["displayLabel"] as? String)?.trim().orEmpty().ifBlank { nodeId }
-            val protocol = (params["outboundType"] as? String)?.trim().orEmpty().ifBlank { "vless" }
+            val protocol = (params["outboundType"] as? String)?.trim().orEmpty().ifBlank { "hysteria2" }
             val username = (params["username"] as? String)?.trim().orEmpty().ifBlank { "anonymous" }
             out.add(
                 AutoCandidate(
@@ -802,53 +791,16 @@ class TeremokVpnService : VpnService() {
         if (!alive()) return false
         autoProving = true
         return try {
-            if (isTrustTunnelCore(params)) {
-                startTrustTunnelOnWorker(username, protocol, params)
-                if (!isRunning) return false
-                val health = PathHealth().proveEgress(
-                    adapter = PathHealth.CoreAdapter.TrustTunnel,
-                    alive = alive,
-                    underlyingIface = DefaultNetworkMonitor.defaultNetwork?.toString(),
-                    candidateLabel = (params["trusttunnelNodeId"] as? String) ?: "tt",
-                )
-                val ok = health is PathHealth.HealthResult.Ok
-                if (!ok) teardownCores()
-                ok
-            } else if (isHysteriaCore(params)) {
+            if (isHysteriaCore(params)) {
                 proveHysteriaSocks(params, alive)
             } else {
-                proveXraySocks(params, alive)
+                false
             }
         } catch (e: Exception) {
             Log.w(TAG, "proveAutoCandidate failed: ${e.message}")
             teardownCores()
             false
         }
-    }
-
-    private fun proveXraySocks(
-        params: Map<String, Any?>,
-        alive: () -> Boolean,
-    ): Boolean {
-        val candidates = runtimeCandidates(params)
-        val selected = candidates.firstOrNull() ?: return false
-        DefaultNetworkMonitor.prewarm(this)
-        if (!DefaultNetworkMonitor.awaitUnderlyingNetwork(this, 5000)) return false
-        val bridge = XrayBridge.instance
-        bridge.bind(this)
-        if (!bridge.loadLibrary()) return false
-        if (!bridge.start(selected.configJson, tunFd = 0)) {
-            bridge.stop()
-            return false
-        }
-        val health = PathHealth().proveEgress(
-            adapter = PathHealth.CoreAdapter.XraySocks,
-            alive = alive,
-            underlyingIface = DefaultNetworkMonitor.defaultNetwork?.toString(),
-            candidateLabel = selected.id,
-        )
-        bridge.stop()
-        return health is PathHealth.HealthResult.Ok
     }
 
     private fun proveHysteriaSocks(
@@ -882,14 +834,13 @@ class TeremokVpnService : VpnService() {
             hy.stop()
             return false
         }
-        // Leave Hy2 up for establish. Stop+Start after libXray.touch deadlocks
-        // the second gomobile runtime (Pixel: Hy2bind.start never returns).
+        // Leave Hy2 up for establish — SOCKS prove already started the core.
         Log.i(TAG, "proveHysteriaSocks: ok, Hy2 SOCKS kept for TUN")
         return true
     }
 
     /**
-     * Creates TUN and starts Xray (gVisor) or TrustTunnel based on paramsJson.
+     * Creates TUN and starts Hysteria2 based on paramsJson.
      */
     private fun startVpn(
         username: String,
@@ -920,22 +871,16 @@ class TeremokVpnService : VpnService() {
             if (!validateRuntimeParams(params)) {
                 failStart(
                     "invalid session: need schemaVersion=$SESSION_SCHEMA_VERSION " +
-                        "with xrayCandidateConfigs, trusttunnelToml, or hysteriaServer " +
-                        "(legacy singBoxConfigJson rejected)",
+                        "with hysteriaServer/hysteriaAuth (legacy Xray/TT rejected)",
                 )
                 return
             }
 
-            if (isTrustTunnelCore(params)) {
-                startTrustTunnelOnWorker(username, protocol, params)
-                return
-            }
             if (isHysteriaCore(params)) {
                 startHysteriaOnWorker(username, protocol, params)
                 return
             }
-
-            startXrayOnWorker(username, protocol, params)
+            failStart("unsupported vpnCore (Hy2-only)")
         } catch (e: Exception) {
             Log.e(TAG, "startVpn: failed", e)
             failStart(e.message ?: e.toString())
@@ -946,308 +891,13 @@ class TeremokVpnService : VpnService() {
         if ((params["schemaVersion"] as? Number)?.toInt() != SESSION_SCHEMA_VERSION) {
             return false
         }
-        if (isTrustTunnelCore(params)) {
-            return !((params["trusttunnelToml"] as? String).isNullOrBlank())
-        }
         if (isHysteriaCore(params)) {
             return !((params["hysteriaServer"] as? String).isNullOrBlank()) &&
                 !((params["hysteriaAuth"] as? String).isNullOrBlank())
         }
-        return runtimeCandidates(params).isNotEmpty()
+        return false
     }
 
-    private fun startXrayOnWorker(
-        username: String,
-        protocol: String,
-        params: Map<String, Any?>,
-    ) {
-        val candidates = runtimeCandidates(params)
-        val autoSelect = (params["autoSelect"] as? Boolean) == true
-        val ordered = candidateProbeOrder(candidates, autoSelect = autoSelect)
-        val selected = ordered.firstOrNull()
-        if (selected == null) {
-            failStart("xrayCandidateConfigs empty after probe order")
-            return
-        }
-
-        val sessionName = (params["sessionName"] as? String)
-            ?.takeIf { it.isNotBlank() }
-            ?: "Теремок VPN"
-        val mtu = (params["mtu"] as? Number)?.toInt() ?: 1500
-        val address = (params["address"] as? String) ?: "10.255.255.1"
-        val addressPrefix = (params["addressPrefix"] as? Number)?.toInt() ?: 30
-        @Suppress("UNCHECKED_CAST")
-        val routes = (params["routes"] as? List<String>) ?: listOf("0.0.0.0/0")
-        @Suppress("UNCHECKED_CAST")
-        val dnsServers = (params["dnsServers"] as? List<String>)
-            ?: listOf(tunDnsPeerAddress(address, addressPrefix))
-        val outboundServer = (params["outboundServer"] as? String)
-            ?.takeIf { it.isNotBlank() }
-            ?: selected.host
-
-        Log.i(TAG, "startVpn: Xray $sessionName candidate=${selected.id}@${selected.host}")
-        Log.i(TAG, "  tunnel: $address/$addressPrefix routes=$routes dns=$dnsServers")
-
-        val builder = Builder()
-            .setSession(sessionName)
-            .setMtu(mtu)
-            .addAddress(address, addressPrefix)
-
-        for (route in routes) {
-            val parts = route.split("/")
-            if (parts.size == 2) {
-                if (parts[0].contains(":")) {
-                    Log.w(TAG, "  skip IPv6 route '$route' (no inet6 on TUN)")
-                    continue
-                }
-                try {
-                    builder.addRoute(parts[0], parts[1].toInt())
-                    Log.i(TAG, "  added route: $route")
-                } catch (_: Exception) {
-                    Log.w(TAG, "  invalid route '$route', skipping")
-                }
-            } else {
-                Log.w(TAG, "  invalid route '$route', skipping")
-            }
-        }
-
-        for (dns in dnsServers) {
-            builder.addDnsServer(dns)
-        }
-
-        applyBypassRoutes(builder, outboundServer, params)
-        applyDisallowedApplications(builder, params)
-
-        currentStatus = "connecting"
-        VpnStatusBroadcaster.emit(currentStatus)
-
-        DefaultNetworkMonitor.prewarm(this)
-        if (!DefaultNetworkMonitor.awaitUnderlyingNetwork(this, 5000)) {
-            failStart("underlying network not ready")
-            return
-        }
-        ProtectGuard.reset()
-        ProtectGuard.onFailure = {
-            Log.e(TAG, "startVpn: protect() failed — stopping VPN")
-            Handler(Looper.getMainLooper()).post {
-                if (isRunning || establishInProgress) {
-                    failStart("VpnService.protect() failed")
-                }
-            }
-        }
-
-        tunInterface.set(builder.establish())
-        val activeTun = tunInterface.get()
-        if (activeTun == null) {
-            ProtectGuard.onFailure = null
-            failStart("VPN permission denied or establish() returned null")
-            return
-        }
-
-        VpnUnderlyingNetworkPolicy.applyTo(this)
-
-        val bridge = XrayBridge.instance
-        bridge.bind(this)
-        if (!bridge.loadLibrary()) {
-            failStart("Xray init failed")
-            return
-        }
-
-        Log.i(
-            TAG,
-            "candidate ${selected.id}@${selected.host}: starting Xray+gVisor tunFd=${activeTun.fd}",
-        )
-        if (!bridge.start(selected.configJson, tunFd = activeTun.fd)) {
-            val detail = bridge.lastErrorMessage ?: "Xray start failed"
-            failStart("${selected.id}@${selected.host}: $detail")
-            return
-        }
-        // libXray gVisor holds the raw fd number; Kotlin keeps the PFD until
-        // teardownCores (closed once after stopXray).
-        if (ProtectGuard.hasFailed()) {
-            failStart("VpnService.protect() failed during Xray start")
-            return
-        }
-
-        // SOCKS CONNECT :443 through proxy. HTTP generate_204 hangs on VPS.
-        if (!probeSocksHttps(selected)) {
-            failStart(
-                "${selected.id}@${selected.host}: SOCKS HTTPS probe failed",
-            )
-            return
-        }
-
-        isRunning = true
-        establishInProgress = false
-        currentStatus = "connected"
-        VpnStatusBroadcaster.emit(currentStatus)
-        showConnectedNotification()
-        startTrafficMonitor()
-        Log.i(
-            TAG,
-            "startVpn: TUN+gVisor+Xray established candidate=" +
-                "${selected.id}@${selected.host} user=$username protocol=$protocol",
-        )
-    }
-
-    /**
-     * TrustTunnel core (ADR 006): native VpnClient owns the tunnel fd after start.
-     */
-    private fun startTrustTunnelOnWorker(
-        username: String,
-        protocol: String,
-        params: Map<String, Any?>,
-    ) {
-        val toml = (params["trusttunnelToml"] as? String)?.trim().orEmpty()
-        if (toml.isEmpty()) {
-            failStart("trusttunnelToml missing")
-            return
-        }
-        val ttHost = (params["trusttunnelHost"] as? String)?.trim().orEmpty()
-        val ttConfig = runCatching { TtVpnServiceConfig.parseToml(toml) }.getOrNull()
-
-        DefaultNetworkMonitor.prewarm(this)
-        if (!DefaultNetworkMonitor.awaitUnderlyingNetwork(this, 5000)) {
-            failStart("underlying network not ready")
-            return
-        }
-        ProtectGuard.reset()
-        ProtectGuard.onFailure = {
-            Log.e(TAG, "TrustTunnel: protect() failed — stopping VPN")
-            Handler(Looper.getMainLooper()).post {
-                if (isRunning || establishInProgress) {
-                    failStart("VpnService.protect() failed")
-                }
-            }
-        }
-
-        val sessionName = (params["sessionName"] as? String)
-            ?.takeIf { it.isNotBlank() }
-            ?: "Теремок VPN"
-        val mtu = ttConfig?.listener?.tun?.mtuSize?.toInt()?.takeIf { it > 0 } ?: 1500
-        val builder = Builder()
-            .setSession(sessionName)
-            .setMtu(mtu)
-            .addAddress(TrustTunnelBridge.TUN_ADDRESS, TrustTunnelBridge.TUN_ADDRESS_PREFIX)
-        builder.allowFamily(OsConstants.AF_INET)
-        applyDisallowedApplications(builder, params)
-
-        val hasDnsUpstreams = ttConfig?.endpoint?.dnsUpstreams?.isNotEmpty() == true ||
-            toml.contains("dns_upstreams")
-        if (hasDnsUpstreams) {
-            builder.addDnsServer(TrustTunnelBridge.FAKE_DNS_SERVER)
-        } else {
-            builder.addDnsServer("1.1.1.1")
-            builder.addDnsServer("8.8.8.8")
-        }
-
-        val included = ttConfig?.listener?.tun?.includedRoutes
-            ?.takeIf { it.isNotEmpty() }
-            ?: listOf("0.0.0.0/0")
-        val excluded = (ttConfig?.listener?.tun?.excludedRoutes ?: emptyList()) +
-            listOf("0.0.0.0/8", "224.0.0.0/3")
-        val routes = try {
-            VpnClient.excludeCidr(included, excluded)
-        } catch (e: Exception) {
-            Log.w(TAG, "excludeCidr failed, using full default route", e)
-            listOf("0.0.0.0/0")
-        } ?: listOf("0.0.0.0/0")
-
-        for (route in routes) {
-            val parts = route.split("/")
-            if (parts.size == 2 && !parts[0].contains(":")) {
-                try {
-                    builder.addRoute(parts[0], parts[1].toInt())
-                } catch (_: Exception) {
-                    Log.w(TAG, "  invalid TT route '$route', skipping")
-                }
-            }
-        }
-
-        currentStatus = "connecting"
-        VpnStatusBroadcaster.emit(currentStatus)
-
-        val tun = builder.establish()
-        if (tun == null) {
-            ProtectGuard.onFailure = null
-            failStart("VPN permission denied or establish() returned null")
-            return
-        }
-        tunInterface.set(tun)
-        VpnUnderlyingNetworkPolicy.applyTo(this)
-
-        val bridge = TrustTunnelBridge.instance
-        bridge.bind(this)
-        val connectedLatch = CountDownLatch(1)
-        val droppedBeforeConnect = AtomicBoolean(false)
-        val host = object : TrustTunnelBridge.Host {
-            override fun onTrustTunnelState(state: VpnState) {
-                when (state) {
-                    VpnState.CONNECTED -> connectedLatch.countDown()
-                    VpnState.DISCONNECTED -> {
-                        if (connectedLatch.count > 0L) {
-                            droppedBeforeConnect.set(true)
-                            connectedLatch.countDown()
-                        } else if (isRunning) {
-                            Log.e(TAG, "TrustTunnel dropped post-connect — stopping")
-                            Handler(Looper.getMainLooper()).post {
-                                markSessionInactive()
-                                stopVpn()
-                            }
-                        }
-                    }
-                    else -> Unit
-                }
-            }
-        }
-
-        if (!bridge.start(toml, tun, host)) {
-            // Native may already have closed [tun] on failure — drop our ref.
-            tunInterface.compareAndSet(tun, null)
-            val detail = bridge.lastErrorMessage ?: "TrustTunnel start failed"
-            failStart(detail)
-            return
-        }
-        // VpnClient.start takes ownership of the TUN fd.
-        tunInterface.compareAndSet(tun, null)
-
-        if (ProtectGuard.hasFailed()) {
-            failStart("VpnService.protect() failed during TrustTunnel start")
-            return
-        }
-
-        val connected = try {
-            connectedLatch.await(TT_CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
-        } catch (_: InterruptedException) {
-            false
-        }
-        if (!connected || droppedBeforeConnect.get()) {
-            failStart(
-                if (droppedBeforeConnect.get()) {
-                    "TrustTunnel handshake dropped (auth/endpoint unreachable)"
-                } else {
-                    "TrustTunnel CONNECTED timeout (${TT_CONNECT_TIMEOUT_MS}ms)"
-                },
-            )
-            return
-        }
-
-        isRunning = true
-        establishInProgress = false
-        currentStatus = "connected"
-        VpnStatusBroadcaster.emit(currentStatus)
-        showConnectedNotification()
-        startTrafficMonitor()
-        Log.i(
-            TAG,
-            "startVpn: TrustTunnel established host=$ttHost user=$username protocol=$protocol",
-        )
-    }
-
-    /**
-     * Hysteria2 (ADR 015): official client SOCKS + libXray tun pump + SOCKS prove.
-     * Soft-pass on QUIC-up is forbidden — same SOCKS CONNECT gate as Xray.
-     */
     private fun startHysteriaOnWorker(
         username: String,
         protocol: String,
@@ -1333,10 +983,9 @@ class TeremokVpnService : VpnService() {
             failStart("VpnService.protect() failed during Hysteria start")
             return
         }
-        // libXray as TUN pump deadlocks while hyjni is loaded (two gomobile
-        // Go runtimes). Pump gVisor inside hy2bind instead.
-        // gVisor unix.Close's this fd. detachFd so ParcelFileDescriptor is
-        // not still the fdsan owner (Pixel abort on StopTun / Auto restart).
+        // Pump gVisor inside hy2bind. gVisor unix.Close's this fd — detachFd
+        // so ParcelFileDescriptor is not still the fdsan owner (Pixel abort
+        // on StopTun / Auto restart).
         val tunFd = try {
             ParcelFileDescriptor.dup(activeTun.fileDescriptor).detachFd()
         } catch (t: Throwable) {
@@ -1351,7 +1000,7 @@ class TeremokVpnService : VpnService() {
         // Go owns the detached dup; Kotlin keeps the establish PFD until
         // [closeTunOnce] in teardownCores (closing establish early tears down VPN).
 
-        val probeCandidate = XrayRuntimeCandidate(
+        val probeCandidate = SocksProbeCandidate(
             id = nodeId,
             host = server.substringBefore(':'),
             label = "hysteria",
@@ -1375,7 +1024,7 @@ class TeremokVpnService : VpnService() {
      * SOCKS CONNECT to 1.1.1.1:443 through local Xray SOCKS — must pass before
      * `connected`. Runs off the main thread (no TLS, no generate_204).
      */
-    private fun probeSocksHttps(selected: XrayRuntimeCandidate): Boolean {
+    private fun probeSocksHttps(selected: SocksProbeCandidate): Boolean {
         val okFlag = AtomicBoolean(false)
         val done = CountDownLatch(1)
         Thread(
@@ -1495,8 +1144,6 @@ class TeremokVpnService : VpnService() {
         try {
             stopTrafficMonitor()
             HysteriaBridge.instance.stop()
-            TrustTunnelBridge.instance.stop()
-            XrayBridge.instance.stop()
             closeTunOnce("teardownCores")
             Log.i(TAG, "teardownCores: cores stopped, TUN closed if any")
         } catch (e: Exception) {
@@ -1744,7 +1391,7 @@ object VpnChannelRegistry {
                         val username = call.argument<String>("username")
                             ?: json.optString("username", "").ifBlank { "anonymous" }
                         val protocol = call.argument<String>("protocol")
-                            ?: json.optString("outboundType", "").ifBlank { "vless" }
+                            ?: json.optString("outboundType", "").ifBlank { "hysteria2" }
 
                         val intent = Intent(
                             appContext,

@@ -217,46 +217,42 @@ void main() {
       'start() вызывает MethodChannel с правильными аргументами',
       () async {
         SharedPreferences.setMockInitialValues({});
-        final config = VpnConfig.fromJson(
-          _vpnJson(
-            candidate: _xrayCandidate(
-              host: 'vpn-dev.example',
-              uuid: '12345678-1234-1234-1234-123456789012',
-              flow: 'xtls-rprx-vision',
-            ),
-          ),
-        );
+        final config = VpnConfig.fromJson({
+          'username': 'test_user',
+          'links': const <String>[],
+          'expire': 1785654092,
+          'active_core': 'hysteria',
+          'hysteria_profile': {
+            'schema_version': 1,
+            'node_id': 'eu-hy2-1',
+            'server': 'hy2.example:443',
+            'auth': 'user:pass',
+            'username': 'user',
+            'sni': 'hy2.example',
+            'socks_listen': '127.0.0.1:10808',
+          },
+        });
         final ok = await VpnController.instance.start(config);
         expect(ok, true);
         expect(log.last.method, 'start');
         final args = log.last.arguments as Map;
         expect(args.containsKey('paramsJson'), true);
         final paramsString = args['paramsJson'] as String;
-        final params = VpnServiceConfig.fromVpnConfig(config).toMap();
-        expect(params['sessionName'], 'Теремок VPN');
-        expect(params['displayLabel'], 'Теремок VPN');
-        expect(params['outboundType'], 'vless');
-        expect(params['mtu'], 1500);
-        expect(params['address'], '10.255.255.1');
-        expect(params['addressPrefix'], 30);
-        expect(params['outboundServer'], 'vpn-dev.example');
-        expect(params['outboundServerPort'], 443);
-        expect(params['outboundFlow'], 'xtls-rprx-vision');
-        expect(paramsString.contains('vpn-dev.example'), true);
-        expect(paramsString.contains('12345678-1234-1234-1234-123456789012'), true);
-        expect(paramsString.contains('"vpnCore":"xray"'), true);
+        expect(paramsString.contains('"vpnCore":"hysteria"'), true);
+        expect(paramsString.contains('hy2.example:443'), true);
+        expect(paramsString.contains('hy2.example'), true);
+        expect(paramsString.contains('user:pass'), true);
       },
     );
 
     test(
-      'start() без candidates бросает VpnControllerException',
+      'start() без hysteria_profile бросает VpnControllerException',
       () async {
         final config = VpnConfig(
           username: 'empty',
           links: const [],
           expire: DateTime.utc(2026, 7, 1),
-          activeCore: VpnActiveCore.xray,
-          xrayProfile: const XrayProfile(schemaVersion: 1, candidates: []),
+          activeCore: VpnActiveCore.hysteria,
         );
         expect(
           () => VpnController.instance.start(config),

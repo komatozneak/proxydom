@@ -71,7 +71,7 @@ jobs:
         run: |
           # minSdk enforced via androidComponents.finalizeDsl (Flutter tooling
           # rewrites a literal `minSdk` back to flutter.minSdkVersion).
-          # ADR 006: TrustTunnel / dual-core requires 26.
+          # ADR 018: Hy2 bind / VpnService requires 26.
           if grep -q "requiredMinSdk = ${{ env.MIN_SDK }}" android/app/build.gradle.kts \
             && grep -q "finalizeDsl" android/app/build.gradle.kts; then
             echo "minSdk enforcement OK (finalizeDsl -> ${{ env.MIN_SDK }})"

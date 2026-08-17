@@ -4,7 +4,6 @@ import '../../../core/config.dart';
 import 'node_display.dart';
 import 'vpn_config.dart';
 import 'vpn_node.dart';
-import 'xray_config_builder.dart';
 
 /// User-facing brand name for VPN session / fallback labels (no Marzban id).
 const kVpnBrandSessionName = 'Теремок VPN';
@@ -159,7 +158,7 @@ class VpnServiceConfig {
   /// Hosts that must stay off TUN via Android [excludeRoute].
   List<String> get controlPlaneHosts => controlPlaneHostsOf();
 
-  /// Shared helper for Xray start and [VpnController.startTrustTunnel].
+  /// Hosts that must stay off TUN (API master). Used by Hy2 start params.
   static List<String> controlPlaneHostsOf() {
     final hosts = <String>{};
     try {
@@ -203,31 +202,7 @@ class VpnServiceConfig {
 
   String toJsonString() => jsonEncode(toMap());
 
-  /// Single Xray JSON (legacy / diagnostics). Prefer [toJsonStringWithXrayCandidates].
-  String toJsonStringWithXray(String xrayConfigJson) =>
-      jsonEncode({
-        ...toMap(),
-        'schemaVersion': 2,
-        'vpnCore': 'xray',
-        'xrayConfigJson': xrayConfigJson,
-      });
-
-  /// Native sequential failover payload (one complete config per candidate).
-  String toJsonStringWithXrayCandidates(
-    List<XrayRuntimeCandidateConfig> candidates, {
-    List<String> disallowedApplications = const [],
-  }) =>
-      jsonEncode({
-        ...toMap(),
-        'schemaVersion': 2,
-        'vpnCore': 'xray',
-        'xrayCandidateConfigs':
-            candidates.map((c) => c.toMap()).toList(growable: false),
-        if (disallowedApplications.isNotEmpty)
-          'disallowedApplications': disallowedApplications,
-      });
-
-  /// Build TUN + outbound flat fields from [VpnConfig.xrayProfile].
+  /// Build TUN + outbound flat fields from a minted config (Hy2 or leftover cache).
   factory VpnServiceConfig.fromVpnConfig(
     VpnConfig config, {
     String? displayLabel,

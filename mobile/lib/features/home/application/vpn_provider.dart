@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/api_secret_storage.dart';
+import '../../../core/app_locale.dart';
 import '../../../core/diagnostics/app_log_buffer.dart';
 import '../../../core/diagnostics/egress_verify.dart';
 import '../../../core/diagnostics/product_log.dart';
@@ -905,19 +906,19 @@ class VpnNotifier extends Notifier<VpnStatus> {
     });
     if (pool.isEmpty) {
       ProductLog.event('vpn.connect_fail', {
-        'code': 'path_incompatible',
+        'code': 'empty_pool',
         'reason': 'empty_pool',
       });
       state = const VpnError(
-        message: 'Нет серверов для Авто',
-        code: 'path_incompatible',
+        message: 'empty_pool',
+        code: 'empty_pool',
       );
       return;
     }
-    final firstHint = autoCandidateHintLabel(pool.first);
+    final firstHint = _autoHintLabel(pool.first);
     state = VpnConnecting(
       progress: 0.55,
-      hint: _pickingHint(firstHint),
+      hint: firstHint,
     );
 
     final payloads = <String>[];
@@ -925,10 +926,10 @@ class VpnNotifier extends Notifier<VpnStatus> {
     _autoActiveNodeId = null;
     for (final node in pool) {
       if (gen != null && await _abortStaleConnect(gen)) return;
-      final candidateHint = autoCandidateHintLabel(node);
+      final candidateHint = _autoHintLabel(node);
       state = VpnConnecting(
         progress: 0.55,
-        hint: _pickingHint(candidateHint),
+        hint: candidateHint,
       );
       try {
         final cfg = await _connectProvisionRetryPolicy.execute(
@@ -952,7 +953,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
             return e is! FormatException;
           },
         );
-        final label = autoCandidateHintLabel(node);
+        final label = _autoHintLabel(node);
         _autoMints[node.id] = _AutoMint(
           config: cfg,
           label: label,
@@ -1004,7 +1005,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
         'reason': 'mint_empty',
       });
       state = const VpnError(
-        message: 'Авто: ни один сервер не выдал конфиг',
+        message: 'path_incompatible',
         code: 'path_incompatible',
       );
       return;
@@ -1017,7 +1018,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
     }
     state = VpnConnecting(
       progress: 0.8,
-      hint: _pickingHint(firstHint),
+      hint: firstHint,
     );
   }
 
@@ -1178,33 +1179,18 @@ class VpnNotifier extends Notifier<VpnStatus> {
       if (await _abortStaleConnect(gen)) return;
       ProductLog.event('vpn.connect_attempt', {
         'mode': 'manual',
-        'id': _config?.hysteriaProfile?.nodeId ??
-            _config?.trusttunnelProfile?.nodeId ??
-            _config?.nodeHost,
+        'id': _config?.hysteriaProfile?.nodeId ?? _config?.nodeHost,
         'core': _config?.activeCore.name,
       });
 
-      // 3. Start VpnService — core from active_core (ADR 015). No silent
-      // core swap: PathIncompatible stays on the selected node.
-      final wantsTrustTunnel = _config!.isTrustTunnelSession ||
-          _selectedNodeProtocol == kVpnNodeProtocolTrusttunnel;
+      // 3. Start VpnService — Hy2 only (ADR 018).
       final wantsHysteria = _config!.isHysteriaSession ||
           _selectedNodeProtocol == kVpnNodeProtocolHysteria2;
       _vpnLog(
         '[VPN] active_core=${_config!.activeCore.name} '
-        'node_id=${_config!.hysteriaProfile?.nodeId ?? _config!.trusttunnelProfile?.nodeId ?? _config!.nodeHost} '
+        'node_id=${_config!.hysteriaProfile?.nodeId ?? _config!.nodeHost} '
         'protocol=$_selectedNodeProtocol',
       );
-      if (wantsTrustTunnel) {
-        final tt = _config!.trusttunnelProfile;
-        if (tt == null) {
-          state = const VpnError(
-            message: 'tt_provision_failed',
-            code: 'tt_provision_failed',
-          );
-          return;
-        }
-      }
       if (wantsHysteria) {
         final hy = _config!.hysteriaProfile;
         if (hy == null) {
@@ -1214,23 +1200,17 @@ class VpnNotifier extends Notifier<VpnStatus> {
           );
           return;
         }
+      } else {
+        state = const VpnError(
+          message: 'hy2_provision_failed',
+          code: 'hy2_provision_failed',
+        );
+        return;
       }
       final started = await _retryPolicy.execute(
         () {
-          if (wantsTrustTunnel) {
-            return VpnController.instance.startTrustTunnel(
-              _config!.trusttunnelProfile!,
-              displayLabel: _displayLabel,
-            );
-          }
-          if (wantsHysteria) {
-            return VpnController.instance.startHysteria(
-              _config!.hysteriaProfile!,
-              displayLabel: _displayLabel,
-            );
-          }
-          return VpnController.instance.start(
-            _config!,
+          return VpnController.instance.startHysteria(
+            _config!.hysteriaProfile!,
             displayLabel: _displayLabel,
           );
         },
@@ -1302,14 +1282,16 @@ class VpnNotifier extends Notifier<VpnStatus> {
         }
         if (code == 401 || e.error == 'session_expired') {
           state = const VpnError(
-            message: 'Сессия истекла — войдите снова',
+            message: 'session_expired',
+            code: 'session_expired',
           );
           return;
         }
         if (e.type == DioExceptionType.connectionError ||
             e.type == DioExceptionType.connectionTimeout) {
           state = const VpnError(
-            message: 'Нет связи с сервером — проверьте интернет',
+            message: 'no_network',
+            code: 'no_network',
           );
           return;
         }
@@ -1548,11 +1530,14 @@ class VpnNotifier extends Notifier<VpnStatus> {
     final current = state as VpnConnecting;
     state = VpnConnecting(
       progress: current.progress,
-      hint: _pickingHint(label),
+      hint: label,
     );
   }
 
-  static String _pickingHint(String label) => 'Подбираем сервер… $label';
+  String _autoHintLabel(VpnNode node) => autoCandidateHintLabel(
+        node,
+        languageCode: AppLocale.current.languageCode,
+      );
 
   String? autoCandidateHintLabelFromId(String? nodeId) {
     if (nodeId == null || nodeId.isEmpty) return null;

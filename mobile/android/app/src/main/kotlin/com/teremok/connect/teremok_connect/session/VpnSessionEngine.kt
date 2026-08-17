@@ -363,7 +363,7 @@ class VpnSessionEngine(
     }
 
     private fun nodeIdFromParams(params: Map<String, Any?>): String? {
-        for (key in listOf("autoNodeId", "hysteriaNodeId", "trusttunnelNodeId")) {
+        for (key in listOf("autoNodeId", "hysteriaNodeId")) {
             val value = (params[key] as? String)?.trim().orEmpty()
             if (value.isNotEmpty()) return value
         }
@@ -371,7 +371,7 @@ class VpnSessionEngine(
     }
 
     private fun hostFromParams(params: Map<String, Any?>): String? {
-        for (key in listOf("trusttunnelHost", "hysteriaServer")) {
+        for (key in listOf("hysteriaServer")) {
             val value = (params[key] as? String)?.trim().orEmpty()
             if (value.isNotEmpty()) return value
         }

@@ -9,8 +9,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 /**
  * Official apernet/hysteria client via our gomobile AAR (`hy2bind`).
  *
- * The AAR is namespaced (`hy.Seq` + `libhyjni.so`) so it can sit beside
- * libXray's `go.Seq` / `libgojni.so`. Do not start Hy2 and Xray together.
+ * Sole dataplane (ADR 018). TUN is [startTun] inside hy2bind.
  *
  * Fails closed when `libs/hysteria-client.aar` is not bundled — never soft-pass
  * "QUIC up". SOCKS prove stays in [TeremokVpnService]. [ProtectGuard.protect]
@@ -102,8 +101,7 @@ class HysteriaBridge private constructor() {
     }
 
     /**
-     * gVisor TUN→SOCKS inside hy2bind (same Go runtime as Hy2). Do not use
-     * [XrayBridge] as the Hy2 pump — two gomobile runtimes deadlock.
+     * gVisor TUN→SOCKS inside hy2bind (same Go runtime as Hy2).
      *
      * [tunFd] must already be detached from a [android.os.ParcelFileDescriptor]
      * (`detachFd()`). Go owns and closes it.

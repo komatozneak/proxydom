@@ -38,7 +38,8 @@ int autoPoolRank(VpnNode node, {required bool isPremium}) {
 }
 
 /// Short Auto status label — same titles as Locations (`placeForNode`).
-String autoCandidateHintLabel(VpnNode node) => placeForNode(node).title;
+String autoCandidateHintLabel(VpnNode node, {String languageCode = 'ru'}) =>
+    placeForNode(node).displayTitle(languageCode);
 
 /// Manual Locations id, or null when the user chose Auto (engine prove loop).
 String? resolveNodeIdForConfig({

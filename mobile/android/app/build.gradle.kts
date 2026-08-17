@@ -26,7 +26,7 @@ val keystoreProperties = Properties().apply {
     }
 }
 
-// TrustTunnel adapter + libXray require minSdk 26 (ADR 006). Flutter tooling
+// minSdk 26 — keep in sync with hysteria-bind / VpnService (do not roll back).
 // may rewrite the literal in defaultConfig back to flutter.minSdkVersion, so
 // the real enforcement is finalizeDsl below.
 val requiredMinSdk = 26
@@ -118,23 +118,11 @@ androidComponents {
 }
 
 dependencies {
-    // Xray-core via libXray (gomobile). Replaces libbox/sing-box — ADR 005.
-    implementation(files("libs/libXray.aar"))
-    // TrustTunnel client adapter (ADR 006 dual-core). Vendored AAR — fetch via
-    // mobile/scripts/fetch-trusttunnel-aar.ps1 (GitHub Packages, needs GPR_KEY).
-    // Transitive deps below mirror the adapter's lib/build.gradle.kts because
-    // a raw AAR carries no POM.
-    implementation(files("libs/trusttunnel-client-android.aar"))
-    // Official Hy2 AAR (optional until `hysteria-bind/build-aar.sh` runs).
+    // Official Hy2 AAR (`hysteria-bind/build-aar.sh`). ADR 018: no libXray / TT.
     val hy2Aar = file("libs/hysteria-client.aar")
     if (hy2Aar.exists()) {
         implementation(files(hy2Aar))
     }
-    implementation("com.akuleshov7:ktoml-core:0.7.0")
-    implementation("org.slf4j:slf4j-api:1.7.25")
-    implementation("com.github.tony19:logback-android:2.0.0")
-    implementation("io.reactivex.rxjava3:rxandroid:3.0.0")
-    implementation("io.reactivex.rxjava3:rxjava:3.1.8")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.material:material:1.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")

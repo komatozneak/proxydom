@@ -46,7 +46,7 @@ void main() {
   final gaming = _node(
     id: 'eu-gaming',
     label: 'Игровой · Premium',
-    protocol: kVpnNodeProtocolTrusttunnel,
+    protocol: kVpnNodeProtocolHysteria2,
     purpose: 'gaming',
     requiresPremium: true,
     host: '204.11.2.216',
@@ -54,7 +54,7 @@ void main() {
   final youtube = _node(
     id: 'al-youtube',
     label: 'YouTube · Premium',
-    protocol: kVpnNodeProtocolTrusttunnel,
+    protocol: kVpnNodeProtocolHysteria2,
     purpose: 'youtube',
     requiresPremium: true,
     host: '85.155.228.235',
@@ -114,7 +114,7 @@ void main() {
     final lockedYt = _node(
       id: 'al-youtube',
       label: 'YouTube · Premium',
-      protocol: kVpnNodeProtocolTrusttunnel,
+      protocol: kVpnNodeProtocolHysteria2,
       purpose: 'youtube',
       requiresPremium: true,
       locked: true,
