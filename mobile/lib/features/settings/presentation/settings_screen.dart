@@ -234,7 +234,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (result is LogoutPartialFailure) {
       showTeremokSnackBar(context, '${l.logoutWarning}: ${result.message}');
     }
-    // Anonymous: re-check entitlement → locked if unpaid (not phone login).
+    // Anonymous: re-check entitlement → locked if unpaid.
     if (AppConfig.authAnonymous) {
       context.go('/gate');
     }

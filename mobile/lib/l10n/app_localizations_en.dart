@@ -15,22 +15,7 @@ class AppL10nEn extends AppL10n {
   String get loginTitle => 'Sign in';
 
   @override
-  String get loginPlaceholderHint => 'Phone number field comes in step 6';
-
-  @override
   String get loginTestButton => 'Sign in (test button)';
-
-  @override
-  String get loginPhoneLabel => 'Phone number';
-
-  @override
-  String get loginPhoneHint => '+7 999 123 4567';
-
-  @override
-  String get loginPhoneHelper => 'We\'ll call you for verification';
-
-  @override
-  String get loginPhoneError => 'Enter a valid number for the selected country';
 
   @override
   String get loginErrorTimeout => 'Server did not respond';
@@ -40,12 +25,6 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get loginErrorGeneric => 'Request failed';
-
-  @override
-  String get loginCallButton => 'Call me';
-
-  @override
-  String get loginCallingTitle => 'Calling...';
 
   @override
   String get homeTitle => 'Teremok';
@@ -360,13 +339,6 @@ class AppL10nEn extends AppL10n {
   String get settingsSectionApp => 'Application';
 
   @override
-  String get settingsPhone => 'Phone number';
-
-  @override
-  String get settingsPhoneReadonly =>
-      'Phone changes only when you sign in again';
-
-  @override
   String get settingsSubscription => 'Access';
 
   @override
@@ -634,14 +606,14 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get devicesLogoutAllHint =>
-      'Revoke every device on this account, including this phone';
+      'Revoke every device on this account, including this one';
 
   @override
   String get devicesLogoutAllTitle => 'Sign out on all devices?';
 
   @override
   String get devicesLogoutAllBody =>
-      'Every device on this account will lose access, including this phone. Recover with your code or register again.';
+      'Every device on this account will lose access, including this one. Recover with your code or register again.';
 
   @override
   String get devicesLogoutAllConfirm => 'Sign out everywhere';
@@ -1034,7 +1006,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get logoutConfirmMessage =>
-      'Your VPN connection will be closed. You\'ll need to verify again next time.';
+      'Your VPN connection will be closed. Restore with your code or register again next time.';
 
   @override
   String get logoutWarning => 'Logout completed with warnings';
@@ -1044,25 +1016,6 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get navBack => 'Back';
-
-  @override
-  String get verifyTitle => 'Enter code';
-
-  @override
-  String verifySentTo(String phone) {
-    return 'We called $phone';
-  }
-
-  @override
-  String get verifyResend => 'Resend call';
-
-  @override
-  String verifyResendIn(int seconds) {
-    return 'Resend in ${seconds}s';
-  }
-
-  @override
-  String get verifyWrongCode => 'Wrong code, try again';
 
   @override
   String get switchLanguage => 'EN';
@@ -1085,7 +1038,8 @@ class AppL10nEn extends AppL10n {
   String get welcomeHeadline => 'A warm house on a cold internet';
 
   @override
-  String get welcomeBody => 'Sign in with your phone, then connect in one tap.';
+  String get welcomeBody =>
+      'An account is created automatically. Then one tap for a protected connection.';
 
   @override
   String get welcomeContinue => 'Continue';
@@ -1329,7 +1283,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get restoreDeviceLimitBody =>
-      'Choose which device to disconnect so this phone can join.';
+      'Choose which device to disconnect so this device can join.';
 
   @override
   String get restoreDeviceLimitOwner => 'Owner';

@@ -109,41 +109,11 @@ abstract class AppL10n {
   /// **'Sign in'**
   String get loginTitle;
 
-  /// No description provided for @loginPlaceholderHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Phone number field comes in step 6'**
-  String get loginPlaceholderHint;
-
   /// No description provided for @loginTestButton.
   ///
   /// In en, this message translates to:
   /// **'Sign in (test button)'**
   String get loginTestButton;
-
-  /// No description provided for @loginPhoneLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Phone number'**
-  String get loginPhoneLabel;
-
-  /// No description provided for @loginPhoneHint.
-  ///
-  /// In en, this message translates to:
-  /// **'+7 999 123 4567'**
-  String get loginPhoneHint;
-
-  /// No description provided for @loginPhoneHelper.
-  ///
-  /// In en, this message translates to:
-  /// **'We\'ll call you for verification'**
-  String get loginPhoneHelper;
-
-  /// No description provided for @loginPhoneError.
-  ///
-  /// In en, this message translates to:
-  /// **'Enter a valid number for the selected country'**
-  String get loginPhoneError;
 
   /// No description provided for @loginErrorTimeout.
   ///
@@ -162,18 +132,6 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Request failed'**
   String get loginErrorGeneric;
-
-  /// No description provided for @loginCallButton.
-  ///
-  /// In en, this message translates to:
-  /// **'Call me'**
-  String get loginCallButton;
-
-  /// No description provided for @loginCallingTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Calling...'**
-  String get loginCallingTitle;
 
   /// No description provided for @homeTitle.
   ///
@@ -757,18 +715,6 @@ abstract class AppL10n {
   /// **'Application'**
   String get settingsSectionApp;
 
-  /// No description provided for @settingsPhone.
-  ///
-  /// In en, this message translates to:
-  /// **'Phone number'**
-  String get settingsPhone;
-
-  /// No description provided for @settingsPhoneReadonly.
-  ///
-  /// In en, this message translates to:
-  /// **'Phone changes only when you sign in again'**
-  String get settingsPhoneReadonly;
-
   /// No description provided for @settingsSubscription.
   ///
   /// In en, this message translates to:
@@ -1252,7 +1198,7 @@ abstract class AppL10n {
   /// No description provided for @devicesLogoutAllHint.
   ///
   /// In en, this message translates to:
-  /// **'Revoke every device on this account, including this phone'**
+  /// **'Revoke every device on this account, including this one'**
   String get devicesLogoutAllHint;
 
   /// No description provided for @devicesLogoutAllTitle.
@@ -1264,7 +1210,7 @@ abstract class AppL10n {
   /// No description provided for @devicesLogoutAllBody.
   ///
   /// In en, this message translates to:
-  /// **'Every device on this account will lose access, including this phone. Recover with your code or register again.'**
+  /// **'Every device on this account will lose access, including this one. Recover with your code or register again.'**
   String get devicesLogoutAllBody;
 
   /// No description provided for @devicesLogoutAllConfirm.
@@ -1972,7 +1918,7 @@ abstract class AppL10n {
   /// No description provided for @logoutConfirmMessage.
   ///
   /// In en, this message translates to:
-  /// **'Your VPN connection will be closed. You\'ll need to verify again next time.'**
+  /// **'Your VPN connection will be closed. Restore with your code or register again next time.'**
   String get logoutConfirmMessage;
 
   /// No description provided for @logoutWarning.
@@ -1992,36 +1938,6 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Back'**
   String get navBack;
-
-  /// No description provided for @verifyTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Enter code'**
-  String get verifyTitle;
-
-  /// No description provided for @verifySentTo.
-  ///
-  /// In en, this message translates to:
-  /// **'We called {phone}'**
-  String verifySentTo(String phone);
-
-  /// No description provided for @verifyResend.
-  ///
-  /// In en, this message translates to:
-  /// **'Resend call'**
-  String get verifyResend;
-
-  /// No description provided for @verifyResendIn.
-  ///
-  /// In en, this message translates to:
-  /// **'Resend in {seconds}s'**
-  String verifyResendIn(int seconds);
-
-  /// No description provided for @verifyWrongCode.
-  ///
-  /// In en, this message translates to:
-  /// **'Wrong code, try again'**
-  String get verifyWrongCode;
 
   /// Short label of language toggle button (shows next-language code)
   ///
@@ -2062,7 +1978,7 @@ abstract class AppL10n {
   /// No description provided for @welcomeBody.
   ///
   /// In en, this message translates to:
-  /// **'Sign in with your phone, then connect in one tap.'**
+  /// **'An account is created automatically. Then one tap for a protected connection.'**
   String get welcomeBody;
 
   /// No description provided for @welcomeContinue.
@@ -2512,7 +2428,7 @@ abstract class AppL10n {
   /// No description provided for @restoreDeviceLimitBody.
   ///
   /// In en, this message translates to:
-  /// **'Choose which device to disconnect so this phone can join.'**
+  /// **'Choose which device to disconnect so this device can join.'**
   String get restoreDeviceLimitBody;
 
   /// No description provided for @restoreDeviceLimitOwner.

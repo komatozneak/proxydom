@@ -31,6 +31,10 @@ void main() {
     await tester.pumpAndSettle();
 
     final l10n = await AppL10n.delegate.load(const Locale('ru'));
+    expect(l10n.welcomeBody.toLowerCase(), isNot(contains('телефон')));
+    final l10nEn = await AppL10n.delegate.load(const Locale('en'));
+    expect(l10nEn.welcomeBody.toLowerCase(), isNot(contains('phone')));
+
     final restoreLink = find.text(l10n.restoreTitle);
     expect(restoreLink, findsOneWidget);
 

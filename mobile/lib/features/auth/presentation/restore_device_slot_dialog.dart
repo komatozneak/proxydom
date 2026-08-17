@@ -4,7 +4,7 @@ import '../../../core/theme.dart';
 import '../../../l10n/app_localizations.dart';
 import '../data/restore_device_choice.dart';
 
-/// Mullvad-style picker: which occupied slot to revoke so this phone can join.
+/// Mullvad-style picker: which occupied slot to revoke so this device can join.
 class RestoreDeviceSlotDialog extends StatelessWidget {
   const RestoreDeviceSlotDialog({super.key, required this.devices});
 

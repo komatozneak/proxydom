@@ -15,23 +15,7 @@ class AppL10nRu extends AppL10n {
   String get loginTitle => 'Вход';
 
   @override
-  String get loginPlaceholderHint => 'Поле для телефона будет в шаге 6';
-
-  @override
   String get loginTestButton => 'Войти (тестовая кнопка)';
-
-  @override
-  String get loginPhoneLabel => 'Введите номер телефона';
-
-  @override
-  String get loginPhoneHint => '+7 (999) 123-45-67';
-
-  @override
-  String get loginPhoneHelper =>
-      'Мы позвоним вам. Последние 4 цифры номера — ваш код. Без СМС и паролей.';
-
-  @override
-  String get loginPhoneError => 'Введите корректный номер для выбранной страны';
 
   @override
   String get loginErrorTimeout => 'Нет ответа от сервера';
@@ -41,12 +25,6 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get loginErrorGeneric => 'Не удалось выполнить запрос';
-
-  @override
-  String get loginCallButton => 'Позвонить мне';
-
-  @override
-  String get loginCallingTitle => 'Звоним...';
 
   @override
   String get homeTitle => 'Теремок';
@@ -360,13 +338,6 @@ class AppL10nRu extends AppL10n {
   String get settingsSectionApp => 'Приложение';
 
   @override
-  String get settingsPhone => 'Номер телефона';
-
-  @override
-  String get settingsPhoneReadonly =>
-      'Номер меняется только при повторном входе';
-
-  @override
   String get settingsSubscription => 'Доступ';
 
   @override
@@ -634,14 +605,14 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get devicesLogoutAllHint =>
-      'Отозвать все устройства аккаунта, включая этот телефон';
+      'Отозвать все устройства аккаунта, включая это устройство';
 
   @override
   String get devicesLogoutAllTitle => 'Выйти на всех устройствах?';
 
   @override
   String get devicesLogoutAllBody =>
-      'Все устройства этого аккаунта потеряют доступ, включая этот телефон. Нужно будет восстановить аккаунт по коду или зарегистрироваться заново.';
+      'Все устройства этого аккаунта потеряют доступ, включая это устройство. Нужно будет восстановить аккаунт по коду или зарегистрироваться заново.';
 
   @override
   String get devicesLogoutAllConfirm => 'Выйти везде';
@@ -1048,25 +1019,6 @@ class AppL10nRu extends AppL10n {
   String get navBack => 'Назад';
 
   @override
-  String get verifyTitle => 'Код из звонка';
-
-  @override
-  String verifySentTo(String phone) {
-    return 'Последние 4 цифры номера, с которого позвонили на $phone';
-  }
-
-  @override
-  String get verifyResend => 'Позвонить повторно';
-
-  @override
-  String verifyResendIn(int seconds) {
-    return 'Позвонить повторно через 00:$seconds';
-  }
-
-  @override
-  String get verifyWrongCode => 'Неверный код, попробуйте снова';
-
-  @override
   String get switchLanguage => 'RU';
 
   @override
@@ -1088,7 +1040,7 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get welcomeBody =>
-      'Войдите по телефону — дальше один тап для подключения.';
+      'Аккаунт создаётся сам. Дальше один тап — защищённое соединение.';
 
   @override
   String get welcomeContinue => 'Продолжить';
@@ -1335,7 +1287,7 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get restoreDeviceLimitBody =>
-      'Выберите, какое устройство отключить, чтобы войти с этого телефона.';
+      'Выберите, какое устройство отключить, чтобы войти с этого устройства.';
 
   @override
   String get restoreDeviceLimitOwner => 'Владелец';
