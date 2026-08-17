@@ -1,7 +1,8 @@
 # DEPRECATED — PR #35 visual assets (do not ship)
 
 **Date:** 2026-07-12  
-**Status:** kept on disk for audit only — **not** listed in `pubspec.yaml` assets.
+**Status:** removed from the repo 2026-08-17 (license ship-blocker) — this note
+kept as the audit record. They were never listed in `pubspec.yaml` assets.
 
 ## Why
 

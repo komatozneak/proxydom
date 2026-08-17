@@ -1,5 +1,11 @@
 # Teremok Connect — мобильный клиент (Flutter + Sing-box)
 
+> ⚠️ **OUTDATED (помечено 2026-08-17):** этот README описывает ранний прототип
+> (libbox JNI, Flash Call auth, пошаговый план «Шаг N»). Актуальное:
+> **anonymous auth `device_uuid` + recovery code**, **libXray + TrustTunnel
+> dual-core** (ADR 005/006), minSdk 26. SoT: `mobile/AGENTS.md`, корневой
+> `AGENTS.md`, `docs/decisions/`. Остальной текст ниже — история.
+
 > ✅ **СТАТУС 2026-07-05 (v0.2.0 — libbox JNI):**
 >
 > **Реальный tun2socks через libbox.aar** (sing-box v1.13.14, JNI binding).
