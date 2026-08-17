@@ -883,7 +883,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
       final index = nodes.indexWhere((n) => n.id == nodeId);
       if (index < 0) return null;
       final place = await resolvePlaceForNode(nodes[index], index: index);
-      return place.title;
+      return place.displayTitle(AppLocale.current.languageCode);
     } catch (_) {
       return null;
     }

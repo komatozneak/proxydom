@@ -20,6 +20,7 @@ import '../application/devices_list_provider.dart';
 import '../application/seat_accept_flow.dart';
 import '../application/seat_invite_flow.dart';
 import '../application/seat_join_code_provider.dart';
+import 'rename_device_dialog.dart';
 
 /// Account device slots — list, invite, join, revoke, leave.
 class DevicesScreen extends ConsumerStatefulWidget {
@@ -100,45 +101,11 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
     final initial = (device.deviceName?.trim().isNotEmpty == true)
         ? device.deviceName!.trim()
         : '';
-    final controller = TextEditingController(text: initial);
     final saved = await showDialog<String>(
       context: context,
       useRootNavigator: true,
-      builder: (ctx) {
-        return AlertDialog(
-          title: Text(l.devicesRenameTitle),
-          content: TextField(
-            controller: controller,
-            autofocus: true,
-            maxLength: 128,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: InputDecoration(
-              hintText: l.devicesRenameHint,
-            ),
-            onSubmitted: (value) {
-              final trimmed = value.trim();
-              if (trimmed.isEmpty) return;
-              Navigator.of(ctx, rootNavigator: true).pop(trimmed);
-            },
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx, rootNavigator: true).pop(),
-              child: Text(l.devicesCancel),
-            ),
-            FilledButton(
-              onPressed: () {
-                final trimmed = controller.text.trim();
-                if (trimmed.isEmpty) return;
-                Navigator.of(ctx, rootNavigator: true).pop(trimmed);
-              },
-              child: Text(l.devicesRenameSave),
-            ),
-          ],
-        );
-      },
+      builder: (_) => RenameDeviceDialog(initial: initial),
     );
-    controller.dispose();
     if (saved == null || saved.isEmpty || !mounted) return;
     if (saved == initial) return;
     setState(() => _busy = true);

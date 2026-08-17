@@ -1,4 +1,6 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:teremok_connect/core/app_locale.dart';
 import 'package:teremok_connect/features/vpn/data/vpn_node.dart';
 import 'package:teremok_connect/features/vpn/data/vpn_service_config.dart';
 
@@ -29,5 +31,23 @@ void main() {
       'Латвия',
     );
     expect(connectedServerName(config: null), kVpnBrandSessionName);
+  });
+
+  test('connectedServerName drops · Бесплатно and localizes USA', () {
+    AppLocale.set(const Locale('ru'));
+    expect(
+      connectedServerName(config: null, displayLabel: 'США · Бесплатно'),
+      'США',
+    );
+    AppLocale.set(const Locale('en'));
+    expect(
+      connectedServerName(config: null, displayLabel: 'США · Бесплатно'),
+      'USA',
+    );
+    expect(
+      connectedServerName(config: null, displayLabel: 'США · Бесплатно'),
+      isNot(contains('Free')),
+    );
+    AppLocale.set(const Locale('ru'));
   });
 }

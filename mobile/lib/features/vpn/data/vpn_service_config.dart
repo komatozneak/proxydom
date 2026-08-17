@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../../../core/app_locale.dart';
 import '../../../core/config.dart';
 import 'node_display.dart';
 import 'vpn_config.dart';
@@ -39,13 +40,29 @@ String sessionProtocolLabel({
   return friendlyProtocolLabel('vless');
 }
 
+String _uiLanguageCode() => AppLocale.current.languageCode;
+
+String localizeVpnLabel(String raw) {
+  final canonical = canonicalPlaceForProductLabel(raw);
+  if (canonical != null) {
+    return canonical.displayTitle(_uiLanguageCode());
+  }
+  final stripped = stripTierRole(raw);
+  if (_uiLanguageCode() == 'en') {
+    return englishTitleForProduct(stripped) ?? stripped;
+  }
+  return stripped;
+}
+
 /// Human label for region/node; never Marzban `username`.
 ///
 /// Order: explicit [displayLabel] → [VpnConfig.nodeHost] /
 /// [VpnConfig.expectedEgressHost] → primary candidate host → brand name.
 String resolveVpnDisplayLabel(VpnConfig config, {String? displayLabel}) {
   final explicit = displayLabel?.trim();
-  if (explicit != null && explicit.isNotEmpty) return explicit;
+  if (explicit != null && explicit.isNotEmpty) {
+    return localizeVpnLabel(explicit);
+  }
 
   final hosts = <String>{};
   void addHost(String? value) {
@@ -64,13 +81,13 @@ String resolveVpnDisplayLabel(VpnConfig config, {String? displayLabel}) {
 
   for (final host in hosts) {
     final known = placeForKnownHost(host);
-    if (known != null) return known.title;
+    if (known != null) return known.displayTitle(_uiLanguageCode());
   }
 
   for (final host in hosts) {
     final place = placeForHost(host);
     if (!_isGenericServerPlaceholder(place.title)) {
-      return place.title;
+      return place.displayTitle(_uiLanguageCode());
     }
   }
 
@@ -80,7 +97,9 @@ String resolveVpnDisplayLabel(VpnConfig config, {String? displayLabel}) {
 /// Home card / logs: catalog label wins even when Flutter has no live mint yet.
 String connectedServerName({VpnConfig? config, String? displayLabel}) {
   final explicit = displayLabel?.trim();
-  if (explicit != null && explicit.isNotEmpty) return explicit;
+  if (explicit != null && explicit.isNotEmpty) {
+    return localizeVpnLabel(explicit);
+  }
   if (config != null) {
     return resolveVpnDisplayLabel(config);
   }

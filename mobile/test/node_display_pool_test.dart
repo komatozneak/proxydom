@@ -98,6 +98,9 @@ void main() {
       );
       final place = placeForNode(eu, index: 0);
       expect(place.title, 'Латвия');
+      expect(place.displayTitle('en'), 'Latvia');
+      expect(place.displaySubtitle('en'), 'Low ping');
+      expect(place.title, isNot(contains('Бесплатно')));
       expect(place.title.toLowerCase(), isNot(contains('франкфурт')));
       expect(place.title.toLowerCase(), isNot(contains('германия')));
       expect(place.flag, '🇱🇻');
@@ -122,11 +125,36 @@ void main() {
       expect(place.flag, kFlagUsa);
       expect(place.flag, isNot('🇱🇻'));
       expect(place.flag, isNot(kFlagGlobe));
+      expect(place.displayTitle('en'), 'USA');
+      expect(place.displayTitle('en'), isNot(contains('Free')));
+      expect(place.displayTitle('ru'), 'США');
+      expect(place.displayTitle('ru'), isNot(contains('Бесплатно')));
+    });
+
+    test('Hy2 catalog USA is USA in English without · Free', () {
+      const usa = VpnNode(
+        id: 'us-hy2-1',
+        label: 'США · Бесплатно',
+        host: '45.91.248.91',
+        port: 443,
+        status: 'connected',
+        isDefault: false,
+        protocol: kVpnNodeProtocolHysteria2,
+        region: 'us',
+        purpose: 'geo-us',
+      );
+      final place = placeForNode(usa, index: 0);
+      expect(place.displayTitle('en'), 'USA');
+      expect(place.displaySubtitle('en'), isNot(contains('Free')));
+      expect(place.displayTitle('ru'), 'США');
+      expect(place.title, isNot(contains('·')));
+      expect(place.title, isNot(contains('Бесплатно')));
     });
 
     test('stripTierRole drops catalog Free and Premium suffixes', () {
       expect(stripTierRole('США · Бесплатно'), 'США');
       expect(stripTierRole('USA · Free'), 'USA');
+      expect(stripTierRole('USA. Free'), 'USA');
       expect(stripTierRole('Латвия'), 'Латвия');
       expect(stripTierRole('YouTube · Premium'), 'YouTube');
       expect(stripTierRole('Индия · Премиум'), 'Индия');

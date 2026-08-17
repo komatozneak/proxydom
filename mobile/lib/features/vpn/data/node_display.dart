@@ -18,16 +18,29 @@ class NodePlace {
   final String? subtitleEn;
   final String flag;
 
-  String displayTitle(String languageCode) =>
-      languageCode == 'en' && titleEn != null ? titleEn! : title;
+  String displayTitle(String languageCode) {
+    String pick() {
+      if (languageCode != 'en') return title;
+      final en = titleEn?.trim();
+      if (en != null && en.isNotEmpty) return en;
+      return englishTitleForProduct(title) ?? title;
+    }
 
-  String displaySubtitle(String languageCode) =>
-      languageCode == 'en' && subtitleEn != null ? subtitleEn! : subtitle;
+    return stripTierRole(pick());
+  }
+
+  String displaySubtitle(String languageCode) {
+    if (languageCode != 'en') return subtitle;
+    final en = subtitleEn?.trim();
+    if (en != null && en.isNotEmpty) return en;
+    return englishTitleForProduct(subtitle) ?? subtitle;
+  }
 
   factory NodePlace.fromGeo(GeoIpResult geo) {
+    final code = geo.countryCode.toUpperCase();
     return NodePlace(
       title: geo.displayCountry('ru'),
-      titleEn: geo.country,
+      titleEn: code == 'US' ? 'USA' : geo.country,
       subtitle: geo.displayCity('ru'),
       subtitleEn: geo.city.isNotEmpty ? geo.city : geo.region,
       flag: geo.flagEmoji,
@@ -160,11 +173,77 @@ enum LocationSection { premium, general, other }
 String stripTierRole(String raw) {
   return raw.trim().replaceFirst(
         RegExp(
-          r'\s*[·•]\s*(Бесплатно|Free|Premium|Премиум)\s*$',
+          r'\s*[·•.\-–—]\s*(Бесплатно|Free|Premium|Премиум)\s*$',
           caseSensitive: false,
         ),
         '',
       );
+}
+
+/// English stand-in when catalog copy is Russian and [NodePlace.titleEn] is empty.
+String? englishTitleForProduct(String raw) {
+  final t = stripTierRole(raw).trim().toLowerCase();
+  if (t.isEmpty) return null;
+  const map = <String, String>{
+    'сша': 'USA',
+    'usa': 'USA',
+    'латвия': 'Latvia',
+    'latvia': 'Latvia',
+    'европа': 'Latvia',
+    'europe': 'Latvia',
+    'индия': 'India',
+    'india': 'India',
+    'игровой': 'Gaming',
+    'gaming': 'Gaming',
+    'нидерланды': 'Netherlands',
+    'netherlands': 'Netherlands',
+    'амстердам': 'Amsterdam',
+    'amsterdam': 'Amsterdam',
+    'низкий пинг': 'Low ping',
+  };
+  final mapped = map[t];
+  if (mapped != null) return mapped;
+  final server = RegExp(r'^сервер\s+(\d+)$').firstMatch(t);
+  if (server != null) return 'Server ${server.group(1)}';
+  return null;
+}
+
+/// Catalog product copy → bilingual place (Free USA/EU, Premium slots).
+NodePlace? canonicalPlaceForProductLabel(String raw) {
+  final t = stripTierRole(raw).trim().toLowerCase();
+  if (t.isEmpty) return null;
+  if (t.contains('youtube')) return kYoutubePremiumPlace;
+  if (t.contains('игровой') || t.contains('gaming')) return kGamingPremiumPlace;
+  if (t.contains('индия') || t.contains('india')) return kIndiaPremiumPlace;
+  if (t.contains('сша') ||
+      t.contains('united states') ||
+      t.contains('usa') ||
+      t == 'us') {
+    return kUsaMobilePlace;
+  }
+  if (t.contains('европа') ||
+      t.contains('europe') ||
+      t.contains('латвия') ||
+      t.contains('latvia')) {
+    return kHysteriaMobilePlace;
+  }
+  if (t.contains('нидерланды') || t.contains('netherlands')) {
+    return kKnownNodePlaces['185.139.228.192'];
+  }
+  return null;
+}
+
+/// User-facing catalog/home label with English titles attached.
+NodePlace placeFromProductLabel(String raw, {String? flag}) {
+  final canonical = canonicalPlaceForProductLabel(raw);
+  if (canonical != null) return canonical;
+  final title = stripTierRole(raw);
+  return NodePlace(
+    title: title,
+    titleEn: englishTitleForProduct(title),
+    subtitle: '',
+    flag: flag ?? flagForProductLabel(raw),
+  );
 }
 
 /// Locations / Home blurb when [NodePlace.subtitle] is empty.
@@ -313,11 +392,7 @@ Map<LocationSection, List<VpnNode>> groupNodesByLocationSection(
 NodePlace placeForHost(String host, {int index = 0, String? fallbackLabel}) {
   final raw = fallbackLabel?.trim() ?? '';
   if (raw.isNotEmpty && _isSafeProductLabel(raw)) {
-    return NodePlace(
-      title: stripTierRole(raw),
-      subtitle: '',
-      flag: flagForProductLabel(raw),
-    );
+    return placeFromProductLabel(raw);
   }
 
   final known = placeForKnownHost(host);
@@ -327,11 +402,7 @@ NodePlace placeForHost(String host, {int index = 0, String? fallbackLabel}) {
   if (cached != null) return cached;
 
   if (raw.isNotEmpty && !_isUnsafeUserFacingLabel(raw)) {
-    return NodePlace(
-      title: raw,
-      subtitle: '',
-      flag: flagForProductLabel(raw),
-    );
+    return placeFromProductLabel(raw);
   }
   return NodePlace(
     title: 'Сервер ${index + 1}',
@@ -346,16 +417,23 @@ NodePlace placeForNode(VpnNode node, {int index = 0}) {
   if (node.isYoutube) return kYoutubePremiumPlace;
   if (node.isGaming) return kGamingPremiumPlace;
   if (node.isGeoIn) return kIndiaPremiumPlace;
+  final raw = node.label.isNotEmpty
+      ? node.label
+      : (node.name.isNotEmpty ? node.name : '');
+  if (raw.isNotEmpty && !_isUnsafeUserFacingLabel(raw)) {
+    final fromLabel = canonicalPlaceForProductLabel(raw);
+    if (fromLabel != null) return fromLabel;
+  }
+
   if (node.isHysteria) {
-    final hyLabel = node.label.isNotEmpty ? node.label : node.name;
+    final hyLabel = raw;
     final lowerLabel = hyLabel.toLowerCase();
     if (hyLabel.isNotEmpty &&
         _isSafeProductLabel(hyLabel) &&
         !lowerLabel.contains('европа') &&
         !lowerLabel.contains('europe')) {
-      return NodePlace(
-        title: stripTierRole(hyLabel),
-        subtitle: '',
+      return placeFromProductLabel(
+        hyLabel,
         flag: flagForNode(node, productLabel: hyLabel),
       );
     }
@@ -365,14 +443,10 @@ NodePlace placeForNode(VpnNode node, {int index = 0}) {
     return kHysteriaMobilePlace;
   }
 
-  final raw = node.label.isNotEmpty
-      ? node.label
-      : (node.name.isNotEmpty ? node.name : '');
   // Catalog product labels beat IP-geo known map (EU → not Frankfurt).
   if (raw.isNotEmpty && _isSafeProductLabel(raw)) {
-    return NodePlace(
-      title: stripTierRole(raw),
-      subtitle: '',
+    return placeFromProductLabel(
+      raw,
       flag: flagForNode(node, productLabel: raw),
     );
   }
@@ -391,9 +465,8 @@ NodePlace placeForNode(VpnNode node, {int index = 0}) {
       flag: flagForNode(node),
     );
   }
-  return NodePlace(
-    title: stripTierRole(raw),
-    subtitle: '',
+  return placeFromProductLabel(
+    raw,
     flag: flagForNode(node, productLabel: raw),
   );
 }

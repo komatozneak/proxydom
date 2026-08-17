@@ -208,9 +208,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 : '');
         if (fallbackLabel.isNotEmpty && !_looksLikeRawHost(fallbackLabel)) {
           final productFlag = flagForProductLabel(fallbackLabel);
-          place = NodePlace(
-            title: fallbackLabel,
-            subtitle: '',
+          place = placeFromProductLabel(
+            fallbackLabel,
             flag: productFlag == kFlagGlobe && poolFlags.isNotEmpty
                 ? poolFlags.first
                 : productFlag,

@@ -138,6 +138,11 @@ void main() {
     expect(autoCandidateHintLabel(gaming), 'Игровой');
     expect(autoCandidateHintLabel(youtube), 'YouTube');
     expect(autoCandidateHintLabel(india), 'Индия');
+    expect(autoCandidateHintLabel(us, languageCode: 'en'), 'USA');
+    expect(autoCandidateHintLabel(euFree, languageCode: 'en'), 'Latvia');
+    expect(autoCandidateHintLabel(gaming, languageCode: 'en'), 'Gaming');
+    expect(autoCandidateHintLabel(us, languageCode: 'en'), isNot(contains('Free')));
+    expect(autoCandidateHintLabel(us), isNot(contains('Бесплатно')));
   });
 
   test('resolveNodeIdForConfig keeps manual id (no Auto swap)', () {
