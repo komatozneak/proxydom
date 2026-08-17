@@ -27,12 +27,13 @@ class DeviceEnvelope {
 
 Future<DeviceEnvelope> buildDeviceEnvelope({
   InstallIdStorage? storage,
+  Future<String> Function()? deviceNameReader,
 }) async {
   final id = await (storage ?? InstallIdStorage.instance).getOrCreate();
-  final model = await DeviceInfoHelper.getDeviceModelName();
+  final name = await (deviceNameReader ?? DeviceInfoHelper.getDeviceModelName)();
   return DeviceEnvelope(
     deviceId: id,
-    deviceName: model,
+    deviceName: name,
     platform: _platformCode(),
   );
 }

@@ -1,5 +1,6 @@
 import '../../../core/api_client.dart';
 import '../../../core/api_secret_storage.dart';
+import '../../../core/device_label.dart';
 import '../../../core/install_id_storage.dart';
 import '../../session/data/account_session_snapshot.dart';
 import 'restore_device_choice.dart';
@@ -12,6 +13,12 @@ const seatAcceptConsentVersion = '2026-08-15';
 class AuthApi {
   AuthApi();
 
+  Future<String> _deviceName(String? override) async {
+    final given = override?.trim();
+    if (given != null && given.isNotEmpty) return given;
+    return readOsDeviceLabel();
+  }
+
   Future<RegisterResult> register({
     String? deviceUuid,
     String? platform,
@@ -22,8 +29,8 @@ class AuthApi {
       '/auth/register',
       data: {
         'device_uuid': id,
-        if (platform != null) 'platform': platform,
-        if (deviceName != null) 'device_name': deviceName,
+        'platform': platform ?? 'android',
+        'device_name': await _deviceName(deviceName),
       },
     );
     if (resp.statusCode != 200 || resp.data is! Map) {
@@ -39,6 +46,7 @@ class AuthApi {
   Future<RegisterResult> recover({
     required String recoveryCode,
     String? deviceUuid,
+    String? platform,
     String? deviceName,
     int? replaceDeviceId,
   }) async {
@@ -48,9 +56,8 @@ class AuthApi {
       data: {
         'recovery_code': recoveryCode,
         'device_uuid': id,
-        'platform': 'android',
-        if (deviceName != null && deviceName.isNotEmpty)
-          'device_name': deviceName,
+        'platform': platform ?? 'android',
+        'device_name': await _deviceName(deviceName),
         if (replaceDeviceId != null) 'replace_device_id': replaceDeviceId,
       },
     );
@@ -102,8 +109,7 @@ class AuthApi {
         'code': code,
         'device_uuid': id,
         'platform': 'android',
-        if (deviceName != null && deviceName.isNotEmpty)
-          'device_name': deviceName,
+        'device_name': await _deviceName(deviceName),
         'consent_version': seatAcceptConsentVersion,
       },
     );
@@ -173,8 +179,7 @@ class AuthApi {
       data: {
         'device_uuid': id,
         'platform': 'android',
-        if (deviceName != null && deviceName.isNotEmpty)
-          'device_name': deviceName,
+        'device_name': await _deviceName(deviceName),
       },
     );
     if (resp.statusCode != 200 || resp.data is! Map) {
@@ -240,6 +245,23 @@ class AuthApi {
       throw Exception('leave device failed: ${resp.statusCode}');
     }
     return LeaveDeviceResult.fromJson(Map<String, dynamic>.from(resp.data as Map));
+  }
+
+  /// Rename a device slot. Returns session when the API sends one.
+  Future<AccountSessionSnapshot?> renameDevice({
+    required int devicePk,
+    required String deviceName,
+  }) async {
+    final resp = await ApiClient.instance.patch(
+      '/devices/$devicePk',
+      data: {'device_name': deviceName},
+    );
+    if (resp.statusCode != 200 || resp.data is! Map) {
+      throw Exception('rename device failed: ${resp.statusCode}');
+    }
+    return AccountSessionSnapshot.fromJson(
+      Map<String, dynamic>.from(resp.data as Map),
+    );
   }
 
   /// Revoke another install's slot. Returns session when the API sends one.

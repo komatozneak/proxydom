@@ -1890,6 +1890,9 @@ object VpnChannelRegistry {
                         val includeIcons = call.argument<Boolean>("includeIcons") ?: true
                         result.success(listLauncherApps(appContext, includeIcons))
                     }
+                    "getDeviceLabel" -> {
+                        result.success(DeviceLabel.raw(appContext))
+                    }
                     else -> result.notImplemented()
                 }
             }

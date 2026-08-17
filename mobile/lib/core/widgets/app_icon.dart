@@ -58,6 +58,7 @@ abstract final class AppIcons {
   static const IconData gauge = PhosphorIconsRegular.gauge;
   static const IconData phone = PhosphorIconsRegular.phone;
   static const IconData devices = PhosphorIconsRegular.devices;
+  static const IconData pencil = PhosphorIconsRegular.pencilSimple;
   static const IconData crown = PhosphorIconsRegular.crown;
   static const IconData gamepad = PhosphorIconsRegular.gameController;
   static const IconData creditCard = PhosphorIconsRegular.creditCard;

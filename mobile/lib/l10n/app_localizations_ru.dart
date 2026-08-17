@@ -558,6 +558,24 @@ class AppL10nRu extends AppL10n {
   String get devicesUntitled => 'Устройство';
 
   @override
+  String get devicesRename => 'Переименовать';
+
+  @override
+  String get devicesRenameTitle => 'Имя устройства';
+
+  @override
+  String get devicesRenameHint => 'Так оно будет видно в списке';
+
+  @override
+  String get devicesRenameSave => 'Сохранить';
+
+  @override
+  String get devicesRenamed => 'Имя обновлено';
+
+  @override
+  String get devicesRenameFailed => 'Не удалось переименовать';
+
+  @override
   String get devicesThisDevice => 'Вы';
 
   @override

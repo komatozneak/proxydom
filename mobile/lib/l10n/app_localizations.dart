@@ -1105,6 +1105,42 @@ abstract class AppL10n {
   /// **'Device'**
   String get devicesUntitled;
 
+  /// No description provided for @devicesRename.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename'**
+  String get devicesRename;
+
+  /// No description provided for @devicesRenameTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Device name'**
+  String get devicesRenameTitle;
+
+  /// No description provided for @devicesRenameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Shown in the device list'**
+  String get devicesRenameHint;
+
+  /// No description provided for @devicesRenameSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get devicesRenameSave;
+
+  /// No description provided for @devicesRenamed.
+  ///
+  /// In en, this message translates to:
+  /// **'Name updated'**
+  String get devicesRenamed;
+
+  /// No description provided for @devicesRenameFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not rename device'**
+  String get devicesRenameFailed;
+
   /// No description provided for @devicesThisDevice.
   ///
   /// In en, this message translates to:

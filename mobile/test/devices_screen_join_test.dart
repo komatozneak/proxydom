@@ -79,6 +79,7 @@ void main() {
     expect(find.text('Выйти на всех устройствах'), findsNothing);
     expect(find.text('Android'), findsOneWidget);
     expect(find.text('Это устройство'), findsOneWidget);
+    expect(find.byTooltip('Переименовать'), findsOneWidget);
     expect(find.byTooltip('Отозвать'), findsNothing);
   });
 
@@ -126,6 +127,7 @@ void main() {
     expect(find.text('Выйти на всех устройствах'), findsOneWidget);
     expect(find.text('Это устройство'), findsOneWidget);
     expect(find.byTooltip('Отозвать'), findsOneWidget);
+    expect(find.byTooltip('Переименовать'), findsNWidgets(2));
     expect(find.text('iPhone'), findsOneWidget);
   });
 }

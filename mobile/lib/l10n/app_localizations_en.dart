@@ -559,6 +559,24 @@ class AppL10nEn extends AppL10n {
   String get devicesUntitled => 'Device';
 
   @override
+  String get devicesRename => 'Rename';
+
+  @override
+  String get devicesRenameTitle => 'Device name';
+
+  @override
+  String get devicesRenameHint => 'Shown in the device list';
+
+  @override
+  String get devicesRenameSave => 'Save';
+
+  @override
+  String get devicesRenamed => 'Name updated';
+
+  @override
+  String get devicesRenameFailed => 'Could not rename device';
+
+  @override
   String get devicesThisDevice => 'You';
 
   @override

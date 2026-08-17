@@ -95,6 +95,73 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
     }
   }
 
+  Future<void> _rename(DeviceSlot device) async {
+    final l = AppL10n.of(context);
+    final initial = (device.deviceName?.trim().isNotEmpty == true)
+        ? device.deviceName!.trim()
+        : '';
+    final controller = TextEditingController(text: initial);
+    final saved = await showDialog<String>(
+      context: context,
+      useRootNavigator: true,
+      builder: (ctx) {
+        return AlertDialog(
+          title: Text(l.devicesRenameTitle),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            maxLength: 128,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: InputDecoration(
+              hintText: l.devicesRenameHint,
+            ),
+            onSubmitted: (value) {
+              final trimmed = value.trim();
+              if (trimmed.isEmpty) return;
+              Navigator.of(ctx, rootNavigator: true).pop(trimmed);
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx, rootNavigator: true).pop(),
+              child: Text(l.devicesCancel),
+            ),
+            FilledButton(
+              onPressed: () {
+                final trimmed = controller.text.trim();
+                if (trimmed.isEmpty) return;
+                Navigator.of(ctx, rootNavigator: true).pop(trimmed);
+              },
+              child: Text(l.devicesRenameSave),
+            ),
+          ],
+        );
+      },
+    );
+    controller.dispose();
+    if (saved == null || saved.isEmpty || !mounted) return;
+    if (saved == initial) return;
+    setState(() => _busy = true);
+    try {
+      final snap = await AuthApi().renameDevice(
+        devicePk: device.id,
+        deviceName: saved,
+      );
+      if (snap != null) {
+        await ref.read(sessionProvider.notifier).apply(snap);
+      } else {
+        await ref.read(devicesListProvider.notifier).refresh();
+      }
+      if (!mounted) return;
+      showTeremokSnackBar(context, l.devicesRenamed);
+    } catch (_) {
+      if (!mounted) return;
+      showTeremokSnackBar(context, l.devicesRenameFailed);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _leave() async {
     final l = AppL10n.of(context);
     final ok = await showDialog<bool>(
@@ -311,6 +378,9 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
                   device: ordered[i],
                   l: l,
                   locale: locale,
+                  onRename: (ordered[i].isCurrent || currentIsOwner) && !_busy
+                      ? () => _rename(ordered[i])
+                      : null,
                   onRevoke: !ordered[i].isCurrent && currentIsOwner && !_busy
                       ? () => _revoke(ordered[i])
                       : null,
@@ -426,12 +496,14 @@ class _DeviceRow extends StatelessWidget {
     required this.l,
     required this.locale,
     required this.onRevoke,
+    this.onRename,
   });
 
   final DeviceSlot device;
   final AppL10n l;
   final String locale;
   final VoidCallback? onRevoke;
+  final VoidCallback? onRename;
 
   @override
   Widget build(BuildContext context) {
@@ -466,6 +538,16 @@ class _DeviceRow extends StatelessWidget {
               ],
             ),
           ),
+          if (onRename != null)
+            IconButton(
+              tooltip: l.devicesRename,
+              onPressed: onRename,
+              icon: AppIcon(
+                AppIcons.pencil,
+                size: 20,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
           if (device.isCurrent)
             Text(
               l.devicesCurrentDevice,
