@@ -1353,6 +1353,7 @@ object VpnChannelRegistry {
         serviceProvider: () -> TeremokVpnService?,
         onPermissionRequest: (MethodChannel.Result) -> Unit,
         onNotificationPermissionRequest: (MethodChannel.Result) -> Unit = {},
+        onInternetPermissionRequest: (MethodChannel.Result) -> Unit = {},
     ) {
         // MethodChannel — команды от Flutter
         MethodChannel(engine.dartExecutor.binaryMessenger, METHOD_CHANNEL)
@@ -1518,6 +1519,17 @@ object VpnChannelRegistry {
                     }
                     "requestNotificationPermission" -> {
                         onNotificationPermissionRequest(result)
+                    }
+                    "ensureInternetPermission" -> {
+                        onInternetPermissionRequest(result)
+                    }
+                    "bindToUnderlyingNetwork" -> {
+                        Thread({
+                            val ok = VpnUnderlyingNetworkPolicy.bindProcess(appContext)
+                            Handler(Looper.getMainLooper()).post {
+                                result.success(ok)
+                            }
+                        }, "bind-underlying").start()
                     }
                     "isShadeNotificationEnabled" -> {
                         result.success(ShadeNotification.isVisible(appContext))

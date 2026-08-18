@@ -31,6 +31,15 @@ class MainActivity : FlutterActivity() {
     @Volatile
     private var pendingTileConnect = false
 
+    private val internetLock = Any()
+    private val pendingInternetResults = mutableListOf<MethodChannel.Result>()
+    @Volatile
+    private var internetRequestInFlight = false
+    @Volatile
+    private var notifyAfterInternet = false
+    @Volatile
+    private var internetEmptyResultRetries = 0
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -67,24 +76,40 @@ class MainActivity : FlutterActivity() {
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         // Android 15 edge-to-edge: draw behind system bars; SafeArea keeps insets.
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        // Android 17 (API 37) on this Pixel: INTERNET is prot=dangerous.
-        // Without a runtime grant, Dart sockets fail with errno 13 (EACCES).
-        ensureInternetPermission()
         super.onCreate(savedInstanceState)
     }
+
+    private fun hasInternetPermission(): Boolean =
+        ContextCompat.checkSelfPermission(this, Manifest.permission.INTERNET) ==
+            PackageManager.PERMISSION_GRANTED
 
     /**
      * Request INTERNET when the platform treats it as dangerous (Android 17+).
      * On older builds where INTERNET is still normal/install-time, check returns
      * GRANTED and we no-op.
+     *
+     * Dart awaits this via MethodChannel before discovery/register so the
+     * POST_NOTIFICATIONS dialog cannot race sockets (errno 13).
      */
-    private fun ensureInternetPermission() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.INTERNET)
-            == PackageManager.PERMISSION_GRANTED
-        ) {
+    private fun ensureInternetPermission(flutterResult: MethodChannel.Result?) {
+        if (hasInternetPermission()) {
             Log.i(TAG, "INTERNET already granted")
+            flutterResult?.success(true)
             return
         }
+        val shouldRequest: Boolean
+        synchronized(internetLock) {
+            if (flutterResult != null) {
+                pendingInternetResults.add(flutterResult)
+            }
+            if (internetRequestInFlight) {
+                shouldRequest = false
+            } else {
+                internetRequestInFlight = true
+                shouldRequest = true
+            }
+        }
+        if (!shouldRequest) return
         Log.i(TAG, "Requesting runtime INTERNET (dangerous on Android 17+)")
         ActivityCompat.requestPermissions(
             this,
@@ -93,12 +118,39 @@ class MainActivity : FlutterActivity() {
         )
     }
 
+    private fun onInternetPermissionResult(granted: Boolean) {
+        val queued: List<MethodChannel.Result>
+        val shouldNotify: Boolean
+        synchronized(internetLock) {
+            internetRequestInFlight = false
+            queued = pendingInternetResults.toList()
+            pendingInternetResults.clear()
+            shouldNotify = notifyAfterInternet
+            notifyAfterInternet = false
+        }
+        Log.i(TAG, "INTERNET granted=$granted queued=${queued.size}")
+        for (pending in queued) {
+            pending.success(granted)
+        }
+        if (shouldNotify) {
+            ensureNotificationPermission(null)
+        }
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
         VpnStatusBroadcaster.attachAppContext(applicationContext)
-        // Prompt early so FGS notification is visible when VPN connects.
-        ensureNotificationPermission(null)
+        // Android 17: INTERNET is dangerous. Prompt here (activity is ready),
+        // not in onCreate before super — that dialog is dropped. Do not request
+        // POST_NOTIFICATIONS until INTERNET is resolved: a second
+        // requestPermissions() cancels the INTERNET dialog on API 37.
+        if (hasInternetPermission()) {
+            ensureNotificationPermission(null)
+        } else {
+            synchronized(internetLock) { notifyAfterInternet = true }
+            ensureInternetPermission(flutterResult = null)
+        }
         handleTileIntent(intent)
 
         VpnChannelRegistry.register(
@@ -126,6 +178,9 @@ class MainActivity : FlutterActivity() {
             },
             onNotificationPermissionRequest = { result ->
                 ensureNotificationPermission(result)
+            },
+            onInternetPermissionRequest = { result ->
+                ensureInternetPermission(result)
             },
         )
     }
@@ -170,9 +225,25 @@ class MainActivity : FlutterActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         when (requestCode) {
             REQUEST_INTERNET -> {
-                val granted = grantResults.isNotEmpty() &&
-                    grantResults[0] == PackageManager.PERMISSION_GRANTED
-                Log.i(TAG, "INTERNET granted=$granted")
+                if (grantResults.isEmpty()) {
+                    // Cancelled (activity not ready / overlapping prompt).
+                    val waiting: Boolean
+                    synchronized(internetLock) {
+                        internetRequestInFlight = false
+                        waiting = pendingInternetResults.isNotEmpty() ||
+                            notifyAfterInternet
+                    }
+                    if (waiting && internetEmptyResultRetries < 2) {
+                        internetEmptyResultRetries++
+                        ensureInternetPermission(flutterResult = null)
+                    } else {
+                        onInternetPermissionResult(hasInternetPermission())
+                    }
+                    return
+                }
+                internetEmptyResultRetries = 0
+                val granted = grantResults[0] == PackageManager.PERMISSION_GRANTED
+                onInternetPermissionResult(granted)
             }
             REQUEST_POST_NOTIFICATIONS -> {
                 val granted = grantResults.isNotEmpty() &&

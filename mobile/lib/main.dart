@@ -10,6 +10,7 @@ import 'core/api_discovery.dart';
 import 'core/config.dart';
 import 'core/diagnostics/app_log_buffer.dart';
 import 'core/diagnostics/diagnostics_service.dart';
+import 'core/internet_permission.dart';
 import 'core/jwt_interceptor.dart';
 import 'core/router.dart';
 import 'core/seat_join_links.dart';
@@ -32,12 +33,20 @@ void main() async {
     // Persist is best-effort; in-memory ring still feeds reports.
   }
 
-  // ADR 009: probe discovery hosts before auth/register.
-  try {
-    await ApiDiscovery.instance.refreshAndSelect();
-  } catch (e) {
+  // Android 17: INTERNET grant, then pin sockets off leftover tun0 (errno 13).
+  final internetOk = await ensureInternetPermissionGranted();
+  await bindProcessToUnderlyingNetwork();
+  if (!internetOk) {
     // ignore: avoid_print
-    print('[api.discovery] skipped: $e');
+    print('[api.discovery] skipped: INTERNET permission denied');
+  } else {
+    // ADR 009: probe discovery hosts before auth/register.
+    try {
+      await ApiDiscovery.instance.refreshAndSelect();
+    } catch (e) {
+      // ignore: avoid_print
+      print('[api.discovery] skipped: $e');
+    }
   }
 
   final container = ProviderContainer();

@@ -1,10 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/api_discovery.dart';
 import '../../../core/api_secret_storage.dart';
 import '../../../core/config.dart';
 import '../../../core/device_info_helper.dart';
 import '../../../core/install_id_storage.dart';
+import '../../../core/internet_permission.dart';
 import '../../../core/router.dart';
 import '../../../core/token_storage.dart';
 import '../../session/application/session_provider.dart';
@@ -138,6 +140,13 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
   /// Retry device register after network failure.
   Future<void> retryBootstrap() async {
     state = const AsyncLoading();
+    await ensureInternetPermissionGranted();
+    await bindProcessToUnderlyingNetwork();
+    try {
+      await ApiDiscovery.instance.refreshAndSelect();
+    } catch (e) {
+      debugPrint('api.discovery retry skipped: $e');
+    }
     state = AsyncData(await _registerDevice());
   }
 

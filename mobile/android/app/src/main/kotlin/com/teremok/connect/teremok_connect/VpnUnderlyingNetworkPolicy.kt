@@ -1,6 +1,7 @@
 package com.teremok.connect.teremok_connect
 
 import android.content.Context
+import android.net.ConnectivityManager
 import android.net.Network
 import android.net.VpnService
 import android.util.Log
@@ -32,6 +33,33 @@ internal object VpnUnderlyingNetworkPolicy {
         val iface = DefaultNetworkMonitor.currentInterfaceName?.takeIf { it.isNotBlank() }
             ?: return null
         return Underlying(network, iface)
+    }
+
+    /**
+     * Pin this process (Flutter Dio / Dart sockets) to Wi‑Fi/LTE, not tun0.
+     *
+     * VpnService.protect() is only for native Hy2 fds. Unprotected Dart
+     * connect() to the control plane gets EACCES (errno 13) while a leftover
+     * TUN / Always-on lockdown is up — even when INTERNET is granted.
+     */
+    fun bindProcess(context: Context, timeoutMs: Long = 3_000): Boolean {
+        DefaultNetworkMonitor.prewarm(context)
+        if (!DefaultNetworkMonitor.awaitUnderlyingNetwork(context, timeoutMs)) {
+            Log.w(TAG, "bindProcess skipped — no underlying network")
+            return false
+        }
+        val net = DefaultNetworkMonitor.defaultNetwork ?: return false
+        val iface = DefaultNetworkMonitor.currentInterfaceName ?: "(unknown)"
+        val cm = context.getSystemService(ConnectivityManager::class.java)
+        return runCatching {
+            val ok = cm.bindProcessToNetwork(net)
+            Log.i(TAG, "bindProcessToNetwork iface=$iface ok=$ok")
+            DiagnosticRing.append(TAG, "bind.process $iface ok=$ok")
+            ok
+        }.getOrElse {
+            Log.w(TAG, "bindProcessToNetwork failed iface=$iface", it)
+            false
+        }
     }
 
     /**
