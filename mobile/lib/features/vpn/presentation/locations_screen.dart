@@ -14,9 +14,13 @@ import '../../../l10n/app_localizations.dart';
 import '../../home/application/vpn_provider.dart';
 import '../../settings/application/subscription_status_provider.dart';
 import '../../settings/data/subscription_status.dart';
+import '../data/node_auto_selector.dart';
 import '../data/node_display.dart';
 import '../data/vpn_controller.dart';
 import '../data/vpn_node.dart';
+
+/// Key on the Locations Auto row flag (Home/Locations icon parity tests).
+const kLocationsAutoFlagKey = ValueKey<String>('locations-auto-flag');
 
 /// Full-screen region list (Locations tab).
 class LocationsScreen extends ConsumerStatefulWidget {
@@ -44,8 +48,9 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
   Widget build(BuildContext context) {
     final l = AppL10n.of(context);
     final theme = Theme.of(context);
-    final canPop = context.canPop();
+    final canPop = GoRouter.maybeOf(context)?.canPop() ?? false;
     final busy = ref.watch(busyOverlayProvider).isBusy;
+    ref.watch(vpnProvider);
     ref.listen<AsyncValue<SubscriptionStatus>>(subscriptionStatusProvider, (
       previous,
       next,
@@ -291,6 +296,16 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     }
 
     final locale = Localizations.localeOf(context).languageCode;
+    final autoSelected = selectedId == kRegionAutoId;
+    final poolFlags = uniqueAutoPoolFlags(
+      autoPoolFor(nodes, isPremium: userPremium),
+    );
+    final autoFlag = autoSelectionDisplayFlag(
+      catalog: nodes,
+      winnerId:
+          autoSelected ? ref.read(vpnProvider.notifier).autoWinnerId : null,
+      poolFlags: poolFlags,
+    );
 
     Widget sectionHeader(String title) => Padding(
           padding: const EdgeInsets.only(top: 12, bottom: 8),
@@ -314,7 +329,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
         // lock is communicated by the badge + gray styling, not the subtitle.
         final subtitle = placeSubtitle.isNotEmpty
             ? placeSubtitle
-                : displaySubtitleForNode(node, l);
+            : displaySubtitleForNode(node, l);
         out.add(
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
@@ -356,12 +371,16 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
         ],
         const SizedBox(height: 16),
         RegionTile(
-          selected: selectedId == kRegionAutoId,
-          leading: const LocationFlagIcon(flag: kFlagEurope, size: 40),
+          selected: autoSelected,
+          leading: LocationFlagIcon(
+            key: kLocationsAutoFlagKey,
+            flag: autoFlag,
+            size: 40,
+          ),
           title: l.regionAutoTitle,
           subtitle: l.regionAutoSubtitle,
           trailingBadge: l.regionSelected,
-          showBadge: selectedId == kRegionAutoId,
+          showBadge: autoSelected,
           onTap: () => _pick(kRegionAutoId),
         ),
         if (sections[LocationSection.premium]!.isNotEmpty) ...[

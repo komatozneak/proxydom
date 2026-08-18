@@ -208,19 +208,21 @@ void main() {
   test('sanitizeHomeLabel strips Premium suffix like Locations titles', () {
     expect(sanitizeHomeLabel('YouTube · Premium'), 'YouTube');
     expect(sanitizeHomeLabel('Игровой · Premium'), 'Игровой');
-    expect(placeForNode(
-      const VpnNode(
-        id: 'al-youtube',
-        label: 'YouTube · Premium',
-        host: '85.155.228.235',
-        port: 443,
-        status: 'connected',
-        isDefault: false,
-        purpose: 'youtube',
-        protocol: 'trusttunnel',
-        requiresPremium: true,
-      ),
-    ).title, 'YouTube');
+    expect(
+        placeForNode(
+          const VpnNode(
+            id: 'al-youtube',
+            label: 'YouTube · Premium',
+            host: '85.155.228.235',
+            port: 443,
+            status: 'connected',
+            isDefault: false,
+            purpose: 'youtube',
+            protocol: 'trusttunnel',
+            requiresPremium: true,
+          ),
+        ).title,
+        'YouTube');
   });
 
   testWidgets('Free quota meter sits above Nest with unlimited curtain',
@@ -240,7 +242,8 @@ void main() {
     );
     addTearDown(container.dispose);
 
-    await tester.pumpWidget(_app(container: container, home: const HomeScreen()));
+    await tester
+        .pumpWidget(_app(container: container, home: const HomeScreen()));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
@@ -271,7 +274,8 @@ void main() {
     );
     addTearDown(container.dispose);
 
-    await tester.pumpWidget(_app(container: container, home: const HomeScreen()));
+    await tester
+        .pumpWidget(_app(container: container, home: const HomeScreen()));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
@@ -349,8 +353,7 @@ void main() {
     expect(find.text('SUB_PAGE'), findsOneWidget);
   });
 
-  testWidgets(
-      'two fast taps from StatefulShellRoute open one /subscription',
+  testWidgets('two fast taps from StatefulShellRoute open one /subscription',
       (tester) async {
     final rootKey = GlobalKey<NavigatorState>(debugLabel: 'root');
     final router = GoRouter(
@@ -447,7 +450,7 @@ void main() {
     expect(find.byType(HomeScreen, skipOffstage: false), findsOneWidget);
   });
 
-  testWidgets('Auto connecting cycles pool flags, not globe emoji',
+  testWidgets('Auto connecting keeps the shared first-pool fallback',
       (tester) async {
     final container = ProviderContainer(
       overrides: [
@@ -464,7 +467,8 @@ void main() {
     );
     addTearDown(container.dispose);
 
-    await tester.pumpWidget(_app(container: container, home: const HomeScreen()));
+    await tester
+        .pumpWidget(_app(container: container, home: const HomeScreen()));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
@@ -485,7 +489,7 @@ void main() {
     expect(first, isNot('🌐'));
     expect([kFlagEurope, kFlagUsa], contains(first));
 
-    await tester.pump(kAutoFlagCyclePeriod + const Duration(milliseconds: 50));
+    await tester.pump(const Duration(milliseconds: 900));
     final second = tester
         .widget<LocationFlagIcon>(
           find.descendant(
@@ -495,13 +499,12 @@ void main() {
         )
         .flag;
     expect(second, isNot('🌐'));
-    expect(second, isNot(first));
-    expect([kFlagEurope, kFlagUsa], contains(second));
+    expect(second, first);
   });
 
   testWidgets('Home ServerCard strips · Premium like Locations titles',
       (tester) async {
-    final yt = VpnNode(
+    const yt = VpnNode(
       id: 'al-youtube',
       label: 'YouTube · Premium',
       host: '85.155.228.235',
@@ -537,7 +540,8 @@ void main() {
     );
     addTearDown(container.dispose);
 
-    await tester.pumpWidget(_app(container: container, home: const HomeScreen()));
+    await tester
+        .pumpWidget(_app(container: container, home: const HomeScreen()));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
@@ -570,7 +574,8 @@ void main() {
     );
     addTearDown(container.dispose);
 
-    await tester.pumpWidget(_app(container: container, home: const HomeScreen()));
+    await tester
+        .pumpWidget(_app(container: container, home: const HomeScreen()));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
@@ -601,7 +606,8 @@ void main() {
     );
     addTearDown(container.dispose);
 
-    await tester.pumpWidget(_app(container: container, home: const HomeScreen()));
+    await tester
+        .pumpWidget(_app(container: container, home: const HomeScreen()));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 

@@ -314,18 +314,33 @@ List<String> uniqueAutoPoolFlags(Iterable<VpnNode> pool) {
     if (flag == kFlagGlobe) continue;
     if (seen.add(flag)) out.add(flag);
   }
-  if (out.isEmpty) return [kFlagEurope, kFlagUsa];
+  if (out.isEmpty) return [kFlagGlobe];
   return out;
 }
 
-/// Period for cycling Auto-pool flags on Home while connecting.
-const Duration kAutoFlagCyclePeriod = Duration(milliseconds: 700);
+/// Catalog node that Auto proved, if [winnerId] is still in [catalog].
+VpnNode? autoWinnerNode(Iterable<VpnNode> catalog, String? winnerId) {
+  if (winnerId == null || winnerId.isEmpty) return null;
+  for (final n in catalog) {
+    if (n.id == winnerId) return n;
+  }
+  return null;
+}
 
-/// Flag shown on ServerCard during Auto connect (tick advances ~700ms).
-String autoConnectingDisplayFlag(List<String> poolFlags, int tick) {
-  final flags = poolFlags.isEmpty ? [kFlagEurope, kFlagUsa] : poolFlags;
-  final i = tick % flags.length;
-  return flags[i < 0 ? i + flags.length : i];
+/// Product flag for Auto on Home and the Locations Auto row.
+///
+/// Winner uses [placeForNode] so YouTube / Gaming / India / Latvia / USA match.
+/// Until prove finishes, both screens use the first Auto-pool flag.
+String autoSelectionDisplayFlag({
+  required Iterable<VpnNode> catalog,
+  String? winnerId,
+  List<String>? poolFlags,
+}) {
+  final winner = autoWinnerNode(catalog, winnerId);
+  if (winner != null) return placeForNode(winner).flag;
+  final flags = poolFlags ?? uniqueAutoPoolFlags(catalog);
+  if (flags.isNotEmpty) return flags.first;
+  return kFlagGlobe;
 }
 
 /// Which Locations section a node belongs to (first match wins).

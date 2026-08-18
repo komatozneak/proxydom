@@ -47,9 +47,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     with WidgetsBindingObserver {
   String _serverTitle = '…';
   String _serverSubtitle = '';
-  String _serverFlag = kFlagEurope;
+  String _serverFlag = kFlagGlobe;
   bool _selectionIsAuto = true;
-  List<String> _autoPoolFlags = const [kFlagEurope, kFlagUsa];
+  List<String> _autoPoolFlags = const [kFlagGlobe];
 
   /// Sticky key for last good Server card (selected id or egress).
   String? _placeStickyKey;
@@ -183,14 +183,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       } else {
         final winnerId = ref.read(vpnProvider.notifier).autoWinnerId;
         stickyKey = 'auto:${winnerId ?? egressHost ?? displayLabel ?? 'none'}';
-        if (winnerId != null && winnerId.isNotEmpty) {
-          for (final n in catalog) {
-            if (n.id == winnerId) {
-              placeNode = n;
-              break;
-            }
-          }
-        }
+        placeNode = autoWinnerNode(catalog, winnerId);
         placeNode ??= catalogNodeForHost(catalog, egressHost);
         if (placeNode != null) {
           place = placeForNode(placeNode);
@@ -198,9 +191,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       }
 
       if (place == null) {
-        final sanitized = displayLabel == null
-            ? ''
-            : sanitizeHomeLabel(displayLabel);
+        final sanitized =
+            displayLabel == null ? '' : sanitizeHomeLabel(displayLabel);
         final fallbackLabel = sanitized.isNotEmpty
             ? sanitized
             : (vpnStatus is VpnConnected
@@ -218,8 +210,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           place = await resolvePlaceForHost(
             egressHost,
             index: 0,
-            fallbackLabel:
-                fallbackLabel.isNotEmpty ? fallbackLabel : null,
+            fallbackLabel: fallbackLabel.isNotEmpty ? fallbackLabel : null,
           );
           // Keep title free of · Premium if resolve used unsanitized meta.
           final cleaned = sanitizeHomeLabel(place.title);
@@ -236,7 +227,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           place = NodePlace(
             title: sanitized.isNotEmpty ? sanitized : l.homeRegionAuto,
             subtitle: '',
-            flag: poolFlags.isNotEmpty ? poolFlags.first : kFlagEurope,
+            flag: autoSelectionDisplayFlag(
+              catalog: catalog,
+              winnerId:
+                  isAuto ? ref.read(vpnProvider.notifier).autoWinnerId : null,
+              poolFlags: poolFlags,
+            ),
           );
         }
       }
@@ -261,14 +257,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         if (isAuto && placeNode == null) {
           _serverTitle = l.regionAutoTitle;
           _serverSubtitle = l.regionAutoSubtitle;
-          _serverFlag = poolFlags.isNotEmpty ? poolFlags.first : kFlagEurope;
+          _serverFlag = autoSelectionDisplayFlag(
+            catalog: catalog,
+            winnerId: ref.read(vpnProvider.notifier).autoWinnerId,
+            poolFlags: poolFlags,
+          );
         } else if (place != null) {
           _serverTitle = place.displayTitle(locale);
           final city = place.displaySubtitle(locale).trim();
           if (placeNode != null) {
-            _serverSubtitle = city.isNotEmpty
-                ? city
-                : displaySubtitleForNode(placeNode, l);
+            _serverSubtitle =
+                city.isNotEmpty ? city : displaySubtitleForNode(placeNode, l);
           } else {
             _serverSubtitle = city;
           }
@@ -297,10 +296,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       setState(() {
         _serverTitle = l.homeRegion;
         _serverSubtitle = l.homeStatServer;
-        _serverFlag = kFlagEurope;
+        _serverFlag = kFlagGlobe;
         _placeStickyKey = null;
         _selectionIsAuto = true;
-        _autoPoolFlags = const [kFlagEurope, kFlagUsa];
+        _autoPoolFlags = const [kFlagGlobe];
       });
     }
   }
@@ -433,8 +432,6 @@ class _DashboardBody extends ConsumerStatefulWidget {
 
 class _DashboardBodyState extends ConsumerState<_DashboardBody> {
   String? _warmingHost;
-  Timer? _autoFlagTimer;
-  int _autoFlagTick = 0;
 
   /// Last Free meter so a background refresh does not unmount the bar.
   SubscriptionStatus? _stickyMeteredQuota;
@@ -456,44 +453,13 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
     if (mounted) await widget.onPlaceRefresh();
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _syncAutoFlagTimer();
-  }
-
-  @override
-  void dispose() {
-    _autoFlagTimer?.cancel();
-    super.dispose();
-  }
-
-  bool get _cycleAutoFlags =>
-      widget.selectionIsAuto && widget.status is VpnConnecting;
-
-  void _syncAutoFlagTimer() {
-    if (_cycleAutoFlags) {
-      _autoFlagTimer ??= Timer.periodic(kAutoFlagCyclePeriod, (_) {
-        if (!mounted) return;
-        setState(() => _autoFlagTick++);
-      });
-    } else {
-      _autoFlagTimer?.cancel();
-      _autoFlagTimer = null;
-      _autoFlagTick = 0;
-    }
-  }
-
   String get _displayFlag {
-    if (_cycleAutoFlags) {
-      return autoConnectingDisplayFlag(widget.autoPoolFlags, _autoFlagTick);
-    }
     if (widget.selectionIsAuto) {
       final flag = widget.serverFlag.trim();
       if (flag.isEmpty || flag == kFlagGlobe || flag == '🌍') {
         return widget.autoPoolFlags.isNotEmpty
             ? widget.autoPoolFlags.first
-            : kFlagEurope;
+            : kFlagGlobe;
       }
     }
     return widget.serverFlag;
@@ -517,10 +483,6 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
           widget.status is VpnDisconnected) {
         unawaited(ref.read(subscriptionStatusProvider.notifier).refresh());
       }
-    }
-    if (oldWidget.status != widget.status ||
-        oldWidget.selectionIsAuto != widget.selectionIsAuto) {
-      _syncAutoFlagTimer();
     }
   }
 
@@ -580,8 +542,7 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
     final showQuotaCta = status is VpnError && status.code == 'quota_exceeded';
     final liveQuota = ref.watch(subscriptionStatusProvider).asData?.value;
     if (liveQuota != null) {
-      _stickyMeteredQuota =
-          liveQuota.showsMeteredQuotaBar ? liveQuota : null;
+      _stickyMeteredQuota = liveQuota.showsMeteredQuotaBar ? liveQuota : null;
     }
     final quota = liveQuota != null && liveQuota.showsMeteredQuotaBar
         ? liveQuota

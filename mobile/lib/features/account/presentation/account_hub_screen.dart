@@ -167,7 +167,9 @@ class _HubBody extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          l.accountHubGuestLead,
+          profile.contactLinked
+              ? l.accountHubLinkedLead
+              : l.accountHubGuestLead,
           style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
@@ -230,7 +232,8 @@ class _HubBody extends ConsumerWidget {
         const SizedBox(height: 20),
         Text(
           l.accountHubAccessSection,
-          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+          style:
+              theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 8),
         _SectionCard(

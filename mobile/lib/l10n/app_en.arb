@@ -726,5 +726,19 @@
   "vpnDisclosureNotTitle": "What we do not do",
   "vpnDisclosureNotBody": "We do not log visited websites and do not use an advertising ID. We do not monetize other apps’ traffic by manipulating ads.",
   "vpnDisclosureAccept": "Accept and continue",
-  "vpnDisclosureDecline": "Not now"
+  "vpnDisclosureDecline": "Not now",
+  "accountTelegramLinkedTitle": "{handle} is linked",
+  "@accountTelegramLinkedTitle": {
+    "placeholders": {
+      "handle": {"type": "String"}
+    }
+  },
+  "accountTelegramLinkedBody": "You can restore access with this Telegram after reinstall.",
+  "accountTelegramOwnerRestoredTitle": "Your account is restored",
+  "accountTelegramOwnerRestoredBody": "You can manage the subscription and restore access via Telegram.",
+  "accountTelegramMemberRestoredTitle": "You’re back in the subscription",
+  "accountTelegramMemberRestoredBody": "The owner hasn’t changed. Access will refresh in the app.",
+  "accountTelegramDone": "Done",
+  "restoreTelegramSlotRevoked": "The owner removed this device. Ask for a new invite code.",
+  "restoreTelegramSubscriptionInactive": "The subscription is not active. After it is renewed you can restore this seat."
 }

@@ -515,5 +515,19 @@
   "vpnDisclosureNotTitle": "Чего мы не делаем",
   "vpnDisclosureNotBody": "Не ведём историю посещённых сайтов и не используем рекламный идентификатор. Не монетизируем трафик других приложений через подмену рекламы.",
   "vpnDisclosureAccept": "Принимаю и продолжить",
-  "vpnDisclosureDecline": "Не сейчас"
+  "vpnDisclosureDecline": "Не сейчас",
+  "accountTelegramLinkedTitle": "{handle} привязан",
+  "@accountTelegramLinkedTitle": {
+    "placeholders": {
+      "handle": {"type": "String"}
+    }
+  },
+  "accountTelegramLinkedBody": "После переустановки доступ можно восстановить через этот Telegram.",
+  "accountTelegramOwnerRestoredTitle": "Аккаунт восстановлен",
+  "accountTelegramOwnerRestoredBody": "Теперь можно управлять подпиской и восстанавливать доступ через Telegram.",
+  "accountTelegramMemberRestoredTitle": "Вернулись в подписку",
+  "accountTelegramMemberRestoredBody": "Владелец не изменился. Доступ подтянется в приложении.",
+  "accountTelegramDone": "Готово",
+  "restoreTelegramSlotRevoked": "Владелец удалил это устройство. Попросите новый код приглашения.",
+  "restoreTelegramSubscriptionInactive": "Подписка сейчас не активна. После продления место можно восстановить снова."
 }

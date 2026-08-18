@@ -14,6 +14,7 @@ import '../../account/application/telegram_identity.dart';
 import '../../account/presentation/telegram_link_dialog.dart';
 import '../../home/application/vpn_provider.dart';
 import '../../session/application/identity_reconnect.dart';
+import '../../session/application/session_provider.dart';
 import '../application/auth_provider.dart';
 import '../application/auth_state.dart';
 import '../data/auth_api.dart';
@@ -25,13 +26,16 @@ class RestoreAccessScreen extends ConsumerStatefulWidget {
   const RestoreAccessScreen({super.key});
 
   @override
-  ConsumerState<RestoreAccessScreen> createState() => _RestoreAccessScreenState();
+  ConsumerState<RestoreAccessScreen> createState() =>
+      _RestoreAccessScreenState();
 }
 
 class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
   final _controller = TextEditingController();
   bool _busy = false;
   bool _tgBusy = false;
+  bool _pollInFlight = false;
+  int _pollFailures = 0;
   String? _error;
   Timer? _pollTimer;
 
@@ -65,6 +69,7 @@ class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
     }
     setState(() {
       _tgBusy = true;
+      _pollFailures = 0;
       _error = null;
     });
     try {
@@ -80,13 +85,17 @@ class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
       await launchTelegramDeepLink(deepLink);
 
       _pollTimer?.cancel();
-      _pollTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
+      late Future<void> Function(Timer) pollOnce;
+      pollOnce = (timer) async {
+        if (_pollInFlight) return;
+        _pollInFlight = true;
         try {
           final poll = authed
               ? await AuthApi().pollTelegramLink(token)
               : await AuthApi().pollTelegramRecover(token);
-          final status = poll['status'];
-          if (status == 'needs_device_slot') {
+          _pollFailures = 0;
+          final outcome = TelegramPollOutcome.fromJson(poll);
+          if (outcome.status == TelegramPollStatus.needsDeviceSlot) {
             timer.cancel();
             if (!mounted) return;
             final devices = RestoreDeviceChoice.listFrom(poll['devices']);
@@ -111,17 +120,22 @@ class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
                     token: token,
                     deviceId: chosen.id,
                   );
-            if (replaced['status'] != 'confirmed') {
+            final replacement = TelegramPollOutcome.fromJson(replaced);
+            if (!replacement.isAccountRestore) {
               setState(() {
                 _tgBusy = false;
-                _error = AppL10n.of(context).restoreFailed;
+                _error = telegramPollErrorCopy(
+                  AppL10n.of(context),
+                  replacement.error,
+                );
               });
               return;
             }
-            final ok = await ref.read(authProvider.notifier).recoverWithTelegram(
-                  token: token,
-                  data: replaced,
-                );
+            final ok =
+                await ref.read(authProvider.notifier).recoverWithTelegram(
+                      token: token,
+                      data: replaced,
+                    );
             if (!mounted) return;
             if (ok) {
               unawaited(reconnectVpnAfterIdentityChange(ref));
@@ -135,12 +149,13 @@ class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
             }
             return;
           }
-          if (status == 'confirmed') {
+          if (outcome.isAccountRestore) {
             timer.cancel();
-            final ok = await ref.read(authProvider.notifier).recoverWithTelegram(
-                  token: token,
-                  data: poll,
-                );
+            final ok =
+                await ref.read(authProvider.notifier).recoverWithTelegram(
+                      token: token,
+                      data: poll,
+                    );
             if (!mounted) return;
             if (ok) {
               unawaited(reconnectVpnAfterIdentityChange(ref));
@@ -152,21 +167,50 @@ class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
                 _error = AppL10n.of(context).restoreFailed;
               });
             }
-          } else if (status == 'linked') {
+          } else if (outcome.status == TelegramPollStatus.linked) {
             timer.cancel();
+            await ref.read(sessionProvider.notifier).refresh();
             if (!mounted) return;
             AppRouter.postAuthResolved = true;
             context.go('/gate');
-          } else if (status == 'failed' || status == 'expired') {
+          } else if (outcome.status == TelegramPollStatus.confirmed) {
             timer.cancel();
             if (!mounted) return;
             setState(() {
               _tgBusy = false;
-              _error = poll['error'] ?? AppL10n.of(context).restoreFailed;
+              _error = AppL10n.of(context).restoreFailed;
+            });
+          } else if (outcome.status == TelegramPollStatus.failed ||
+              outcome.status == TelegramPollStatus.expired) {
+            timer.cancel();
+            if (!mounted) return;
+            setState(() {
+              _tgBusy = false;
+              _error = telegramPollErrorCopy(
+                AppL10n.of(context),
+                outcome.error,
+              );
             });
           }
-        } catch (_) {}
-      });
+        } catch (_) {
+          _pollFailures++;
+          if (!timer.isActive || _pollFailures >= 3) {
+            timer.cancel();
+            if (!mounted) return;
+            setState(() {
+              _tgBusy = false;
+              _error = AppL10n.of(context).restoreFailed;
+            });
+          }
+        } finally {
+          _pollInFlight = false;
+        }
+      };
+      _pollTimer = Timer.periodic(
+        const Duration(seconds: 2),
+        (timer) => unawaited(pollOnce(timer)),
+      );
+      unawaited(pollOnce(_pollTimer!));
     } catch (e) {
       if (!mounted) return;
       setState(() {

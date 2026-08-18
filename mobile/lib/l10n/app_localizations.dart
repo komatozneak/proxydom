@@ -2886,6 +2886,60 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Not now'**
   String get vpnDisclosureDecline;
+
+  /// No description provided for @accountTelegramLinkedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{handle} is linked'**
+  String accountTelegramLinkedTitle(String handle);
+
+  /// No description provided for @accountTelegramLinkedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'You can restore access with this Telegram after reinstall.'**
+  String get accountTelegramLinkedBody;
+
+  /// No description provided for @accountTelegramOwnerRestoredTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account is restored'**
+  String get accountTelegramOwnerRestoredTitle;
+
+  /// No description provided for @accountTelegramOwnerRestoredBody.
+  ///
+  /// In en, this message translates to:
+  /// **'You can manage the subscription and restore access via Telegram.'**
+  String get accountTelegramOwnerRestoredBody;
+
+  /// No description provided for @accountTelegramMemberRestoredTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'You’re back in the subscription'**
+  String get accountTelegramMemberRestoredTitle;
+
+  /// No description provided for @accountTelegramMemberRestoredBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The owner hasn’t changed. Access will refresh in the app.'**
+  String get accountTelegramMemberRestoredBody;
+
+  /// No description provided for @accountTelegramDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get accountTelegramDone;
+
+  /// No description provided for @restoreTelegramSlotRevoked.
+  ///
+  /// In en, this message translates to:
+  /// **'The owner removed this device. Ask for a new invite code.'**
+  String get restoreTelegramSlotRevoked;
+
+  /// No description provided for @restoreTelegramSubscriptionInactive.
+  ///
+  /// In en, this message translates to:
+  /// **'The subscription is not active. After it is renewed you can restore this seat.'**
+  String get restoreTelegramSubscriptionInactive;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

@@ -1540,4 +1540,38 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get vpnDisclosureDecline => 'Не сейчас';
+
+  @override
+  String accountTelegramLinkedTitle(String handle) {
+    return '$handle привязан';
+  }
+
+  @override
+  String get accountTelegramLinkedBody =>
+      'После переустановки доступ можно восстановить через этот Telegram.';
+
+  @override
+  String get accountTelegramOwnerRestoredTitle => 'Аккаунт восстановлен';
+
+  @override
+  String get accountTelegramOwnerRestoredBody =>
+      'Теперь можно управлять подпиской и восстанавливать доступ через Telegram.';
+
+  @override
+  String get accountTelegramMemberRestoredTitle => 'Вернулись в подписку';
+
+  @override
+  String get accountTelegramMemberRestoredBody =>
+      'Владелец не изменился. Доступ подтянется в приложении.';
+
+  @override
+  String get accountTelegramDone => 'Готово';
+
+  @override
+  String get restoreTelegramSlotRevoked =>
+      'Владелец удалил это устройство. Попросите новый код приглашения.';
+
+  @override
+  String get restoreTelegramSubscriptionInactive =>
+      'Подписка сейчас не активна. После продления место можно восстановить снова.';
 }

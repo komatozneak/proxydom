@@ -14,6 +14,7 @@ import '../../auth/data/restore_device_choice.dart';
 import '../../auth/presentation/restore_device_slot_dialog.dart';
 import '../../session/application/identity_reconnect.dart';
 import '../../session/application/session_provider.dart';
+import '../application/telegram_identity.dart';
 
 /// Interactive dialog for linking Telegram to the user's account.
 class TelegramLinkDialog extends ConsumerStatefulWidget {
@@ -32,7 +33,8 @@ class TelegramLinkDialog extends ConsumerStatefulWidget {
 }
 
 /// Prefer the native Telegram app so `start=` is not dropped by the browser.
-Uri telegramStartUri({required String botUsername, required String startPayload}) {
+Uri telegramStartUri(
+    {required String botUsername, required String startPayload}) {
   final bot = botUsername.replaceAll('@', '').trim();
   return Uri(
     scheme: 'tg',
@@ -99,6 +101,9 @@ class _TelegramLinkDialogState extends ConsumerState<TelegramLinkDialog>
   bool _starting = true;
   bool _linked = false;
   bool _restored = false;
+  bool _restoreIsMember = false;
+  bool _pollInFlight = false;
+  int _pollFailures = 0;
   String? _deepLink;
   String? _token;
   String? _linkedUsername;
@@ -140,6 +145,7 @@ class _TelegramLinkDialogState extends ConsumerState<TelegramLinkDialog>
 
     setState(() {
       _starting = true;
+      _pollFailures = 0;
       _error = null;
     });
 
@@ -172,18 +178,21 @@ class _TelegramLinkDialogState extends ConsumerState<TelegramLinkDialog>
 
   void _startPolling() {
     _pollTimer?.cancel();
-    _pollTimer = Timer.periodic(const Duration(seconds: 2), (_) => _checkStatus());
+    _pollTimer =
+        Timer.periodic(const Duration(seconds: 2), (_) => _checkStatus());
     // Also fire immediately so we don't wait 2s for the first poll.
     unawaited(_checkStatus());
   }
 
   Future<void> _checkStatus() async {
-    if (!mounted) return;
+    if (!mounted || _pollInFlight) return;
+    _pollInFlight = true;
     try {
       if (_token != null) {
         final poll = await AuthApi().pollTelegramLink(_token!);
-        final status = poll['status'];
-        if (status == 'needs_device_slot') {
+        _pollFailures = 0;
+        final outcome = TelegramPollOutcome.fromJson(poll);
+        if (outcome.status == TelegramPollStatus.needsDeviceSlot) {
           _pollTimer?.cancel();
           final devices = RestoreDeviceChoice.listFrom(poll['devices']);
           if (!mounted) return;
@@ -202,13 +211,18 @@ class _TelegramLinkDialogState extends ConsumerState<TelegramLinkDialog>
             token: _token!,
             deviceId: chosen.id,
           );
-          if (replaced['status'] != 'confirmed') {
+          final replacement = TelegramPollOutcome.fromJson(replaced);
+          if (!replacement.isAccountRestore) {
             if (!mounted) return;
             setState(() {
-              _error = AppL10n.of(context).restoreFailed;
+              _error = telegramPollErrorCopy(
+                AppL10n.of(context),
+                replacement.error,
+              );
             });
             return;
           }
+          final memberFromPayload = telegramRestoreIsMember(replaced);
           final ok = await ref.read(authProvider.notifier).recoverWithTelegram(
                 token: _token!,
                 data: replaced,
@@ -216,9 +230,13 @@ class _TelegramLinkDialogState extends ConsumerState<TelegramLinkDialog>
           if (!mounted) return;
           if (ok) {
             unawaited(reconnectVpnAfterIdentityChange(ref));
+            final session = ref.read(sessionProvider).valueOrNull;
             setState(() {
               _linked = true;
               _restored = true;
+              _restoreIsMember = memberFromPayload ||
+                  (session != null && !session.manageAccount);
+              _linkedUsername = session?.telegramUsername;
             });
           } else {
             setState(() {
@@ -227,8 +245,9 @@ class _TelegramLinkDialogState extends ConsumerState<TelegramLinkDialog>
           }
           return;
         }
-        if (status == 'confirmed') {
+        if (outcome.isAccountRestore) {
           _pollTimer?.cancel();
+          final memberFromPayload = telegramRestoreIsMember(poll);
           final ok = await ref.read(authProvider.notifier).recoverWithTelegram(
                 token: _token!,
                 data: poll,
@@ -236,29 +255,51 @@ class _TelegramLinkDialogState extends ConsumerState<TelegramLinkDialog>
           if (!mounted) return;
           if (ok) {
             unawaited(reconnectVpnAfterIdentityChange(ref));
+            final session = ref.read(sessionProvider).valueOrNull;
             setState(() {
               _linked = true;
               _restored = true;
+              _restoreIsMember = memberFromPayload ||
+                  (session != null && !session.manageAccount);
+              _linkedUsername = session?.telegramUsername;
+            });
+          } else {
+            setState(() {
+              _error = AppL10n.of(context).restoreFailed;
             });
           }
           return;
         }
-        if (status == 'linked') {
+        if (outcome.status == TelegramPollStatus.linked) {
           _pollTimer?.cancel();
           await ref.read(sessionProvider.notifier).refresh();
           if (!mounted) return;
           final session = ref.read(sessionProvider).valueOrNull;
           setState(() {
             _linked = true;
+            _restored = false;
+            _restoreIsMember = false;
             _linkedUsername = session?.telegramUsername;
           });
           return;
         }
-        if (status == 'failed' || status == 'expired') {
+        if (outcome.status == TelegramPollStatus.confirmed) {
           _pollTimer?.cancel();
           if (!mounted) return;
           setState(() {
-            _error = AppL10n.of(context).accountTelegramStartFailed;
+            _error = AppL10n.of(context).restoreFailed;
+          });
+          return;
+        }
+        if (outcome.status == TelegramPollStatus.failed ||
+            outcome.status == TelegramPollStatus.expired) {
+          _pollTimer?.cancel();
+          if (!mounted) return;
+          setState(() {
+            _error = telegramPollErrorCopy(
+              AppL10n.of(context),
+              outcome.error,
+            );
           });
           return;
         }
@@ -270,10 +311,23 @@ class _TelegramLinkDialogState extends ConsumerState<TelegramLinkDialog>
         _pollTimer?.cancel();
         setState(() {
           _linked = true;
+          _restored = false;
+          _restoreIsMember = false;
           _linkedUsername = session.telegramUsername;
         });
       }
-    } catch (_) {}
+    } catch (_) {
+      _pollFailures++;
+      if (_pollTimer?.isActive != true || _pollFailures >= 3) {
+        _pollTimer?.cancel();
+        if (!mounted) return;
+        setState(() {
+          _error = AppL10n.of(context).accountTelegramStartFailed;
+        });
+      }
+    } finally {
+      _pollInFlight = false;
+    }
   }
 
   @override
@@ -330,7 +384,12 @@ class _TelegramLinkDialogState extends ConsumerState<TelegramLinkDialog>
                 ),
               ),
               Text(
-                '$handle успешно привязан!',
+                telegramSuccessTitle(
+                  l,
+                  restored: _restored,
+                  member: _restoreIsMember,
+                  handle: handle,
+                ),
                 textAlign: TextAlign.center,
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w700,
@@ -338,7 +397,11 @@ class _TelegramLinkDialogState extends ConsumerState<TelegramLinkDialog>
               ),
               const SizedBox(height: 8),
               Text(
-                'Теперь вы можете управлять подпиской и восстанавливать доступ через Telegram.',
+                telegramSuccessBody(
+                  l,
+                  restored: _restored,
+                  member: _restoreIsMember,
+                ),
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
@@ -351,7 +414,7 @@ class _TelegramLinkDialogState extends ConsumerState<TelegramLinkDialog>
                       ? TelegramLinkDialogResult.restored
                       : TelegramLinkDialogResult.linked,
                 ),
-                child: const Text('Готово'),
+                child: Text(l.accountTelegramDone),
               ),
             ] else ...[
               Text(

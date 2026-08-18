@@ -1532,4 +1532,39 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get vpnDisclosureDecline => 'Not now';
+
+  @override
+  String accountTelegramLinkedTitle(String handle) {
+    return '$handle is linked';
+  }
+
+  @override
+  String get accountTelegramLinkedBody =>
+      'You can restore access with this Telegram after reinstall.';
+
+  @override
+  String get accountTelegramOwnerRestoredTitle => 'Your account is restored';
+
+  @override
+  String get accountTelegramOwnerRestoredBody =>
+      'You can manage the subscription and restore access via Telegram.';
+
+  @override
+  String get accountTelegramMemberRestoredTitle =>
+      'You’re back in the subscription';
+
+  @override
+  String get accountTelegramMemberRestoredBody =>
+      'The owner hasn’t changed. Access will refresh in the app.';
+
+  @override
+  String get accountTelegramDone => 'Done';
+
+  @override
+  String get restoreTelegramSlotRevoked =>
+      'The owner removed this device. Ask for a new invite code.';
+
+  @override
+  String get restoreTelegramSubscriptionInactive =>
+      'The subscription is not active. After it is renewed you can restore this seat.';
 }

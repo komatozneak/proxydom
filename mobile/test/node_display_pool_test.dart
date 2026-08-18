@@ -185,7 +185,8 @@ void main() {
       );
       expect(displaySubtitleForNode(yt, l), l.regionBlurbYoutube);
       expect(displaySubtitleForNode(game, l), l.regionBlurbGaming);
-      expect(displaySubtitleForNode(yt, l), isNot(l.locationsPremiumUnavailable));
+      expect(
+          displaySubtitleForNode(yt, l), isNot(l.locationsPremiumUnavailable));
     });
 
     test('normalizeNodeHost strips IPv4 port', () {
@@ -213,8 +214,7 @@ void main() {
       expect(place.subtitle, isEmpty);
     });
 
-    test('gaming purpose shows Игровой with gamepad, not Germany',
-        () {
+    test('gaming purpose shows Игровой with gamepad, not Germany', () {
       const game = VpnNode(
         id: 'eu-gaming',
         label: 'Германия',
@@ -365,14 +365,111 @@ void main() {
       region: 'eu',
     );
     expect(uniqueAutoPoolFlags([eu, us, eu2]), [kFlagEurope, kFlagUsa]);
-    expect(uniqueAutoPoolFlags(const []), [kFlagEurope, kFlagUsa]);
+    expect(uniqueAutoPoolFlags(const []), [kFlagGlobe]);
   });
 
-  test('autoConnectingDisplayFlag cycles the pool', () {
-    const flags = [kFlagEurope, kFlagUsa];
-    expect(autoConnectingDisplayFlag(flags, 0), kFlagEurope);
-    expect(autoConnectingDisplayFlag(flags, 1), kFlagUsa);
-    expect(autoConnectingDisplayFlag(flags, 2), kFlagEurope);
-    expect(autoConnectingDisplayFlag(const [], 0), kFlagEurope);
+  test('autoSelectionDisplayFlag uses winner place, else Auto-pool fallback',
+      () {
+    const eu = VpnNode(
+      id: 'eu-hy2-1',
+      label: 'Европа · Бесплатно',
+      host: '217.60.3.9',
+      port: 443,
+      status: 'connected',
+      isDefault: true,
+      protocol: kVpnNodeProtocolHysteria2,
+      region: 'eu',
+    );
+    const us = VpnNode(
+      id: 'us-hy2-1',
+      label: 'США · Бесплатно',
+      host: '45.91.248.91',
+      port: 443,
+      status: 'connected',
+      isDefault: false,
+      protocol: kVpnNodeProtocolHysteria2,
+      purpose: 'geo-us',
+    );
+    const yt = VpnNode(
+      id: 'al-youtube',
+      label: 'YouTube · Premium',
+      host: '85.155.228.235',
+      port: 443,
+      status: 'connected',
+      isDefault: false,
+      purpose: 'youtube',
+      requiresPremium: true,
+    );
+    const india = VpnNode(
+      id: 'in-geo-1',
+      label: 'Индия · Премиум',
+      host: '107.181.139.193',
+      port: 443,
+      status: 'connected',
+      isDefault: false,
+      purpose: 'geo-in',
+      requiresPremium: true,
+    );
+    const game = VpnNode(
+      id: 'eu-gaming',
+      label: 'Игровой · Premium',
+      host: '204.11.2.216',
+      port: 443,
+      status: 'connected',
+      isDefault: false,
+      purpose: 'gaming',
+      requiresPremium: true,
+    );
+    final catalog = [eu, us, yt, india, game];
+    final freeFlags = uniqueAutoPoolFlags([eu, us]);
+    expect(
+      autoSelectionDisplayFlag(
+        catalog: catalog,
+        winnerId: null,
+        poolFlags: freeFlags,
+      ),
+      kFlagEurope,
+    );
+    expect(
+      autoSelectionDisplayFlag(
+        catalog: catalog,
+        winnerId: 'al-youtube',
+        poolFlags: freeFlags,
+      ),
+      'youtube',
+    );
+    expect(
+      autoSelectionDisplayFlag(
+        catalog: catalog,
+        winnerId: 'eu-gaming',
+        poolFlags: freeFlags,
+      ),
+      'gaming',
+    );
+    expect(
+      autoSelectionDisplayFlag(
+        catalog: catalog,
+        winnerId: 'in-geo-1',
+        poolFlags: freeFlags,
+      ),
+      kFlagIndia,
+    );
+    expect(
+      autoSelectionDisplayFlag(
+        catalog: catalog,
+        winnerId: 'us-hy2-1',
+        poolFlags: freeFlags,
+      ),
+      kFlagUsa,
+    );
+    expect(autoWinnerNode(catalog, 'al-youtube')?.id, 'al-youtube');
+    expect(autoWinnerNode(catalog, null), isNull);
+    expect(
+      autoSelectionDisplayFlag(
+        catalog: const [],
+        winnerId: null,
+      ),
+      kFlagGlobe,
+    );
   });
 }
