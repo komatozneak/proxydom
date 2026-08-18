@@ -17,7 +17,7 @@ import android.widget.Toast
  * В release-сборке Шага 19 этот файл будет удалён (или помечен @VisibleForTesting).
  *
  * Использование:
- * 1. adb shell am start -n com.teremok.connect.teremok_connect/.DebugVpnActivity
+ * 1. adb shell am start -n com.teremok.connect.teremok_connect.debug/.DebugVpnActivity
  * 2. Нажать "Start VPN" → системный диалог "Разрешить VPN"
  * 3. Разрешить → в logcat: "TeremokVpn: TUN interface established"
  * 4. Нажать "Stop VPN" → "TUN interface closed"

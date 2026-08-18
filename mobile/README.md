@@ -17,8 +17,16 @@ cd mobile
 flutter pub get
 flutter test
 flutter run
-flutter build apk --release
 ```
+
+`flutter run` ставит `com.teremok.connect.teremok_connect.debug`. APK для сайта / Pixel — только с upload keystore:
+
+```powershell
+cd mobile\android
+.\build-sideload.ps1
+```
+
+`flutter build apk --release` без `key.properties` даёт CI-пакет `…teremok_connect.ci` (debug-подпись), его нельзя класть в `/downloads`.
 
 Прод API по умолчанию; эмулятор: `--dart-define=APP_ENV=dev`.
 

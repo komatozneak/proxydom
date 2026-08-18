@@ -10,7 +10,7 @@
         <!-- ТОЛЬКО ДЛЯ DEBUG: ручной старт VpnService без Flutter UI.
              НЕ имеет LAUNCHER intent-filter, чтобы не перехватывать главный запуск
              (Flutter run запускает MainActivity по умолчанию). Доступна через
-             `adb shell am start -n com.teremok.connect.teremok_connect/.DebugVpnActivity`.
+             `adb shell am start -n com.teremok.connect.teremok_connect.debug/.DebugVpnActivity`.
 
              usesCleartextTraffic="true" разрешает HTTP (не HTTPS) к localhost/10.0.2.2
              для dev backend. В release этого не будет. -->

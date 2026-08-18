@@ -80,6 +80,21 @@ jobs:
             exit 1
           fi
 
+      - name: Verify non-production package suffixes
+        working-directory: mobile
+        run: |
+          # debug/profile/CI must not occupy the Play/sideload applicationId.
+          # Ids are set on ApplicationVariant (onVariants), not applicationIdSuffix:
+          # Flutter 3.32–3.35 copies buildTypes onto library plugins (flutter#169215).
+          if grep -q 'applicationId.set("$productionApplicationId.debug")' android/app/build.gradle.kts \
+            && grep -q 'applicationId.set("$productionApplicationId.profile")' android/app/build.gradle.kts \
+            && grep -q 'applicationId.set("$productionApplicationId.ci")' android/app/build.gradle.kts; then
+            echo "package ids OK (.debug / .profile / .ci via onVariants)"
+          else
+            echo "onVariants applicationId for debug/profile/ci missing from build.gradle.kts"
+            exit 1
+          fi
+
   build-android:
     name: Build Android APK
     needs: analyze-test
@@ -133,18 +148,60 @@ jobs:
           echo "=== Sizes ==="
           du -sh build/app/outputs/flutter-apk/*.apk 2>/dev/null || true
 
-      # Compile must produce the universal APK; upload is best-effort so an
-      # Actions storage-quota hit cannot fail an otherwise green build
-      # (4× ABI uploads @ 30d previously exhausted the account).
-      - name: Verify release APK exists
-        run: test -f mobile/build/app/outputs/flutter-apk/app-release.apk
+      # CI APK is compile smoke only (debug-signed, package suffix .ci / .debug).
+      # Never publish this artifact to the site — use mobile/android/build-sideload.ps1.
+      - name: Verify CI APK exists
+        run: |
+          if [ "${{ github.event.inputs.debug_build }}" = "true" ]; then
+            test -f mobile/build/app/outputs/flutter-apk/app-debug.apk
+          else
+            test -f mobile/build/app/outputs/flutter-apk/app-release.apk
+          fi
 
-      - name: Upload universal APK
+      - name: Verify CI APK is not the production package
+        working-directory: mobile
+        run: |
+          python3 <<'PY'
+          import json, pathlib, sys
+          debug = "${{ github.event.inputs.debug_build }}" == "true"
+          variant = "debug" if debug else "release"
+          expected = (
+              "com.teremok.connect.teremok_connect.debug"
+              if debug
+              else "com.teremok.connect.teremok_connect.ci"
+          )
+          forbidden = "com.teremok.connect.teremok_connect"
+          candidates = list(pathlib.Path("build/app/outputs").rglob("output-metadata.json"))
+          matches = [p for p in candidates if variant in p.parts]
+          meta_path = matches[0] if matches else (candidates[0] if candidates else None)
+          if meta_path is None:
+              sys.exit("missing Gradle output-metadata.json after flutter build apk")
+          data = json.loads(meta_path.read_text(encoding="utf-8"))
+          app_id = data.get("applicationId")
+          print(f"metadata={meta_path} applicationId={app_id}")
+          if app_id == forbidden:
+              sys.exit("CI APK used production applicationId; refuse to upload")
+          if app_id != expected:
+              sys.exit(f"expected {expected}, got {app_id}")
+          PY
+
+      - name: Upload CI-only APK
+        if: github.event.inputs.debug_build != 'true'
         uses: actions/upload-artifact@v4
         continue-on-error: true
         with:
-          name: android-apk-universal
+          name: android-apk-ci
           path: mobile/build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Upload CI debug APK
+        if: github.event.inputs.debug_build == 'true'
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: android-apk-ci-debug
+          path: mobile/build/app/outputs/flutter-apk/app-debug.apk
           retention-days: 7
           if-no-files-found: error
 
@@ -154,16 +211,16 @@ jobs:
           {
             echo "## Android Build Summary"
             echo ""
-            echo "| Artifact | Path | Approx Size |"
-            echo "|---|---|---|"
-            echo "| Universal APK | android-apk-universal | ~110 MB |"
+            echo "| Artifact | Path | Package | Approx Size |"
+            echo "|---|---|---|---|"
+            echo "| CI unsigned release | android-apk-ci | com.teremok.connect.teremok_connect.ci | ~110 MB |"
             echo ""
-            echo "Retention: 7 days (universal only; ABI splits not uploaded)."
-            echo "Upload is best-effort (continue-on-error) so storage quota"
-            echo "cannot fail a green compile."
+            echo "This artifact is **CI-only** (debug-signed, \`.ci\` suffix)."
+            echo "Do **not** upload it to /downloads. Sideload APK:"
+            echo "\`mobile/android/build-sideload.ps1\` (upload keystore required)."
             echo ""
-            echo "Local/Pixel: prefer \`flutter build apk --release --split-per-abi\`"
-            echo "and install arm64-v8a for modern devices."
+            echo "Retention: 7 days. Upload is best-effort (continue-on-error)"
+            echo "so storage quota cannot fail a green compile."
           } >> "$GITHUB_STEP_SUMMARY"
 
   integration-test:
