@@ -83,10 +83,11 @@ void main() async {
     await container.read(logoutHandlerProvider).logout();
   };
 
-  // Warm auth restore before first frame so GoRouter sees tokens on cold start.
-  await container.read(authProvider.future);
+  // Do not await auth here: Play 0.1.7 sat on the launcher icon for the full
+  // register timeout. GoRouter keeps /bootstrap while [authProvider] loads.
   await AppRouter.warmWelcomeFlag();
   await attachSeatJoinLinks(container);
+  container.read(authProvider);
 
   // Связываем GoRouter с authProvider: при смене состояния авторизации
   // вызываем refreshNotifier.notifyAuthChanged(), чтобы GoRouter пересчитал redirect.

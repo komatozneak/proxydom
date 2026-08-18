@@ -15,6 +15,7 @@ class BootstrapFailedScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppL10n.of(context);
     final theme = Theme.of(context);
+    final loading = ref.watch(authProvider).isLoading;
     return Scaffold(
       body: Center(
         child: Padding(
@@ -31,8 +32,16 @@ class BootstrapFailedScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
               FilledButton(
-                onPressed: () => ref.read(authProvider.notifier).retryBootstrap(),
-                child: Text(l.homeRetry),
+                onPressed: loading
+                    ? null
+                    : () => ref.read(authProvider.notifier).retryBootstrap(),
+                child: loading
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(l.homeRetry),
               ),
               const SizedBox(height: 12),
               OutlinedButton(

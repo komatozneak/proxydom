@@ -9,6 +9,7 @@ import '../features/auth/application/auth_provider.dart'
 import '../features/auth/application/auth_state.dart';
 import '../features/auth/data/recovery_code_storage.dart';
 import '../features/auth/presentation/bootstrap_failed_screen.dart';
+import '../features/auth/presentation/bootstrap_loading_screen.dart';
 import '../features/auth/presentation/recovery_code_screen.dart';
 import '../features/auth/presentation/restore_access_screen.dart';
 import '../features/beta/presentation/locked_access_screen.dart';
@@ -84,15 +85,12 @@ class AppRouter {
 
   static final GoRouter config = GoRouter(
     navigatorKey: rootNavigatorKey,
-    // Prefer /home: with tokens restored in main() before runApp, redirect
-    // sends authed users through /gate instead of flashing /login.
-    initialLocation: '/home',
+    // First frame is /bootstrap so cold register never blocks runApp.
+    // Authed users redirect through /gate once [authProvider] resolves.
+    initialLocation: '/bootstrap',
     refreshListenable: refreshNotifier,
     redirect: (context, state) {
       final auth = _readAuth(context);
-      // Still loading / no ProviderScope — do not bounce to login.
-      if (auth == null) return null;
-
       final loc = state.matchedLocation;
       final goingToWelcome = loc == '/welcome';
       final goingToGate = loc == '/gate';
@@ -100,6 +98,7 @@ class AppRouter {
       final goingToLocked = loc == '/locked';
       final goingToRecovery = loc == '/recovery';
       final goingToRestore = loc == '/restore';
+      final goingToBootstrap = loc == '/bootstrap';
       final goingToBootstrapFail = loc == '/bootstrap-failed';
       final goingToOnboarding = loc == '/onboarding';
       final inShell = loc == '/home' ||
@@ -109,12 +108,26 @@ class AppRouter {
       // /subscription + /premium parked outside shell — still require auth gate.
       final goingToBillingTabs = loc == '/subscription' || loc == '/premium';
 
+      // Still loading / no ProviderScope — keep the bootstrap spinner on screen.
+      if (auth == null) {
+        if (goingToBootstrap) return null;
+        return '/bootstrap';
+      }
+
       if (auth is AuthStateBootstrapFailed) {
         if (goingToBootstrapFail || goingToRestore) return null;
         return '/bootstrap-failed';
       }
 
       final isAuthed = auth is AuthStateAuthenticated;
+
+      if (goingToBootstrap) {
+        if (isAuthed) return '/gate';
+        if (auth is AuthStateUnauthenticated) {
+          return AppConfig.authAnonymous ? '/welcome' : '/bootstrap-failed';
+        }
+        return null;
+      }
 
       if (!isAuthed) {
         postAuthResolved = false;
@@ -157,6 +170,10 @@ class AppRouter {
       return '/gate';
     },
     routes: [
+      GoRoute(
+        path: '/bootstrap',
+        builder: (c, s) => const BootstrapLoadingScreen(),
+      ),
       GoRoute(path: '/welcome', builder: (c, s) => const WelcomeScreen()),
       GoRoute(path: '/gate', builder: (c, s) => const PostAuthGateScreen()),
       GoRoute(path: '/promo', builder: (c, s) => const PromoCodeScreen()),

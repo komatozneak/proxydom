@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
 import 'package:flutter/foundation.dart';
@@ -44,7 +42,6 @@ class ApiClient {
       ),
     );
     _refreshClient = refreshClient;
-    _pinControlPlaneDns(refreshClient);
     configureSignedRetryClient(refreshClient);
 
     final dio = Dio(
@@ -58,7 +55,6 @@ class ApiClient {
         validateStatus: (status) => status != null && status < 500,
       ),
     );
-    _pinControlPlaneDns(dio);
 
     dio.interceptors.add(V2PathInterceptor());
     dio.interceptors.add(HmacSignatureInterceptor());
@@ -100,62 +96,13 @@ class ApiClient {
   static bool shouldInstallHttpLogging({required bool isDebugMode}) =>
       isDebugMode;
 
-  /// VPN TUN DNS sometimes fails host lookup for the API hostname even though
-  /// the control-plane IP is excludeRoute'd.
-  ///
-  /// IMPORTANT: for `https:` [HttpClient.connectionFactory] must return a
-  /// [SecureSocket] (or ConnectionTask thereof). A plain [Socket] makes Dio
-  /// send cleartext HTTP to :8443 → Caddy `400 Bad Request` (non-JSON body),
-  /// which the gate shows as «Не удалось проверить доступ».
-  static void _pinControlPlaneDns(Dio dio) {
-    dio.httpClientAdapter = IOHttpClientAdapter(
-      createHttpClient: () {
-        final client = HttpClient();
-        client.connectionFactory = (uri, proxyHost, proxyPort) async {
-          if (proxyHost != null && proxyPort != null) {
-            return Socket.startConnect(proxyHost, proxyPort);
-          }
-          final InternetAddress address;
-          if (isControlPlaneHost(uri.host)) {
-            address = InternetAddress(AppConfig.vpsIpv4);
-          } else {
-            final lookedUp = await InternetAddress.lookup(uri.host);
-            if (lookedUp.isEmpty) {
-              throw const SocketException('Failed host lookup');
-            }
-            address = lookedUp.first;
-          }
-          if (uri.isScheme('https')) {
-            // Connect TCP to pinned IP, then TLS with SNI/cert = uri.host.
-            return _startSecureConnect(
-              address: address,
-              port: uri.port,
-              sniHost: uri.host,
-            );
-          }
-          return Socket.startConnect(address, uri.port);
-        };
-        return client;
-      },
-    );
-  }
-
-  /// [ConnectionTask] that upgrades a raw TCP connect to [SecureSocket].
-  static Future<ConnectionTask<Socket>> _startSecureConnect({
-    required InternetAddress address,
-    required int port,
-    required String sniHost,
-  }) async {
-    final rawTask = await Socket.startConnect(address, port);
-    return ConnectionTask.fromSocket(
-      rawTask.socket.then((raw) {
-        return SecureSocket.secure(
-          raw,
-          host: sniHost,
-        );
-      }),
-      rawTask.cancel,
-    );
+  /// Play 0.1.7 hung on a custom IP-pinned [SecureSocket] factory.
+  /// Auth and discovery must share the default OS TLS stack.
+  @visibleForTesting
+  static bool usesDefaultTlsTransport(Dio client) {
+    final adapter = client.httpClientAdapter;
+    if (adapter is! IOHttpClientAdapter) return false;
+    return adapter.createHttpClient == null;
   }
 
   /// POST with the longer auth timeout budget used by bootstrap/recovery flows.

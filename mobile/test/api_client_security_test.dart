@@ -78,4 +78,22 @@ void main() {
       isTrue,
     );
   });
+
+  test('control-plane Dio uses default TLS, not a pinned SecureSocket factory',
+      () {
+    expect(ApiClient.usesDefaultTlsTransport(ApiClient.instance), isTrue);
+    final refresh = Dio(
+      BaseOptions(baseUrl: 'https://api.teremokconnect.online:8443/v2'),
+    );
+    expect(ApiClient.usesDefaultTlsTransport(refresh), isTrue);
+  });
+
+  test('primary Dio keeps v2 remap, HMAC, and JWT refresh interceptors', () {
+    final types = ApiClient.instance.interceptors
+        .map((interceptor) => interceptor.runtimeType.toString())
+        .toList();
+    expect(types, contains('V2PathInterceptor'));
+    expect(types, contains('HmacSignatureInterceptor'));
+    expect(types, contains('JwtRefreshInterceptor'));
+  });
 }
