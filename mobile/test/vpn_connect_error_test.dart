@@ -32,7 +32,7 @@ void main() {
       final err = vpnErrorFromNativeDetail(
         'path_incompatible: auto: no candidate passed data-plane prove',
       );
-      expect(err.code, 'path_incompatible');
+      expect(err.code, kVpnPathIncompatibleErrorCode);
     });
 
     test('maps session PathIncompatible to path_incompatible', () {
@@ -45,7 +45,7 @@ void main() {
               'path_incompatible: auto: no candidate passed data-plane prove',
         ),
       );
-      expect(err.code, 'path_incompatible');
+      expect(err.code, kVpnPathIncompatibleErrorCode);
     });
 
     test('falls back when detail empty', () {
@@ -379,6 +379,78 @@ void main() {
   group('shouldAutoConnectAfterIdentityChange', () {
     test('restore/link never auto-starts a connect walk', () {
       expect(shouldAutoConnectAfterIdentityChange(), isFalse);
+    });
+  });
+
+  group('isWifiUnderlying', () {
+    test('treats wlan and wifi iface as Wi-Fi', () {
+      expect(isWifiUnderlying(iface: 'wlan0'), isTrue);
+      expect(isWifiUnderlying(iface: 'wlan1'), isTrue);
+      expect(isWifiUnderlying(iface: 'wifi0'), isTrue);
+      expect(
+        isWifiUnderlying(
+          iface: 'rmnet0',
+          transport: VpnPathTransport.wifi,
+        ),
+        isTrue,
+      );
+    });
+
+    test('does not treat cellular as Wi-Fi', () {
+      expect(isWifiUnderlying(iface: 'rmnet0'), isFalse);
+      expect(
+        isWifiUnderlying(
+          iface: 'wlan0',
+          transport: VpnPathTransport.cellular,
+        ),
+        isFalse,
+      );
+    });
+
+    test('does not treat native unknown placeholder as Wi-Fi', () {
+      expect(isWifiUnderlying(iface: '(unknown)'), isFalse);
+      expect(isWifiUnderlying(iface: 'unknown'), isFalse);
+      expect(isWifiUnderlying(iface: ''), isFalse);
+    });
+  });
+
+  group('shouldRetryAutoOnWifi', () {
+    test('retries once on Wi-Fi only', () {
+      expect(
+        shouldRetryAutoOnWifi(
+          alreadyRetried: false,
+          userStopping: false,
+          isWifi: true,
+        ),
+        isTrue,
+      );
+    });
+
+    test('does not retry twice or after Nest stop', () {
+      expect(
+        shouldRetryAutoOnWifi(
+          alreadyRetried: true,
+          userStopping: false,
+          isWifi: true,
+        ),
+        isFalse,
+      );
+      expect(
+        shouldRetryAutoOnWifi(
+          alreadyRetried: false,
+          userStopping: true,
+          isWifi: true,
+        ),
+        isFalse,
+      );
+      expect(
+        shouldRetryAutoOnWifi(
+          alreadyRetried: false,
+          userStopping: false,
+          isWifi: false,
+        ),
+        isFalse,
+      );
     });
   });
 }

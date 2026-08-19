@@ -619,6 +619,12 @@ abstract class AppL10n {
   /// **'Couldn’t connect. Please try again.'**
   String get homeErrorFriendly;
 
+  /// No description provided for @homePathIncompatibleHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t reach a server. Tap again or pick a location yourself.'**
+  String get homePathIncompatibleHint;
+
   /// No description provided for @homeQuotaExceededTitle.
   ///
   /// In en, this message translates to:

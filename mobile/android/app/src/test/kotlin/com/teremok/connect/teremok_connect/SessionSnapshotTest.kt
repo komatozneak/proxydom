@@ -70,6 +70,22 @@ class SessionSnapshotTest {
     }
 
     @Test
+    fun `path incompatible snapshot carries wifi path fields`() {
+        val snap = SessionSnapshot(
+            phase = SessionPhase.Error,
+            generation = 4L,
+            reason = SessionReason.PathIncompatible,
+            underlyingIface = "wlan0",
+            transport = PathTransport.Wifi,
+            detail = "path_incompatible: auto: no candidate passed data-plane prove",
+        )
+        assertEquals("wlan0", snap.underlyingIface)
+        assertEquals(PathTransport.Wifi, snap.transport)
+        assertEquals(SessionReason.PathIncompatible, snap.reason)
+        assertEquals("error", snap.phase.toLegacyStatus())
+    }
+
+    @Test
     fun `session reason fromWire is case insensitive`() {
         assertEquals(SessionReason.EgressTimeout, SessionReason.fromWire("EgressTimeout"))
         assertEquals(SessionReason.EgressTimeout, SessionReason.fromWire("egresstimeout"))

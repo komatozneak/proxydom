@@ -9,6 +9,7 @@ import 'package:teremok_connect/features/home/presentation/home_screen.dart';
 import 'package:teremok_connect/features/vpn/data/vpn_controller.dart';
 import 'package:teremok_connect/features/vpn/data/vpn_node.dart';
 import 'package:teremok_connect/features/vpn/data/vpn_nodes_repository.dart';
+import 'package:teremok_connect/features/vpn/domain/vpn_connect_error.dart';
 import 'package:teremok_connect/l10n/app_localizations.dart';
 
 class _FakeVpnNodesRepository extends VpnNodesRepository {
@@ -33,6 +34,21 @@ class _FixedVpnNotifier extends VpnNotifier {
 
   @override
   VpnStatus build() => _status;
+}
+
+class _CancelTrackingNotifier extends VpnNotifier {
+  _CancelTrackingNotifier(this._status);
+
+  final VpnStatus _status;
+  int disconnectCalls = 0;
+
+  @override
+  VpnStatus build() => _status;
+
+  @override
+  Future<void> disconnect() async {
+    disconnectCalls++;
+  }
 }
 
 void main() {
@@ -105,7 +121,8 @@ void main() {
       findsWidgets,
     );
     expect(find.text('Открыть настройки VPN'), findsOneWidget);
-    expect(find.text('Не удалось подключиться. Попробуйте снова.'), findsNothing);
+    expect(
+        find.text('Не удалось подключиться. Попробуйте снова.'), findsNothing);
   });
 
   testWidgets('Home shows permission hint without VPN settings CTA',
@@ -141,5 +158,77 @@ void main() {
     expect(find.text('Ошибка подключения'), findsOneWidget);
     expect(find.textContaining('Разрешите VPN'), findsOneWidget);
     expect(find.text('Открыть настройки VPN'), findsNothing);
+  });
+
+  testWidgets('Home shows path_incompatible hint, not generic friendly error',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          vpnNodesRepositoryProvider
+              .overrideWithValue(_FakeVpnNodesRepository()),
+          vpnProvider.overrideWith(
+            () => _FixedVpnNotifier(
+              const VpnError(
+                message: kVpnPathIncompatibleErrorCode,
+                code: kVpnPathIncompatibleErrorCode,
+              ),
+            ),
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light,
+          locale: const Locale('ru'),
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          home: const HomeScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('Ошибка подключения'), findsOneWidget);
+    expect(
+      find.text(
+        'Не вышло проверить сервер. Нажмите ещё раз или выберите локацию вручную.',
+      ),
+      findsOneWidget,
+    );
+    expect(
+        find.text('Не удалось подключиться. Попробуйте снова.'), findsNothing);
+  });
+
+  testWidgets('Nest tap while Connecting cancels the walk', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final notifier = _CancelTrackingNotifier(
+      const VpnConnecting(progress: 0.55, hint: 'Латвия'),
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          vpnNodesRepositoryProvider
+              .overrideWithValue(_FakeVpnNodesRepository()),
+          vpnProvider.overrideWith(() => notifier),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light,
+          locale: const Locale('ru'),
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          home: const HomeScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    await tester.tap(find.byKey(kHomeSignalNestKey));
+    await tester.pump();
+
+    expect(notifier.disconnectCalls, 1);
   });
 }

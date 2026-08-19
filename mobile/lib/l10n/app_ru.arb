@@ -93,6 +93,7 @@
   "homeMoreMenu": "Ещё",
   "homeRetry": "Повторить",
   "homeErrorFriendly": "Не удалось подключиться. Попробуйте снова.",
+  "homePathIncompatibleHint": "Не вышло проверить сервер. Нажмите ещё раз или выберите локацию вручную.",
   "homeQuotaExceededTitle": "Лимит Free исчерпан",
   "homeQuotaExceededHint": "В этом месяце израсходованы 4,20 ГБ. Оформите Premium — без лимита трафика.",
   "homeQuotaUpgradeCta": "Оформить Premium",

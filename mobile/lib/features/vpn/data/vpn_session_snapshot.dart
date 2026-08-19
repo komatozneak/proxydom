@@ -163,8 +163,7 @@ bool shouldIgnoreRegressiveIdleSnapshot({
   required bool sessionOwnsUi,
   bool userStopping = false,
 }) {
-  if (incoming != VpnSessionPhase.idle &&
-      incoming != VpnSessionPhase.unknown) {
+  if (incoming != VpnSessionPhase.idle && incoming != VpnSessionPhase.unknown) {
     return false;
   }
   if (userStopping) return false;
@@ -193,11 +192,11 @@ bool connectingIdleShouldDrop({
   bool userStopping = false,
 }) {
   if (nativeIdleMustNotDemote(
-        walkActive: walkActive,
-        sessionOwnsUi: sessionOwnsUi,
-        lastPhase: lastPhase,
-        userStopping: userStopping,
-      )) {
+    walkActive: walkActive,
+    sessionOwnsUi: sessionOwnsUi,
+    lastPhase: lastPhase,
+    userStopping: userStopping,
+  )) {
     return false;
   }
   return lastPhase == VpnSessionPhase.idle || userStopping;
@@ -288,4 +287,28 @@ VpnPathTransport parseVpnPathTransport(String? raw) {
     default:
       return VpnPathTransport.unknown;
   }
+}
+
+/// Home Wi-Fi path: native `wlan*` / `wifi*` or PathPlan transport `wifi`.
+bool isWifiUnderlying({
+  String? iface,
+  VpnPathTransport transport = VpnPathTransport.unknown,
+}) {
+  if (transport == VpnPathTransport.wifi) return true;
+  if (transport == VpnPathTransport.cellular) return false;
+  final lower = iface?.trim().toLowerCase() ?? '';
+  if (lower.isEmpty || lower == '(unknown)' || lower == 'unknown') {
+    return false;
+  }
+  return lower.startsWith('wlan') || lower.startsWith('wifi');
+}
+
+/// One PathIncompatible Auto retry on Wi-Fi. Never loops; never after Nest stop.
+bool shouldRetryAutoOnWifi({
+  required bool alreadyRetried,
+  required bool userStopping,
+  required bool isWifi,
+}) {
+  if (alreadyRetried || userStopping || !isWifi) return false;
+  return true;
 }

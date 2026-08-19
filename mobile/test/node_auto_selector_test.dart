@@ -1,7 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:teremok_connect/features/vpn/data/node_auto_selector.dart';
 import 'package:teremok_connect/features/vpn/data/node_display.dart';
 import 'package:teremok_connect/features/vpn/data/vpn_node.dart';
+import 'package:teremok_connect/features/vpn/data/vpn_nodes_repository.dart';
 
 VpnNode _node({
   required String id,
@@ -28,6 +30,7 @@ VpnNode _node({
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   final euRetired = _node(id: 'eu-primary', label: 'Восточная Европа');
   final us = _node(
     id: 'us-hy2-1',
@@ -95,19 +98,46 @@ void main() {
     expect(autoPoolRank(youtube, isPremium: false), 4);
   });
 
-  test('Premium Auto pool tries YouTube first, then EU, US, gaming', () {
+  test('Premium Auto pool is EU then US, gaming, YouTube (SoT)', () {
     final pool = autoPoolFor(
       [youtube, us, euFree, euRetired, gaming, india],
       isPremium: true,
     );
     expect(
       pool.map((n) => n.id),
-      ['al-youtube', 'eu-hy2-1', 'us-hy2-1', 'eu-gaming'],
+      ['eu-hy2-1', 'us-hy2-1', 'eu-gaming', 'al-youtube'],
     );
     expect(gaming.inAutoPool(isPremium: true), isTrue);
     expect(youtube.inAutoPool(isPremium: true), isTrue);
     expect(euRetired.inAutoPool(isPremium: true), isFalse);
     expect(india.inAutoPool(isPremium: true), isFalse);
+    expect(autoPoolRank(euFree, isPremium: true), 0);
+    expect(autoPoolRank(us, isPremium: true), 1);
+    expect(autoPoolRank(gaming, isPremium: true), 2);
+    expect(autoPoolRank(youtube, isPremium: true), 3);
+  });
+
+  test('preferLastAutoWinner prepends a still-eligible winner', () {
+    final pool = autoPoolFor(
+      [youtube, us, euFree, gaming],
+      isPremium: true,
+    );
+    expect(
+      preferLastAutoWinner(pool, 'us-hy2-1').map((n) => n.id),
+      ['us-hy2-1', 'eu-hy2-1', 'eu-gaming', 'al-youtube'],
+    );
+    expect(
+      preferLastAutoWinner(pool, 'al-youtube').map((n) => n.id),
+      ['al-youtube', 'eu-hy2-1', 'us-hy2-1', 'eu-gaming'],
+    );
+    expect(
+      preferLastAutoWinner(pool, 'missing').map((n) => n.id),
+      pool.map((n) => n.id),
+    );
+    expect(
+      preferLastAutoWinner(pool, kRegionAutoId).first.id,
+      'eu-hy2-1',
+    );
   });
 
   test('Premium Auto skips locked YouTube and uses other nodes', () {
@@ -141,7 +171,8 @@ void main() {
     expect(autoCandidateHintLabel(us, languageCode: 'en'), 'USA');
     expect(autoCandidateHintLabel(euFree, languageCode: 'en'), 'Latvia');
     expect(autoCandidateHintLabel(gaming, languageCode: 'en'), 'Gaming');
-    expect(autoCandidateHintLabel(us, languageCode: 'en'), isNot(contains('Free')));
+    expect(autoCandidateHintLabel(us, languageCode: 'en'),
+        isNot(contains('Free')));
     expect(autoCandidateHintLabel(us), isNot(contains('Бесплатно')));
   });
 
@@ -158,5 +189,21 @@ void main() {
       resolveNodeIdForConfig(storedId: null, catalog: [us, euFree]),
       isNull,
     );
+  });
+
+  test(
+      'VpnNodesRepository persists Auto last winner across disconnect-shaped clear',
+      () async {
+    SharedPreferences.setMockInitialValues({});
+    final repo = VpnNodesRepository();
+    expect(await repo.getAutoLastWinnerId(), isNull);
+    await repo.setAutoLastWinnerId(kRegionAutoId);
+    expect(await repo.getAutoLastWinnerId(), isNull);
+    await repo.setAutoLastWinnerId('eu-hy2-1');
+    expect(await repo.getAutoLastWinnerId(), 'eu-hy2-1');
+    await repo.clearSelectedNodeId();
+    expect(await repo.getAutoLastWinnerId(), 'eu-hy2-1');
+    await repo.clearAutoLastWinnerId();
+    expect(await repo.getAutoLastWinnerId(), isNull);
   });
 }

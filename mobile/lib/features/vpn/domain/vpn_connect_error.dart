@@ -4,6 +4,9 @@ import '../data/vpn_session_snapshot.dart';
 /// Machine code when native SOCKS HTTPS pre-connect probe fails.
 const kVpnProbeFailedErrorCode = 'server_probe_failed';
 
+/// Auto walk: no candidate passed data-plane prove.
+const kVpnPathIncompatibleErrorCode = 'path_incompatible';
+
 final RegExp _socksProbeFailPattern = RegExp(
   r'^(.+?)@([^:\s]+):\s*SOCKS HTTPS probe failed\s*$',
   caseSensitive: false,
@@ -50,8 +53,8 @@ VpnError vpnErrorFromNativeDetail(
   }
   if (detail.toLowerCase().contains('path_incompatible')) {
     return const VpnError(
-      message: 'Авто: ни один сервер не прошёл проверку',
-      code: 'path_incompatible',
+      message: kVpnPathIncompatibleErrorCode,
+      code: kVpnPathIncompatibleErrorCode,
     );
   }
   return VpnError(message: 'vpn: $detail');
@@ -64,8 +67,8 @@ VpnError vpnErrorFromSession(
 }) {
   if (snap.reason == VpnSessionReason.pathIncompatible) {
     return const VpnError(
-      message: 'Авто: ни один сервер не прошёл проверку',
-      code: 'path_incompatible',
+      message: kVpnPathIncompatibleErrorCode,
+      code: kVpnPathIncompatibleErrorCode,
     );
   }
   return vpnErrorFromNativeDetail(

@@ -325,12 +325,15 @@ class VpnSessionEngine(
         if (!isAlive(gen)) return
         if (winner == null) {
             host.markPersistedInactive()
+            val iface = DefaultNetworkMonitor.currentInterfaceName
             publish(
                 SessionSnapshot(
                     phase = SessionPhase.Error,
                     generation = gen,
                     reason = SessionReason.PathIncompatible,
                     detail = "path_incompatible: auto: no candidate passed data-plane prove",
+                    underlyingIface = iface,
+                    transport = PathTransport.fromIface(iface),
                 ),
             )
         } else {

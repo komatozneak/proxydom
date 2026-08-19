@@ -318,10 +318,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final notifier = ref.read(vpnProvider.notifier);
     final status = ref.read(vpnProvider);
 
-    // Connecting: wait. A second tap must not disconnect (Always-on / lockdown).
-    // Do not reconcileWithNative here — getStatus() idle during Binding/Proving
-    // was demoting Nest to rest while the tunnel was coming up.
+    // Connecting: second tap cancels the walk (issue #147). Do not reconcile
+    // with native here — getStatus() idle during Binding/Proving used to
+    // demote Nest to rest while the tunnel was coming up.
     if (status is VpnConnecting || notifier.isConnectInFlight) {
+      await notifier.disconnect();
       return;
     }
 
@@ -533,6 +534,8 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
         l.settingsDevicesHint,
       VpnError(:final code) when code == 'quota_exceeded' =>
         l.homeQuotaExceededHint,
+      VpnError(:final code) when code == kVpnPathIncompatibleErrorCode =>
+        l.homePathIncompatibleHint,
       VpnError() => l.homeErrorFriendly,
     };
     final showVpnSettingsCta =

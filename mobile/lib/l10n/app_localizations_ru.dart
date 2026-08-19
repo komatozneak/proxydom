@@ -281,6 +281,10 @@ class AppL10nRu extends AppL10n {
   String get homeErrorFriendly => 'Не удалось подключиться. Попробуйте снова.';
 
   @override
+  String get homePathIncompatibleHint =>
+      'Не вышло проверить сервер. Нажмите ещё раз или выберите локацию вручную.';
+
+  @override
   String get homeQuotaExceededTitle => 'Лимит Free исчерпан';
 
   @override

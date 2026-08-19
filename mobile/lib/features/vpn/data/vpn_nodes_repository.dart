@@ -5,10 +5,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/api_client.dart';
 import '../../../core/vpn_nodes.dart';
+import 'node_display.dart';
 import 'vpn_node.dart';
 
 const _selectedNodeKey = SelectedRegionStore.key;
 const _nodesCacheKey = 'vpn_nodes_cache_v1';
+const _autoLastWinnerKey = 'vpn_auto_last_winner_id';
 
 /// Repository for node catalog + local selection persistence.
 ///
@@ -113,5 +115,23 @@ class VpnNodesRepository {
   Future<void> clearSelectedNodeId() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_selectedNodeKey);
+  }
+
+  /// Last Auto prove winner (not a manual Locations pick). Survives disconnect.
+  Future<String?> getAutoLastWinnerId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_autoLastWinnerKey);
+  }
+
+  Future<void> setAutoLastWinnerId(String nodeId) async {
+    final trimmed = nodeId.trim();
+    if (trimmed.isEmpty || trimmed == kRegionAutoId) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_autoLastWinnerKey, trimmed);
+  }
+
+  Future<void> clearAutoLastWinnerId() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_autoLastWinnerKey);
   }
 }

@@ -54,6 +54,15 @@ final _connectProvisionRetryPolicy = RetryPolicy(
   maxDelay: const Duration(seconds: 6),
 );
 
+/// Auto mint: short wall-clock so Wi-Fi does not stall Connecting before prove.
+final _autoMintRetryPolicy = RetryPolicy(
+  maxAttempts: 2,
+  initialDelay: const Duration(milliseconds: 400),
+  maxDelay: const Duration(seconds: 2),
+);
+
+const _autoMintTimeout = Duration(seconds: 8);
+
 const _connectedSinceKey = 'vpn_connected_since_ms';
 
 /// Home + analytics: another app holds Always-on / lockdown.
@@ -125,6 +134,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
 
   bool _shouldDropConnectingOnIdle() {
     if (state is! VpnConnecting) return false;
+    if (_wifiRetryPending) return false;
     return connectingIdleShouldDrop(
       walkActive: _sessionWalkActive,
       sessionOwnsUi: _sessionOwnsUi,
@@ -136,6 +146,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
   bool _isConnectStale(int gen) => gen != _connectGeneration;
 
   bool _idleMustNotDemote() {
+    if (_wifiRetryPending) return true;
     return nativeIdleMustNotDemote(
       walkActive: _sessionWalkActive,
       sessionOwnsUi: _sessionOwnsUi,
@@ -189,6 +200,19 @@ class VpnNotifier extends Notifier<VpnStatus> {
   /// Set after intentional stop / self-revoke — blocks [_scheduleReconnect]
   /// and syncFromNative auto-reconnect until the next user [connect].
   bool _suppressAutoReconnect = false;
+
+  /// One PathIncompatible Auto retry on Wi-Fi (issue #147).
+  bool _wifiAutoRetryUsed = false;
+  bool _wifiRetryPending = false;
+  Timer? _wifiRetryTimer;
+  String _lastAutoPoolIds = '';
+  int _autoConnectAttempt = 1;
+
+  void _cancelWifiRetry() {
+    _wifiRetryTimer?.cancel();
+    _wifiRetryTimer = null;
+    _wifiRetryPending = false;
+  }
 
   void _cancelConnectingWatchdog() {
     _connectingPoll?.cancel();
@@ -416,7 +440,9 @@ class VpnNotifier extends Notifier<VpnStatus> {
         'label': serverName,
         'protocol': protocol,
       });
-      unawaited(_persistConnectedUi(serverName: serverName, protocol: protocol));
+      unawaited(
+          _persistConnectedUi(serverName: serverName, protocol: protocol));
+      unawaited(_persistAutoLastWinner());
       return;
     }
     final since = await _resolveConnectedSince(freshSession: freshSession);
@@ -448,6 +474,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
       'protocol': protocol,
     });
     unawaited(_persistConnectedUi(serverName: serverName, protocol: protocol));
+    unawaited(_persistAutoLastWinner());
     unawaited(_logEgressProbe());
     unawaited(
       VpnController.instance.getUnderlyingNetworkInterface().then((iface) {
@@ -465,9 +492,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
 
   Future<void> _hydrateConnectedUi({String? winnerId}) async {
     final fromSnap = winnerId?.trim();
-    if (fromSnap != null &&
-        fromSnap.isNotEmpty &&
-        fromSnap != kRegionAutoId) {
+    if (fromSnap != null && fromSnap.isNotEmpty && fromSnap != kRegionAutoId) {
       _autoActiveNodeId = fromSnap;
       _applyAutoMint(fromSnap);
     }
@@ -533,6 +558,21 @@ class VpnNotifier extends Notifier<VpnStatus> {
     } catch (_) {}
   }
 
+  Future<void> _persistAutoLastWinner() async {
+    final id = _autoActiveNodeId?.trim();
+    if (id == null || id.isEmpty || id == kRegionAutoId) return;
+    try {
+      final repo = ref.read(vpnNodesRepositoryProvider);
+      final stored = await repo.getSelectedNodeId();
+      final useAuto =
+          stored == null || stored.isEmpty || stored == kRegionAutoId;
+      if (!useAuto) return;
+      await repo.setAutoLastWinnerId(id);
+    } on StateError {
+      // tests
+    } catch (_) {}
+  }
+
   /// After TUN is up: icanhazip vs catalog IPv4 (not SNI / expected_egress_host).
   Future<void> _logEgressProbe() async {
     try {
@@ -547,9 +587,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
         try {
           final stored =
               await ref.read(vpnNodesRepositoryProvider).getSelectedNodeId();
-          if (stored != null &&
-              stored.isNotEmpty &&
-              stored != kRegionAutoId) {
+          if (stored != null && stored.isNotEmpty && stored != kRegionAutoId) {
             winnerId = stored;
           }
         } on StateError {
@@ -739,6 +777,8 @@ class VpnNotifier extends Notifier<VpnStatus> {
     _autoMints.clear();
     _autoActiveNodeId = null;
     _catalogHost = null;
+    _cancelWifiRetry();
+    _wifiAutoRetryUsed = false;
     _cancelStatusSubscriptions();
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
@@ -844,7 +884,8 @@ class VpnNotifier extends Notifier<VpnStatus> {
         // Lost local api_secret while the server still knows this install:
         // re-register with the SAME install id re-returns the secret (ADR 012).
         // Never rotate here — that would orphan the install.
-        _vpnLog('[VPN] hmac_required → heal register (same install), retry once');
+        _vpnLog(
+            '[VPN] hmac_required → heal register (same install), retry once');
         await ApiSecretStorage.instance.clear();
         ref.read(vpnConfigRepositoryProvider).clearCache();
         await ref.read(authProvider.notifier).retryBootstrap();
@@ -861,7 +902,8 @@ class VpnNotifier extends Notifier<VpnStatus> {
         // The account owner revoked this install. Do NOT rotate + silently
         // mint a fresh anonymous account — the subscription stays on the old
         // one. Log out to Welcome, where restore is one tap away.
-        _vpnLog('[VPN] device_revoked → logout to Welcome (no silent register)');
+        _vpnLog(
+            '[VPN] device_revoked → logout to Welcome (no silent register)');
         await SessionExpiredGate.onDeviceRevoked?.call();
       }
       rethrow;
@@ -896,18 +938,31 @@ class VpnNotifier extends Notifier<VpnStatus> {
     if (gen != null && await _abortStaleConnect(gen)) return;
     final sub = ref.read(subscriptionStatusProvider).valueOrNull;
     final isPremium = sub?.unlocksPremium ?? false;
-    final pool = autoPoolFor(catalog, isPremium: isPremium);
+    String? lastWinner;
+    try {
+      lastWinner = await nodesRepo.getAutoLastWinnerId();
+    } on StateError {
+      lastWinner = null;
+    }
+    final pool = preferLastAutoWinner(
+      autoPoolFor(catalog, isPremium: isPremium),
+      lastWinner,
+    );
+    _lastAutoPoolIds = pool.map((n) => n.id).join(',');
     _vpnLog('[VPN] auto pool n=${pool.length} premium=$isPremium '
-        'ids=${pool.map((n) => n.id).join(',')}');
+        'winner=$lastWinner ids=$_lastAutoPoolIds attempt=$_autoConnectAttempt');
     ProductLog.event('vpn.connect_attempt', {
       'mode': 'auto',
-      'pool_ids': pool.map((n) => n.id).join(','),
+      'pool_ids': _lastAutoPoolIds,
       'premium': isPremium,
+      'attempt': _autoConnectAttempt,
+      'last_winner': lastWinner,
     });
     if (pool.isEmpty) {
       ProductLog.event('vpn.connect_fail', {
         'code': 'empty_pool',
         'reason': 'empty_pool',
+        'attempt': _autoConnectAttempt,
       });
       state = const VpnError(
         message: 'empty_pool',
@@ -921,104 +976,175 @@ class VpnNotifier extends Notifier<VpnStatus> {
       hint: firstHint,
     );
 
-    final payloads = <String>[];
     _autoMints.clear();
     _autoActiveNodeId = null;
-    for (final node in pool) {
-      if (gen != null && await _abortStaleConnect(gen)) return;
-      final candidateHint = _autoHintLabel(node);
-      state = VpnConnecting(
-        progress: 0.55,
-        hint: candidateHint,
+    List<_AutoMint?> minted;
+    try {
+      minted = await Future.wait([
+        for (final node in pool) _mintAutoNode(node, gen),
+      ]);
+    } on _AutoMintQuotaExceeded {
+      ProductLog.event('vpn.connect_fail', {'code': 'quota_exceeded'});
+      state = const VpnError(
+        message: 'quota_exceeded',
+        code: 'quota_exceeded',
       );
-      try {
-        final cfg = await _connectProvisionRetryPolicy.execute(
-          () => ref.read(vpnConfigRepositoryProvider).getConfig(
-                forceRefresh: true,
-                nodeId: node.id,
-              ),
-          shouldRetry: (e) async {
-            if (e is DioException) {
-              final code = e.response?.statusCode ?? 0;
-              if (e.error == 'quota_exceeded' ||
-                  _apiErrorCode(e) == 'quota_exceeded') {
-                return false;
-              }
-              if (code >= 400 && code < 500) return false;
-              if (e.error == 'tt_provision_failed' ||
-                  e.error == 'hy2_provision_failed') {
-                return false;
-              }
-            }
-            return e is! FormatException;
-          },
-        );
-        final label = _autoHintLabel(node);
-        _autoMints[node.id] = _AutoMint(
-          config: cfg,
-          label: label,
-          protocol: node.protocol,
-        );
-        if (_autoMints.length == 1) {
-          _applyAutoMint(node.id);
-        }
-        ProductLog.event('vpn.mint', {
-          'id': node.id,
-          'active_core': cfg.activeCore.name,
-          'protocol': node.protocol,
-        });
-        payloads.add(
-          await VpnController.instance.buildStartParamsJson(
-            cfg,
-            displayLabel: label,
-            catalogNodeId: node.id,
-          ),
-        );
-      } on DioException catch (e) {
-        if (e.error == 'quota_exceeded' ||
-            _apiErrorCode(e) == 'quota_exceeded') {
-          ProductLog.event('vpn.connect_fail', {'code': 'quota_exceeded'});
-          state = const VpnError(
-            message: 'quota_exceeded',
-            code: 'quota_exceeded',
-          );
-          return;
-        }
-        ProductLog.event('vpn.mint', {
-          'id': node.id,
-          'skip': true,
-          'code': e.error ?? _apiErrorCode(e) ?? e.response?.statusCode,
-        });
-        _vpnLog('[VPN] auto mint skip ${node.id}: $e', warn: true);
-      } catch (e) {
-        ProductLog.event('vpn.mint', {
-          'id': node.id,
-          'skip': true,
-          'code': e.runtimeType.toString(),
-        });
-        _vpnLog('[VPN] auto mint skip ${node.id}: $e', warn: true);
+      return;
+    }
+    if (gen != null && await _abortStaleConnect(gen)) return;
+
+    final payloads = <String>[];
+    for (var i = 0; i < pool.length; i++) {
+      final mint = minted[i];
+      if (mint == null) continue;
+      final node = pool[i];
+      _autoMints[node.id] = mint;
+      if (_autoMints.length == 1) {
+        _applyAutoMint(node.id);
       }
+      payloads.add(
+        await VpnController.instance.buildStartParamsJson(
+          mint.config,
+          displayLabel: mint.label,
+          catalogNodeId: node.id,
+        ),
+      );
     }
     if (payloads.isEmpty) {
-      ProductLog.event('vpn.connect_fail', {
-        'code': 'path_incompatible',
-        'reason': 'mint_empty',
-      });
-      state = const VpnError(
-        message: 'path_incompatible',
-        code: 'path_incompatible',
-      );
+      await _onAutoPathIncompatible(reason: 'mint_empty');
       return;
     }
     final started = await VpnController.instance.startAuto(payloads);
     if (!started) {
-      ProductLog.event('vpn.connect_fail', {'code': 'start_auto_false'});
+      ProductLog.event('vpn.connect_fail', {
+        'code': 'start_auto_false',
+        'pool_ids': _lastAutoPoolIds,
+        'attempt': _autoConnectAttempt,
+      });
       state = await _errorForStartFailure();
       return;
     }
     state = VpnConnecting(
       progress: 0.8,
       hint: firstHint,
+    );
+  }
+
+  Future<_AutoMint?> _mintAutoNode(VpnNode node, int? gen) async {
+    if (gen != null && await _abortStaleConnect(gen)) return null;
+    try {
+      final cfg = await _autoMintRetryPolicy.execute(
+        () => ref
+            .read(vpnConfigRepositoryProvider)
+            .getConfig(
+              forceRefresh: true,
+              nodeId: node.id,
+            )
+            .timeout(_autoMintTimeout),
+        shouldRetry: (e) async {
+          if (e is TimeoutException) return true;
+          if (e is DioException) {
+            final code = e.response?.statusCode ?? 0;
+            if (e.error == 'quota_exceeded' ||
+                _apiErrorCode(e) == 'quota_exceeded') {
+              return false;
+            }
+            if (code >= 400 && code < 500) return false;
+            if (e.error == 'tt_provision_failed' ||
+                e.error == 'hy2_provision_failed') {
+              return false;
+            }
+          }
+          return e is! FormatException;
+        },
+      );
+      if (gen != null && await _abortStaleConnect(gen)) return null;
+      final label = _autoHintLabel(node);
+      ProductLog.event('vpn.mint', {
+        'id': node.id,
+        'active_core': cfg.activeCore.name,
+        'protocol': node.protocol,
+      });
+      return _AutoMint(
+        config: cfg,
+        label: label,
+        protocol: node.protocol,
+      );
+    } on DioException catch (e) {
+      if (e.error == 'quota_exceeded' || _apiErrorCode(e) == 'quota_exceeded') {
+        throw _AutoMintQuotaExceeded();
+      }
+      ProductLog.event('vpn.mint', {
+        'id': node.id,
+        'skip': true,
+        'code': e.error ?? _apiErrorCode(e) ?? e.response?.statusCode,
+      });
+      _vpnLog('[VPN] auto mint skip ${node.id}: $e', warn: true);
+      return null;
+    } catch (e) {
+      ProductLog.event('vpn.mint', {
+        'id': node.id,
+        'skip': true,
+        'code': e.runtimeType.toString(),
+      });
+      _vpnLog('[VPN] auto mint skip ${node.id}: $e', warn: true);
+      return null;
+    }
+  }
+
+  Future<void> _onAutoPathIncompatible({
+    required String reason,
+    String? underlying,
+    VpnPathTransport transport = VpnPathTransport.unknown,
+  }) async {
+    var iface = underlying?.trim();
+    if (iface == null ||
+        iface.isEmpty ||
+        iface == '(unknown)' ||
+        iface.toLowerCase() == 'unknown') {
+      try {
+        iface = await VpnController.instance.getUnderlyingNetworkInterface();
+      } catch (_) {
+        iface = null;
+      }
+    }
+    if (iface == '(unknown)' || iface?.toLowerCase() == 'unknown') {
+      iface = null;
+    }
+    final wifi = isWifiUnderlying(iface: iface, transport: transport);
+    ProductLog.event('vpn.connect_fail', {
+      'code': kVpnPathIncompatibleErrorCode,
+      'reason': reason,
+      'underlying': iface,
+      'pool_ids': _lastAutoPoolIds,
+      'attempt': _autoConnectAttempt,
+    });
+    if (shouldRetryAutoOnWifi(
+      alreadyRetried: _wifiAutoRetryUsed,
+      userStopping: _suppressAutoReconnect,
+      isWifi: wifi,
+    )) {
+      _wifiAutoRetryUsed = true;
+      _autoConnectAttempt = 2;
+      _wifiRetryPending = true;
+      _vpnLog('[VPN] wifi auto retry after path_incompatible iface=$iface');
+      state = const VpnConnecting(progress: 0.45);
+      _wifiRetryTimer?.cancel();
+      _wifiRetryTimer = Timer(const Duration(milliseconds: 1500), () {
+        if (_suppressAutoReconnect) {
+          _wifiRetryPending = false;
+          return;
+        }
+        _wifiRetryPending = false;
+        unawaited(connect(forceRestart: true, wifiRetry: true));
+      });
+      return;
+    }
+    _endSessionWalk();
+    _cancelConnectingWatchdog();
+    state = const VpnError(
+      message: kVpnPathIncompatibleErrorCode,
+      code: kVpnPathIncompatibleErrorCode,
     );
   }
 
@@ -1085,9 +1211,15 @@ class VpnNotifier extends Notifier<VpnStatus> {
   Future<void> connect({
     bool forceRestart = false,
     bool reuseConfig = false,
+    bool wifiRetry = false,
   }) async {
     // Deduplicate concurrent connect() (auto-reconnect + nest tap).
     _suppressAutoReconnect = false;
+    if (!wifiRetry) {
+      _cancelWifiRetry();
+      _wifiAutoRetryUsed = false;
+      _autoConnectAttempt = 1;
+    }
     if (_connectInFlight != null) return _connectInFlight!;
     if (!forceRestart && state is VpnConnected) return;
 
@@ -1316,6 +1448,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
   /// Block auto-reconnect (device self-revoke / intentional stop side-effects).
   void suppressAutoReconnect() {
     _suppressAutoReconnect = true;
+    _cancelWifiRetry();
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
     _autoReconnectArmed = false;
@@ -1325,6 +1458,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
     _connectGeneration++;
     _activeConnectGen = null;
     _cancelConnectingWatchdog();
+    _cancelWifiRetry();
     _reconnectTimer?.cancel();
     _suppressAutoReconnect = true;
     _endSessionWalk();
@@ -1493,12 +1627,28 @@ class VpnNotifier extends Notifier<VpnStatus> {
       return;
     }
     if (snap.phase == VpnSessionPhase.error) {
+      final pathIncompatible = snap.reason ==
+              VpnSessionReason.pathIncompatible ||
+          (snap.detail?.toLowerCase().contains('path_incompatible') ?? false);
+      if (pathIncompatible) {
+        unawaited(
+          _onAutoPathIncompatible(
+            reason: snap.detail ?? snap.reason.name,
+            underlying: snap.underlyingIface,
+            transport: snap.transport,
+          ),
+        );
+        return;
+      }
       _endSessionWalk();
       _cancelConnectingWatchdog();
       _lastProveSummary = 'id=${snap.candidateId} fail ${snap.reason.name}';
       ProductLog.event('vpn.connect_fail', {
         'code': snap.reason.name,
         'detail': snap.detail,
+        'underlying': snap.underlyingIface,
+        'pool_ids': _lastAutoPoolIds,
+        'attempt': _autoConnectAttempt,
       });
       state = vpnErrorFromSession(snap);
       return;
@@ -1712,6 +1862,8 @@ String? _apiErrorCode(DioException e) {
   }
   return null;
 }
+
+final class _AutoMintQuotaExceeded implements Exception {}
 
 final class _AutoMint {
   const _AutoMint({

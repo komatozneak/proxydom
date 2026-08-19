@@ -4,13 +4,15 @@ import 'vpn_node.dart';
 /// Ordered Auto pool (ADR 015 / honest prove).
 ///
 /// Free: EU Hy2 → US Hy2.
-/// Premium: YouTube (if unlocked) → EU Hy2 → US Hy2 → gaming.
+/// Premium: same Free hops → gaming → YouTube (SoT `server-pool-sot.md`).
+/// Last Auto winner is prepended by [preferLastAutoWinner].
 /// SOCKS CONNECT :443 through the tunnel — not Cloudflare generate_204.
 List<VpnNode> autoPoolFor(
   Iterable<VpnNode> catalog, {
   required bool isPremium,
 }) {
-  final pool = catalog.where((n) => n.inAutoPool(isPremium: isPremium)).toList();
+  final pool =
+      catalog.where((n) => n.inAutoPool(isPremium: isPremium)).toList();
   pool.sort((a, b) {
     final ra = autoPoolRank(a, isPremium: isPremium);
     final rb = autoPoolRank(b, isPremium: isPremium);
@@ -22,14 +24,27 @@ List<VpnNode> autoPoolFor(
   return pool;
 }
 
-/// Free: EU → US. Premium: YouTube first, then the rest. India geo never Auto.
+/// Move a previous Auto winner to the front when it is still in the pool.
+List<VpnNode> preferLastAutoWinner(List<VpnNode> pool, String? winnerId) {
+  if (winnerId == null || winnerId.isEmpty || winnerId == kRegionAutoId) {
+    return pool;
+  }
+  final index = pool.indexWhere((n) => n.id == winnerId);
+  if (index <= 0) return pool;
+  final next = List<VpnNode>.from(pool);
+  final winner = next.removeAt(index);
+  next.insert(0, winner);
+  return next;
+}
+
+/// Free: EU → US. Premium: EU → US → gaming → YouTube. India geo never Auto.
 int autoPoolRank(VpnNode node, {required bool isPremium}) {
   if (node.isGeoIn) return 99;
   if (isPremium) {
-    if (node.isYoutube) return 0;
-    if (node.isGaming) return 3;
-    if (node.isGeoUs) return 2;
-    return 1;
+    if (node.isYoutube) return 3;
+    if (node.isGaming) return 2;
+    if (node.isGeoUs) return 1;
+    return 0;
   }
   if (node.isYoutube) return 4;
   if (node.isGaming) return 3;

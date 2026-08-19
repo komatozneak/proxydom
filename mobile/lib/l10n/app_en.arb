@@ -137,6 +137,8 @@
   "@homeRetry": {},
   "homeErrorFriendly": "Couldn’t connect. Please try again.",
   "@homeErrorFriendly": {},
+  "homePathIncompatibleHint": "Couldn’t reach a server. Tap again or pick a location yourself.",
+  "@homePathIncompatibleHint": {},
   "homeQuotaExceededTitle": "Free traffic used up",
   "@homeQuotaExceededTitle": {},
   "homeQuotaExceededHint": "You’ve used this month’s 4.20 GB. Upgrade to Premium for unlimited traffic.",

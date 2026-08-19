@@ -281,6 +281,10 @@ class AppL10nEn extends AppL10n {
   String get homeErrorFriendly => 'Couldn’t connect. Please try again.';
 
   @override
+  String get homePathIncompatibleHint =>
+      'Couldn’t reach a server. Tap again or pick a location yourself.';
+
+  @override
   String get homeQuotaExceededTitle => 'Free traffic used up';
 
   @override
