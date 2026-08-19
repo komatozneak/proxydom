@@ -45,7 +45,8 @@ func shouldSkipCDN(ip netip.Addr) bool {
 // is not used — our SOCKS listener is TCP CONNECT only, which broke DNS
 // and QUIC/YouTube (UDP ASSOCIATE: command not supported).
 type hyDialer struct {
-	c client.Client
+	c          client.Client
+	directDial func(network, addr string) (net.Conn, error)
 }
 
 var _ proxy.Dialer = (*hyDialer)(nil)
@@ -54,7 +55,11 @@ func (d *hyDialer) DialContext(_ context.Context, m *M.Metadata) (net.Conn, erro
 	if shouldSkipCDN(m.DstIP) {
 		return nil, errSkipCDN
 	}
-	return d.c.TCP(egressAddr(m))
+	addr := egressAddr(m)
+	if shouldDirectTCP(m) {
+		return d.dialDirect("tcp", addr)
+	}
+	return d.c.TCP(addr)
 }
 
 func (d *hyDialer) DialUDP(m *M.Metadata) (net.PacketConn, error) {

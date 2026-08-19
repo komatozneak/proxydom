@@ -138,38 +138,23 @@ String _newSiteId() {
 class SplitTunnelPrefs {
   SplitTunnelPrefs._();
 
-  static const _bundledRuKey = 'split_tunnel_bundled_ru_v1';
   static const _sitesKey = 'split_tunnel_custom_sites_v1';
   static const _appliedRevKey = 'split_tunnel_applied_rev_v1';
   static const _draftRevKey = 'split_tunnel_draft_rev_v1';
   static const _osnovnyeKey = 'split_tunnel_osnovnye_v1';
+  static const _osnovnyeRfDefaultsKey = 'split_tunnel_osnovnye_rf_defaults_v1';
   static const _disallowedAppsKey = 'split_tunnel_disallowed_apps_v1';
   static const _seededBypassKey = 'split_tunnel_seeded_bypass_v1';
+  static const _seededBypassV2Key = 'split_tunnel_seeded_bypass_v2';
 
-  /// Default ON — preserves existing RU `.srs` direct behavior.
-  static Future<bool> isBundledRuEnabled() async {
-    final map = await loadOsnovnyeEnabled();
-    return map['ru'] ?? true;
-  }
+  static Map<String, bool> _osnovnyeDefaults() => {
+        for (final c in kOsnovnyeCategories) c.id: c.defaultEnabled,
+      };
 
-  static Future<void> setBundledRuEnabled(bool value) async {
-    await setOsnovnyeEnabled('ru', value);
-  }
-
-  /// Огонь «Основные» toggles. Defaults: ru+gov ON.
-  static Future<Map<String, bool>> loadOsnovnyeEnabled() async {
-    final prefs = await SharedPreferences.getInstance();
+  static Map<String, bool> _decodeOsnovnyeMap(SharedPreferences prefs) {
+    final out = _osnovnyeDefaults();
     final raw = prefs.getString(_osnovnyeKey);
-    final out = <String, bool>{
-      for (final c in kOsnovnyeCategories) c.id: c.defaultEnabled,
-    };
-    // Migrate legacy bundled RU key once.
-    if (raw == null || raw.isEmpty) {
-      if (prefs.containsKey(_bundledRuKey)) {
-        out['ru'] = prefs.getBool(_bundledRuKey) ?? true;
-      }
-      return out;
-    }
+    if (raw == null || raw.isEmpty) return out;
     try {
       final decoded = jsonDecode(raw);
       if (decoded is Map) {
@@ -184,16 +169,41 @@ class SplitTunnelPrefs {
     return out;
   }
 
+  /// One-shot: turn ON live RF lists even if an older JSON saved them false.
+  ///
+  /// Does not touch TikTok. After this flag is set, a user OFF sticks.
+  static Future<void> _applyRfOsnovnyeDefaultsIfNeeded(
+    SharedPreferences prefs,
+  ) async {
+    if (prefs.getBool(_osnovnyeRfDefaultsKey) == true) return;
+    final map = _decodeOsnovnyeMap(prefs);
+    var changed = false;
+    for (final id in kRfDefaultOnOsnovnyeIds) {
+      if (map[id] != true) {
+        map[id] = true;
+        changed = true;
+      }
+    }
+    if (changed) {
+      await prefs.setString(_osnovnyeKey, jsonEncode(map));
+      await _bumpDraft(prefs);
+    }
+    await prefs.setBool(_osnovnyeRfDefaultsKey, true);
+  }
+
+  /// Live «Основные» toggles. Defaults: VK / Yandex / Ozon / WB ON, TikTok OFF.
+  static Future<Map<String, bool>> loadOsnovnyeEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    await _applyRfOsnovnyeDefaultsIfNeeded(prefs);
+    return _decodeOsnovnyeMap(prefs);
+  }
+
   static Future<void> setOsnovnyeEnabled(String id, bool value) async {
     final prefs = await SharedPreferences.getInstance();
     final map = await loadOsnovnyeEnabled();
     if (!map.containsKey(id)) return;
     map[id] = value;
     await prefs.setString(_osnovnyeKey, jsonEncode(map));
-    // Keep legacy key in sync for older readers.
-    if (id == 'ru') {
-      await prefs.setBool(_bundledRuKey, value);
-    }
     await _bumpDraft(prefs);
   }
 
@@ -226,32 +236,46 @@ class SplitTunnelPrefs {
 
   /// Once per install: exclude curated RU apps that are actually installed.
   ///
-  /// Apps path (`addDisallowedApplication`) works on Hy2/TT/Xray. Sites
-  /// «Сервисы Яндекса» is Xray-only and does not fix Yandex Go on Free Hy2.
-  /// Never re-runs after [_seededBypassKey] so a user off-toggle sticks.
+  /// Apps path (`addDisallowedApplication`) works on Hy2. Native apps that
+  /// skip DNS (Yandex Go, banks) stay here — Sites suffixes do not cover them.
+  /// v1 never re-runs after [_seededBypassKey] so a user off-toggle sticks.
+  /// v2 adds VK / Ozon / WB once without restoring packages turned off after v1.
   static Future<bool> seedDefaultBypassIfNeeded(
     Iterable<String> installedPackages,
   ) async {
     final prefs = await SharedPreferences.getInstance();
-    if (prefs.getBool(_seededBypassKey) == true) return false;
     final installed = installedPackages
         .map((p) => p.trim())
         .where((p) => p.isNotEmpty)
         .toSet();
-    final toAdd = kDefaultBypassPackages.intersection(installed);
-    if (toAdd.isNotEmpty) {
-      final current = await loadDisallowedPackages();
-      current.addAll(toAdd);
-      await prefs.setStringList(_disallowedAppsKey, current.toList()..sort());
-      await _bumpDraft(prefs);
-    }
-    await prefs.setBool(_seededBypassKey, true);
-    return toAdd.isNotEmpty;
-  }
+    var addedAny = false;
 
-  static Future<bool> isGovRuEnabled() async {
-    final map = await loadOsnovnyeEnabled();
-    return map['gov'] ?? true;
+    if (prefs.getBool(_seededBypassKey) != true) {
+      final toAdd = kDefaultBypassPackages.intersection(installed);
+      if (toAdd.isNotEmpty) {
+        final current = await loadDisallowedPackages();
+        current.addAll(toAdd);
+        await prefs.setStringList(_disallowedAppsKey, current.toList()..sort());
+        await _bumpDraft(prefs);
+        addedAny = true;
+      }
+      await prefs.setBool(_seededBypassKey, true);
+    }
+
+    if (prefs.getBool(_seededBypassV2Key) != true) {
+      final current = await loadDisallowedPackages();
+      final toAdd =
+          kDefaultBypassPackagesV2.intersection(installed).difference(current);
+      if (toAdd.isNotEmpty) {
+        current.addAll(toAdd);
+        await prefs.setStringList(_disallowedAppsKey, current.toList()..sort());
+        await _bumpDraft(prefs);
+        addedAny = true;
+      }
+      await prefs.setBool(_seededBypassV2Key, true);
+    }
+
+    return addedAny;
   }
 
   static Future<List<SplitTunnelSite>> loadSites() async {
@@ -334,7 +358,6 @@ class SplitTunnelPrefs {
     final cats = await loadOsnovnyeEnabled();
     for (final c in kOsnovnyeCategories) {
       if (cats[c.id] != true) continue;
-      if (c.kind != OsnovnyeKind.domains) continue;
       out.addAll(c.domains);
     }
     return out.toList()..sort();
@@ -390,7 +413,18 @@ class SplitTunnelPrefs {
   }
 }
 
-/// Curated TUN-exclude packages (Yandex Go / banks / Gosuslugi).
+/// Packages added by the v2 Apps seed (VK / Ozon / WB).
+///
+/// v1 installs already seeded taxi / banks / Gosuslugi; v2 must not restore
+/// those if the user turned them off.
+const kDefaultBypassPackagesV2 = <String>{
+  'com.vkontakte.android',
+  'com.vk.android',
+  'ru.ozon.app.android',
+  'com.wildberries.ru',
+};
+
+/// Curated TUN-exclude packages (Yandex Go / banks / Gosuslugi / VK / Ozon / WB).
 /// Only seeded when the package is installed; missing ids are skipped.
 const kDefaultBypassPackages = <String>{
   'ru.yandex.taxi',
@@ -403,10 +437,11 @@ const kDefaultBypassPackages = <String>{
   'ru.alfabank.mobile.android',
   'ru.vtb24.mobilebanking.android',
   'ru.gosuslugi.mobile',
+  ...kDefaultBypassPackagesV2,
 };
 
-/// Огонь «Основные» category kind.
-enum OsnovnyeKind { geositeRu, geositeGov, domains }
+/// Live RF site lists that default ON (suffix → Hy2 direct). Not TikTok.
+const kRfDefaultOnOsnovnyeIds = <String>{'vk', 'yandex', 'ozon', 'wb'};
 
 /// One row under Sites → Основные.
 class OsnovnyeCategory {
@@ -415,8 +450,7 @@ class OsnovnyeCategory {
     required this.labelRu,
     required this.labelEn,
     required this.badge,
-    required this.kind,
-    this.domains = const [],
+    required this.domains,
     this.defaultEnabled = false,
   });
 
@@ -424,37 +458,20 @@ class OsnovnyeCategory {
   final String labelRu;
   final String labelEn;
   final String badge;
-  final OsnovnyeKind kind;
   final List<String> domains;
   final bool defaultEnabled;
 
   String label(String languageCode) => languageCode == 'en' ? labelEn : labelRu;
 }
 
-/// Fixed 7 categories matching Огонь «Основные» (counter N/7).
+/// Live Hy2 suffix lists. Geosite ru/gov placeholders were removed — no matcher.
 const kOsnovnyeCategories = <OsnovnyeCategory>[
-  OsnovnyeCategory(
-    id: 'ru',
-    labelRu: 'Российские сайты',
-    labelEn: 'Russian sites',
-    badge: 'RU',
-    kind: OsnovnyeKind.geositeRu,
-    defaultEnabled: true,
-  ),
-  OsnovnyeCategory(
-    id: 'gov',
-    labelRu: 'Сайты госорганов РФ',
-    labelEn: 'RF government sites',
-    badge: 'GOV',
-    kind: OsnovnyeKind.geositeGov,
-    defaultEnabled: true,
-  ),
   OsnovnyeCategory(
     id: 'vk',
     labelRu: 'VK',
     labelEn: 'VK',
     badge: 'VK',
-    kind: OsnovnyeKind.domains,
+    defaultEnabled: true,
     domains: [
       'vk.com',
       'vk.ru',
@@ -470,7 +487,6 @@ const kOsnovnyeCategories = <OsnovnyeCategory>[
     labelRu: 'TikTok',
     labelEn: 'TikTok',
     badge: 'TT',
-    kind: OsnovnyeKind.domains,
     domains: [
       'tiktok.com',
       'tiktokv.com',
@@ -484,7 +500,7 @@ const kOsnovnyeCategories = <OsnovnyeCategory>[
     labelRu: 'Сервисы Яндекса',
     labelEn: 'Yandex services',
     badge: 'YA',
-    kind: OsnovnyeKind.domains,
+    defaultEnabled: true,
     domains: [
       'yandex.ru',
       'yandex.com',
@@ -502,7 +518,7 @@ const kOsnovnyeCategories = <OsnovnyeCategory>[
     labelRu: 'Ozon',
     labelEn: 'Ozon',
     badge: 'OZ',
-    kind: OsnovnyeKind.domains,
+    defaultEnabled: true,
     domains: ['ozon.ru', 'ozon.com', 'ozonusercontent.com'],
   ),
   OsnovnyeCategory(
@@ -510,7 +526,7 @@ const kOsnovnyeCategories = <OsnovnyeCategory>[
     labelRu: 'Wildberries',
     labelEn: 'Wildberries',
     badge: 'WB',
-    kind: OsnovnyeKind.domains,
+    defaultEnabled: true,
     domains: ['wildberries.ru', 'wb.ru', 'wbbasket.ru'],
   ),
 ];

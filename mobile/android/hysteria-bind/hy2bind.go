@@ -29,10 +29,11 @@ type Protector interface {
 }
 
 type startConfig struct {
-	Server      string `json:"server"`
-	Auth        string `json:"auth"`
-	SNI         string `json:"sni"`
-	SocksListen string `json:"socks_listen"`
+	Server               string   `json:"server"`
+	Auth                 string   `json:"auth"`
+	SNI                  string   `json:"sni"`
+	SocksListen          string   `json:"socks_listen"`
+	DirectDomainSuffixes []string `json:"direct_domain_suffixes"`
 }
 
 type protectedFactory struct{}
@@ -83,16 +84,21 @@ func SetProtector(p Protector) {
 }
 
 // Start connects the official Hy2 client and serves SOCKS5. Returns "" on success.
+//
+// Site-split suffixes are JSON-only (`direct_domain_suffixes`). Rebuild
+// hysteria-client.aar after changing this package — an old AAR ignores the field.
 func Start(configJSON string) string {
-	mu.Lock()
-	already := hyClient != nil
-	mu.Unlock()
-	if already {
-		return "already running"
-	}
 	var cfg startConfig
 	if err := json.Unmarshal([]byte(configJSON), &cfg); err != nil {
 		return err.Error()
+	}
+	setDirectSuffixes(cfg.DirectDomainSuffixes)
+	mu.Lock()
+	alreadyRunning := hyClient != nil
+	mu.Unlock()
+	if alreadyRunning {
+		// SOCKS prove already started the core; refresh site-split suffixes.
+		return ""
 	}
 	if cfg.Server == "" || cfg.Auth == "" {
 		return "server and auth are required"
@@ -220,6 +226,7 @@ func Stop() {
 	if c != nil {
 		_ = c.Close()
 	}
+	clearSplitState()
 }
 
 func serveSOCKS(ln net.Listener, c client.Client) {

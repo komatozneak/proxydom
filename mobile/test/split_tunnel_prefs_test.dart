@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:teremok_connect/features/settings/data/split_tunnel_prefs.dart';
+import 'package:teremok_connect/features/vpn/data/vpn_route_policy.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -45,8 +46,22 @@ void main() {
   });
 
   group('prefs defaults', () {
-    test('bundled RU defaults ON', () async {
-      expect(await SplitTunnelPrefs.isBundledRuEnabled(), isTrue);
+    test('live RF categories default ON; TikTok stays OFF', () async {
+      expect(kOsnovnyeCategories.length, 5);
+      expect(kRfDefaultOnOsnovnyeIds, {'vk', 'yandex', 'ozon', 'wb'});
+      expect(await SplitTunnelPrefs.osnovnyeEnabledCount(), 4);
+      final map = await SplitTunnelPrefs.loadOsnovnyeEnabled();
+      expect(map['vk'], isTrue);
+      expect(map['yandex'], isTrue);
+      expect(map['ozon'], isTrue);
+      expect(map['wb'], isTrue);
+      expect(map['tiktok'], isFalse);
+      final suffixes = await SplitTunnelPrefs.enabledDomainSuffixes();
+      expect(
+        suffixes,
+        containsAll(['vk.com', 'yandex.ru', 'ozon.ru', 'wildberries.ru']),
+      );
+      expect(suffixes, isNot(contains('tiktok.com')));
     });
 
     test('custom list empty; add/toggle/pending', () async {
@@ -60,7 +75,9 @@ void main() {
       await SplitTunnelPrefs.updateSite(sites.single.copyWith(enabled: false));
       sites = await SplitTunnelPrefs.loadSites();
       expect(sites.single.enabled, isFalse);
-      expect(await SplitTunnelPrefs.enabledDomainSuffixes(), isEmpty);
+      final suffixes = await SplitTunnelPrefs.enabledDomainSuffixes();
+      expect(suffixes, isNot(contains('news.example.org')));
+      expect(suffixes, contains('vk.com'));
 
       await SplitTunnelPrefs.markApplied();
       expect(await SplitTunnelPrefs.hasPendingChanges(), isFalse);
@@ -110,14 +127,41 @@ void main() {
       );
     });
 
-    test('osnovnye defaults ru+gov ON (2/7)', () async {
-      expect(kOsnovnyeCategories.length, 7);
-      expect(await SplitTunnelPrefs.osnovnyeEnabledCount(), 2);
-      expect(await SplitTunnelPrefs.isBundledRuEnabled(), isTrue);
-      expect(await SplitTunnelPrefs.isGovRuEnabled(), isTrue);
+    test('osnovnye vk domains feed suffixes; youtube aliases stripped for Hy2',
+        () async {
+      expect(kOsnovnyeCategories.length, 5);
+      expect(await SplitTunnelPrefs.osnovnyeEnabledCount(), 4);
       await SplitTunnelPrefs.setOsnovnyeEnabled('vk', true);
       final suffixes = await SplitTunnelPrefs.enabledDomainSuffixes();
       expect(suffixes, contains('vk.com'));
+      expect(suffixes, isNot(contains('tiktok.com')));
+      expect(await SplitTunnelPrefs.osnovnyeEnabledCount(), 4);
+      await SplitTunnelPrefs.addSite(domain: 'youtube.com');
+      final withYt = await SplitTunnelPrefs.enabledDomainSuffixes();
+      expect(withYt, contains('youtube.com'));
+      expect(stripForceProxySuffixes(withYt), isNot(contains('youtube.com')));
+      expect(stripForceProxySuffixes(withYt), contains('vk.com'));
+    });
+
+    test('one-shot RF defaults turn saved-false lists ON once', () async {
+      SharedPreferences.setMockInitialValues({
+        'split_tunnel_osnovnye_v1':
+            '{"ru":true,"gov":true,"vk":false,"tiktok":false,'
+                '"yandex":false,"ozon":false,"wb":false}',
+      });
+      final suffixes = await SplitTunnelPrefs.enabledDomainSuffixes();
+      expect(
+        suffixes,
+        containsAll(['vk.com', 'yandex.ru', 'ozon.ru', 'wildberries.ru']),
+      );
+      expect(suffixes, isNot(contains('tiktok.com')));
+      expect(await SplitTunnelPrefs.osnovnyeEnabledCount(), 4);
+
+      await SplitTunnelPrefs.setOsnovnyeEnabled('vk', false);
+      expect(
+        await SplitTunnelPrefs.enabledDomainSuffixes(),
+        isNot(contains('vk.com')),
+      );
       expect(await SplitTunnelPrefs.osnovnyeEnabledCount(), 3);
     });
 
@@ -136,6 +180,8 @@ void main() {
     test('seedDefaultBypassIfNeeded adds only installed curated packages',
         () async {
       expect(kDefaultBypassPackages, contains('ru.yandex.taxi'));
+      expect(kDefaultBypassPackages, contains('com.vkontakte.android'));
+      expect(kDefaultBypassPackagesV2, contains('ru.ozon.app.android'));
       final added = await SplitTunnelPrefs.seedDefaultBypassIfNeeded([
         'ru.yandex.taxi',
         'com.example.other',
@@ -172,6 +218,29 @@ void main() {
       ]);
       expect(again, isFalse);
       expect(await SplitTunnelPrefs.loadDisallowedPackages(), isEmpty);
+    });
+
+    test('v2 seed adds VK/Ozon/WB without restoring user-off v1 taxi', () async {
+      SharedPreferences.setMockInitialValues({
+        'split_tunnel_seeded_bypass_v1': true,
+      });
+      final added = await SplitTunnelPrefs.seedDefaultBypassIfNeeded([
+        'ru.yandex.taxi',
+        'com.vkontakte.android',
+        'ru.ozon.app.android',
+        'com.wildberries.ru',
+      ]);
+      expect(added, isTrue);
+      expect(await SplitTunnelPrefs.loadDisallowedPackages(), {
+        'com.vkontakte.android',
+        'ru.ozon.app.android',
+        'com.wildberries.ru',
+      });
+      final again = await SplitTunnelPrefs.seedDefaultBypassIfNeeded([
+        'ru.yandex.taxi',
+        'com.vkontakte.android',
+      ]);
+      expect(again, isFalse);
     });
   });
 }

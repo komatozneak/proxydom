@@ -145,8 +145,7 @@ class AppL10nEn extends AppL10n {
   String get settingsNoVpn => 'What works without VPN?';
 
   @override
-  String get settingsNoVpnHint =>
-      'These addresses open directly, bypassing the VPN';
+  String get settingsNoVpnHint => 'Choose apps and sites that skip the VPN';
 
   @override
   String get modesTitle => 'Mode';
@@ -724,6 +723,14 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get splitTunnelApplyFailed => 'Couldn\'t reconnect — try again';
+
+  @override
+  String get splitTunnelAppsLockdownWarning =>
+      'Android “Block connections without VPN” is on. Apps in this list may have no internet until you turn that off or reconnect them through the VPN.';
+
+  @override
+  String get splitTunnelGeoHy2Pending =>
+      'Not applied on this connection yet (needs IP lists). Use Apps or add a site.';
 
   @override
   String get settingsLanguage => 'Language';

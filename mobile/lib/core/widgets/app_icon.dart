@@ -100,8 +100,6 @@ abstract final class AppIcons {
   static const IconData siteCustom = PhosphorIconsRegular.globe;
 
   // NoVPN Sites → «Основные» (VK uses launcher PNG, not these).
-  static const IconData osnovnyeRu = PhosphorIconsRegular.globeHemisphereEast;
-  static const IconData osnovnyeGov = PhosphorIconsRegular.buildings;
   static const IconData osnovnyeTiktok = siteTiktok;
   static const IconData osnovnyeYandex = PhosphorIconsRegular.magnifyingGlass;
   static const IconData osnovnyeOzon = PhosphorIconsRegular.package;

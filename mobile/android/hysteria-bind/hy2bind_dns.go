@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"net/netip"
+	"strings"
 )
 
 // Minimal DNS (RFC 1035 + RFC 9460 hints) post-filter for Hy2 UDP/53.
@@ -62,6 +63,7 @@ func filterDNSResponse(msg []byte) []byte {
 		return msg
 	}
 	if dropped == 0 && rewritten == 0 {
+		rememberDNSFromMessage(msg)
 		return msg
 	}
 
@@ -81,6 +83,7 @@ func filterDNSResponse(msg []byte) []byte {
 		out = append(out, rr...)
 	}
 	log.Printf("hy2bind dns-filter dropped=%d rewritten=%d kept=%d", dropped, rewritten, len(anKept))
+	rememberDNSFromMessage(out)
 	return out
 }
 
@@ -269,4 +272,94 @@ func skipDNSName(msg []byte, off int) (int, error) {
 		}
 	}
 	return 0, errDNSLoop
+}
+
+func readDNSName(msg []byte, off int) (string, int, error) {
+	var labels []string
+	consumed := 0
+	cur := off
+	jumped := false
+	for i := 0; i < 128; i++ {
+		if cur >= len(msg) {
+			return "", 0, errDNSTrunc
+		}
+		c := int(msg[cur])
+		if c == 0 {
+			if !jumped {
+				consumed++
+			}
+			return strings.ToLower(strings.Join(labels, ".")), off + consumed, nil
+		}
+		switch c >> 6 {
+		case 0:
+			if cur+1+c > len(msg) {
+				return "", 0, errDNSTrunc
+			}
+			labels = append(labels, string(msg[cur+1:cur+1+c]))
+			cur += 1 + c
+			if !jumped {
+				consumed += 1 + c
+			}
+		case 3:
+			if cur+1 >= len(msg) {
+				return "", 0, errDNSTrunc
+			}
+			ptr := (c&0x3F)<<8 | int(msg[cur+1])
+			if ptr >= len(msg) {
+				return "", 0, errDNSBad
+			}
+			if !jumped {
+				consumed += 2
+				jumped = true
+			}
+			cur = ptr
+		default:
+			return "", 0, errDNSBad
+		}
+	}
+	return "", 0, errDNSLoop
+}
+
+func rememberDNSFromMessage(msg []byte) {
+	if len(msg) < 12 || msg[2]&0x80 == 0 {
+		return
+	}
+	qd := int(binary.BigEndian.Uint16(msg[4:6]))
+	an := int(binary.BigEndian.Uint16(msg[6:8]))
+	off := 12
+	host := ""
+	for i := 0; i < qd; i++ {
+		name, next, err := readDNSName(msg, off)
+		if err != nil || next+4 > len(msg) {
+			return
+		}
+		if host == "" && name != "" {
+			host = name
+		}
+		off = next + 4
+	}
+	if host == "" {
+		return
+	}
+	for i := 0; i < an; i++ {
+		_, next, err := readDNSName(msg, off)
+		if err != nil || next+10 > len(msg) {
+			return
+		}
+		typ := binary.BigEndian.Uint16(msg[next : next+2])
+		rdlen := int(binary.BigEndian.Uint16(msg[next+8 : next+10]))
+		rdataOff := next + 10
+		end := rdataOff + rdlen
+		if end > len(msg) {
+			return
+		}
+		switch typ {
+		case dnsTypeA, dnsTypeAAAA:
+			ip, ok := netip.AddrFromSlice(msg[rdataOff:end])
+			if ok {
+				rememberHostIP(host, ip)
+			}
+		}
+		off = end
+	}
 }

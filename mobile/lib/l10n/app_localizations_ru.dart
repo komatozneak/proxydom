@@ -145,7 +145,7 @@ class AppL10nRu extends AppL10n {
   String get settingsNoVpn => 'Что работает без VPN?';
 
   @override
-  String get settingsNoVpnHint => 'Эти адреса открываются напрямую, мимо VPN';
+  String get settingsNoVpnHint => 'Приложения и сайты, которые идут мимо VPN';
 
   @override
   String get modesTitle => 'Режим';
@@ -724,6 +724,14 @@ class AppL10nRu extends AppL10n {
   @override
   String get splitTunnelApplyFailed =>
       'Не удалось переподключить — попробуйте снова';
+
+  @override
+  String get splitTunnelAppsLockdownWarning =>
+      'Включён Android «Блокировать без VPN». Приложения из этого списка могут остаться без интернета, пока вы не выключите блокировку или не вернёте их в VPN.';
+
+  @override
+  String get splitTunnelGeoHy2Pending =>
+      'Пока не применяется (нужны IP-списки). Используйте вкладку «Приложения» или добавьте сайт.';
 
   @override
   String get settingsLanguage => 'Язык';

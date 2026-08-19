@@ -58,6 +58,28 @@ const kSmartProxyForceSuffixes = <String>[
   'google.com',
 ];
 
+bool isSmartForceProxyHost(String host) {
+  final h = host.trim().toLowerCase();
+  if (h.isEmpty) return false;
+  for (final raw in kSmartProxyForceSuffixes) {
+    final s = raw.trim().toLowerCase();
+    if (s.isEmpty) continue;
+    if (h == s || h.endsWith('.$s')) return true;
+  }
+  return false;
+}
+
+/// Hy2 site-split input: drop YouTube/Google force-proxy suffixes.
+List<String> stripForceProxySuffixes(Iterable<String> raw) {
+  final out = <String>{};
+  for (final item in raw) {
+    final s = item.trim().toLowerCase();
+    if (s.isEmpty || isSmartForceProxyHost(s)) continue;
+    out.add(s);
+  }
+  return out.toList()..sort();
+}
+
 /// Extra hosts only needed when ads reject is on (player bootstrap).
 const kAdsRejectBypassSuffixes = <String>[
   ...kSmartProxyForceSuffixes,

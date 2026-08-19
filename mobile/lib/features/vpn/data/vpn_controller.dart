@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../../settings/data/split_tunnel_prefs.dart';
 import 'vpn_config.dart';
+import 'vpn_route_policy.dart';
 import 'vpn_service_config.dart';
 import 'vpn_session_snapshot.dart';
 
@@ -42,6 +43,9 @@ class VpnController {
     }
     final disallowedApps =
         (await SplitTunnelPrefs.loadDisallowedPackages()).toList()..sort();
+    final directSuffixes = stripForceProxySuffixes(
+      await SplitTunnelPrefs.enabledDomainSuffixes(),
+    );
     return jsonEncode({
       'schemaVersion': 2,
       'vpnCore': 'hysteria',
@@ -62,6 +66,7 @@ class VpnController {
         'hysteriaBandwidthDown': profile.bandwidthDown,
       'controlPlaneHosts': VpnServiceConfig.controlPlaneHostsOf(),
       if (disallowedApps.isNotEmpty) 'disallowedApplications': disallowedApps,
+      if (directSuffixes.isNotEmpty) 'directDomainSuffixes': directSuffixes,
     });
   }
 
@@ -101,6 +106,9 @@ class VpnController {
     try {
       final disallowedApps =
           (await SplitTunnelPrefs.loadDisallowedPackages()).toList()..sort();
+      final directSuffixes = stripForceProxySuffixes(
+        await SplitTunnelPrefs.enabledDomainSuffixes(),
+      );
       final paramsJson = jsonEncode({
         'schemaVersion': 2,
         'vpnCore': 'hysteria',
@@ -120,6 +128,7 @@ class VpnController {
         'controlPlaneHosts': VpnServiceConfig.controlPlaneHostsOf(),
         if (disallowedApps.isNotEmpty)
           'disallowedApplications': disallowedApps,
+        if (directSuffixes.isNotEmpty) 'directDomainSuffixes': directSuffixes,
       });
 
       final result = await _methodChannel.invokeMethod<bool>(

@@ -10,6 +10,7 @@ import '../../../core/widgets/teremok_snackbar.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../home/application/vpn_provider.dart';
 import '../../home/application/vpn_status.dart';
+import '../../vpn/data/vpn_controller.dart';
 import '../data/installed_apps_channel.dart';
 import '../data/split_tunnel_prefs.dart';
 
@@ -31,6 +32,7 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
   bool _pending = false;
   bool _reconnecting = false;
   bool _osnovnyeExpanded = true;
+  bool _lockdownOn = false;
 
   Map<String, bool> _osnovnye = {
     for (final c in kOsnovnyeCategories) c.id: c.defaultEnabled,
@@ -66,6 +68,7 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
     );
     final disallowed = await SplitTunnelPrefs.loadDisallowedPackages();
     final pendingAfterSeed = await SplitTunnelPrefs.hasPendingChanges();
+    final lockdown = await VpnController.instance.queryLockdownState();
     if (!mounted) return;
     final vpn = ref.read(vpnProvider);
     final sessionLive = vpn is VpnConnected || vpn is VpnConnecting;
@@ -75,6 +78,7 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
       _pending = sessionLive && pendingAfterSeed;
       _disallowed = disallowed;
       _apps = apps;
+      _lockdownOn = lockdown == VpnLockdownState.enabled;
       _loading = false;
     });
   }
@@ -120,8 +124,6 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
     final appsLabel = lang == 'en' ? 'Apps' : 'Приложения';
     final sitesLabel = lang == 'en' ? 'Sites' : 'Сайты';
     final osnovnyeLabel = lang == 'en' ? 'Main' : 'Основные';
-    final createListLabel =
-        lang == 'en' ? 'Create a new list' : 'Создать новый список';
     final appsSection = lang == 'en' ? 'Apps' : 'Приложения';
 
     return Scaffold(
@@ -220,6 +222,8 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
                         apps: _filteredApps,
                         disallowed: _disallowed,
                         sectionLabel: appsSection,
+                        lockdownOn: _lockdownOn,
+                        lockdownWarning: l.splitTunnelAppsLockdownWarning,
                         onToggle: (pkg, bypass) async {
                           await SplitTunnelPrefs.setDisallowedPackage(
                             pkg,
@@ -232,7 +236,6 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
                         osnovnye: _osnovnye,
                         osnovnyeExpanded: _osnovnyeExpanded,
                         osnovnyeLabel: osnovnyeLabel,
-                        createListLabel: createListLabel,
                         sites: _filteredSites,
                         lang: lang,
                         iconsByPackage: {
@@ -337,12 +340,16 @@ class _AppsTab extends StatelessWidget {
     required this.apps,
     required this.disallowed,
     required this.sectionLabel,
+    required this.lockdownOn,
+    required this.lockdownWarning,
     required this.onToggle,
   });
 
   final List<LauncherAppInfo> apps;
   final Set<String> disallowed;
   final String sectionLabel;
+  final bool lockdownOn;
+  final String lockdownWarning;
   final Future<void> Function(String packageName, bool bypass) onToggle;
 
   @override
@@ -354,6 +361,15 @@ class _AppsTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
+        if (lockdownOn) ...[
+          Text(
+            lockdownWarning,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
         Row(
           children: [
             Text('• $sectionLabel', style: theme.textTheme.titleSmall),
@@ -457,7 +473,6 @@ class _SitesTab extends StatelessWidget {
     required this.osnovnye,
     required this.osnovnyeExpanded,
     required this.osnovnyeLabel,
-    required this.createListLabel,
     required this.sites,
     required this.lang,
     required this.iconsByPackage,
@@ -471,7 +486,6 @@ class _SitesTab extends StatelessWidget {
   final Map<String, bool> osnovnye;
   final bool osnovnyeExpanded;
   final String osnovnyeLabel;
-  final String createListLabel;
   final List<SplitTunnelSite> sites;
   final String lang;
   final Map<String, Uint8List> iconsByPackage;
@@ -485,7 +499,9 @@ class _SitesTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l = AppL10n.of(context);
-    final enabledCount = osnovnye.values.where((v) => v).length;
+    final enabledCount = kOsnovnyeCategories
+        .where((c) => osnovnye[c.id] ?? c.defaultEnabled)
+        .length;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -578,7 +594,7 @@ class _SitesTab extends StatelessWidget {
         OutlinedButton.icon(
           onPressed: onAddSite,
           icon: const AppIcon(AppIcons.plus),
-          label: Text(createListLabel),
+          label: Text(l.splitTunnelAddSite),
         ),
       ],
     );

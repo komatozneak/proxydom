@@ -813,6 +813,14 @@ class TeremokVpnService : VpnService() {
         }
     }
 
+    /** Custom / Основные domain suffixes for hy2bind direct (Issue #143). */
+    private fun directDomainSuffixesOf(params: Map<String, Any?>): List<String> {
+        val raw = params["directDomainSuffixes"] as? List<*> ?: return emptyList()
+        return raw.mapNotNull { (it as? String)?.trim()?.lowercase() }
+            .filter { it.isNotEmpty() }
+            .distinct()
+    }
+
     /** Self + user «Что работает без VPN?» apps stay off the TUN. */
     private fun applyDisallowedApplications(
         builder: Builder,
@@ -929,7 +937,13 @@ class TeremokVpnService : VpnService() {
         ProtectGuard.reset()
         val hy = HysteriaBridge.instance
         hy.bind(this)
-        if (!hy.start(server = server, auth = auth, sni = sni, socksListen = socksListen)) {
+        if (!hy.start(
+                server = server,
+                auth = auth,
+                sni = sni,
+                socksListen = socksListen,
+                directDomainSuffixes = directDomainSuffixesOf(params),
+            )) {
             Log.w(TAG, "proveHysteriaSocks: start failed ${hy.lastErrorMessage}")
             return false
         }
@@ -1085,7 +1099,13 @@ class TeremokVpnService : VpnService() {
 
         val hy = HysteriaBridge.instance
         hy.bind(this)
-        if (!hy.start(server = server, auth = auth, sni = sni, socksListen = socksListen)) {
+        if (!hy.start(
+                server = server,
+                auth = auth,
+                sni = sni,
+                socksListen = socksListen,
+                directDomainSuffixes = directDomainSuffixesOf(params),
+            )) {
             failStart(hy.lastErrorMessage ?: "Hysteria start failed")
             return
         }

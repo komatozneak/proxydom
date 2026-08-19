@@ -364,7 +364,7 @@ abstract class AppL10n {
   /// No description provided for @settingsNoVpnHint.
   ///
   /// In en, this message translates to:
-  /// **'These addresses open directly, bypassing the VPN'**
+  /// **'Choose apps and sites that skip the VPN'**
   String get settingsNoVpnHint;
 
   /// No description provided for @modesTitle.
@@ -1416,6 +1416,18 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Couldn\'t reconnect — try again'**
   String get splitTunnelApplyFailed;
+
+  /// No description provided for @splitTunnelAppsLockdownWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Android “Block connections without VPN” is on. Apps in this list may have no internet until you turn that off or reconnect them through the VPN.'**
+  String get splitTunnelAppsLockdownWarning;
+
+  /// No description provided for @splitTunnelGeoHy2Pending.
+  ///
+  /// In en, this message translates to:
+  /// **'Not applied on this connection yet (needs IP lists). Use Apps or add a site.'**
+  String get splitTunnelGeoHy2Pending;
 
   /// No description provided for @settingsLanguage.
   ///

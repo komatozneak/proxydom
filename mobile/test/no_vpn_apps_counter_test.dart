@@ -60,10 +60,10 @@ void main() {
   });
 
   group('osnovnyeCategoryIcon', () {
-    test('maps non-VK categories to AppIcons; vk is null', () {
+    test('maps non-VK categories to AppIcons; vk/ru/gov are null', () {
       expect(osnovnyeCategoryIcon('vk'), isNull);
-      expect(osnovnyeCategoryIcon('ru'), AppIcons.osnovnyeRu);
-      expect(osnovnyeCategoryIcon('gov'), AppIcons.osnovnyeGov);
+      expect(osnovnyeCategoryIcon('ru'), isNull);
+      expect(osnovnyeCategoryIcon('gov'), isNull);
       expect(osnovnyeCategoryIcon('tiktok'), AppIcons.osnovnyeTiktok);
       expect(osnovnyeCategoryIcon('yandex'), AppIcons.osnovnyeYandex);
       expect(osnovnyeCategoryIcon('ozon'), AppIcons.osnovnyeOzon);

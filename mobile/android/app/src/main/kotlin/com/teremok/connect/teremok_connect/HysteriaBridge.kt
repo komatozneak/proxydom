@@ -61,27 +61,38 @@ class HysteriaBridge private constructor() {
         auth: String,
         sni: String,
         socksListen: String,
+        directDomainSuffixes: List<String> = emptyList(),
     ): Boolean {
-        if (isRunning.get()) {
-            Log.w(TAG, "start: already running")
-            return true
-        }
         val svc = vpnService
         if (svc == null) {
             lastErrorMessage = "VpnService not bound for protect()"
             return false
         }
-        val configJson = """
-            {"server":${jsonQuote(server)},"auth":${jsonQuote(auth)},"sni":${jsonQuote(sni)},"socks_listen":${jsonQuote(socksListen)}}
-        """.trimIndent()
+        val obj = org.json.JSONObject()
+        obj.put("server", server)
+        obj.put("auth", auth)
+        obj.put("sni", sni)
+        obj.put("socks_listen", socksListen)
+        val suffixes = org.json.JSONArray()
+        for (raw in directDomainSuffixes) {
+            val s = raw.trim().lowercase()
+            if (s.isNotEmpty()) suffixes.put(s)
+        }
+        if (suffixes.length() > 0) {
+            obj.put("direct_domain_suffixes", suffixes)
+        }
         if (!loadLibrary()) {
             return false
         }
         return try {
             lastErrorMessage = null
-            Log.i(TAG, "start: Hy2bind.start server=$server sni=$sni socks=$socksListen")
+            Log.i(
+                TAG,
+                "start: Hy2bind.start server=$server sni=$sni socks=$socksListen " +
+                    "directSuffixes=${suffixes.length()}",
+            )
             Hy2bind.setProtector(Hy2VpnProtector(svc))
-            val err: String? = Hy2bind.start(configJson)
+            val err: String? = Hy2bind.start(obj.toString())
             if (!err.isNullOrBlank()) {
                 lastErrorMessage = err
                 Log.e(TAG, "start: Hy2bind.start error=$err")
@@ -137,20 +148,6 @@ class HysteriaBridge private constructor() {
         }
         lastErrorMessage = null
     }
-
-    private fun jsonQuote(value: String): String =
-        buildString {
-            append('"')
-            for (ch in value) {
-                when (ch) {
-                    '\\' -> append("\\\\")
-                    '"' -> append("\\\"")
-                    '\n' -> append("\\n")
-                    else -> append(ch)
-                }
-            }
-            append('"')
-        }
 }
 
 /** gomobile [Protector] — `protect(long)`, not a Kotlin fun-interface lambda. */
