@@ -190,6 +190,11 @@ class PathHealth {
         )
     }
 
+    /**
+     * Continuous SOCKS CONNECT while the TUN is up. [TeremokVpnService] must
+     * start this after ConnectedHealthy — otherwise a dead Hy2 path still
+     * paints Nest connected (screen-off Doze).
+     */
     fun startContinuous(
         adapter: CoreAdapter,
         listener: Listener,
@@ -281,7 +286,7 @@ class PathHealth {
     companion object {
         private const val TAG = "PathHealth"
         private const val CONTINUOUS_INTERVAL_MS = 5_000L
-        private const val CONTINUOUS_PROBE_TIMEOUT_MS = 1_000
+        private const val CONTINUOUS_PROBE_TIMEOUT_MS = 2_500
         const val DEGRADED_THRESHOLD = 2
         const val DEAD_THRESHOLD = 4
     }

@@ -6,10 +6,12 @@ import android.net.ConnectivityManager
 import android.net.IpPrefix
 import android.net.NetworkCapabilities
 import android.net.VpnService
+import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.ParcelFileDescriptor
+import android.os.PowerManager
 import android.os.SystemClock
 import android.provider.Settings
 import android.system.OsConstants
@@ -408,6 +410,7 @@ class TeremokVpnService : VpnService() {
 
     /** Sole Kotlin owner of the VpnService TUN PFD (null = transferred or closed). */
     private val tunInterface = AtomicReference<ParcelFileDescriptor?>(null)
+    @Volatile
     private var isRunning = false
     /** True only while [startVpn] is establishing TUN/core (not onCreate hint). */
     @Volatile
@@ -416,6 +419,17 @@ class TeremokVpnService : VpnService() {
     private val teardownInFlight = AtomicBoolean(false)
     private var trafficMonitor: VpnTrafficMonitor? = null
     private var notificationSessionLine: String = "Теремок VPN"
+    private val pathHealth = PathHealth()
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var vpnWakeLock: PowerManager.WakeLock? = null
+    private var vpnWifiLock: WifiManager.WifiLock? = null
+    /** Hy2 died while TUN still up — recover without painting Nest rest. */
+    @Volatile
+    private var coreRecovering = false
+    @Volatile
+    private var deadRecoverAttempts = 0
+    private var lastDeadRecoverAt = 0L
+    private var deadRecoverRetry: Runnable? = null
 
     private val sessionEngine: VpnSessionEngine by lazy { VpnSessionEngine(sessionHost) }
 
@@ -429,8 +443,11 @@ class TeremokVpnService : VpnService() {
             }
             currentStatus = snapshot.phase.toLegacyStatus()
             VpnStatusBroadcaster.emit(currentStatus)
-            if (snapshot.phase == SessionPhase.ConnectedHealthy ||
-                snapshot.phase == SessionPhase.ConnectedDegraded ||
+            if (snapshot.phase == SessionPhase.ConnectedHealthy) {
+                autoProving = false
+                coreRecovering = false
+                deadRecoverAttempts = 0
+            } else if (snapshot.phase == SessionPhase.ConnectedDegraded ||
                 snapshot.phase == SessionPhase.Error ||
                 snapshot.phase == SessionPhase.Idle
             ) {
@@ -468,7 +485,10 @@ class TeremokVpnService : VpnService() {
         override fun onPathDead(generation: Long, detail: String) {
             Log.e(TAG, "path dead gen=$generation $detail")
             DiagnosticRing.append(TAG, "path dead gen=$generation $detail")
+            recoverDeadTunnel("path_dead $detail")
         }
+
+        override fun suppressEstablishError(): Boolean = coreRecovering
 
         override fun onUnderlyingChangedWhileUp(generation: Long, iface: String?) {
             Log.i(TAG, "underlying changed gen=$generation iface=$iface")
@@ -554,6 +574,8 @@ class TeremokVpnService : VpnService() {
             ACTION_STOP -> {
                 Log.i(TAG, "onStartCommand: ACTION_STOP")
                 autoProving = false
+                coreRecovering = false
+                cancelDeadRecoverRetry()
                 // Keep params_json so Quick Settings can reconnect without Flutter.
                 markSessionInactive()
                 sessionEngine.enqueueStop(markInactive = true)
@@ -641,6 +663,94 @@ class TeremokVpnService : VpnService() {
             return
         }
         sessionEngine.enqueueStart(username, protocol, params)
+    }
+
+    /**
+     * Hy2 QUIC died (screen off / Doze / Wi‑Fi sleep) while TUN is still up.
+     * Restart the core from persisted params without going idle — Dart
+     * auto-reconnect never sees this as a disconnect.
+     */
+    private fun recoverDeadTunnel(reason: String) {
+        val now = SystemClock.elapsedRealtime()
+        val elapsed = if (lastDeadRecoverAt == 0L) Long.MAX_VALUE else now - lastDeadRecoverAt
+        val allowed = DeadTunnelReconnect.shouldAttempt(
+            sessionActive = prefs().getBoolean(KEY_ACTIVE, false),
+            userStopping = currentStatus == "disconnecting" || currentStatus == "idle",
+            recoverInFlight = coreRecovering,
+            attempts = deadRecoverAttempts,
+            elapsedSinceLastMs = elapsed,
+        )
+        if (!allowed) {
+            Log.w(
+                TAG,
+                "recoverDeadTunnel skip reason=$reason attempts=$deadRecoverAttempts " +
+                    "recovering=$coreRecovering status=$currentStatus",
+            )
+            return
+        }
+        beginDeadRecover(reason)
+    }
+
+    private fun beginDeadRecover(reason: String) {
+        coreRecovering = true
+        deadRecoverAttempts += 1
+        lastDeadRecoverAt = SystemClock.elapsedRealtime()
+        cancelDeadRecoverRetry()
+        stopPathHealthWatch()
+        Log.i(
+            TAG,
+            "beginDeadRecover reason=$reason attempt=$deadRecoverAttempts/" +
+                "${DeadTunnelReconnect.MAX_ATTEMPTS}",
+        )
+        DiagnosticRing.append(TAG, "vpn.recover attempt=$deadRecoverAttempts $reason")
+        if (!enqueuePersistedStart(reason)) {
+            coreRecovering = false
+            Log.w(TAG, "beginDeadRecover: no persisted session")
+        }
+    }
+
+    private fun enqueuePersistedStart(reason: String): Boolean {
+        val store = prefs()
+        if (!store.getBoolean(KEY_ACTIVE, false)) return false
+        val paramsJson = store.getString(KEY_PARAMS_JSON, null)
+        if (paramsJson.isNullOrBlank()) return false
+        val username = store.getString(KEY_USERNAME, "anonymous") ?: "anonymous"
+        val protocol = store.getString(KEY_PROTOCOL, "unknown") ?: "unknown"
+        val params = runCatching { jsonToMap(JSONObject(paramsJson)) }
+            .onFailure { Log.w(TAG, "enqueuePersistedStart: bad JSON", it) }
+            .getOrDefault(emptyMap())
+        if (params.isEmpty()) return false
+        Log.i(TAG, "enqueuePersistedStart reason=$reason user=$username proto=$protocol")
+        sessionEngine.enqueueStart(username, protocol, params)
+        return true
+    }
+
+    private fun scheduleDeadRecoverRetry(message: String) {
+        if (!prefs().getBoolean(KEY_ACTIVE, false) || currentStatus == "disconnecting") {
+            coreRecovering = false
+            return
+        }
+        if (deadRecoverAttempts >= DeadTunnelReconnect.MAX_ATTEMPTS) {
+            coreRecovering = false
+            VpnStatusBroadcaster.setError(message)
+            currentStatus = "error"
+            VpnStatusBroadcaster.emit(currentStatus)
+            Log.e(TAG, "dead recover exhausted: $message")
+            return
+        }
+        val delay = DeadTunnelReconnect.backoffMs(deadRecoverAttempts)
+        Log.i(TAG, "dead recover retry in ${delay}ms attempt=$deadRecoverAttempts")
+        val retry = Runnable {
+            coreRecovering = false
+            beginDeadRecover("retry $message")
+        }
+        deadRecoverRetry = retry
+        mainHandler.postDelayed(retry, delay)
+    }
+
+    private fun cancelDeadRecoverRetry() {
+        deadRecoverRetry?.let { mainHandler.removeCallbacks(it) }
+        deadRecoverRetry = null
     }
 
     /**
@@ -1013,9 +1123,14 @@ class TeremokVpnService : VpnService() {
 
         isRunning = true
         establishInProgress = false
+        coreRecovering = false
+        deadRecoverAttempts = 0
+        cancelDeadRecoverRetry()
         currentStatus = "connected"
         VpnStatusBroadcaster.emit(currentStatus)
         showConnectedNotification()
+        acquireVpnLocks()
+        startPathHealthWatch()
         startTrafficMonitor()
         Log.i(TAG, "startVpn: Hysteria established server=$server user=$username")
     }
@@ -1104,10 +1219,16 @@ class TeremokVpnService : VpnService() {
     private fun failStart(message: String) {
         establishInProgress = false
         VpnStatusBroadcaster.setError(message)
-        DiagnosticRing.append(TAG, "failStart autoProving=$autoProving msg=$message")
+        DiagnosticRing.append(TAG, "failStart autoProving=$autoProving recovering=$coreRecovering msg=$message")
         if (autoProving) {
             Log.w(TAG, "failStart during auto prove (no stopSelf): $message")
             teardownCores()
+            return
+        }
+        if (coreRecovering) {
+            Log.w(TAG, "failStart during dead recover (no stopSelf): $message")
+            teardownCores()
+            scheduleDeadRecoverRetry(message)
             return
         }
         currentStatus = "error"
@@ -1142,6 +1263,8 @@ class TeremokVpnService : VpnService() {
             return
         }
         try {
+            stopPathHealthWatch()
+            releaseVpnLocks()
             stopTrafficMonitor()
             HysteriaBridge.instance.stop()
             closeTunOnce("teardownCores")
@@ -1158,6 +1281,7 @@ class TeremokVpnService : VpnService() {
             // connecting/probing: idle here paints Nest rest while Hy2 is live.
             if (currentStatus != "revoked" && currentStatus != "disconnecting") {
                 val hop = autoProving ||
+                    coreRecovering ||
                     sessionEngine.currentSnapshot().phase.suppressTeardownIdleBroadcast()
                 if (hop) {
                     VpnStatusBroadcaster.remember(currentStatus)
@@ -1170,6 +1294,8 @@ class TeremokVpnService : VpnService() {
     }
 
     private fun stopVpn() {
+        cancelDeadRecoverRetry()
+        coreRecovering = false
         val shouldAnnounce = isRunning ||
             establishInProgress ||
             currentStatus == "connecting" ||
@@ -1235,14 +1361,102 @@ class TeremokVpnService : VpnService() {
 
     private fun startTrafficMonitor() {
         stopTrafficMonitor()
-        trafficMonitor = VpnTrafficMonitor(this) { downBps, upBps, downText, upText ->
-            VpnTrafficBroadcaster.emit(downBps, upBps, downText, upText)
-            if (currentStatus == "connected" && ShadeNotification.isVisible(this)) {
-                showConnectedNotification(downText = downText, upText = upText)
+        trafficMonitor = VpnTrafficMonitor(
+            context = this,
+            onSpeeds = { downBps, upBps, downText, upText ->
+                VpnTrafficBroadcaster.emit(downBps, upBps, downText, upText)
+                if (currentStatus == "connected" && ShadeNotification.isVisible(this)) {
+                    showConnectedNotification(downText = downText, upText = upText)
+                }
+            },
+        ).also { it.start() }
+        // Home ping stays off: SOCKS CONNECT every 5s shared the Hy2 path with
+        // tabs. PathHealth continuous (below) is the liveness probe instead.
+    }
+
+    private fun startPathHealthWatch() {
+        pathHealth.stopContinuous()
+        if (!isRunning) return
+        pathHealth.startContinuous(
+            adapter = PathHealth.CoreAdapter.HysteriaSocks,
+            listener = { result -> sessionEngine.notifyHealth(result) },
+            alive = {
+                isRunning &&
+                    prefs().getBoolean(KEY_ACTIVE, false) &&
+                    currentStatus != "disconnecting" &&
+                    currentStatus != "idle"
+            },
+        )
+        Log.i(TAG, "path health watch started")
+    }
+
+    private fun stopPathHealthWatch() {
+        pathHealth.stopContinuous()
+    }
+
+    private fun acquireVpnLocks() {
+        acquireVpnWakeLock()
+        acquireVpnWifiLock()
+    }
+
+    private fun releaseVpnLocks() {
+        releaseVpnWakeLock()
+        releaseVpnWifiLock()
+    }
+
+    private fun acquireVpnWakeLock() {
+        if (vpnWakeLock?.isHeld == true) return
+        val pm = getSystemService(POWER_SERVICE) as? PowerManager ?: return
+        runCatching {
+            vpnWakeLock = pm.newWakeLock(
+                PowerManager.PARTIAL_WAKE_LOCK,
+                "$packageName:vpn",
+            ).apply {
+                setReferenceCounted(false)
+                acquire()
             }
-        }.also { it.start() }
-        // Home ping off: SOCKS CONNECT every 5s shared the same proxy as tabs.
-        // Flutter already renders `— ms` when delayMs is null.
+            Log.i(TAG, "vpn wake lock acquired")
+        }.onFailure {
+            Log.w(TAG, "vpn wake lock failed", it)
+            vpnWakeLock = null
+        }
+    }
+
+    private fun releaseVpnWakeLock() {
+        runCatching {
+            if (vpnWakeLock?.isHeld == true) vpnWakeLock?.release()
+        }
+        vpnWakeLock = null
+    }
+
+    /**
+     * Keep STA radio up after screen off. CPU wake lock does not stop Wi‑Fi sleep;
+     * Hy2 QUIC dies and VpnService still reports connected.
+     */
+    private fun acquireVpnWifiLock() {
+        if (vpnWifiLock?.isHeld == true) return
+        val wifi = applicationContext.getSystemService(WIFI_SERVICE) as? WifiManager ?: return
+        runCatching {
+            @Suppress("DEPRECATION")
+            vpnWifiLock = wifi.createWifiLock(
+                WifiManager.WIFI_MODE_FULL_HIGH_PERF,
+                "$packageName:vpn-wifi",
+            ).apply {
+                setReferenceCounted(false)
+                acquire()
+            }
+            Log.i(TAG, "vpn wifi lock acquired")
+        }.onFailure {
+            Log.w(TAG, "vpn wifi lock skipped", it)
+            vpnWifiLock = null
+        }
+    }
+
+    private fun releaseVpnWifiLock() {
+        runCatching {
+            if (vpnWifiLock?.isHeld == true) vpnWifiLock?.release()
+        }
+        vpnWifiLock = null
     }
 
     private fun stopTrafficMonitor() {

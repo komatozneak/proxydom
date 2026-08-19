@@ -32,6 +32,11 @@ class VpnSessionEngine(
         fun onPathDead(generation: Long, detail: String)
         fun onUnderlyingChangedWhileUp(generation: Long, iface: String?)
         /**
+         * True while native is retrying a dead Hy2 path. Skip Error snapshot so
+         * Flutter auto-reconnect does not fight the in-service recover.
+         */
+        fun suppressEstablishError(): Boolean = false
+        /**
          * SOCKS-only (Xray/Hy2) or TUN+HTTPS (TT) prove. Must not leave a
          * Healthy session unless TT already has a live tunnel.
          */
@@ -228,8 +233,12 @@ class VpnSessionEngine(
             return
         }
         if (!ok) {
-            // Host already published Error + tore down via failStart.
-            if (isAlive(gen) && snapshot.phase != SessionPhase.Error) {
+            // Host already published Error + tore down via failStart,
+            // unless a silent dead-tunnel recover is already scheduled.
+            if (isAlive(gen) &&
+                snapshot.phase != SessionPhase.Error &&
+                !host.suppressEstablishError()
+            ) {
                 publish(
                     SessionSnapshot(
                         phase = SessionPhase.Error,
