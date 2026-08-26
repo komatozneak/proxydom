@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -10,6 +11,9 @@ import '../../../../l10n/app_localizations.dart';
 import '../../application/vpn_provider.dart';
 import '../../application/vpn_status.dart';
 
+/// Auto Connecting flag hop (Free LV→US, Premium + gaming/YouTube).
+const Duration kAutoFlagCycleDuration = Duration(milliseconds: 750);
+
 /// Server pill: region left | session column right. Tappable → Locations.
 class ServerCard extends ConsumerWidget {
   const ServerCard({
@@ -17,12 +21,18 @@ class ServerCard extends ConsumerWidget {
     required this.title,
     required this.subtitle,
     required this.flagEmoji,
+    this.selectionIsAuto = false,
+    this.autoPoolFlags = const [],
     this.onTap,
   });
 
   final String title;
   final String subtitle;
   final String flagEmoji;
+
+  /// Auto row: Connecting cycles [autoPoolFlags] instead of a frozen first hop.
+  final bool selectionIsAuto;
+  final List<String> autoPoolFlags;
 
   final VoidCallback? onTap;
 
@@ -32,7 +42,10 @@ class ServerCard extends ConsumerWidget {
     final l = AppL10n.of(context);
     final elevated = theme.colorScheme.surfaceContainerHighest;
     final line = theme.colorScheme.outline;
-    final connected = ref.watch(vpnProvider) is VpnConnected;
+    final status = ref.watch(vpnProvider);
+    final connected = status is VpnConnected;
+    final cycleFlags =
+        selectionIsAuto && status is VpnConnecting && autoPoolFlags.length > 1;
 
     return Material(
       color: elevated,
@@ -54,7 +67,10 @@ class ServerCard extends ConsumerWidget {
                 Expanded(
                   child: Row(
                     children: [
-                      LocationFlagIcon(flag: flagEmoji, size: 48),
+                      if (cycleFlags)
+                        _CyclingLocationFlag(flags: autoPoolFlags)
+                      else
+                        LocationFlagIcon(flag: flagEmoji, size: 48),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
@@ -106,6 +122,64 @@ class ServerCard extends ConsumerWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Cycles Auto-pool flags while Connecting so Free (2) and Premium (4) move.
+class _CyclingLocationFlag extends StatefulWidget {
+  const _CyclingLocationFlag({required this.flags});
+
+  final List<String> flags;
+
+  @override
+  State<_CyclingLocationFlag> createState() => _CyclingLocationFlagState();
+}
+
+class _CyclingLocationFlagState extends State<_CyclingLocationFlag> {
+  Timer? _timer;
+  int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _armTimer();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CyclingLocationFlag oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!listEquals(oldWidget.flags, widget.flags)) {
+      _index = 0;
+      _armTimer();
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _armTimer() {
+    _timer?.cancel();
+    if (widget.flags.length < 2) return;
+    _timer = Timer.periodic(kAutoFlagCycleDuration, (_) {
+      if (!mounted) return;
+      setState(() => _index = (_index + 1) % widget.flags.length);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final flag = widget.flags[_index % widget.flags.length];
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 280),
+      child: LocationFlagIcon(
+        key: ValueKey<String>(flag),
+        flag: flag,
+        size: 48,
       ),
     );
   }

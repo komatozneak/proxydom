@@ -105,6 +105,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     if (!mounted) return;
     await ref.read(vpnProvider.notifier).syncFromNative();
     if (!mounted) return;
+    await ref.read(vpnProvider.notifier).reconcileWithNative();
+    if (!mounted) return;
     unawaited(ref.read(subscriptionStatusProvider.notifier).refresh());
   }
 
@@ -180,6 +182,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         } else {
           stickyKey = 'selected:$selectedId';
         }
+      } else if (vpnStatus is VpnConnecting) {
+        // Keep «Автоматически» while Auto proves; ServerCard cycles pool flags.
+        stickyKey = 'auto:connecting';
+        placeNode = null;
+        place = NodePlace(
+          title: l.regionAutoTitle,
+          subtitle: l.regionAutoSubtitle,
+          flag: poolFlags.isNotEmpty ? poolFlags.first : kFlagGlobe,
+        );
       } else {
         final winnerId = ref.read(vpnProvider.notifier).autoWinnerId;
         stickyKey = 'auto:${winnerId ?? egressHost ?? displayLabel ?? 'none'}';
@@ -254,12 +265,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
       setState(() {
         _selectionIsAuto = isAuto;
-        if (isAuto && placeNode == null) {
+        if (isAuto && (placeNode == null || vpnStatus is VpnConnecting)) {
           _serverTitle = l.regionAutoTitle;
           _serverSubtitle = l.regionAutoSubtitle;
           _serverFlag = autoSelectionDisplayFlag(
             catalog: catalog,
-            winnerId: ref.read(vpnProvider.notifier).autoWinnerId,
+            winnerId: vpnStatus is VpnConnecting
+                ? null
+                : ref.read(vpnProvider.notifier).autoWinnerId,
             poolFlags: poolFlags,
           );
         } else if (place != null) {
@@ -665,6 +678,8 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
           title: widget.serverTitle,
           subtitle: widget.serverSubtitle,
           flagEmoji: _displayFlag,
+          selectionIsAuto: widget.selectionIsAuto,
+          autoPoolFlags: widget.autoPoolFlags,
           onTap: widget.onOpenLocations,
         ),
       ],

@@ -7,14 +7,14 @@ import android.content.pm.PackageManager
 import android.net.VpnService
 import android.os.Build
 import android.util.Log
+import androidx.activity.enableEdgeToEdge
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import androidx.core.view.WindowCompat
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
-class MainActivity : FlutterActivity() {
+class MainActivity : FlutterFragmentActivity() {
     companion object {
         private const val TAG = "MainActivity"
         private const val REQUEST_VPN_PERMISSION = 1001
@@ -74,8 +74,8 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
-        // Android 15 edge-to-edge: draw behind system bars; SafeArea keeps insets.
-        WindowCompat.setDecorFitsSystemWindows(window, false)
+        // Android 15+: FlutterActivity is not a ComponentActivity; FragmentActivity is.
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
     }
 

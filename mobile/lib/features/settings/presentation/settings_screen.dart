@@ -27,7 +27,6 @@ import '../data/auto_reconnect_prefs.dart';
 import '../data/subscription_status.dart';
 import '../data/vpn_notification_prefs.dart';
 import '../data/qs_tile_prefs.dart';
-import 'kill_switch_settings_tile.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -499,8 +498,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 subtitle: l.settingsNoVpnHint,
                 onTap: () => context.go('/settings/no-vpn'),
               ),
-              const _CardDivider(),
-              const KillSwitchSettingsTile(),
             ],
           ),
           const SizedBox(height: 20),

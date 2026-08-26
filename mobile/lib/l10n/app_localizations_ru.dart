@@ -314,11 +314,11 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get homeVpnConflictHint =>
-      'Отключите другой VPN или «Всегда включён» в настройках Android, затем подключитесь снова.';
+      'Отключите другой VPN в настройках Android, затем подключитесь снова.';
 
   @override
   String homeVpnConflictHintNamed(String app) {
-    return 'Отключите «$app» (или «Всегда включён») в настройках Android, затем подключитесь снова.';
+    return 'Отключите «$app» в настройках Android, затем подключитесь снова.';
   }
 
   @override
@@ -415,59 +415,11 @@ class AppL10nRu extends AppL10n {
   String get settingsProtocolLocked => 'Сейчас доступен только VLESS + Reality';
 
   @override
-  String get settingsKillSwitch => 'Блокировка без VPN';
-
-  @override
-  String get settingsKillSwitchHint =>
-      'Android будет блокировать интернет, если защищённое соединение не установлено.';
-
-  @override
-  String get settingsKillSwitchHintSystem =>
-      'Включите «Всегда VPN» и «Блокировать без VPN» в системных настройках VPN';
-
-  @override
-  String get settingsKillSwitchOn => 'Включено в настройках Android';
-
-  @override
-  String get settingsKillSwitchAlwaysOnOnly =>
-      'Always-on включён — включите ещё «Блокировать без VPN»';
-
-  @override
-  String get settingsKillSwitchOff =>
-      'Выключено — интернет может работать без VPN';
-
-  @override
-  String get settingsKillSwitchUnavailable =>
-      'Не удалось проверить настройку Android';
-
-  @override
-  String get settingsKillSwitchChecking => 'Проверка настройки Android…';
-
-  @override
   String get settingsKillSwitchOpenVpn => 'Открыть настройки VPN';
-
-  @override
-  String get settingsKillSwitchRisk =>
-      'Если соединение не восстановится, интернет останется недоступен, пока вы не отключите блокировку в настройках Android.';
 
   @override
   String get settingsKillSwitchOpenFailed =>
       'Не удалось открыть настройки VPN. Откройте Настройки → Сеть и интернет → VPN.';
-
-  @override
-  String get settingsKillSwitchAndroidOwned => 'Управляется в Android';
-
-  @override
-  String get settingsKillSwitchBadgeOn => 'Вкл';
-
-  @override
-  String get settingsKillSwitchBadgePartial => 'Частично';
-
-  @override
-  String get settingsKillSwitchBadgeOff => 'Выкл';
-
-  @override
-  String get settingsKillSwitchBadgeUnknown => 'Неизвестно';
 
   @override
   String get settingsAutoReconnect => 'Авто-переподключение';
@@ -883,10 +835,6 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get homeIpUnavailable => 'Ваш IP: недоступен — туннель без интернета';
-
-  @override
-  String get homeIpLockdownHint =>
-      'Отключите «Всегда VPN» и «Блокировать без VPN» в системных настройках VPN, затем подключитесь снова';
 
   @override
   String get homeRegionAuto => 'Авто';

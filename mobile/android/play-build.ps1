@@ -23,6 +23,9 @@ if ($text -match "YOUR_.*_PASSWORD_HERE") {
 }
 
 Write-Host "Building app bundle (release, signed)..."
+# Release minify + resource shrink (incl. optimized shrinking on AGP 8.11) come
+# from app/build.gradle.kts + gradle.properties. AGP 9 is a follow-up.
+# See docs/ops/play-console-edge-r8.md.
 Push-Location (Join-Path $root "mobile")
 try {
     flutter pub get

@@ -116,6 +116,43 @@ void main() {
   });
 
   testWidgets(
+      'gate shows VPN conflict UX when entitlement fails and live foreign VPN',
+      (tester) async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(vpnChannel, (call) async {
+      if (call.method == 'getVpnConflict') {
+        return <String, Object?>{
+          'foreignAlwaysOn': false,
+          'foreignVpnActive': true,
+          'lockdown': false,
+        };
+      }
+      if (call.method == 'openVpnSettings') return true;
+      return null;
+    });
+
+    final container = ProviderContainer(
+      overrides: [
+        authProvider.overrideWith(_AuthedNotifier.new),
+        betaApiProvider.overrideWithValue(_FailingBetaApi()),
+      ],
+    );
+    addTearDown(container.dispose);
+    await container.read(authProvider.future);
+
+    await tester.pumpWidget(_gateApp(container));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 3));
+
+    expect(find.text('Мешает другой VPN'), findsOneWidget);
+    expect(find.text('Открыть настройки VPN'), findsOneWidget);
+    expect(
+      find.text('Не удалось проверить доступ. Проверьте связь.'),
+      findsNothing,
+    );
+  });
+
+  testWidgets(
       'gate shows betaGateError when entitlement fails without VPN conflict',
       (tester) async {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger

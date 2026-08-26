@@ -67,6 +67,9 @@ class _FixedVpnNotifier extends VpnNotifier {
 
   @override
   Future<void> onAppResumed() async {}
+
+  @override
+  Future<void> reconcileWithNative() async {}
 }
 
 class _FixedSubNotifier extends SubscriptionStatusNotifier {
@@ -450,7 +453,7 @@ void main() {
     expect(find.byType(HomeScreen, skipOffstage: false), findsOneWidget);
   });
 
-  testWidgets('Auto connecting keeps the shared first-pool fallback',
+  testWidgets('Auto connecting cycles Free pool flags LV then US',
       (tester) async {
     final container = ProviderContainer(
       overrides: [
@@ -486,20 +489,23 @@ void main() {
           ),
         )
         .flag;
-    expect(first, isNot('🌐'));
-    expect([kFlagEurope, kFlagUsa], contains(first));
+    expect(first, kFlagEurope);
+    expect(find.text('Автоматически'), findsOneWidget);
+    expect(find.text('Европа'), findsNothing);
 
-    await tester.pump(const Duration(milliseconds: 900));
+    await tester.pump(kAutoFlagCycleDuration);
+    await tester.pump();
     final second = tester
-        .widget<LocationFlagIcon>(
+        .widgetList<LocationFlagIcon>(
           find.descendant(
             of: find.byType(ServerCard),
             matching: find.byType(LocationFlagIcon),
           ),
         )
+        .last
         .flag;
-    expect(second, isNot('🌐'));
-    expect(second, first);
+    expect(second, kFlagUsa);
+    expect(find.text('Автоматически'), findsOneWidget);
   });
 
   testWidgets('Home ServerCard strips · Premium like Locations titles',

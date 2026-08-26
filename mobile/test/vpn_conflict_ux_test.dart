@@ -34,6 +34,15 @@ class _FixedVpnNotifier extends VpnNotifier {
 
   @override
   VpnStatus build() => _status;
+
+  @override
+  Future<void> syncFromNative() async {}
+
+  @override
+  Future<void> onAppResumed() async {}
+
+  @override
+  Future<void> reconcileWithNative() async {}
 }
 
 class _CancelTrackingNotifier extends VpnNotifier {
@@ -49,10 +58,23 @@ class _CancelTrackingNotifier extends VpnNotifier {
   Future<void> disconnect() async {
     disconnectCalls++;
   }
+
+  @override
+  Future<void> syncFromNative() async {}
+
+  @override
+  Future<void> onAppResumed() async {}
+
+  @override
+  Future<void> reconcileWithNative() async {}
 }
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('stuck connecting watchdog is 18s', () {
+    expect(VpnNotifier.stuckConnectingTimeout, const Duration(seconds: 18));
+  });
 
   group('VpnConflictInfo.fromNative', () {
     test('marks foreign Always-on as blocking', () {
@@ -66,12 +88,31 @@ void main() {
       expect(info.displayName, 'Огонь');
     });
 
-    test('treats lockdown-without-pkg as blocking', () {
+    test('treats lockdown-without-pkg as blocking when native flags it', () {
       final info = VpnConflictInfo.fromNative({
-        'foreignAlwaysOn': false,
+        'foreignAlwaysOn': true,
         'lockdown': true,
       });
       expect(info.foreignAlwaysOn, isTrue);
+    });
+
+    test('ignores leftover lockdown if native did not mark foreign', () {
+      final info = VpnConflictInfo.fromNative({
+        'foreignAlwaysOn': false,
+        'lockdown': true,
+        'foreignVpnActive': false,
+      });
+      expect(info.foreignAlwaysOn, isFalse);
+    });
+
+    test('treats live foreign VPN without Always-on as blocking', () {
+      final info = VpnConflictInfo.fromNative({
+        'foreignAlwaysOn': false,
+        'foreignVpnActive': true,
+        'lockdown': false,
+      });
+      expect(info.foreignAlwaysOn, isTrue);
+      expect(info.foreignVpnActive, isTrue);
     });
 
     test('returns none when not blocking', () {
@@ -123,6 +164,46 @@ void main() {
     expect(find.text('Открыть настройки VPN'), findsOneWidget);
     expect(
         find.text('Не удалось подключиться. Попробуйте снова.'), findsNothing);
+  });
+
+  testWidgets('Home unnamed conflict shows settings CTA, not Always-on copy',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          vpnNodesRepositoryProvider
+              .overrideWithValue(_FakeVpnNodesRepository()),
+          vpnProvider.overrideWith(
+            () => _FixedVpnNotifier(
+              const VpnError(
+                message: 'vpn_conflict',
+                code: kVpnConflictErrorCode,
+              ),
+            ),
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light,
+          locale: const Locale('ru'),
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          home: const HomeScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('Мешает другой VPN'), findsOneWidget);
+    expect(
+      find.text(
+          'Отключите другой VPN в настройках Android, затем подключитесь снова.'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Всегда включён'), findsNothing);
+    expect(find.text('Открыть настройки VPN'), findsOneWidget);
   });
 
   testWidgets('Home shows permission hint without VPN settings CTA',

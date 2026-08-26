@@ -58,6 +58,9 @@ class _FixedVpnNotifier extends VpnNotifier {
 
   @override
   Future<void> onAppResumed() async {}
+
+  @override
+  Future<void> reconcileWithNative() async {}
 }
 
 class _FixedSubNotifier extends SubscriptionStatusNotifier {
@@ -156,7 +159,7 @@ void main() {
         .setMockMethodCallHandler(const MethodChannel('teremok/vpn'), null);
   });
 
-  testWidgets('Auto YouTube winner matches Home and Locations while connecting',
+  testWidgets('Auto YouTube winner matches Home and Locations when connected',
       (tester) async {
     final container = ProviderContainer(
       overrides: [
@@ -165,9 +168,10 @@ void main() {
         ),
         vpnProvider.overrideWith(
           () => _FixedVpnNotifier(
-            const VpnConnecting(
-              progress: 0.75,
-              hint: 'YouTube',
+            VpnConnected(
+              serverName: 'YouTube',
+              protocol: 'hysteria2',
+              connectedSince: DateTime(2026, 1, 1),
             ),
             overrideWinnerId: 'al-youtube',
           ),

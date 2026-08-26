@@ -676,13 +676,13 @@ abstract class AppL10n {
   /// No description provided for @homeVpnConflictHint.
   ///
   /// In en, this message translates to:
-  /// **'Turn off the other VPN or Always-on in Android settings, then connect again.'**
+  /// **'Turn off the other VPN in Android settings, then connect again.'**
   String get homeVpnConflictHint;
 
   /// No description provided for @homeVpnConflictHintNamed.
   ///
   /// In en, this message translates to:
-  /// **'Turn off “{app}” (or Always-on) in Android settings, then connect again.'**
+  /// **'Turn off “{app}” in Android settings, then connect again.'**
   String homeVpnConflictHintNamed(String app);
 
   /// No description provided for @homeVpnPermissionHint.
@@ -853,101 +853,17 @@ abstract class AppL10n {
   /// **'Only VLESS + Reality is available for now'**
   String get settingsProtocolLocked;
 
-  /// No description provided for @settingsKillSwitch.
-  ///
-  /// In en, this message translates to:
-  /// **'Block connections without VPN'**
-  String get settingsKillSwitch;
-
-  /// No description provided for @settingsKillSwitchHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Android blocks internet access while the protected connection is unavailable.'**
-  String get settingsKillSwitchHint;
-
-  /// No description provided for @settingsKillSwitchHintSystem.
-  ///
-  /// In en, this message translates to:
-  /// **'Enable Always-on VPN and Block connections without VPN in system VPN settings'**
-  String get settingsKillSwitchHintSystem;
-
-  /// No description provided for @settingsKillSwitchOn.
-  ///
-  /// In en, this message translates to:
-  /// **'Enabled in Android settings'**
-  String get settingsKillSwitchOn;
-
-  /// No description provided for @settingsKillSwitchAlwaysOnOnly.
-  ///
-  /// In en, this message translates to:
-  /// **'Always-on is on — also enable “Block connections without VPN”'**
-  String get settingsKillSwitchAlwaysOnOnly;
-
-  /// No description provided for @settingsKillSwitchOff.
-  ///
-  /// In en, this message translates to:
-  /// **'Off — internet may work without VPN'**
-  String get settingsKillSwitchOff;
-
-  /// No description provided for @settingsKillSwitchUnavailable.
-  ///
-  /// In en, this message translates to:
-  /// **'Couldn\'t check the Android setting'**
-  String get settingsKillSwitchUnavailable;
-
-  /// No description provided for @settingsKillSwitchChecking.
-  ///
-  /// In en, this message translates to:
-  /// **'Checking Android setting…'**
-  String get settingsKillSwitchChecking;
-
   /// No description provided for @settingsKillSwitchOpenVpn.
   ///
   /// In en, this message translates to:
   /// **'Open VPN settings'**
   String get settingsKillSwitchOpenVpn;
 
-  /// No description provided for @settingsKillSwitchRisk.
-  ///
-  /// In en, this message translates to:
-  /// **'If the connection cannot recover, internet stays unavailable until you turn this off in Android settings.'**
-  String get settingsKillSwitchRisk;
-
   /// No description provided for @settingsKillSwitchOpenFailed.
   ///
   /// In en, this message translates to:
   /// **'Couldn\'t open VPN settings. Open Settings → Network & internet → VPN.'**
   String get settingsKillSwitchOpenFailed;
-
-  /// No description provided for @settingsKillSwitchAndroidOwned.
-  ///
-  /// In en, this message translates to:
-  /// **'Controlled by Android'**
-  String get settingsKillSwitchAndroidOwned;
-
-  /// No description provided for @settingsKillSwitchBadgeOn.
-  ///
-  /// In en, this message translates to:
-  /// **'On'**
-  String get settingsKillSwitchBadgeOn;
-
-  /// No description provided for @settingsKillSwitchBadgePartial.
-  ///
-  /// In en, this message translates to:
-  /// **'Partial'**
-  String get settingsKillSwitchBadgePartial;
-
-  /// No description provided for @settingsKillSwitchBadgeOff.
-  ///
-  /// In en, this message translates to:
-  /// **'Off'**
-  String get settingsKillSwitchBadgeOff;
-
-  /// No description provided for @settingsKillSwitchBadgeUnknown.
-  ///
-  /// In en, this message translates to:
-  /// **'Unknown'**
-  String get settingsKillSwitchBadgeUnknown;
 
   /// No description provided for @settingsAutoReconnect.
   ///
@@ -1686,12 +1602,6 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Your IP: unavailable — tunnel has no internet'**
   String get homeIpUnavailable;
-
-  /// No description provided for @homeIpLockdownHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Disable Always-on “Block connections without VPN” in system VPN settings, then reconnect'**
-  String get homeIpLockdownHint;
 
   /// No description provided for @homeRegionAuto.
   ///

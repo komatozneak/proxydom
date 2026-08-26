@@ -313,11 +313,11 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get homeVpnConflictHint =>
-      'Turn off the other VPN or Always-on in Android settings, then connect again.';
+      'Turn off the other VPN in Android settings, then connect again.';
 
   @override
   String homeVpnConflictHintNamed(String app) {
-    return 'Turn off “$app” (or Always-on) in Android settings, then connect again.';
+    return 'Turn off “$app” in Android settings, then connect again.';
   }
 
   @override
@@ -417,58 +417,11 @@ class AppL10nEn extends AppL10n {
       'Only VLESS + Reality is available for now';
 
   @override
-  String get settingsKillSwitch => 'Block connections without VPN';
-
-  @override
-  String get settingsKillSwitchHint =>
-      'Android blocks internet access while the protected connection is unavailable.';
-
-  @override
-  String get settingsKillSwitchHintSystem =>
-      'Enable Always-on VPN and Block connections without VPN in system VPN settings';
-
-  @override
-  String get settingsKillSwitchOn => 'Enabled in Android settings';
-
-  @override
-  String get settingsKillSwitchAlwaysOnOnly =>
-      'Always-on is on — also enable “Block connections without VPN”';
-
-  @override
-  String get settingsKillSwitchOff => 'Off — internet may work without VPN';
-
-  @override
-  String get settingsKillSwitchUnavailable =>
-      'Couldn\'t check the Android setting';
-
-  @override
-  String get settingsKillSwitchChecking => 'Checking Android setting…';
-
-  @override
   String get settingsKillSwitchOpenVpn => 'Open VPN settings';
-
-  @override
-  String get settingsKillSwitchRisk =>
-      'If the connection cannot recover, internet stays unavailable until you turn this off in Android settings.';
 
   @override
   String get settingsKillSwitchOpenFailed =>
       'Couldn\'t open VPN settings. Open Settings → Network & internet → VPN.';
-
-  @override
-  String get settingsKillSwitchAndroidOwned => 'Controlled by Android';
-
-  @override
-  String get settingsKillSwitchBadgeOn => 'On';
-
-  @override
-  String get settingsKillSwitchBadgePartial => 'Partial';
-
-  @override
-  String get settingsKillSwitchBadgeOff => 'Off';
-
-  @override
-  String get settingsKillSwitchBadgeUnknown => 'Unknown';
 
   @override
   String get settingsAutoReconnect => 'Auto-reconnect';
@@ -882,10 +835,6 @@ class AppL10nEn extends AppL10n {
   @override
   String get homeIpUnavailable =>
       'Your IP: unavailable — tunnel has no internet';
-
-  @override
-  String get homeIpLockdownHint =>
-      'Disable Always-on “Block connections without VPN” in system VPN settings, then reconnect';
 
   @override
   String get homeRegionAuto => 'Auto';

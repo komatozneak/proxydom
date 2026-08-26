@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:teremok_connect/features/vpn/data/node_auto_selector.dart';
 import 'package:teremok_connect/features/vpn/data/node_display.dart';
 import 'package:teremok_connect/features/vpn/data/vpn_node.dart';
 import 'package:teremok_connect/l10n/app_localizations.dart';
@@ -366,6 +367,75 @@ void main() {
     );
     expect(uniqueAutoPoolFlags([eu, us, eu2]), [kFlagEurope, kFlagUsa]);
     expect(uniqueAutoPoolFlags(const []), [kFlagGlobe]);
+  });
+
+  test('flagForProductLabel maps Latvia copy to EU flag', () {
+    expect(flagForProductLabel('Латвия'), kFlagEurope);
+    expect(flagForProductLabel('Latvia'), kFlagEurope);
+    expect(flagForProductLabel('латвия · бесплатно'), kFlagEurope);
+  });
+
+  test('uniqueAutoPoolFlags Free is LV→US, Premium adds gaming then YouTube',
+      () {
+    const eu = VpnNode(
+      id: 'eu-hy2-1',
+      label: 'Европа · Бесплатно',
+      host: '217.60.3.9',
+      port: 443,
+      status: 'connected',
+      isDefault: false,
+      protocol: kVpnNodeProtocolHysteria2,
+      region: 'eu',
+    );
+    const us = VpnNode(
+      id: 'us-hy2-1',
+      label: 'США · Бесплатно',
+      host: '45.91.248.91',
+      port: 443,
+      status: 'connected',
+      isDefault: false,
+      protocol: kVpnNodeProtocolHysteria2,
+      purpose: 'geo-us',
+    );
+    const game = VpnNode(
+      id: 'eu-gaming',
+      label: 'Игровой · Premium',
+      host: '204.11.2.216',
+      port: 443,
+      status: 'connected',
+      isDefault: false,
+      purpose: 'gaming',
+      requiresPremium: true,
+    );
+    const yt = VpnNode(
+      id: 'al-youtube',
+      label: 'YouTube · Premium',
+      host: '85.155.228.235',
+      port: 443,
+      status: 'connected',
+      isDefault: false,
+      purpose: 'youtube',
+      requiresPremium: true,
+    );
+    const india = VpnNode(
+      id: 'in-geo-1',
+      label: 'Индия · Премиум',
+      host: '107.181.139.193',
+      port: 443,
+      status: 'connected',
+      isDefault: false,
+      purpose: 'geo-in',
+      requiresPremium: true,
+    );
+    final catalog = [eu, us, game, yt, india];
+    expect(
+      uniqueAutoPoolFlags(autoPoolFor(catalog, isPremium: false)),
+      [kFlagEurope, kFlagUsa],
+    );
+    expect(
+      uniqueAutoPoolFlags(autoPoolFor(catalog, isPremium: true)),
+      [kFlagEurope, kFlagUsa, kFlagGaming, 'youtube'],
+    );
   });
 
   test('autoSelectionDisplayFlag uses winner place, else Auto-pool fallback',

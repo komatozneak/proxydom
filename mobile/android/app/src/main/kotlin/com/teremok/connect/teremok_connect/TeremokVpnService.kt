@@ -37,6 +37,10 @@ import org.json.JSONObject
 /**
  * Android VpnService, Hysteria2-only (ADR 018):
  * VpnService TUN → hy2bind startTun + SOCKS prove on :10808.
+ *
+ * ADR 020: product opts out of Always-on (`SUPPORTS_ALWAYS_ON=false`).
+ * Sticky restore / QS persist / foreign Always-on conflict / lockdown leftover
+ * routing stay — they are not product Always-on promotion.
  */
 class TeremokVpnService : VpnService() {
 
@@ -158,10 +162,11 @@ class TeremokVpnService : VpnService() {
         }
 
         /**
-         * Detect Always-on held by **another** VPN app (blocks Teremok Connect).
+         * Detect a VPN that blocks Teremok Connect: foreign Always-on / lockdown,
+         * or another app's live VPN (system TRANSPORT_VPN without our TUN).
          *
-         * Keys: foreignAlwaysOn (Boolean), packageName (String?),
-         * appLabel (String?), lockdown (Boolean?).
+         * Keys: foreignAlwaysOn (Boolean), foreignVpnActive (Boolean),
+         * packageName (String?), appLabel (String?), lockdown (Boolean?).
          */
         fun queryVpnConflict(context: android.content.Context): Map<String, Any?> {
             val alwaysOnPkg = readSecureString(context, "always_on_vpn_app")?.trim()
@@ -175,16 +180,14 @@ class TeremokVpnService : VpnService() {
             } else {
                 false
             }
-            // Android 12+ often blocks Settings.Secure.always_on_vpn_app for
-            // non-system apps (Pixel: "is not readable") while still exposing
-            // always_on_vpn_lockdown=1. Treat lockdown-without-our-Always-on as
-            // a foreign block so gate UX is not «check your connection».
-            val foreign = when {
-                alwaysOnPkg != null -> alwaysOnPkg != context.packageName
-                lockdown == true && !oursAlwaysOn -> true
-                else -> false
-            }
-            val label = if (foreign && alwaysOnPkg != null) {
+            val foreignAlwaysOnPkg = alwaysOnPkg != null && alwaysOnPkg != context.packageName
+            val occupying = isOurSessionOccupying()
+            val foreignLockdown = lockdown == true && !oursAlwaysOn && !occupying
+            // Live VPN from another app (no Always-on required). Skip while we
+            // are establishing / already own the TUN / restoring an active session.
+            val foreignVpn = isSystemVpnUp(context) && !occupying
+            val foreign = foreignAlwaysOnPkg || foreignLockdown || foreignVpn
+            val label = if (foreign && alwaysOnPkg != null && alwaysOnPkg != context.packageName) {
                 resolveAppLabel(context, alwaysOnPkg)
             } else {
                 null
@@ -192,14 +195,26 @@ class TeremokVpnService : VpnService() {
             Log.i(
                 TAG,
                 "vpnConflict foreign=$foreign pkg=$alwaysOnPkg label=$label " +
-                    "lockdown=$lockdown oursAlwaysOn=$oursAlwaysOn",
+                    "lockdown=$lockdown oursAlwaysOn=$oursAlwaysOn " +
+                    "foreignVpn=$foreignVpn occupying=$occupying",
             )
             return mapOf(
                 "foreignAlwaysOn" to foreign,
-                "packageName" to if (foreign) alwaysOnPkg else null,
+                "foreignVpnActive" to foreignVpn,
+                "packageName" to if (foreignAlwaysOnPkg) alwaysOnPkg else null,
                 "appLabel" to label,
                 "lockdown" to lockdown,
             )
+        }
+
+        /** True while Teremok owns or is taking the system VPN slot. */
+        fun isOurSessionOccupying(): Boolean {
+            val svc = currentInstance() ?: return false
+            if (svc.hasLiveTun() || svc.establishInProgress) return true
+            return when (svc.currentStatus) {
+                "connected", "connecting", "preparing", "probing" -> true
+                else -> false
+            }
         }
 
         private fun resolveAppLabel(context: android.content.Context, packageName: String): String {

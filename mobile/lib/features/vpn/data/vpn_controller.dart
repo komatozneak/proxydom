@@ -61,7 +61,8 @@ class VpnController {
       'hysteriaSocksListen': profile.socksListen,
       'hysteriaNodeId': profile.nodeId,
       if (catalogNodeId != null) 'autoNodeId': catalogNodeId,
-      if (profile.bandwidthUp != null) 'hysteriaBandwidthUp': profile.bandwidthUp,
+      if (profile.bandwidthUp != null)
+        'hysteriaBandwidthUp': profile.bandwidthUp,
       if (profile.bandwidthDown != null)
         'hysteriaBandwidthDown': profile.bandwidthDown,
       'controlPlaneHosts': VpnServiceConfig.controlPlaneHostsOf(),
@@ -122,12 +123,12 @@ class VpnController {
         'hysteriaSni': profile.sni,
         'hysteriaSocksListen': profile.socksListen,
         'hysteriaNodeId': profile.nodeId,
-        if (profile.bandwidthUp != null) 'hysteriaBandwidthUp': profile.bandwidthUp,
+        if (profile.bandwidthUp != null)
+          'hysteriaBandwidthUp': profile.bandwidthUp,
         if (profile.bandwidthDown != null)
           'hysteriaBandwidthDown': profile.bandwidthDown,
         'controlPlaneHosts': VpnServiceConfig.controlPlaneHostsOf(),
-        if (disallowedApps.isNotEmpty)
-          'disallowedApplications': disallowedApps,
+        if (disallowedApps.isNotEmpty) 'disallowedApplications': disallowedApps,
         if (directSuffixes.isNotEmpty) 'directDomainSuffixes': directSuffixes,
       });
 
@@ -148,16 +149,14 @@ class VpnController {
 
   Future<bool> stop() async {
     try {
-      final result = await _methodChannel
-          .invokeMethod<bool>('stop')
-          .timeout(
-            stopTimeout,
-            onTimeout: () {
-              throw VpnControllerException(
-                'stop timeout after ${stopTimeout.inSeconds}s',
-              );
-            },
+      final result = await _methodChannel.invokeMethod<bool>('stop').timeout(
+        stopTimeout,
+        onTimeout: () {
+          throw VpnControllerException(
+            'stop timeout after ${stopTimeout.inSeconds}s',
           );
+        },
+      );
       return result ?? false;
     } on TimeoutException catch (e) {
       throw VpnControllerException('stop timeout: $e');
@@ -186,12 +185,15 @@ class VpnController {
       return parseVpnNativeStatus(result);
     } on PlatformException {
       return VpnNativeStatus.unknown;
+    } on MissingPluginException {
+      return VpnNativeStatus.unknown;
     }
   }
 
   Future<bool> hasActiveSession() async {
     try {
-      final result = await _methodChannel.invokeMethod<bool>('hasActiveSession');
+      final result =
+          await _methodChannel.invokeMethod<bool>('hasActiveSession');
       return result ?? false;
     } on PlatformException {
       return false;
@@ -275,8 +277,7 @@ class VpnController {
 
   Future<bool> openVpnSettings() async {
     try {
-      final result =
-          await _methodChannel.invokeMethod<bool>('openVpnSettings');
+      final result = await _methodChannel.invokeMethod<bool>('openVpnSettings');
       return result ?? false;
     } on PlatformException {
       return false;
@@ -285,11 +286,10 @@ class VpnController {
     }
   }
 
-  /// Detect Always-on VPN held by another app (Android only).
+  /// Detect a blocking foreign VPN: Always-on / lockdown / live TUN (Android).
   Future<VpnConflictInfo> queryVpnConflict() async {
     try {
-      final raw =
-          await _methodChannel.invokeMethod<dynamic>('getVpnConflict');
+      final raw = await _methodChannel.invokeMethod<dynamic>('getVpnConflict');
       return VpnConflictInfo.fromNative(raw);
     } on PlatformException {
       return VpnConflictInfo.none;
@@ -311,17 +311,14 @@ class VpnController {
   }
 
   Stream<VpnNativeStatus> get statusStream {
-    _statusStream ??= _eventChannel
-        .receiveBroadcastStream()
-        .map((event) {
-          if (event is String) {
-            return parseVpnNativeStatus(event);
-          }
-          return VpnNativeStatus.unknown;
-        })
-        .handleError((_) {
-          return VpnNativeStatus.unknown;
-        });
+    _statusStream ??= _eventChannel.receiveBroadcastStream().map((event) {
+      if (event is String) {
+        return parseVpnNativeStatus(event);
+      }
+      return VpnNativeStatus.unknown;
+    }).handleError((_) {
+      return VpnNativeStatus.unknown;
+    });
     return _statusStream!;
   }
 
@@ -330,29 +327,27 @@ class VpnController {
         .receiveBroadcastStream()
         .map(VpnSessionSnapshot.fromEvent)
         .handleError((_) {
-          return const VpnSessionSnapshot(
-            phase: VpnSessionPhase.unknown,
-            generation: 0,
-          );
-        });
+      return const VpnSessionSnapshot(
+        phase: VpnSessionPhase.unknown,
+        generation: 0,
+      );
+    });
     return _sessionStream!;
   }
 
   Stream<VpnTrafficStats> get trafficStream {
-    _trafficStream ??= _trafficEventChannel
-        .receiveBroadcastStream()
-        .map((event) {
-          if (event is Map) {
-            final down = event['downlinkBps'];
-            final up = event['uplinkBps'];
-            return VpnTrafficStats(
-              downlinkBps: (down is num) ? down.toInt() : 0,
-              uplinkBps: (up is num) ? up.toInt() : 0,
-            );
-          }
-          return const VpnTrafficStats.zero();
-        })
-        .handleError((_) => const VpnTrafficStats.zero());
+    _trafficStream ??=
+        _trafficEventChannel.receiveBroadcastStream().map((event) {
+      if (event is Map) {
+        final down = event['downlinkBps'];
+        final up = event['uplinkBps'];
+        return VpnTrafficStats(
+          downlinkBps: (down is num) ? down.toInt() : 0,
+          uplinkBps: (up is num) ? up.toInt() : 0,
+        );
+      }
+      return const VpnTrafficStats.zero();
+    }).handleError((_) => const VpnTrafficStats.zero());
     return _trafficStream!;
   }
 
@@ -460,13 +455,14 @@ class VpnControllerException implements Exception {
   String toString() => 'VpnControllerException: $message';
 }
 
-/// Snapshot from Android `getVpnConflict` (foreign Always-on holder).
+/// Snapshot from Android `getVpnConflict` (foreign Always-on / live VPN).
 final class VpnConflictInfo {
   const VpnConflictInfo({
     required this.foreignAlwaysOn,
     this.packageName,
     this.appLabel,
     this.lockdown,
+    this.foreignVpnActive = false,
   });
 
   static const none = VpnConflictInfo(foreignAlwaysOn: false);
@@ -475,6 +471,7 @@ final class VpnConflictInfo {
   final String? packageName;
   final String? appLabel;
   final bool? lockdown;
+  final bool foreignVpnActive;
 
   /// Prefer resolved label; fall back to package name.
   String get displayName {
@@ -489,18 +486,20 @@ final class VpnConflictInfo {
     if (raw is! Map) return VpnConflictInfo.none;
     final map = Map<Object?, Object?>.from(raw);
     final foreign = map['foreignAlwaysOn'] == true;
+    final foreignVpn = map['foreignVpnActive'] == true;
     final lockdownRaw = map['lockdown'];
     final lockdown = lockdownRaw is bool ? lockdownRaw : null;
-    // Android 12+ may hide always_on_vpn_app while lockdown=1 is still visible.
-    // Treat lockdown-without-readable-pkg as a blocking conflict for UX.
-    final blocking = foreign || lockdown == true;
+    // Native already folds foreign lockdown into [foreignAlwaysOn]. Do not
+    // OR lockdown here: leftover lockdown while we occupy the TUN would
+    // look like a conflict and hide "already connected".
+    final blocking = foreign || foreignVpn;
     if (!blocking) return VpnConflictInfo.none;
     return VpnConflictInfo(
       foreignAlwaysOn: true,
+      foreignVpnActive: foreignVpn,
       packageName: map['packageName']?.toString(),
       appLabel: map['appLabel']?.toString(),
       lockdown: lockdown,
     );
   }
 }
-

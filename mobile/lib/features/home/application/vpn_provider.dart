@@ -65,7 +65,7 @@ const _autoMintTimeout = Duration(seconds: 8);
 
 const _connectedSinceKey = 'vpn_connected_since_ms';
 
-/// Home + analytics: another app holds Always-on / lockdown.
+/// Home + analytics: another VPN / Always-on / lockdown is blocking.
 const kVpnConflictErrorCode = 'vpn_conflict';
 
 /// VPN-контроллер. Шаг 16: retry/reconnect логика поверх VpnController + native.
@@ -192,6 +192,10 @@ class VpnNotifier extends Notifier<VpnStatus> {
   Timer? _connectingPoll;
   Timer? _disconnectWatchdog;
   Future<void>? _syncInFlight;
+  DateTime? _connectingUiStartedAt;
+
+  /// UI Connecting without native Connected — then conflict CTA, not a spinner.
+  static const stuckConnectingTimeout = Duration(seconds: 18);
 
   /// True while a connect() Future is in-flight (dedupe concurrent callers).
   Future<void>? _connectInFlight;
@@ -217,6 +221,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
   void _cancelConnectingWatchdog() {
     _connectingPoll?.cancel();
     _connectingPoll = null;
+    _connectingUiStartedAt = null;
   }
 
   void _cancelDisconnectWatchdog() {
@@ -283,6 +288,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
   /// Poll native while UI is connecting. Never force-stops (ADR 014 / 015).
   void _armConnectingPoll() {
     _cancelConnectingWatchdog();
+    _connectingUiStartedAt = DateTime.now();
     _connectingPoll = Timer.periodic(const Duration(milliseconds: 1500), (_) {
       unawaited(_pollConnectingNative());
     });
@@ -304,6 +310,12 @@ class VpnNotifier extends Notifier<VpnStatus> {
       await _failConnectingFromNative();
       return;
     }
+    final startedAt = _connectingUiStartedAt;
+    if (startedAt != null &&
+        DateTime.now().difference(startedAt) >= stuckConnectingTimeout) {
+      await _failConnectingStuck();
+      return;
+    }
     if (_sessionWalkActive) return;
     if (native == VpnNativeStatus.idle && _connectInFlight == null) {
       if (_idleMustNotDemote()) {
@@ -311,6 +323,16 @@ class VpnNotifier extends Notifier<VpnStatus> {
       }
       await _failConnectingIdle();
     }
+  }
+
+  Future<VpnError> _vpnErrorFromConflict(VpnConflictInfo conflict) {
+    final label = conflict.appLabel?.trim();
+    return Future.value(
+      VpnError(
+        message: (label != null && label.isNotEmpty) ? label : 'vpn_conflict',
+        code: kVpnConflictErrorCode,
+      ),
+    );
   }
 
   Future<VpnError> _vpnErrorFromNative({
@@ -323,15 +345,11 @@ class VpnNotifier extends Notifier<VpnStatus> {
     );
   }
 
-  /// After prepare denial: foreign Always-on / lockdown → [vpn_conflict], else permission.
+  /// After prepare denial: foreign Always-on / live VPN → [vpn_conflict], else permission.
   Future<VpnError> _errorForPermissionFailure() async {
     final conflict = await VpnController.instance.queryVpnConflict();
     if (conflict.foreignAlwaysOn) {
-      final label = conflict.appLabel?.trim();
-      return VpnError(
-        message: (label != null && label.isNotEmpty) ? label : 'vpn_conflict',
-        code: kVpnConflictErrorCode,
-      );
+      return _vpnErrorFromConflict(conflict);
     }
     return const VpnError(
       message: 'VPN permission denied',
@@ -343,11 +361,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
   Future<VpnError> _errorForStartFailure() async {
     final conflict = await VpnController.instance.queryVpnConflict();
     if (conflict.foreignAlwaysOn) {
-      final label = conflict.appLabel?.trim();
-      return VpnError(
-        message: (label != null && label.isNotEmpty) ? label : 'vpn_conflict',
-        code: kVpnConflictErrorCode,
-      );
+      return _vpnErrorFromConflict(conflict);
     }
     final detail = await VpnController.instance.getLastError();
     if (detail != null && detail.toLowerCase().contains('permission denied')) {
@@ -1244,16 +1258,34 @@ class VpnNotifier extends Notifier<VpnStatus> {
     bool reuseConfig = false,
     required int gen,
   }) async {
-    // Error Nest must not stay a frozen screenshot while we probe native.
-    if (state is VpnError || state is VpnDisconnected) {
-      state = const VpnConnecting(progress: 0.0);
-    }
-    // Already up in the system tray (UI lost state after Activity recreate).
+    // Conflict before Connecting — foreign VPN must not paint a spinner.
     final existing = await VpnController.instance.getStatus();
     if (await _abortStaleConnect(gen)) return;
+    final preConflict = await VpnController.instance.queryVpnConflict();
+    if (preConflict.foreignAlwaysOn) {
+      state = await _vpnErrorFromConflict(preConflict);
+      return;
+    }
+    // Already up in the system tray (UI lost state after Activity recreate).
     if (!forceRestart && existing == VpnNativeStatus.connected) {
       await _syncFromNative();
       return;
+    }
+    if (!forceRestart &&
+        (existing == VpnNativeStatus.connecting ||
+            existing == VpnNativeStatus.preparing)) {
+      final sessionActive = await VpnController.instance.hasActiveSession();
+      if (sessionActive) {
+        await _syncFromNative();
+        if (state is VpnConnected) return;
+        if (state is VpnConnecting) {
+          _armConnectingPoll();
+          return;
+        }
+      }
+    }
+    if (state is VpnError || state is VpnDisconnected) {
+      state = const VpnConnecting(progress: 0.0);
     }
     if (forceRestart && existing == VpnNativeStatus.connected) {
       try {
@@ -1262,7 +1294,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
       if (await _abortStaleConnect(gen)) return;
     }
 
-// Allow retry after a stuck VpnConnecting (e.g. hung fetchConfig).
+    // Allow retry after a stuck VpnConnecting (e.g. hung fetchConfig).
     try {
       ref.read(betaUsageTrackerProvider).recordConnectAttempt();
     } on StateError {
@@ -1443,6 +1475,9 @@ class VpnNotifier extends Notifier<VpnStatus> {
   /// Call from Home [AppLifecycleState.resumed] (sync native status).
   Future<void> onAppResumed() async {
     await syncFromNative();
+    if (state is VpnDisconnected || state is VpnError) {
+      await reconcileWithNative();
+    }
   }
 
   /// Block auto-reconnect (device self-revoke / intentional stop side-effects).
@@ -1595,7 +1630,12 @@ class VpnNotifier extends Notifier<VpnStatus> {
     }
     _lastSessionPhase = snap.phase;
     _sessionOwnsUi = snap.ownsConnectUi;
+    final wasProving = _sessionProving;
     _sessionProving = snap.ignoresNativeConnected;
+    // Auto-prove can exceed 18s; restart the hung-Connecting clock after it.
+    if (wasProving && !_sessionProving && state is VpnConnecting) {
+      _connectingUiStartedAt = DateTime.now();
+    }
     final winnerId = snap.candidateId?.trim();
     if (winnerId != null && winnerId.isNotEmpty) {
       _autoActiveNodeId = winnerId;
@@ -1809,6 +1849,23 @@ class VpnNotifier extends Notifier<VpnStatus> {
     }
     _logUiTransition('disconnected', 'idle_connecting');
     state = const VpnDisconnected();
+  }
+
+  /// Hung Connecting: open system VPN settings instead of spinning forever.
+  Future<void> _failConnectingStuck() async {
+    _cancelConnectingWatchdog();
+    if (state is! VpnConnecting) return;
+    _vpnLog('[VPN] connecting stuck — conflict CTA');
+    _connectGeneration++;
+    _activeConnectGen = null;
+    _suppressAutoReconnect = true;
+    _endSessionWalk();
+    _sessionOwnsUi = false;
+    _sessionProving = false;
+    await _clearConnectedSince();
+    final conflict = await VpnController.instance.queryVpnConflict();
+    _logUiTransition('error', 'stuck_connecting');
+    state = await _vpnErrorFromConflict(conflict);
   }
 
   /// Don't flip UI to disconnected on a single idle event — re-check native.

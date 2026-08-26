@@ -295,6 +295,7 @@ String flagForProductLabel(String label) {
   if (t.isEmpty) return kFlagGlobe;
   if (t.contains('игровой') || t.contains('gaming')) return kFlagGaming;
   if (t.contains('индия') || t.contains('india')) return kFlagIndia;
+  if (t.contains('латвия') || t.contains('latvia')) return kFlagEurope;
   if (t.contains('европа') || t.contains('europe')) return kFlagEurope;
   if (t.contains('сша') ||
       t.contains('usa') ||
@@ -305,7 +306,7 @@ String flagForProductLabel(String label) {
   return kFlagGlobe;
 }
 
-/// Unique location flags in Auto pool order (for Home connecting animation).
+/// Unique location flags in Auto pool order (Home Connecting cycle).
 List<String> uniqueAutoPoolFlags(Iterable<VpnNode> pool) {
   final seen = <String>{};
   final out = <String>[];

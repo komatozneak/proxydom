@@ -6,6 +6,7 @@ import 'package:teremok_connect/core/widgets/location_flag_icon.dart';
 import 'package:teremok_connect/features/home/application/vpn_provider.dart';
 import 'package:teremok_connect/features/home/application/vpn_status.dart';
 import 'package:teremok_connect/features/home/presentation/widgets/server_card.dart';
+import 'package:teremok_connect/features/vpn/data/node_display.dart';
 import 'package:teremok_connect/l10n/app_localizations.dart';
 
 class _FixedVpnNotifier extends VpnNotifier {
@@ -28,6 +29,13 @@ Widget _wrap(Widget child, {required List<Override> overrides}) {
       home: Scaffold(body: child),
     ),
   );
+}
+
+String _cardFlag(WidgetTester tester) {
+  return tester
+      .widgetList<LocationFlagIcon>(find.byType(LocationFlagIcon))
+      .last
+      .flag;
 }
 
 void main() {
@@ -90,5 +98,95 @@ void main() {
     final sessionY = tester.getTopLeft(find.text('СЕССИЯ')).dy;
     final timerY = tester.getTopLeft(find.text('11:09')).dy;
     expect(sessionY, lessThan(timerY));
+  });
+
+  testWidgets('Auto Connecting cycles Free pool flags LV then US',
+      (tester) async {
+    await tester.pumpWidget(
+      _wrap(
+        const ServerCard(
+          title: 'Автоматически',
+          subtitle: 'Ближайшая локация',
+          flagEmoji: kFlagEurope,
+          selectionIsAuto: true,
+          autoPoolFlags: [kFlagEurope, kFlagUsa],
+        ),
+        overrides: [
+          vpnProvider.overrideWith(
+            () => _FixedVpnNotifier(const VpnConnecting(progress: 0.4)),
+          ),
+        ],
+      ),
+    );
+    await tester.pump();
+    expect(_cardFlag(tester), kFlagEurope);
+
+    await tester.pump(kAutoFlagCycleDuration);
+    await tester.pump();
+    expect(_cardFlag(tester), kFlagUsa);
+  });
+
+  testWidgets('Auto Connecting cycles Premium pool through gaming and YouTube',
+      (tester) async {
+    await tester.pumpWidget(
+      _wrap(
+        const ServerCard(
+          title: 'Автоматически',
+          subtitle: 'Ближайшая локация',
+          flagEmoji: kFlagEurope,
+          selectionIsAuto: true,
+          autoPoolFlags: [kFlagEurope, kFlagUsa, kFlagGaming, 'youtube'],
+        ),
+        overrides: [
+          vpnProvider.overrideWith(
+            () => _FixedVpnNotifier(const VpnConnecting(progress: 0.4)),
+          ),
+        ],
+      ),
+    );
+    await tester.pump();
+    expect(_cardFlag(tester), kFlagEurope);
+
+    await tester.pump(kAutoFlagCycleDuration);
+    await tester.pump();
+    expect(_cardFlag(tester), kFlagUsa);
+    await tester.pump(kAutoFlagCycleDuration);
+    await tester.pump();
+    expect(_cardFlag(tester), kFlagGaming);
+    await tester.pump(kAutoFlagCycleDuration);
+    await tester.pump();
+    expect(_cardFlag(tester), 'youtube');
+  });
+
+  testWidgets('Auto Connected keeps the winner flag and does not cycle',
+      (tester) async {
+    await tester.pumpWidget(
+      _wrap(
+        const ServerCard(
+          title: 'YouTube',
+          subtitle: '',
+          flagEmoji: 'youtube',
+          selectionIsAuto: true,
+          autoPoolFlags: [kFlagEurope, kFlagUsa, kFlagGaming, 'youtube'],
+        ),
+        overrides: [
+          vpnProvider.overrideWith(
+            () => _FixedVpnNotifier(
+              VpnConnected(
+                serverName: 'YouTube',
+                protocol: 'hysteria2',
+                connectedSince: DateTime.now(),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    await tester.pump();
+    expect(_cardFlag(tester), 'youtube');
+
+    await tester.pump(kAutoFlagCycleDuration);
+    await tester.pump();
+    expect(_cardFlag(tester), 'youtube');
   });
 }
