@@ -80,7 +80,7 @@ void main() {
     expect(find.text('Android'), findsOneWidget);
     expect(find.text('Это устройство'), findsOneWidget);
     expect(find.byTooltip('Переименовать'), findsOneWidget);
-    expect(find.byTooltip('Отозвать'), findsNothing);
+    expect(find.text('Удалить'), findsNothing);
   });
 
   testWidgets(
@@ -126,8 +126,31 @@ void main() {
     expect(find.text('Войти в группу'), findsNothing);
     expect(find.text('Выйти на всех устройствах'), findsOneWidget);
     expect(find.text('Это устройство'), findsOneWidget);
-    expect(find.byTooltip('Отозвать'), findsOneWidget);
+    expect(find.text('Удалить'), findsOneWidget);
     expect(find.byTooltip('Переименовать'), findsNWidgets(2));
     expect(find.text('iPhone'), findsOneWidget);
+  });
+
+  testWidgets(
+    'member with others can revoke',
+    skip: !anonymous,
+    (tester) async {
+    await tester.pumpWidget(
+      _app(
+        DeviceListResult(
+          activeCount: 2,
+          maxDevices: 5,
+          devices: [
+            _slot(id: 1, current: true, owner: false, name: 'Windows'),
+            _slot(id: 2, current: false, owner: true, name: 'Pixel'),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Это устройство'), findsOneWidget);
+    expect(find.text('Удалить'), findsOneWidget);
+    expect(find.text('Pixel'), findsOneWidget);
   });
 }

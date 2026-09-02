@@ -192,7 +192,7 @@
   "devicesThisDevice": "Вы",
   "devicesOwnerLabel": "Владелец подписки",
   "devicesInvitedLabel": "Приглашённое устройство",
-  "devicesRevoke": "Отозвать",
+  "devicesRevoke": "Удалить",
   "devicesRevokeTitle": "Отозвать устройство?",
   "devicesRevokeBody": "VPN-ключ этого устройства перестанет работать. Остальные устройства не затронуты.",
   "devicesRevokeConfirm": "Отозвать",

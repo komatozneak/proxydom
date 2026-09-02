@@ -514,7 +514,7 @@ class AppL10nEn extends AppL10n {
   String get devicesInvitedLabel => 'Invited device';
 
   @override
-  String get devicesRevoke => 'Revoke';
+  String get devicesRevoke => 'Remove';
 
   @override
   String get devicesRevokeTitle => 'Revoke this device?';

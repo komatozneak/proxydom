@@ -512,7 +512,7 @@ class AppL10nRu extends AppL10n {
   String get devicesInvitedLabel => 'Приглашённое устройство';
 
   @override
-  String get devicesRevoke => 'Отозвать';
+  String get devicesRevoke => 'Удалить';
 
   @override
   String get devicesRevokeTitle => 'Отозвать устройство?';

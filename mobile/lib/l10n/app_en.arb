@@ -289,7 +289,7 @@
   "@devicesOwnerLabel": {},
   "devicesInvitedLabel": "Invited device",
   "@devicesInvitedLabel": {},
-  "devicesRevoke": "Revoke",
+  "devicesRevoke": "Remove",
   "@devicesRevoke": {},
   "devicesRevokeTitle": "Revoke this device?",
   "@devicesRevokeTitle": {},

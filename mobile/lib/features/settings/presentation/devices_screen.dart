@@ -348,7 +348,7 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
                   onRename: (ordered[i].isCurrent || currentIsOwner) && !_busy
                       ? () => _rename(ordered[i])
                       : null,
-                  onRevoke: !ordered[i].isCurrent && currentIsOwner && !_busy
+                  onRevoke: !ordered[i].isCurrent && !_busy
                       ? () => _revoke(ordered[i])
                       : null,
                 ),
@@ -524,13 +524,14 @@ class _DeviceRow extends StatelessWidget {
               ),
             )
           else if (onRevoke != null)
-            IconButton(
-              tooltip: l.devicesRevoke,
+            TextButton(
               onPressed: onRevoke,
-              icon: AppIcon(
-                AppIcons.xCircle,
-                size: 22,
-                color: theme.colorScheme.onSurfaceVariant,
+              child: Text(
+                l.devicesRevoke,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: theme.colorScheme.error,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
         ],
