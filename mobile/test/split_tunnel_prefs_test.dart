@@ -47,19 +47,48 @@ void main() {
 
   group('prefs defaults', () {
     test('live RF categories default ON; TikTok stays OFF', () async {
-      expect(kOsnovnyeCategories.length, 5);
-      expect(kRfDefaultOnOsnovnyeIds, {'vk', 'yandex', 'ozon', 'wb'});
-      expect(await SplitTunnelPrefs.osnovnyeEnabledCount(), 4);
+      expect(kOsnovnyeCategories.length, 10);
+      expect(
+        kRfDefaultOnOsnovnyeIds,
+        {
+          'vk',
+          'yandex',
+          'ozon',
+          'wb',
+          'steam',
+          'rutube',
+          'avito',
+          'banks',
+          'gosuslugi',
+        },
+      );
+      expect(await SplitTunnelPrefs.osnovnyeEnabledCount(), 9);
       final map = await SplitTunnelPrefs.loadOsnovnyeEnabled();
       expect(map['vk'], isTrue);
       expect(map['yandex'], isTrue);
       expect(map['ozon'], isTrue);
       expect(map['wb'], isTrue);
+      expect(map['steam'], isTrue);
+      expect(map['rutube'], isTrue);
+      expect(map['avito'], isTrue);
+      expect(map['banks'], isTrue);
+      expect(map['gosuslugi'], isTrue);
       expect(map['tiktok'], isFalse);
       final suffixes = await SplitTunnelPrefs.enabledDomainSuffixes();
       expect(
         suffixes,
-        containsAll(['vk.com', 'yandex.ru', 'ozon.ru', 'wildberries.ru']),
+        containsAll([
+          'vk.com',
+          'yandex.ru',
+          'kinopoisk.ru',
+          'ozon.ru',
+          'wildberries.ru',
+          'steampowered.com',
+          'rutube.ru',
+          'avito.ru',
+          'sberbank.ru',
+          'gosuslugi.ru',
+        ]),
       );
       expect(suffixes, isNot(contains('tiktok.com')));
     });
@@ -129,13 +158,13 @@ void main() {
 
     test('osnovnye vk domains feed suffixes; youtube aliases stripped for Hy2',
         () async {
-      expect(kOsnovnyeCategories.length, 5);
-      expect(await SplitTunnelPrefs.osnovnyeEnabledCount(), 4);
+      expect(kOsnovnyeCategories.length, 10);
+      expect(await SplitTunnelPrefs.osnovnyeEnabledCount(), 9);
       await SplitTunnelPrefs.setOsnovnyeEnabled('vk', true);
       final suffixes = await SplitTunnelPrefs.enabledDomainSuffixes();
       expect(suffixes, contains('vk.com'));
       expect(suffixes, isNot(contains('tiktok.com')));
-      expect(await SplitTunnelPrefs.osnovnyeEnabledCount(), 4);
+      expect(await SplitTunnelPrefs.osnovnyeEnabledCount(), 9);
       await SplitTunnelPrefs.addSite(domain: 'youtube.com');
       final withYt = await SplitTunnelPrefs.enabledDomainSuffixes();
       expect(withYt, contains('youtube.com'));
@@ -154,15 +183,16 @@ void main() {
         suffixes,
         containsAll(['vk.com', 'yandex.ru', 'ozon.ru', 'wildberries.ru']),
       );
+      expect(suffixes, contains('steampowered.com'));
       expect(suffixes, isNot(contains('tiktok.com')));
-      expect(await SplitTunnelPrefs.osnovnyeEnabledCount(), 4);
+      expect(await SplitTunnelPrefs.osnovnyeEnabledCount(), 9);
 
       await SplitTunnelPrefs.setOsnovnyeEnabled('vk', false);
       expect(
         await SplitTunnelPrefs.enabledDomainSuffixes(),
         isNot(contains('vk.com')),
       );
-      expect(await SplitTunnelPrefs.osnovnyeEnabledCount(), 3);
+      expect(await SplitTunnelPrefs.osnovnyeEnabledCount(), 8);
     });
 
     test('disallowed apps prefs round-trip', () async {

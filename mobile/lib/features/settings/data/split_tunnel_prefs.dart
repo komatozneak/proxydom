@@ -143,6 +143,7 @@ class SplitTunnelPrefs {
   static const _draftRevKey = 'split_tunnel_draft_rev_v1';
   static const _osnovnyeKey = 'split_tunnel_osnovnye_v1';
   static const _osnovnyeRfDefaultsKey = 'split_tunnel_osnovnye_rf_defaults_v1';
+  static const _osnovnyeV2DefaultsKey = 'split_tunnel_osnovnye_v2_defaults_v1';
   static const _disallowedAppsKey = 'split_tunnel_disallowed_apps_v1';
   static const _seededBypassKey = 'split_tunnel_seeded_bypass_v1';
   static const _seededBypassV2Key = 'split_tunnel_seeded_bypass_v2';
@@ -191,10 +192,34 @@ class SplitTunnelPrefs {
     await prefs.setBool(_osnovnyeRfDefaultsKey, true);
   }
 
-  /// Live «Основные» toggles. Defaults: VK / Yandex / Ozon / WB ON, TikTok OFF.
+  /// One-shot: add v2 categories (Steam / RuTube / Avito / banks / Gosuslugi).
+  ///
+  /// Does not restore a later user OFF — flag is set after the first apply.
+  static Future<void> _applyV2OsnovnyeDefaultsIfNeeded(
+    SharedPreferences prefs,
+  ) async {
+    if (prefs.getBool(_osnovnyeV2DefaultsKey) == true) return;
+    final map = _decodeOsnovnyeMap(prefs);
+    var changed = false;
+    for (final id in kOsnovnyeV2Ids) {
+      if (map[id] != true) {
+        map[id] = true;
+        changed = true;
+      }
+    }
+    if (changed) {
+      await prefs.setString(_osnovnyeKey, jsonEncode(map));
+      await _bumpDraft(prefs);
+    }
+    await prefs.setBool(_osnovnyeV2DefaultsKey, true);
+  }
+
+  /// Live «Основные» toggles. Defaults: RF + Steam/RuTube/Avito/banks/Gosuslugi ON,
+  /// TikTok OFF.
   static Future<Map<String, bool>> loadOsnovnyeEnabled() async {
     final prefs = await SharedPreferences.getInstance();
     await _applyRfOsnovnyeDefaultsIfNeeded(prefs);
+    await _applyV2OsnovnyeDefaultsIfNeeded(prefs);
     return _decodeOsnovnyeMap(prefs);
   }
 
@@ -441,7 +466,26 @@ const kDefaultBypassPackages = <String>{
 };
 
 /// Live RF site lists that default ON (suffix → Hy2 direct). Not TikTok.
-const kRfDefaultOnOsnovnyeIds = <String>{'vk', 'yandex', 'ozon', 'wb'};
+const kRfDefaultOnOsnovnyeIds = <String>{
+  'vk',
+  'yandex',
+  'ozon',
+  'wb',
+  'steam',
+  'rutube',
+  'avito',
+  'banks',
+  'gosuslugi',
+};
+
+/// Category ids shipped in osnovnye v2 (one-shot migrate).
+const kOsnovnyeV2Ids = <String>{
+  'steam',
+  'rutube',
+  'avito',
+  'banks',
+  'gosuslugi',
+};
 
 /// One row under Sites → Основные.
 class OsnovnyeCategory {
@@ -511,6 +555,7 @@ const kOsnovnyeCategories = <OsnovnyeCategory>[
       'yandex.uz',
       'yandexcloud.net',
       'yastatic.net',
+      'kinopoisk.ru',
     ],
   ),
   OsnovnyeCategory(
@@ -528,6 +573,64 @@ const kOsnovnyeCategories = <OsnovnyeCategory>[
     badge: 'WB',
     defaultEnabled: true,
     domains: ['wildberries.ru', 'wb.ru', 'wbbasket.ru'],
+  ),
+  OsnovnyeCategory(
+    id: 'steam',
+    labelRu: 'Steam',
+    labelEn: 'Steam',
+    badge: 'ST',
+    defaultEnabled: true,
+    domains: [
+      'steampowered.com',
+      'steamcommunity.com',
+      'steamstatic.com',
+      'steamcontent.com',
+      'steamusercontent.com',
+      'steamserver.net',
+      'valvesoftware.com',
+      'dota2.com',
+      'steam-chat.com',
+    ],
+  ),
+  OsnovnyeCategory(
+    id: 'rutube',
+    labelRu: 'RuTube',
+    labelEn: 'RuTube',
+    badge: 'RT',
+    defaultEnabled: true,
+    domains: ['rutube.ru'],
+  ),
+  OsnovnyeCategory(
+    id: 'avito',
+    labelRu: 'Avito',
+    labelEn: 'Avito',
+    badge: 'AV',
+    defaultEnabled: true,
+    domains: ['avito.ru', 'avito.st'],
+  ),
+  OsnovnyeCategory(
+    id: 'banks',
+    labelRu: 'Банки',
+    labelEn: 'Banks',
+    badge: 'BK',
+    defaultEnabled: true,
+    domains: [
+      'sberbank.ru',
+      'sber.ru',
+      'tbank.ru',
+      'tinkoff.ru',
+      'alfabank.ru',
+      'vtb.ru',
+      'nspk.ru',
+    ],
+  ),
+  OsnovnyeCategory(
+    id: 'gosuslugi',
+    labelRu: 'Госуслуги',
+    labelEn: 'Gosuslugi',
+    badge: 'GU',
+    defaultEnabled: true,
+    domains: ['gosuslugi.ru', 'nalog.ru'],
   ),
 ];
 
