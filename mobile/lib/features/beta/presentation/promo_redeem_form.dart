@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../session/application/session_provider.dart';
+import '../../referral/application/referral_providers.dart';
 import '../application/beta_providers.dart';
 import '../data/beta_redeem_outcome.dart';
 
@@ -33,6 +34,15 @@ class _PromoRedeemFormState extends ConsumerState<PromoRedeemForm> {
   final _focus = FocusNode();
   bool _submitting = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final pending = ref.read(pendingReferralCodeProvider)?.trim();
+    if (pending != null && pending.isNotEmpty) {
+      _controller.text = pending;
+    }
+  }
 
   @override
   void dispose() {
@@ -70,8 +80,18 @@ class _PromoRedeemFormState extends ConsumerState<PromoRedeemForm> {
         if (snap != null) {
           await ref.read(sessionProvider.notifier).apply(snap);
         }
+        ref.read(pendingReferralCodeProvider.notifier).state = null;
         await widget.onSuccess();
         return;
+      }
+      if (result.outcome == BetaRedeemOutcomeCode.invalid) {
+        final referral = await ref.read(referralApiProvider).bind(code);
+        if (!mounted) return;
+        if (referral != null && referral.accepted) {
+          ref.read(pendingReferralCodeProvider.notifier).state = null;
+          await widget.onSuccess();
+          return;
+        }
       }
       setState(() {
         _error = result.outcome.isSuccess && !result.hasAccess

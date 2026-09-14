@@ -12,6 +12,7 @@ import 'core/diagnostics/app_log_buffer.dart';
 import 'core/diagnostics/diagnostics_service.dart';
 import 'core/internet_permission.dart';
 import 'core/jwt_interceptor.dart';
+import 'core/referral_links.dart';
 import 'core/router.dart';
 import 'core/seat_join_links.dart';
 import 'features/auth/application/auth_provider.dart';
@@ -87,6 +88,7 @@ void main() async {
   // register timeout. GoRouter keeps /bootstrap while [authProvider] loads.
   await AppRouter.warmWelcomeFlag();
   await attachSeatJoinLinks(container);
+  await attachReferralLinks(container);
   container.read(authProvider);
 
   // Связываем GoRouter с authProvider: при смене состояния авторизации

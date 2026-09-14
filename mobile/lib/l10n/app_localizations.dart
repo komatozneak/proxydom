@@ -1999,6 +1999,24 @@ abstract class AppL10n {
   /// **'Couldn’t apply the code. Try again.'**
   String get promoOutcomeUnknown;
 
+  /// No description provided for @referralShareTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite a friend'**
+  String get referralShareTitle;
+
+  /// No description provided for @referralShareBody.
+  ///
+  /// In en, this message translates to:
+  /// **'They enter your code after install. Extra days land after they pay, not after install.'**
+  String get referralShareBody;
+
+  /// No description provided for @referralCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy link'**
+  String get referralCopy;
+
   /// No description provided for @onboardingSkip.
   ///
   /// In en, this message translates to:

@@ -6,6 +6,7 @@ import '../../../core/widgets/app_icon.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../beta/presentation/promo_redeem_form.dart';
 import '../../home/application/vpn_provider.dart';
+import '../../referral/presentation/referral_share_card.dart';
 
 /// Promo redeem from Account hub — pop back after success (shell SoT).
 class AccountPromoScreen extends ConsumerWidget {
@@ -42,6 +43,7 @@ class AccountPromoScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 24),
+              const ReferralShareCard(),
               PromoRedeemForm(
                 onSuccess: () async {
                   await ref

@@ -1052,6 +1052,16 @@ class AppL10nRu extends AppL10n {
       'Не удалось применить код. Попробуйте ещё раз.';
 
   @override
+  String get referralShareTitle => 'Пригласить друга';
+
+  @override
+  String get referralShareBody =>
+      'Друг вводит код после установки. Дни вам капают после его оплаты, не после установки.';
+
+  @override
+  String get referralCopy => 'Скопировать ссылку';
+
+  @override
   String get onboardingSkip => 'Пропустить';
 
   @override

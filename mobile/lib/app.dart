@@ -5,6 +5,7 @@ import 'core/app_locale.dart';
 import 'core/router.dart';
 import 'core/theme.dart';
 import 'core/updates/update_check_service.dart';
+import 'features/referral/application/referral_providers.dart';
 import 'features/settings/application/locale_provider.dart';
 import 'features/settings/application/seat_join_code_provider.dart';
 import 'features/settings/application/theme_mode_provider.dart';
@@ -33,7 +34,9 @@ class TeremokApp extends ConsumerWidget {
       routerConfig: AppRouter.config,
       builder: (context, child) {
         return _SeatJoinHost(
-          child: _UpdateCheckHost(child: child ?? const SizedBox.shrink()),
+          child: _ReferralLinkHost(
+            child: _UpdateCheckHost(child: child ?? const SizedBox.shrink()),
+          ),
         );
       },
     );
@@ -53,6 +56,25 @@ class _SeatJoinHost extends ConsumerWidget {
       if (code == null || code.isEmpty) return;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         AppRouter.config.go('/settings/devices');
+      });
+    });
+    return child;
+  }
+}
+
+/// Opens Account → promo when a `teremokconnect://ref` code arrives.
+class _ReferralLinkHost extends ConsumerWidget {
+  const _ReferralLinkHost({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen<String?>(pendingReferralCodeProvider, (prev, next) {
+      final code = next?.trim();
+      if (code == null || code.isEmpty) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        AppRouter.config.go('/settings/account/promo');
       });
     });
     return child;

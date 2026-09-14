@@ -1049,6 +1049,16 @@ class AppL10nEn extends AppL10n {
   String get promoOutcomeUnknown => 'Couldn’t apply the code. Try again.';
 
   @override
+  String get referralShareTitle => 'Invite a friend';
+
+  @override
+  String get referralShareBody =>
+      'They enter your code after install. Extra days land after they pay, not after install.';
+
+  @override
+  String get referralCopy => 'Copy link';
+
+  @override
   String get onboardingSkip => 'Skip';
 
   @override
