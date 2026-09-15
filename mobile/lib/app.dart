@@ -5,6 +5,7 @@ import 'core/app_locale.dart';
 import 'core/router.dart';
 import 'core/theme.dart';
 import 'core/updates/update_check_service.dart';
+import 'features/auth/application/pending_pair_token_provider.dart';
 import 'features/referral/application/referral_providers.dart';
 import 'features/settings/application/locale_provider.dart';
 import 'features/settings/application/seat_join_code_provider.dart';
@@ -35,7 +36,9 @@ class TeremokApp extends ConsumerWidget {
       builder: (context, child) {
         return _SeatJoinHost(
           child: _ReferralLinkHost(
-            child: _UpdateCheckHost(child: child ?? const SizedBox.shrink()),
+            child: _PairLinkHost(
+              child: _UpdateCheckHost(child: child ?? const SizedBox.shrink()),
+            ),
           ),
         );
       },
@@ -75,6 +78,25 @@ class _ReferralLinkHost extends ConsumerWidget {
       if (code == null || code.isEmpty) return;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         AppRouter.config.go('/settings/account/promo');
+      });
+    });
+    return child;
+  }
+}
+
+/// Opens restore when a `teremokconnect://pair` token arrives.
+class _PairLinkHost extends ConsumerWidget {
+  const _PairLinkHost({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen<String?>(pendingPairTokenProvider, (prev, next) {
+      final token = next?.trim();
+      if (token == null || token.isEmpty) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        AppRouter.config.go('/restore');
       });
     });
     return child;

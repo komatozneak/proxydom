@@ -234,6 +234,43 @@ class AuthApi {
     return Map<String, dynamic>.from(resp.data as Map);
   }
 
+  /// Bot-first pair: attach this install to a Telegram-created account.
+  Future<Map<String, dynamic>> pairTelegram({
+    required String token,
+    String? deviceUuid,
+    String? deviceName,
+  }) async {
+    final id = deviceUuid ?? await InstallIdStorage.instance.getOrCreate();
+    final resp = await ApiClient.postAuth(
+      '/auth/pair/telegram',
+      data: {
+        'token': token,
+        'device_uuid': id,
+        'platform': 'android',
+        'device_name': await _deviceName(deviceName),
+      },
+    );
+    if (resp.statusCode != 200 || resp.data is! Map) {
+      throw Exception('pairTelegram failed: ${resp.statusCode}');
+    }
+    return Map<String, dynamic>.from(resp.data as Map);
+  }
+
+  /// Device-slot picker after pair hits Premium cap.
+  Future<Map<String, dynamic>> replaceTelegramPair({
+    required String token,
+    required int deviceId,
+  }) async {
+    final resp = await ApiClient.postAuth(
+      '/auth/pair/telegram/replace',
+      data: {'token': token, 'device_id': deviceId},
+    );
+    if (resp.statusCode != 200 || resp.data is! Map) {
+      throw Exception('replaceTelegramPair failed: ${resp.statusCode}');
+    }
+    return Map<String, dynamic>.from(resp.data as Map);
+  }
+
   /// Detach this install into a fresh solo account.
   Future<LeaveDeviceResult> leaveDevice({String? deviceUuid}) async {
     final id = deviceUuid ?? await InstallIdStorage.instance.getOrCreate();

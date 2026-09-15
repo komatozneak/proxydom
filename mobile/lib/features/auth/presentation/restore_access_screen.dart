@@ -17,11 +17,13 @@ import '../../session/application/identity_reconnect.dart';
 import '../../session/application/session_provider.dart';
 import '../application/auth_provider.dart';
 import '../application/auth_state.dart';
+import '../application/pending_pair_token_provider.dart';
 import '../data/auth_api.dart';
+import '../data/pair_token_format.dart';
 import '../data/restore_device_choice.dart';
 import 'restore_device_slot_dialog.dart';
 
-/// Self-serve recover after reinstall (ADR 008 / Telegram link).
+/// Self-serve recover after reinstall (ADR 008 / Telegram link / bot pair).
 class RestoreAccessScreen extends ConsumerStatefulWidget {
   const RestoreAccessScreen({super.key});
 
@@ -35,15 +37,32 @@ class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
   bool _busy = false;
   bool _tgBusy = false;
   bool _pollInFlight = false;
+  bool _pairStarted = false;
   int _pollFailures = 0;
   String? _error;
   Timer? _pollTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_consumePendingPairToken());
+    });
+  }
 
   @override
   void dispose() {
     _pollTimer?.cancel();
     _controller.dispose();
     super.dispose();
+  }
+
+  Future<void> _consumePendingPairToken() async {
+    final pending = ref.read(pendingPairTokenProvider)?.trim();
+    if (pending == null || pending.isEmpty || _pairStarted) return;
+    ref.read(pendingPairTokenProvider.notifier).state = null;
+    _controller.text = pending;
+    await _submitPair(pending);
   }
 
   void _goBack() {
@@ -59,6 +78,93 @@ class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
       context.go('/settings');
     } else {
       context.go('/home');
+    }
+  }
+
+  Future<void> _finishPairSuccess(Map<String, dynamic> data) async {
+    final ok = await ref.read(authProvider.notifier).recoverWithTelegram(
+          token: data['token']?.toString() ?? '',
+          data: data,
+        );
+    if (!mounted) return;
+    if (ok) {
+      unawaited(reconnectVpnAfterIdentityChange(ref));
+      AppRouter.postAuthResolved = true;
+      context.go('/gate');
+    } else {
+      setState(() {
+        _busy = false;
+        _pairStarted = false;
+        _error = AppL10n.of(context).restoreFailed;
+      });
+    }
+  }
+
+  Future<void> _submitPair(String token) async {
+    if (_pairStarted && _busy) return;
+    setState(() {
+      _busy = true;
+      _pairStarted = true;
+      _error = null;
+    });
+    try {
+      final model = await DeviceInfoHelper.getDeviceModelName();
+      final result = await AuthApi().pairTelegram(
+        token: token,
+        deviceName: model,
+      );
+      final outcome = TelegramPollOutcome.fromJson(result);
+      if (!mounted) return;
+      if (outcome.status == TelegramPollStatus.needsDeviceSlot) {
+        final devices = RestoreDeviceChoice.listFrom(result['devices']);
+        final chosen = await RestoreDeviceSlotDialog.show(
+          context,
+          devices: devices,
+        );
+        if (!mounted) return;
+        if (chosen == null) {
+          setState(() {
+            _busy = false;
+            _pairStarted = false;
+            _error = AppL10n.of(context).restoreDeviceLimitPickFailed;
+          });
+          return;
+        }
+        final replaced = await AuthApi().replaceTelegramPair(
+          token: token,
+          deviceId: chosen.id,
+        );
+        final replacement = TelegramPollOutcome.fromJson(replaced);
+        if (!replacement.isAccountRestore) {
+          setState(() {
+            _busy = false;
+            _pairStarted = false;
+            _error = telegramPollErrorCopy(
+              AppL10n.of(context),
+              replacement.error,
+            );
+          });
+          return;
+        }
+        await _finishPairSuccess(replaced);
+        return;
+      }
+      if (outcome.isAccountRestore) {
+        await _finishPairSuccess(result);
+        return;
+      }
+      setState(() {
+        _busy = false;
+        _pairStarted = false;
+        _error = telegramPollErrorCopy(AppL10n.of(context), outcome.error);
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _pairStarted = false;
+        _error = AppL10n.of(context).restoreFailed;
+      });
     }
   }
 
@@ -221,11 +327,17 @@ class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
   }
 
   Future<void> _submit() async {
-    final code = _controller.text.trim();
-    if (code.isEmpty) {
+    final raw = _controller.text.trim();
+    if (raw.isEmpty) {
       setState(() => _error = AppL10n.of(context).restoreCodeEmpty);
       return;
     }
+    final pairToken = normalizePairTokenInput(raw);
+    if (pairToken != null) {
+      await _submitPair(pairToken);
+      return;
+    }
+    final code = raw;
     setState(() {
       _busy = true;
       _error = null;
@@ -280,6 +392,13 @@ class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
     final l = AppL10n.of(context);
     final theme = Theme.of(context);
     final vpnOk = telegramIdentityAllowed(ref.watch(vpnProvider));
+    ref.listen<String?>(pendingPairTokenProvider, (prev, next) {
+      final token = next?.trim();
+      if (token == null || token.isEmpty) return;
+      ref.read(pendingPairTokenProvider.notifier).state = null;
+      _controller.text = token;
+      unawaited(_submitPair(token));
+    });
     return Scaffold(
       appBar: AppBar(
         title: Text(l.restoreTitle),
@@ -312,13 +431,15 @@ class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
               TextField(
                 controller: _controller,
                 enabled: !_busy,
-                textCapitalization: TextCapitalization.characters,
+                textCapitalization: TextCapitalization.none,
                 decoration: InputDecoration(
                   labelText: l.restoreCodeLabel,
                   hintText: l.restoreCodeHint,
                 ),
                 inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9\-]')),
+                  FilteringTextInputFormatter.allow(
+                    RegExp(r'[A-Za-z0-9\-:./?=&_]'),
+                  ),
                 ],
               ),
               if (_error != null) ...[
