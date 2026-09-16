@@ -200,6 +200,7 @@ func StopTun() {
 	st := tunStk
 	tunDev = nil
 	tunStk = nil
+	stopPacketTunLocked()
 	mu.Unlock()
 	if st != nil {
 		st.Close()

@@ -1470,6 +1470,13 @@ class AppL10nEn extends AppL10n {
   String get accountEmailDebugHint => 'DEBUG: code filled from API response';
 
   @override
+  String get navPromo => 'Invite code';
+
+  @override
+  String get iosBillingUnavailableBody =>
+      'In-app payment is not available on iPhone yet. Use an invite code if you have one, or unlock Premium on Android. Free locations still work.';
+
+  @override
   String get vpnDisclosureTitle => 'Protected connection';
 
   @override
@@ -1484,11 +1491,22 @@ class AppL10nEn extends AppL10n {
       'The app uses the system VpnService to create a protected tunnel after you tap Connect. App traffic on the device is routed through this tunnel to Teremok VPN servers. This is the core function of the app — a protected connection, not access to a private corporate network.';
 
   @override
+  String get vpnDisclosureVpnTitleIos => 'Why a VPN configuration is required';
+
+  @override
+  String get vpnDisclosureVpnBodyIos =>
+      'The app uses a system Network Extension (Packet Tunnel) to create a protected tunnel after you tap Connect. Device traffic is routed through this tunnel to Teremok VPN servers. This is the core function of the app — a protected connection on public networks, not access to a private corporate network and not traffic circumvention marketing.';
+
+  @override
   String get vpnDisclosureDataTitle => 'What data we process';
 
   @override
   String get vpnDisclosureDataBody =>
       'Install ID (device ID) and account ID — to grant access and restore it after reinstall. Subscription purchase history (via the payment provider; we do not store card numbers). On your request — a diagnostic report from Settings. Aggregated usage summary (connect attempts, session length) — without browsing history.';
+
+  @override
+  String get vpnDisclosureDataBodyIos =>
+      'Install ID (device ID) and account ID — to grant access and restore it after reinstall. On your request — a diagnostic report from Settings. Aggregated usage summary (connect attempts, session length) — without browsing history. We do not sell tunnel traffic or monetize other apps’ packets.';
 
   @override
   String get vpnDisclosureNotTitle => 'What we do not do';

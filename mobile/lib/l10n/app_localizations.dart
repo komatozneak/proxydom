@@ -1030,7 +1030,7 @@ abstract class AppL10n {
   /// No description provided for @devicesRevoke.
   ///
   /// In en, this message translates to:
-  /// **'Revoke'**
+  /// **'Remove'**
   String get devicesRevoke;
 
   /// No description provided for @devicesRevokeTitle.
@@ -2773,6 +2773,18 @@ abstract class AppL10n {
   /// **'DEBUG: code filled from API response'**
   String get accountEmailDebugHint;
 
+  /// No description provided for @navPromo.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite code'**
+  String get navPromo;
+
+  /// No description provided for @iosBillingUnavailableBody.
+  ///
+  /// In en, this message translates to:
+  /// **'In-app payment is not available on iPhone yet. Use an invite code if you have one, or unlock Premium on Android. Free locations still work.'**
+  String get iosBillingUnavailableBody;
+
   /// No description provided for @vpnDisclosureTitle.
   ///
   /// In en, this message translates to:
@@ -2797,6 +2809,18 @@ abstract class AppL10n {
   /// **'The app uses the system VpnService to create a protected tunnel after you tap Connect. App traffic on the device is routed through this tunnel to Teremok VPN servers. This is the core function of the app — a protected connection, not access to a private corporate network.'**
   String get vpnDisclosureVpnBody;
 
+  /// No description provided for @vpnDisclosureVpnTitleIos.
+  ///
+  /// In en, this message translates to:
+  /// **'Why a VPN configuration is required'**
+  String get vpnDisclosureVpnTitleIos;
+
+  /// No description provided for @vpnDisclosureVpnBodyIos.
+  ///
+  /// In en, this message translates to:
+  /// **'The app uses a system Network Extension (Packet Tunnel) to create a protected tunnel after you tap Connect. Device traffic is routed through this tunnel to Teremok VPN servers. This is the core function of the app — a protected connection on public networks, not access to a private corporate network and not traffic circumvention marketing.'**
+  String get vpnDisclosureVpnBodyIos;
+
   /// No description provided for @vpnDisclosureDataTitle.
   ///
   /// In en, this message translates to:
@@ -2808,6 +2832,12 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Install ID (device ID) and account ID — to grant access and restore it after reinstall. Subscription purchase history (via the payment provider; we do not store card numbers). On your request — a diagnostic report from Settings. Aggregated usage summary (connect attempts, session length) — without browsing history.'**
   String get vpnDisclosureDataBody;
+
+  /// No description provided for @vpnDisclosureDataBodyIos.
+  ///
+  /// In en, this message translates to:
+  /// **'Install ID (device ID) and account ID — to grant access and restore it after reinstall. On your request — a diagnostic report from Settings. Aggregated usage summary (connect attempts, session length) — without browsing history. We do not sell tunnel traffic or monetize other apps’ packets.'**
+  String get vpnDisclosureDataBodyIos;
 
   /// No description provided for @vpnDisclosureNotTitle.
   ///

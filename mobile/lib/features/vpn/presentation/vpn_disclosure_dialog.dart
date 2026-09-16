@@ -1,3 +1,6 @@
+import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -6,14 +9,16 @@ import '../../../core/theme.dart';
 import '../../../l10n/app_localizations.dart';
 import '../data/vpn_disclosure_prefs.dart';
 
-/// Play VpnService prominent disclosure (Ogon-style: first in-app Connect).
+/// Prominent VPN disclosure before first Connect (Play + App Store 5.4).
 ///
-/// Shown from Home Nest tap before [VpnService.prepare]. OS VPN prompt is next.
+/// Shown from Home Nest tap before OS VPN permission. Decline leaves prefs
+/// unset so the next Nest tap shows this again.
 class VpnDisclosureDialog extends StatelessWidget {
   const VpnDisclosureDialog({super.key});
 
+  static bool get _isIos => !kIsWeb && Platform.isIOS;
+
   /// Returns true if the user already accepted, or accepts now.
-  /// Decline leaves prefs unset so the next Nest tap shows this again.
   static Future<bool> ensureAccepted(BuildContext context) async {
     if (await VpnDisclosurePrefs.isAccepted()) return true;
     if (!context.mounted) return false;
@@ -30,6 +35,10 @@ class VpnDisclosureDialog extends StatelessWidget {
     final l = AppL10n.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final vpnTitle = _isIos ? l.vpnDisclosureVpnTitleIos : l.vpnDisclosureVpnTitle;
+    final vpnBody = _isIos ? l.vpnDisclosureVpnBodyIos : l.vpnDisclosureVpnBody;
+    final dataBody =
+        _isIos ? l.vpnDisclosureDataBodyIos : l.vpnDisclosureDataBody;
 
     return Dialog.fullscreen(
       backgroundColor: scheme.surface,
@@ -61,14 +70,11 @@ class VpnDisclosureDialog extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    _Section(
-                      title: l.vpnDisclosureVpnTitle,
-                      body: l.vpnDisclosureVpnBody,
-                    ),
+                    _Section(title: vpnTitle, body: vpnBody),
                     const SizedBox(height: 16),
                     _Section(
                       title: l.vpnDisclosureDataTitle,
-                      body: l.vpnDisclosureDataBody,
+                      body: dataBody,
                     ),
                     const SizedBox(height: 16),
                     _Section(

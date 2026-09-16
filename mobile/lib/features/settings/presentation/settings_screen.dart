@@ -476,20 +476,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         : _onNotifChanged,
                   ),
                 ),
-                const _CardDivider(),
-                _SettingsRow(
-                  icon: AppIcons.house,
-                  title: l.settingsQsTileTitle,
-                  subtitle: l.settingsQsTileHint,
-                  onTap: _qsAdding ? null : _onAddQsTile,
-                  trailing: _qsAdding
-                      ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : null,
-                ),
+                if (QsTilePrefs.isSupported) ...[
+                  const _CardDivider(),
+                  _SettingsRow(
+                    icon: AppIcons.house,
+                    title: l.settingsQsTileTitle,
+                    subtitle: l.settingsQsTileHint,
+                    onTap: _qsAdding ? null : _onAddQsTile,
+                    trailing: _qsAdding
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : null,
+                  ),
+                ],
               ],
               const _CardDivider(),
               _SettingsRow(

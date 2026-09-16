@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/teremok_snackbar.dart';
@@ -15,6 +16,8 @@ import '../data/installed_apps_channel.dart';
 import '../data/split_tunnel_prefs.dart';
 
 /// Огонь IA: Приложения (default) | Сайты, under «Что работает без VPN?».
+///
+/// iOS: Apps tab parked (no consumer per-app VpnService.Builder / NE MDM).
 class NoVpnScreen extends ConsumerStatefulWidget {
   const NoVpnScreen({super.key});
 
@@ -24,7 +27,7 @@ class NoVpnScreen extends ConsumerStatefulWidget {
 
 class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
     with SingleTickerProviderStateMixin {
-  late final TabController _tabs;
+  TabController? _tabs;
   final _search = TextEditingController();
   String _query = '';
 
@@ -33,6 +36,9 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
   bool _reconnecting = false;
   bool _osnovnyeExpanded = true;
   bool _lockdownOn = false;
+
+  /// Apps tab is Android-only (see [iosAppsSplitUnsupported]).
+  bool get _sitesOnly => iosAppsSplitUnsupported;
 
   Map<String, bool> _osnovnye = {
     for (final c in kOsnovnyeCategories) c.id: c.defaultEnabled,
@@ -44,7 +50,9 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 2, vsync: this);
+    if (!_sitesOnly) {
+      _tabs = TabController(length: 2, vsync: this);
+    }
     _search.addListener(() {
       setState(() => _query = _search.text.trim().toLowerCase());
     });
@@ -53,7 +61,7 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
 
   @override
   void dispose() {
-    _tabs.dispose();
+    _tabs?.dispose();
     _search.dispose();
     super.dispose();
   }
@@ -62,11 +70,17 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
     await SplitTunnelPrefs.purgePresetSites();
     final cats = await SplitTunnelPrefs.loadOsnovnyeEnabled();
     final sites = await SplitTunnelPrefs.loadSites();
-    final apps = await InstalledAppsChannel.listLauncherApps();
-    await SplitTunnelPrefs.seedDefaultBypassIfNeeded(
-      apps.map((a) => a.packageName),
-    );
-    final disallowed = await SplitTunnelPrefs.loadDisallowedPackages();
+    final apps = _sitesOnly
+        ? const <LauncherAppInfo>[]
+        : await InstalledAppsChannel.listLauncherApps();
+    if (!_sitesOnly) {
+      await SplitTunnelPrefs.seedDefaultBypassIfNeeded(
+        apps.map((a) => a.packageName),
+      );
+    }
+    final disallowed = _sitesOnly
+        ? <String>{}
+        : await SplitTunnelPrefs.loadDisallowedPackages();
     final pendingAfterSeed = await SplitTunnelPrefs.hasPendingChanges();
     final lockdown = await VpnController.instance.queryLockdownState();
     if (!mounted) return;
@@ -159,33 +173,35 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
                     ),
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceContainerHighest,
-                      borderRadius:
-                          BorderRadius.circular(AppBrand.radiusNavPill),
-                    ),
-                    child: TabBar(
-                      controller: _tabs,
-                      dividerColor: Colors.transparent,
-                      indicatorSize: TabBarIndicatorSize.tab,
-                      indicator: BoxDecoration(
-                        color: theme.colorScheme.surface,
+                if (!_sitesOnly)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceContainerHighest,
                         borderRadius:
                             BorderRadius.circular(AppBrand.radiusNavPill),
-                        border: Border.all(color: AppBrand.primary),
                       ),
-                      labelColor: AppBrand.primary,
-                      unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
-                      tabs: [
-                        Tab(text: appsLabel),
-                        Tab(text: sitesLabel),
-                      ],
+                      child: TabBar(
+                        controller: _tabs,
+                        dividerColor: Colors.transparent,
+                        indicatorSize: TabBarIndicatorSize.tab,
+                        indicator: BoxDecoration(
+                          color: theme.colorScheme.surface,
+                          borderRadius:
+                              BorderRadius.circular(AppBrand.radiusNavPill),
+                          border: Border.all(color: AppBrand.primary),
+                        ),
+                        labelColor: AppBrand.primary,
+                        unselectedLabelColor:
+                            theme.colorScheme.onSurfaceVariant,
+                        tabs: [
+                          Tab(text: appsLabel),
+                          Tab(text: sitesLabel),
+                        ],
+                      ),
                     ),
                   ),
-                ),
                 if (_pending)
                   Material(
                     color: theme.colorScheme.tertiaryContainer,
@@ -215,54 +231,86 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
                     ),
                   ),
                 Expanded(
-                  child: TabBarView(
-                    controller: _tabs,
-                    children: [
-                      _AppsTab(
-                        apps: _filteredApps,
-                        disallowed: _disallowed,
-                        sectionLabel: appsSection,
-                        lockdownOn: _lockdownOn,
-                        lockdownWarning: l.splitTunnelAppsLockdownWarning,
-                        onToggle: (pkg, bypass) async {
-                          await SplitTunnelPrefs.setDisallowedPackage(
-                            pkg,
-                            bypass,
-                          );
-                          await _afterMutation();
-                        },
-                      ),
-                      _SitesTab(
-                        osnovnye: _osnovnye,
-                        osnovnyeExpanded: _osnovnyeExpanded,
-                        osnovnyeLabel: osnovnyeLabel,
-                        sites: _filteredSites,
-                        lang: lang,
-                        iconsByPackage: {
-                          for (final a in _apps)
-                            if (a.iconPng != null && a.iconPng!.isNotEmpty)
-                              a.packageName: a.iconPng!,
-                        },
-                        onToggleOsnovnye: (id, v) async {
-                          await SplitTunnelPrefs.setOsnovnyeEnabled(id, v);
-                          await _afterMutation();
-                        },
-                        onExpandOsnovnye: () {
-                          setState(
-                            () => _osnovnyeExpanded = !_osnovnyeExpanded,
-                          );
-                        },
-                        onToggleSite: (site, enabled) async {
-                          await SplitTunnelPrefs.updateSite(
-                            site.copyWith(enabled: enabled),
-                          );
-                          await _afterMutation();
-                        },
-                        onDeleteSite: _deleteSite,
-                        onAddSite: _showAddSite,
-                      ),
-                    ],
-                  ),
+                  child: _sitesOnly
+                      ? _SitesTab(
+                          osnovnye: _osnovnye,
+                          osnovnyeExpanded: _osnovnyeExpanded,
+                          osnovnyeLabel: osnovnyeLabel,
+                          sites: _filteredSites,
+                          lang: lang,
+                          iconsByPackage: const {},
+                          onToggleOsnovnye: (id, v) async {
+                            await SplitTunnelPrefs.setOsnovnyeEnabled(id, v);
+                            await _afterMutation();
+                          },
+                          onExpandOsnovnye: () {
+                            setState(
+                              () => _osnovnyeExpanded = !_osnovnyeExpanded,
+                            );
+                          },
+                          onToggleSite: (site, enabled) async {
+                            await SplitTunnelPrefs.updateSite(
+                              site.copyWith(enabled: enabled),
+                            );
+                            await _afterMutation();
+                          },
+                          onDeleteSite: _deleteSite,
+                          onAddSite: _showAddSite,
+                        )
+                      : TabBarView(
+                          controller: _tabs,
+                          children: [
+                            _AppsTab(
+                              apps: _filteredApps,
+                              disallowed: _disallowed,
+                              sectionLabel: appsSection,
+                              lockdownOn: _lockdownOn,
+                              lockdownWarning:
+                                  l.splitTunnelAppsLockdownWarning,
+                              onToggle: (pkg, bypass) async {
+                                await SplitTunnelPrefs.setDisallowedPackage(
+                                  pkg,
+                                  bypass,
+                                );
+                                await _afterMutation();
+                              },
+                            ),
+                            _SitesTab(
+                              osnovnye: _osnovnye,
+                              osnovnyeExpanded: _osnovnyeExpanded,
+                              osnovnyeLabel: osnovnyeLabel,
+                              sites: _filteredSites,
+                              lang: lang,
+                              iconsByPackage: {
+                                for (final a in _apps)
+                                  if (a.iconPng != null &&
+                                      a.iconPng!.isNotEmpty)
+                                    a.packageName: a.iconPng!,
+                              },
+                              onToggleOsnovnye: (id, v) async {
+                                await SplitTunnelPrefs.setOsnovnyeEnabled(
+                                  id,
+                                  v,
+                                );
+                                await _afterMutation();
+                              },
+                              onExpandOsnovnye: () {
+                                setState(
+                                  () =>
+                                      _osnovnyeExpanded = !_osnovnyeExpanded,
+                                );
+                              },
+                              onToggleSite: (site, enabled) async {
+                                await SplitTunnelPrefs.updateSite(
+                                  site.copyWith(enabled: enabled),
+                                );
+                                await _afterMutation();
+                              },
+                              onDeleteSite: _deleteSite,
+                              onAddSite: _showAddSite,
+                            ),
+                          ],
+                        ),
                 ),
               ],
             ),

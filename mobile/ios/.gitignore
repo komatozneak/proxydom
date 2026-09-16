@@ -27,6 +27,11 @@ Flutter/flutter_export_environment.sh
 ServiceDefinitions.json
 Runner/GeneratedPluginRegistrant.*
 
+# Gomobile Hy2 (built on Mac/CI; do not commit binary)
+Frameworks/*.xcframework/
+Frameworks/**/*.a
+ExportOptions.plist
+
 # Exceptions to above rules.
 !default.mode1v3
 !default.mode2v3

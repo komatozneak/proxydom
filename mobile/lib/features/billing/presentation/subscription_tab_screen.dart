@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/ios_store_gates.dart';
 import '../../../core/utils/format_utils.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../beta/presentation/promo_redeem_form.dart';
@@ -83,12 +84,27 @@ class SubscriptionTabScreen extends ConsumerWidget {
                     error: (_, __) => Text(l.settingsAccessNoneSubtitle),
                   ),
                   const SizedBox(height: 20),
-                  FilledButton(
-                    key: kSubscriptionPayKey,
-                    style: buttonStyle,
-                    onPressed: () => context.push('/locked'),
-                    child: Text(l.subscriptionPay),
-                  ),
+                  if (hideInAppPlategaCheckout) ...[
+                    Text(
+                      l.iosBillingUnavailableBody,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    FilledButton.tonal(
+                      style: buttonStyle,
+                      onPressed: () => context.push('/promo'),
+                      child: Text(l.navPromo),
+                    ),
+                  ] else
+                    FilledButton(
+                      key: kSubscriptionPayKey,
+                      style: buttonStyle,
+                      onPressed: () => context.push('/locked'),
+                      child: Text(l.subscriptionPay),
+                    ),
                 ],
               ),
             ),

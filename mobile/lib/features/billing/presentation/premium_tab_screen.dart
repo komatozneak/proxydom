@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../settings/application/subscription_status_provider.dart';
@@ -47,8 +48,12 @@ class PremiumTabScreen extends ConsumerWidget {
             )
           else
             FilledButton(
-              onPressed: () => context.go('/subscription'),
-              child: Text(l.premiumCta),
+              onPressed: () => context.go(
+                hideInAppPlategaCheckout ? '/promo' : '/subscription',
+              ),
+              child: Text(
+                hideInAppPlategaCheckout ? l.navPromo : l.premiumCta,
+              ),
             ),
         ],
       ),

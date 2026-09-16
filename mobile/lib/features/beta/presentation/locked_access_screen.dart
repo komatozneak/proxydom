@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/config.dart';
+import '../../../core/ios_store_gates.dart';
 import '../../../core/router.dart';
 import '../../../core/support_contact.dart';
 import '../../../core/theme.dart';
@@ -227,6 +228,24 @@ class _LockedAccessScreenState extends ConsumerState<LockedAccessScreen> {
                                 ),
                                 textAlign: TextAlign.center,
                               )
+                            else if (hideInAppPlategaCheckout) ...[
+                              Text(
+                                l.iosBillingUnavailableBody,
+                                style: theme.textTheme.bodyLarge?.copyWith(
+                                  color: muted,
+                                  height: 1.45,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 16),
+                              FilledButton.tonal(
+                                style: buttonStyle,
+                                onPressed: busy
+                                    ? null
+                                    : () => context.push('/promo'),
+                                child: Text(l.navPromo),
+                              ),
+                            ]
                             else ...[
                               for (final plan in plans) ...[
                                 _PlanTile(
@@ -291,12 +310,13 @@ class _LockedAccessScreenState extends ConsumerState<LockedAccessScreen> {
                                     : () => _open(AppConfig.termsOfServiceUrl),
                                 child: Text(l.settingsTerms),
                               ),
-                              TextButton(
-                                onPressed: busy
-                                    ? null
-                                    : () => _open(AppConfig.pricingUrl),
-                                child: Text(l.settingsPricing),
-                              ),
+                              if (!hideInAppPlategaCheckout)
+                                TextButton(
+                                  onPressed: busy
+                                      ? null
+                                      : () => _open(AppConfig.pricingUrl),
+                                  child: Text(l.settingsPricing),
+                                ),
                               TextButton(
                                 onPressed: busy
                                     ? null

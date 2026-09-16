@@ -33,7 +33,9 @@ Do **not** bulk-generate AI PNGs without commercial license + owner go (Visual A
 - Flutter + Riverpod + go_router + Dio
 - VPN core: Hysteria2 / hy2bind (ADR 018), MethodChannel `teremok/vpn`
 - minSdk **26** (hard requirement — do not roll back)
-- Billing: **Platega hosted only** (ADR 017). Do **not** add Play Billing / `com.android.vending.BILLING`
+- Billing: **Platega hosted only on Android** (ADR 017). Do **not** add Play Billing /
+  `com.android.vending.BILLING`. On **iOS**, hide Platega CTA (`hideInAppPlategaCheckout`);
+  see ADR 019 + `docs/ops/ios-iap-parked.md`.
 
 ## Tests
 

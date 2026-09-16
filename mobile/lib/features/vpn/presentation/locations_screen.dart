@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/busy/busy_overlay.dart';
+import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/location_flag_icon.dart';
@@ -215,7 +216,8 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
   }
 
   void _onLockedPremiumTap() {
-    context.push('/subscription');
+    // iOS: no Platega CTA — promo / server unlock only until StoreKit (PR7).
+    context.push(hideInAppPlategaCheckout ? '/promo' : '/subscription');
   }
 
   /// Free/online egress + always keep Premium/locked rows in the pool (gray).

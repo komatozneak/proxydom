@@ -95,6 +95,20 @@ jobs:
             exit 1
           fi
 
+  hy2bind-go-test:
+    name: hy2bind Go tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.x"
+          cache-dependency-path: mobile/android/hysteria-bind/go.sum
+      - name: go test
+        working-directory: mobile/android/hysteria-bind
+        run: go test ./...
+
   build-android:
     name: Build Android APK
     needs: analyze-test
@@ -258,11 +272,16 @@ jobs:
   build-ios-no-codesign:
     name: Build iOS (no codesign)
     runs-on: macos-latest
-    timeout-minutes: 25
+    timeout-minutes: 75
     if: github.event_name == 'workflow_dispatch'
 
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.x"
+          cache-dependency-path: mobile/android/hysteria-bind/go.sum
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -270,6 +289,12 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
+
+      - name: Build Hy2bind.xcframework
+        working-directory: mobile/android/hysteria-bind
+        run: |
+          export PATH="$(go env GOPATH)/bin:$PATH"
+          bash build-ios.sh
 
       - name: Install dependencies
         working-directory: mobile
