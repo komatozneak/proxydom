@@ -16,11 +16,19 @@ enum TeremokVpnChannel {
   static let paramsKey = "vpn.paramsJson"
   static let statusKey = "vpn.status"
   static let lastErrorKey = "vpn.lastError"
+  static let generationKey = "vpn.generation"
+  /// How long stop waits for NEVPN disconnected before returning to Dart.
+  private static let stopIdleTimeout: TimeInterval = 3.0
+  /// How long start waits if the previous tunnel is still disconnecting.
+  private static let startDisconnectWait: TimeInterval = 3.0
 
   private static var statusHandler: StatusStreamHandler?
   private static var sessionHandler: SessionStreamHandler?
   private static var trafficHandler: StubMapStreamHandler?
   private static var pingHandler: StubMapStreamHandler?
+  /// Last observed system VPN status (NEVPNStatusDidChange + load callbacks).
+  private static var cachedNEVPNStatus: NEVPNStatus = .invalid
+  private static var nevpnObserver: NSObjectProtocol?
 
   static func register(messenger: FlutterBinaryMessenger) {
     let channel = FlutterMethodChannel(
@@ -47,9 +55,10 @@ enum TeremokVpnChannel {
       case "stop", "wipeSession":
         stopTunnel(wipe: call.method == "wipeSession", result: result)
       case "getStatus":
-        result(readStatus())
+        result(resolveStatus())
       case "hasActiveSession":
-        result(readStatus() == "connected" || readStatus() == "connecting")
+        let s = resolveStatus()
+        result(s == "connected" || s == "connecting")
       case "getLastError":
         result(UserDefaults(suiteName: appGroupId)?.string(forKey: lastErrorKey))
       case "requestPermission":
@@ -100,20 +109,74 @@ enum TeremokVpnChannel {
     pingHandler = ping
     FlutterEventChannel(name: pingEventChannelName, binaryMessenger: messenger)
       .setStreamHandler(ping)
+
+    installNEVPNObserver()
+    refreshCachedNEVPNStatus()
   }
 
   private static func defaults() -> UserDefaults? {
     UserDefaults(suiteName: appGroupId)
   }
 
-  private static func readStatus() -> String {
+  @discardableResult
+  private static func bumpGeneration() -> Int {
+    let next = (defaults()?.integer(forKey: generationKey) ?? 0) + 1
+    defaults()?.set(next, forKey: generationKey)
+    return next
+  }
+
+  private static func readAppGroupStatus() -> String {
     defaults()?.string(forKey: statusKey) ?? "idle"
+  }
+
+  /// Prefer live NEVPN; App Group is fallback when manager is not yet loaded.
+  private static func resolveStatus() -> String {
+    switch cachedNEVPNStatus {
+    case .connecting, .reasserting:
+      return "connecting"
+    case .connected:
+      return "connected"
+    case .disconnecting:
+      return "disconnecting"
+    case .disconnected, .invalid:
+      // Extension may have written honest status before NEVPN settles.
+      return readAppGroupStatus()
+    @unknown default:
+      return readAppGroupStatus()
+    }
   }
 
   private static func publishStatus(_ status: String) {
     defaults()?.set(status, forKey: statusKey)
     statusHandler?.emit(status)
     sessionHandler?.emit(forStatus: status)
+  }
+
+  private static func installNEVPNObserver() {
+    if nevpnObserver != nil { return }
+    nevpnObserver = NotificationCenter.default.addObserver(
+      forName: .NEVPNStatusDidChange,
+      object: nil,
+      queue: .main
+    ) { note in
+      guard let connection = note.object as? NEVPNConnection else { return }
+      cachedNEVPNStatus = connection.status
+      let mapped = mapNEVPNStatus(connection.status)
+      statusHandler?.emit(mapped)
+      sessionHandler?.emit(forStatus: mapped)
+    }
+  }
+
+  private static func refreshCachedNEVPNStatus() {
+    NETunnelProviderManager.loadAllFromPreferences { managers, _ in
+      let ours = managers?.first {
+        ($0.protocolConfiguration as? NETunnelProviderProtocol)?
+          .providerBundleIdentifier == tunnelBundleId
+      }
+      if let ours {
+        cachedNEVPNStatus = ours.connection.status
+      }
+    }
   }
 
   private static func startTunnel(paramsJson: String, result: @escaping FlutterResult) {
@@ -123,6 +186,7 @@ enum TeremokVpnChannel {
       )
       return
     }
+    bumpGeneration()
     defaults()?.set(paramsJson, forKey: paramsKey)
     defaults()?.removeObject(forKey: lastErrorKey)
     publishStatus("connecting")
@@ -146,21 +210,41 @@ enum TeremokVpnChannel {
         )
         return
       }
-      do {
-        try manager.connection.startVPNTunnel()
-        // Honest Connected is decided by the extension (status App Group).
-        // Flutter polls getStatus / EventChannel; return true = start requested.
-        result(true)
-      } catch {
-        defaults()?.set(error.localizedDescription, forKey: lastErrorKey)
-        publishStatus("idle")
-        result(
-          FlutterError(
-            code: "start",
-            message: error.localizedDescription,
-            details: nil
+      cachedNEVPNStatus = manager.connection.status
+      waitUntilNotDisconnecting(manager: manager, timeout: startDisconnectWait) {
+        do {
+          // Never start while still tearing down the previous tunnel.
+          if manager.connection.status == .disconnecting {
+            defaults()?.set(
+              "previous tunnel still disconnecting",
+              forKey: lastErrorKey
+            )
+            publishStatus("idle")
+            result(
+              FlutterError(
+                code: "start",
+                message: "previous tunnel still disconnecting",
+                details: nil
+              )
+            )
+            return
+          }
+          try manager.connection.startVPNTunnel()
+          cachedNEVPNStatus = manager.connection.status
+          // Honest Connected is decided by the extension (status App Group).
+          // Flutter polls getStatus / EventChannel; return true = start requested.
+          result(true)
+        } catch {
+          defaults()?.set(error.localizedDescription, forKey: lastErrorKey)
+          publishStatus("idle")
+          result(
+            FlutterError(
+              code: "start",
+              message: error.localizedDescription,
+              details: nil
+            )
           )
-        )
+        }
       }
     }
   }
@@ -171,8 +255,18 @@ enum TeremokVpnChannel {
         ($0.protocolConfiguration as? NETunnelProviderProtocol)?
           .providerBundleIdentifier == tunnelBundleId
       } ?? []
+      if ours.isEmpty {
+        publishStatus("idle")
+        cachedNEVPNStatus = .disconnected
+        result(true)
+        return
+      }
       for manager in ours {
-        manager.connection.stopVPNTunnel()
+        let status = manager.connection.status
+        if status == .connected || status == .connecting || status == .reasserting {
+          manager.connection.stopVPNTunnel()
+        }
+        cachedNEVPNStatus = manager.connection.status
         if wipe {
           manager.isEnabled = false
           manager.saveToPreferences(completionHandler: nil)
@@ -181,9 +275,52 @@ enum TeremokVpnChannel {
       if wipe {
         defaults()?.removeObject(forKey: paramsKey)
       }
-      publishStatus("idle")
-      result(true)
+      // Do NOT publish idle yet — wait for real NEVPN disconnected so Dart
+      // waitUntilNativeIdle / hot-switch start see the truth.
+      waitUntilDisconnected(managers: ours, timeout: stopIdleTimeout) {
+        cachedNEVPNStatus = .disconnected
+        publishStatus("idle")
+        result(true)
+      }
     }
+  }
+
+  private static func waitUntilDisconnected(
+    managers: [NETunnelProviderManager],
+    timeout: TimeInterval,
+    completion: @escaping () -> Void
+  ) {
+    let deadline = Date().addingTimeInterval(timeout)
+    func poll() {
+      let stillUp = managers.contains {
+        let s = $0.connection.status
+        return s == .connected || s == .connecting || s == .reasserting
+          || s == .disconnecting
+      }
+      if !stillUp || Date() >= deadline {
+        completion()
+        return
+      }
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.1, execute: poll)
+    }
+    poll()
+  }
+
+  private static func waitUntilNotDisconnecting(
+    manager: NETunnelProviderManager,
+    timeout: TimeInterval,
+    completion: @escaping () -> Void
+  ) {
+    let deadline = Date().addingTimeInterval(timeout)
+    func poll() {
+      cachedNEVPNStatus = manager.connection.status
+      if manager.connection.status != .disconnecting || Date() >= deadline {
+        completion()
+        return
+      }
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.1, execute: poll)
+    }
+    poll()
   }
 
   private static func loadManager(
@@ -215,6 +352,7 @@ enum TeremokVpnChannel {
           return
         }
         manager.loadFromPreferences { loadError in
+          cachedNEVPNStatus = manager.connection.status
           completion(manager, loadError)
         }
       }
@@ -267,11 +405,7 @@ private final class StatusStreamHandler: NSObject, FlutterStreamHandler {
     ) { [weak self] note in
       guard let connection = note.object as? NEVPNConnection else { return }
       let mapped = TeremokVpnChannel.mapNEVPNStatus(connection.status)
-      // Prefer App Group when extension already wrote honest status.
-      let fromGroup = UserDefaults(suiteName: TeremokVpnChannel.appGroupId)?
-        .string(forKey: TeremokVpnChannel.statusKey)
-      let status = fromGroup ?? mapped
-      self?.sink?(status)
+      self?.sink?(mapped)
     }
     return nil
   }
@@ -355,6 +489,6 @@ private final class StubMapStreamHandler: NSObject, FlutterStreamHandler {
 
 extension TeremokVpnChannel {
   fileprivate static func readStatusPublic() -> String {
-    readStatus()
+    resolveStatus()
   }
 }

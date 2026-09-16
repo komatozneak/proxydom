@@ -68,6 +68,9 @@ const _connectedSinceKey = 'vpn_connected_since_ms';
 /// Home + analytics: another VPN / Always-on / lockdown is blocking.
 const kVpnConflictErrorCode = 'vpn_conflict';
 
+/// Connecting UI hung without a real foreign-VPN conflict (iOS hot-switch race).
+const kVpnConnectTimeoutErrorCode = 'connect_timeout';
+
 /// VPN-контроллер. Шаг 16: retry/reconnect логика поверх VpnController + native.
 class VpnNotifier extends Notifier<VpnStatus> {
   VpnConfig? _config;
@@ -1186,6 +1189,9 @@ class VpnNotifier extends Notifier<VpnStatus> {
       } catch (_) {
         // Best-effort before region switch.
       }
+      // iOS Packet Tunnel: stop() must settle to idle before start, or the
+      // late Latvia stopTunnel races the YouTube start (false vpn_conflict).
+      await waitUntilNativeIdle();
       await _clearConnectedSince();
       state = const VpnDisconnected();
     }
@@ -1851,11 +1857,10 @@ class VpnNotifier extends Notifier<VpnStatus> {
     state = const VpnDisconnected();
   }
 
-  /// Hung Connecting: open system VPN settings instead of spinning forever.
+  /// Hung Connecting: foreign VPN CTA only when conflict is real; else timeout.
   Future<void> _failConnectingStuck() async {
     _cancelConnectingWatchdog();
     if (state is! VpnConnecting) return;
-    _vpnLog('[VPN] connecting stuck — conflict CTA');
     _connectGeneration++;
     _activeConnectGen = null;
     _suppressAutoReconnect = true;
@@ -1865,7 +1870,25 @@ class VpnNotifier extends Notifier<VpnStatus> {
     await _clearConnectedSince();
     final conflict = await VpnController.instance.queryVpnConflict();
     _logUiTransition('error', 'stuck_connecting');
-    state = await _vpnErrorFromConflict(conflict);
+    if (conflict.foreignAlwaysOn || conflict.foreignVpnActive) {
+      _vpnLog('[VPN] connecting stuck — conflict CTA');
+      state = await _vpnErrorFromConflict(conflict);
+      return;
+    }
+    // iOS has no getVpnConflict — do not paint Android "another VPN" copy.
+    _vpnLog('[VPN] connecting stuck — connect_timeout');
+    final detail = await VpnController.instance.getLastError();
+    if (detail != null && detail.trim().isNotEmpty) {
+      state = VpnError(
+        message: detail.trim(),
+        code: kVpnConnectTimeoutErrorCode,
+      );
+      return;
+    }
+    state = const VpnError(
+      message: kVpnConnectTimeoutErrorCode,
+      code: kVpnConnectTimeoutErrorCode,
+    );
   }
 
   /// Don't flip UI to disconnected on a single idle event — re-check native.

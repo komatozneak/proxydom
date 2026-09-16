@@ -206,6 +206,50 @@ void main() {
     expect(find.text('Открыть настройки VPN'), findsOneWidget);
   });
 
+  testWidgets('Home connect_timeout is not painted as foreign VPN conflict',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          vpnNodesRepositoryProvider
+              .overrideWithValue(_FakeVpnNodesRepository()),
+          vpnProvider.overrideWith(
+            () => _FixedVpnNotifier(
+              const VpnError(
+                message: kVpnConnectTimeoutErrorCode,
+                code: kVpnConnectTimeoutErrorCode,
+              ),
+            ),
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light,
+          locale: const Locale('ru'),
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          home: const HomeScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('Мешает другой VPN'), findsNothing);
+    expect(find.text('Открыть настройки VPN'), findsNothing);
+    expect(find.text('Ошибка подключения'), findsOneWidget);
+    expect(
+      find.text('Не удалось подключиться. Попробуйте снова.'),
+      findsOneWidget,
+    );
+  });
+
+  test('stuck timeout constant is distinct from vpn_conflict', () {
+    expect(kVpnConnectTimeoutErrorCode, 'connect_timeout');
+    expect(kVpnConnectTimeoutErrorCode, isNot(kVpnConflictErrorCode));
+  });
+
   testWidgets('Home shows permission hint without VPN settings CTA',
       (tester) async {
     SharedPreferences.setMockInitialValues({});
