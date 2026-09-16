@@ -142,6 +142,20 @@ jobs:
           echo "=== codesigning identities ==="
           security find-identity -v -p codesigning
 
+          # Flutter 3.35 looks up Development certs unless DEVELOPMENT_TEAM is
+          # visible in `xcodebuild -showBuildSettings`. FLUTTER_XCODE_* is the
+          # supported CI hook (flutter/flutter#43553) and is forwarded to that
+          # query. Do not set PROVISIONING_PROFILE_SPECIFIER here — app vs
+          # Packet Tunnel profiles differ; use-profiles already set those
+          # per-target.
+          team_id="$(/usr/libexec/PlistBuddy -c 'Print teamID' "$HOME/export_options.plist")"
+          {
+            echo "FLUTTER_XCODE_DEVELOPMENT_TEAM=$team_id"
+            echo "FLUTTER_XCODE_CODE_SIGN_STYLE=Manual"
+            echo "FLUTTER_XCODE_CODE_SIGN_IDENTITY=Apple Distribution"
+          } >> "$GITHUB_ENV"
+          echo "Exported Flutter Xcode signing env for team $team_id"
+
       - name: Build IPA
         working-directory: mobile
         run: |
