@@ -1,7 +1,8 @@
 name: iOS TestFlight
 
-# Official Flutter CI path: Codemagic CLI tools
+# Official Flutter + Codemagic CLI path:
 # https://docs.flutter.dev/deployment/ios#create-a-build-archive-with-codemagic-cli-tools
+# https://blog.codemagic.io/deploy-your-app-to-app-store-with-codemagic-cli-tools-and-github-actions/
 # Actions → iOS TestFlight → Run workflow → IPA → App Store Connect / TestFlight.
 
 on:
@@ -26,7 +27,6 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 90
     env:
-      # Codemagic CLI / App Store Connect API
       APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
       APP_STORE_CONNECT_KEY_IDENTIFIER: ${{ secrets.APPSTORE_KEY_ID }}
       APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
@@ -60,6 +60,14 @@ jobs:
         with:
           xcode-version: "16.3"
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Codemagic CLI tools
+        run: python -m pip install codemagic-cli-tools
+
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -71,10 +79,6 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
-
-      - name: Install Codemagic CLI tools
-        run: pip3 install --user codemagic-cli-tools
-        # https://docs.flutter.dev/deployment/ios#create-a-build-archive-with-codemagic-cli-tools
 
       - name: Build Hy2bind.xcframework
         working-directory: mobile/android/hysteria-bind
@@ -88,21 +92,18 @@ jobs:
         working-directory: mobile
         run: flutter pub get
 
-      - name: Set up code signing (Codemagic CLI)
+      - name: Set up keychain
+        run: keychain initialize
+
+      - name: Fetch signing files
         working-directory: mobile
         run: |
           set -euo pipefail
-          export PATH="$HOME/Library/Python/3.13/bin:$HOME/Library/Python/3.12/bin:$HOME/.local/bin:$PATH"
 
-          # 1) Temporary keychain (Flutter docs)
-          keychain initialize
-
-          # 2) Private key from Apple Distribution .p12 (Flutter docs openssl step)
           echo "$BUILD_CERTIFICATE_BASE64" | base64 --decode > "$RUNNER_TEMP/dist.p12"
           if ! openssl pkcs12 -in "$RUNNER_TEMP/dist.p12" -nodes -nocerts \
               -passin pass:"$P12_PASSWORD" 2>/dev/null \
               | openssl rsa -out "$RUNNER_TEMP/cert_key" 2>/dev/null; then
-            # OpenSSL 3 on some runners needs -legacy for older p12 bags
             openssl pkcs12 -in "$RUNNER_TEMP/dist.p12" -nodes -nocerts -legacy \
               -passin pass:"$P12_PASSWORD" \
               | openssl rsa -out "$RUNNER_TEMP/cert_key"
@@ -110,27 +111,32 @@ jobs:
           chmod 600 "$RUNNER_TEMP/cert_key"
           test -s "$RUNNER_TEMP/cert_key"
 
-          # 3) Fetch App Store profiles + cert for app and Packet Tunnel extension
+          # --strict-match-identifier: do not also match RunnerTests
+          # (online.teremokconnect.app.RunnerTests).
           app-store-connect fetch-signing-files "$APP_BUNDLE_ID" \
             --platform IOS \
             --type IOS_APP_STORE \
             --certificate-key="@file:$RUNNER_TEMP/cert_key" \
-            --create
+            --create \
+            --strict-match-identifier
           app-store-connect fetch-signing-files "$TUNNEL_BUNDLE_ID" \
             --platform IOS \
             --type IOS_APP_STORE \
             --certificate-key="@file:$RUNNER_TEMP/cert_key" \
-            --create
+            --create \
+            --strict-match-identifier
 
-          # 4) Add fetched certificates to the keychain
-          keychain add-certificates
+      - name: Set up signing certificate
+        run: keychain add-certificates
 
-          # 5) Wire profiles into Xcode project + write $HOME/export_options.plist
+      - name: Set up code signing settings on Xcode project
+        working-directory: mobile
+        run: |
           xcode-project use-profiles \
             --project ios/Runner.xcodeproj \
             --archive-method app-store \
+            --warn-only \
             --code-signing-setup-verbose-logging
-
           echo "=== export_options.plist ==="
           cat "$HOME/export_options.plist"
           echo "=== codesigning identities ==="
@@ -139,7 +145,6 @@ jobs:
       - name: Build IPA
         working-directory: mobile
         run: |
-          export PATH="$HOME/Library/Python/3.13/bin:$HOME/Library/Python/3.12/bin:$HOME/.local/bin:$PATH"
           flutter build ipa --release \
             --export-options-plist="$HOME/export_options.plist"
 
@@ -155,12 +160,9 @@ jobs:
         if: ${{ inputs.upload }}
         working-directory: mobile
         run: |
-          export PATH="$HOME/Library/Python/3.13/bin:$HOME/Library/Python/3.12/bin:$HOME/.local/bin:$PATH"
           ipa="$(ls build/ios/ipa/*.ipa | head -n 1)"
           app-store-connect publish --path "$ipa"
 
       - name: Restore login keychain
         if: always()
-        run: |
-          export PATH="$HOME/Library/Python/3.13/bin:$HOME/Library/Python/3.12/bin:$HOME/.local/bin:$PATH"
-          keychain use-login || true
+        run: keychain use-login || true
