@@ -150,14 +150,16 @@ jobs:
 
       - name: Build IPA
         working-directory: mobile
-        # Codemagic archives/exports with the profiles from use-profiles.
-        # https://github.com/codemagic-ci-cd/cli-tools/blob/master/docs/xcode-project/build-ipa.md
+        # Official Codemagic sample: workspace + scheme only.
+        # --config was forwarded as invalid xcodebuild -config (exit 64).
+        # Destination flag: https://docs.codemagic.io/troubleshooting/common-ios-issues/
         run: |
           xcode-project build-ipa \
             --workspace ios/Runner.xcworkspace \
             --scheme Runner \
-            --config Release \
+            --no-show-build-settings \
             --export-options-plist "$HOME/export_options.plist" \
+            --archive-flags="-destination generic/platform=iOS" \
             --archive-xcargs "COMPILER_INDEX_STORE_ENABLE=NO CODE_SIGN_STYLE=Manual"
 
       - name: Upload IPA artifact
