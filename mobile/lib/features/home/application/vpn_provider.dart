@@ -71,6 +71,20 @@ const kVpnConflictErrorCode = 'vpn_conflict';
 /// Connecting UI hung without a real foreign-VPN conflict (iOS hot-switch race).
 const kVpnConnectTimeoutErrorCode = 'connect_timeout';
 
+/// Hot region switch: mint while TUN up, then tear down, then reconnect.
+///
+/// Order matters — mint after stop times out on iOS RF without tunnel (~18s).
+@visibleForTesting
+Future<void> runHotRegionSwitch({
+  required Future<void> Function() mint,
+  required Future<void> Function() stopAndWaitIdle,
+  required Future<void> Function() connectReuse,
+}) async {
+  await mint();
+  await stopAndWaitIdle();
+  await connectReuse();
+}
+
 /// VPN-контроллер. Шаг 16: retry/reconnect логика поверх VpnController + native.
 class VpnNotifier extends Notifier<VpnStatus> {
   VpnConfig? _config;
@@ -1165,7 +1179,11 @@ class VpnNotifier extends Notifier<VpnStatus> {
     );
   }
 
-  /// Persist region and refresh cached config (disconnect → fetch → reconnect).
+  /// Persist region and refresh cached config.
+  ///
+  /// Hot switch (already Connected/Connecting): mint **while TUN is up** so
+  /// API `:8443` still routes (iOS RF hang without tunnel), then stop → idle →
+  /// reconnect. Stay [VpnConnecting] — do not flash Disconnected mid-switch.
   Future<void> selectNode(String nodeId) async {
     final nodesRepo = ref.read(vpnNodesRepositoryProvider);
     final wasConnected = state is VpnConnected || state is VpnConnecting;
@@ -1181,25 +1199,33 @@ class VpnNotifier extends Notifier<VpnStatus> {
     } on StateError {
       // Provider disposed in tests.
     }
+
     if (wasConnected) {
-      _reconnectTimer?.cancel();
-      _cancelStatusSubscriptions();
-      try {
-        await VpnController.instance.stop();
-      } catch (_) {
-        // Best-effort before region switch.
-      }
-      // iOS Packet Tunnel: stop() must settle to idle before start, or the
-      // late Latvia stopTunnel races the YouTube start (false vpn_conflict).
-      await waitUntilNativeIdle();
-      await _clearConnectedSince();
-      state = const VpnDisconnected();
+      state = const VpnConnecting(progress: 0.2);
+      await runHotRegionSwitch(
+        mint: () async {
+          _config = await fetchConfig(nodeId: useAuto ? null : nodeId);
+        },
+        stopAndWaitIdle: () async {
+          _reconnectTimer?.cancel();
+          _cancelStatusSubscriptions();
+          try {
+            await VpnController.instance.stop();
+          } catch (_) {
+            // Best-effort before region switch.
+          }
+          // iOS Packet Tunnel: stop() must settle to idle before start, or the
+          // late previous stopTunnel races the new start (false vpn_conflict).
+          await waitUntilNativeIdle();
+          await _clearConnectedSince();
+          state = const VpnConnecting(progress: 0.5);
+        },
+        connectReuse: () => connect(reuseConfig: true),
+      );
+      return;
     }
+
     _config = await fetchConfig(nodeId: useAuto ? null : nodeId);
-    if (wasConnected) {
-      // Config already fetched above — skip a second /vpn/config + nodes round-trip.
-      await connect(reuseConfig: true);
-    }
   }
 
   /// Explicit stop → start so route-mode / site prefs enter the next runtime config.

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -13,6 +14,7 @@ import '../../../core/widgets/location_flag_icon.dart';
 import '../../../core/widgets/teremok_snackbar.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../home/application/vpn_provider.dart';
+import '../../home/application/vpn_status.dart';
 import '../../settings/application/subscription_status_provider.dart';
 import '../../settings/data/subscription_status.dart';
 import '../data/node_auto_selector.dart';
@@ -22,6 +24,12 @@ import '../data/vpn_node.dart';
 
 /// Key on the Locations Auto row flag (Home/Locations icon parity tests).
 const kLocationsAutoFlagKey = ValueKey<String>('locations-auto-flag');
+
+/// Hot switch: Nest Connecting owns progress — do not block Locations with busy overlay.
+@visibleForTesting
+bool regionPickUsesBusyOverlay(VpnStatus status) {
+  return status is! VpnConnected && status is! VpnConnecting;
+}
 
 /// Full-screen region list (Locations tab).
 class LocationsScreen extends ConsumerStatefulWidget {
@@ -195,6 +203,28 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     }
 
     final l = AppL10n.of(context);
+    final vpnStatus = ref.read(vpnProvider);
+    final hotSwitch = !regionPickUsesBusyOverlay(vpnStatus);
+
+    // Hot switch: leave Locations immediately; Nest Connecting is the progress UX.
+    // Busy overlay over the region list blocked the UI for ~18s when mint raced
+    // after stop (API without TUN).
+    if (hotSwitch) {
+      if (!mounted) return;
+      setState(() => _selectedId = id);
+      context.go('/home');
+      try {
+        await ref.read(vpnProvider.notifier).selectNode(id);
+      } catch (e) {
+        if (!mounted) return;
+        final msg = _isTransientNetwork(e)
+            ? AppL10n.of(context).networkErrorFriendly
+            : l.regionChangeFailed(e.toString());
+        showTeremokSnackBar(context, msg);
+      }
+      return;
+    }
+
     try {
       await ref.read(busyOverlayProvider.notifier).run(
             () => ref.read(vpnProvider.notifier).selectNode(id),
