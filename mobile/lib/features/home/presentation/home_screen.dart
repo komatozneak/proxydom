@@ -79,8 +79,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       unawaited(ref.read(vpnProvider.notifier).onAppResumed());
       unawaited(_refreshNoVpnCounter());
       unawaited(_refreshServerCard());
-      unawaited(ref.read(subscriptionStatusProvider.notifier).refresh());
+      unawaited(_refreshEntitlement());
     }
+  }
+
+  Future<void> _refreshEntitlement() async {
+    await ref.read(sessionProvider.notifier).refresh();
+    await ref.read(subscriptionStatusProvider.notifier).refresh();
   }
 
   Future<void> _openSubscription() async {
@@ -107,7 +112,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     if (!mounted) return;
     await ref.read(vpnProvider.notifier).reconcileWithNative();
     if (!mounted) return;
-    unawaited(ref.read(subscriptionStatusProvider.notifier).refresh());
+    unawaited(_refreshEntitlement());
   }
 
   Future<void> _refreshNoVpnCounter() async {
