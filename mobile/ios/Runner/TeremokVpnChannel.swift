@@ -161,7 +161,9 @@ enum TeremokVpnChannel {
       let proto = NETunnelProviderProtocol()
       proto.providerBundleIdentifier = tunnelBundleId
       proto.serverAddress = hostFromParams(paramsJson) ?? "Teremok VPN"
-      proto.excludeLocalNetworks = true
+      if #available(iOS 14.2, *) {
+        proto.excludeLocalNetworks = true
+      }
       manager.protocolConfiguration = proto
       manager.localizedDescription = "Teremok VPN"
       manager.isEnabled = true
