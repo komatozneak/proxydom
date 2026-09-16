@@ -18,7 +18,10 @@ cd mobile/android/hysteria-bind
 bash build-ios.sh
 ```
 
-Writes `mobile/ios/Frameworks/Hy2bind.xcframework`. The extension already links that path.
+Writes `mobile/ios/Frameworks/Hy2bind.xcframework`. The **app** embeds it
+(`Runner.app/Frameworks`); the extension **links** it and loads via
+`@executable_path/../../Frameworks`. Do not nest Hy2bind inside the appex
+(App Store: "disallowed nested bundles").
 
 Until the xcframework exists, Xcode/CI cannot finish the VpnTunnelProvider link.
 

@@ -55,14 +55,12 @@ jobs:
             exit 1
           fi
 
-      # macos-15 default is 16.4 (iOS 18.5 SDK on the image). 16.3's iOS 18.4
-      # platform is often missing → xcodebuild archive dies in <1s:
-      # "Unable to find a destination matching generic/platform=iOS"
-      # https://github.com/actions/runner-images/issues/12758
+      # Apple (2026): App Store Connect requires iOS 26 SDK / Xcode 26.
+      # macos-15 ships Xcode_26.3.app. Flutter 3.35.1 still archives with it.
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: "16.4"
+          xcode-version: "26.3"
 
       - name: Set up Python
         uses: actions/setup-python@v5

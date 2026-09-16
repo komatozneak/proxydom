@@ -48,16 +48,6 @@
 			dstPath = "";
 			dstSubfolderSpec = 10;
 			files = (
-			);
-			name = "Embed Frameworks";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		A2E000000000000000000034 /* Embed Frameworks */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 10;
-			files = (
 				A2E000000000000000000005 /* Hy2bind.xcframework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
@@ -251,7 +241,6 @@
 				A2E000000000000000000031 /* Sources */,
 				A2E000000000000000000032 /* Frameworks */,
 				A2E000000000000000000033 /* Resources */,
-				A2E000000000000000000034 /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
