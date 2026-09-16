@@ -142,25 +142,23 @@ jobs:
           echo "=== codesigning identities ==="
           security find-identity -v -p codesigning
 
-          # Flutter 3.35 looks up Development certs unless DEVELOPMENT_TEAM is
-          # visible in `xcodebuild -showBuildSettings`. FLUTTER_XCODE_* is the
-          # supported CI hook (flutter/flutter#43553) and is forwarded to that
-          # query. Do not set PROVISIONING_PROFILE_SPECIFIER here — app vs
-          # Packet Tunnel profiles differ; use-profiles already set those
-          # per-target.
-          team_id="$(/usr/libexec/PlistBuddy -c 'Print teamID' "$HOME/export_options.plist")"
-          {
-            echo "FLUTTER_XCODE_DEVELOPMENT_TEAM=$team_id"
-            echo "FLUTTER_XCODE_CODE_SIGN_STYLE=Manual"
-            echo "FLUTTER_XCODE_CODE_SIGN_IDENTITY=Apple Distribution"
-          } >> "$GITHUB_ENV"
-          echo "Exported Flutter Xcode signing env for team $team_id"
+      - name: Generate Flutter iOS project
+        working-directory: mobile
+        # --no-codesign skips Flutter 3.35's Development-cert lookup
+        # (Distribution-only CI). Pods + Generated.xcconfig still run.
+        run: flutter build ios --release --config-only --no-codesign
 
       - name: Build IPA
         working-directory: mobile
+        # Codemagic archives/exports with the profiles from use-profiles.
+        # https://github.com/codemagic-ci-cd/cli-tools/blob/master/docs/xcode-project/build-ipa.md
         run: |
-          flutter build ipa --release \
-            --export-options-plist="$HOME/export_options.plist"
+          xcode-project build-ipa \
+            --workspace ios/Runner.xcworkspace \
+            --scheme Runner \
+            --config Release \
+            --export-options-plist "$HOME/export_options.plist" \
+            --archive-xcargs "COMPILER_INDEX_STORE_ENABLE=NO CODE_SIGN_STYLE=Manual"
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
