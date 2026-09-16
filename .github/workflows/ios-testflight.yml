@@ -1,7 +1,8 @@
 name: iOS TestFlight
 
-# Owner: App Store Connect app + GitHub secrets (docs/ops/apple-testflight-checklist.md).
-# Actions → iOS TestFlight → Run workflow → IPA uploads to App Store Connect → TestFlight.
+# Official Flutter CI path: Codemagic CLI tools
+# https://docs.flutter.dev/deployment/ios#create-a-build-archive-with-codemagic-cli-tools
+# Actions → iOS TestFlight → Run workflow → IPA → App Store Connect / TestFlight.
 
 on:
   workflow_dispatch:
@@ -16,23 +17,21 @@ env:
   FLUTTER_VERSION: "3.35.1"
   HYSTERIA_TAG: "v2.6.2"
   GO_VERSION: "1.25.x"
+  APP_BUNDLE_ID: online.teremokconnect.app
+  TUNNEL_BUNDLE_ID: online.teremokconnect.app.VpnTunnelProvider
 
 jobs:
   testflight:
     name: Build IPA + TestFlight
-    runs-on: macos-latest
+    runs-on: macos-15
     timeout-minutes: 90
     env:
-      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
-      APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
-      APPSTORE_PRIVATE_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+      # Codemagic CLI / App Store Connect API
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+      APP_STORE_CONNECT_KEY_IDENTIFIER: ${{ secrets.APPSTORE_KEY_ID }}
+      APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
       BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
       P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
-      APP_PROVISION_BASE64: ${{ secrets.APP_PROVISION_BASE64 }}
-      TUNNEL_PROVISION_BASE64: ${{ secrets.TUNNEL_PROVISION_BASE64 }}
-      APP_PROFILE_NAME: ${{ secrets.APP_PROFILE_NAME }}
-      TUNNEL_PROFILE_NAME: ${{ secrets.TUNNEL_PROFILE_NAME }}
 
     steps:
       - uses: actions/checkout@v4
@@ -43,12 +42,11 @@ jobs:
       - name: Check Apple secrets
         run: |
           fail=0
-          for name in APPLE_TEAM_ID APPSTORE_ISSUER_ID APPSTORE_KEY_ID APPSTORE_PRIVATE_KEY \
-            BUILD_CERTIFICATE_BASE64 P12_PASSWORD APP_PROVISION_BASE64 TUNNEL_PROVISION_BASE64 \
-            APP_PROFILE_NAME TUNNEL_PROFILE_NAME; do
+          for name in APP_STORE_CONNECT_ISSUER_ID APP_STORE_CONNECT_KEY_IDENTIFIER \
+            APP_STORE_CONNECT_PRIVATE_KEY BUILD_CERTIFICATE_BASE64 P12_PASSWORD; do
             eval "val=\${$name}"
             if [ -z "$val" ]; then
-              echo "Missing GitHub secret: $name"
+              echo "Missing GitHub secret / env: $name"
               fail=1
             fi
           done
@@ -56,6 +54,11 @@ jobs:
             echo "See docs/ops/apple-testflight-checklist.md"
             exit 1
           fi
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: "16.3"
 
       - uses: actions/setup-go@v5
         with:
@@ -69,6 +72,10 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Install Codemagic CLI tools
+        run: pip3 install --user codemagic-cli-tools
+        # https://docs.flutter.dev/deployment/ios#create-a-build-archive-with-codemagic-cli-tools
+
       - name: Build Hy2bind.xcframework
         working-directory: mobile/android/hysteria-bind
         run: |
@@ -81,99 +88,61 @@ jobs:
         working-directory: mobile
         run: flutter pub get
 
-      - name: Import distribution certificate
-        uses: apple-actions/import-codesign-certs@v2
-        with:
-          p12-file-base64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
-          p12-password: ${{ secrets.P12_PASSWORD }}
-
-      - name: Install provisioning profiles
+      - name: Set up code signing (Codemagic CLI)
+        working-directory: mobile
         run: |
-          # Xcode 16+: ~/Library/Developer/Xcode/UserData/Provisioning Profiles/<UUID>.mobileprovision
-          # Keep legacy MobileDevice path for older tooling.
-          legacy="$HOME/Library/MobileDevice/Provisioning Profiles"
-          modern="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
-          mkdir -p "$legacy" "$modern"
-          install_profile() {
-            local b64="$1"
-            local tmp="$2"
-            echo "$b64" | base64 --decode > "$tmp"
-            local uuid
-            uuid="$(security cms -D -i "$tmp" | plutil -extract UUID raw -)"
-            echo "Installed profile UUID=$uuid"
-            cp "$tmp" "$legacy/${uuid}.mobileprovision"
-            cp "$tmp" "$modern/${uuid}.mobileprovision"
-          }
-          install_profile "$APP_PROVISION_BASE64" /tmp/app.mobileprovision
-          install_profile "$TUNNEL_PROVISION_BASE64" /tmp/tunnel.mobileprovision
+          set -euo pipefail
+          export PATH="$HOME/Library/Python/3.13/bin:$HOME/Library/Python/3.12/bin:$HOME/.local/bin:$PATH"
 
-      - name: Verify codesigning identity
-        run: |
-          security find-identity -v -p codesigning
-          count="$(security find-identity -v -p codesigning | grep -c 'Apple Distribution' || true)"
-          if [ "$count" -lt 1 ]; then
-            echo "No Apple Distribution identity in keychain — check BUILD_CERTIFICATE_BASE64 / P12_PASSWORD"
-            exit 1
+          # 1) Temporary keychain (Flutter docs)
+          keychain initialize
+
+          # 2) Private key from Apple Distribution .p12 (Flutter docs openssl step)
+          echo "$BUILD_CERTIFICATE_BASE64" | base64 --decode > "$RUNNER_TEMP/dist.p12"
+          if ! openssl pkcs12 -in "$RUNNER_TEMP/dist.p12" -nodes -nocerts \
+              -passin pass:"$P12_PASSWORD" 2>/dev/null \
+              | openssl rsa -out "$RUNNER_TEMP/cert_key" 2>/dev/null; then
+            # OpenSSL 3 on some runners needs -legacy for older p12 bags
+            openssl pkcs12 -in "$RUNNER_TEMP/dist.p12" -nodes -nocerts -legacy \
+              -passin pass:"$P12_PASSWORD" \
+              | openssl rsa -out "$RUNNER_TEMP/cert_key"
           fi
+          chmod 600 "$RUNNER_TEMP/cert_key"
+          test -s "$RUNNER_TEMP/cert_key"
 
-      - name: Apply Manual signing
-        working-directory: mobile
-        run: python3 ios/ci/apply_signing.py
+          # 3) Fetch App Store profiles + cert for app and Packet Tunnel extension
+          app-store-connect fetch-signing-files "$APP_BUNDLE_ID" \
+            --platform IOS \
+            --type IOS_APP_STORE \
+            --certificate-key="@file:$RUNNER_TEMP/cert_key" \
+            --create
+          app-store-connect fetch-signing-files "$TUNNEL_BUNDLE_ID" \
+            --platform IOS \
+            --type IOS_APP_STORE \
+            --certificate-key="@file:$RUNNER_TEMP/cert_key" \
+            --create
 
-      - name: Inject team into Flutter xcconfigs
-        working-directory: mobile
-        run: |
-          # Flutter skips Development-cert lookup only when DEVELOPMENT_TEAM
-          # is already visible in xcodebuild build settings (code_signing.dart).
-          for f in ios/Flutter/Debug.xcconfig ios/Flutter/Release.xcconfig; do
-            {
-              echo ""
-              echo "// CI Manual signing (ios-testflight.yml)"
-              echo "DEVELOPMENT_TEAM=${APPLE_TEAM_ID}"
-              echo "CODE_SIGN_STYLE=Manual"
-              echo "CODE_SIGN_IDENTITY=Apple Distribution"
-            } >> "$f"
-            echo "--- $f ---"
-            cat "$f"
-          done
+          # 4) Add fetched certificates to the keychain
+          keychain add-certificates
 
-      - name: Allow Apple Distribution in flutter_tools
-        # Flutter 3.35 regex only matches Develop(ment|er); skips Distribution.
-        # https://github.com/flutter/flutter/issues/176636
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import os
-          path = Path(os.environ["FLUTTER_ROOT"]) / "packages/flutter_tools/lib/src/ios/code_signing.dart"
-          text = path.read_text()
-          old = r'^\s*\d+\).+"(.+Develop(ment|er).+)"$'
-          new = r'^\s*\d+\).+"(.+)"$'
-          if old not in text:
-              raise SystemExit(f"regex not found in {path}")
-          path.write_text(text.replace(old, new, 1))
-          print(f"patched identity regex in {path}")
-          PY
-          # Snapshot tools so the patch is picked up (no stale kernel).
-          rm -f "$FLUTTER_ROOT/bin/cache/flutter_tools.stamp" \
-                "$FLUTTER_ROOT/bin/cache/flutter_tools.snapshot" || true
+          # 5) Wire profiles into Xcode project + write $HOME/export_options.plist
+          xcode-project use-profiles \
+            --project ios/Runner.xcodeproj \
+            --archive-method app-store \
+            --code-signing-setup-verbose-logging
 
-      - name: Write ExportOptions.plist
-        working-directory: mobile
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import os
-          src = Path("ios/ExportOptions.plist.example").read_text()
-          src = src.replace("APPLE_TEAM_ID", os.environ["APPLE_TEAM_ID"])
-          src = src.replace("APP_PROFILE_NAME", os.environ["APP_PROFILE_NAME"])
-          src = src.replace("TUNNEL_PROFILE_NAME", os.environ["TUNNEL_PROFILE_NAME"])
-          Path("ios/ExportOptions.plist").write_text(src)
-          print("wrote ios/ExportOptions.plist")
-          PY
+          echo "=== export_options.plist ==="
+          cat "$HOME/export_options.plist"
+          echo "=== codesigning identities ==="
+          security find-identity -v -p codesigning
 
       - name: Build IPA
         working-directory: mobile
-        run: flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
+        run: |
+          export PATH="$HOME/Library/Python/3.13/bin:$HOME/Library/Python/3.12/bin:$HOME/.local/bin:$PATH"
+          flutter build ipa --release \
+            --export-options-plist="$HOME/export_options.plist"
+
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
@@ -186,12 +155,12 @@ jobs:
         if: ${{ inputs.upload }}
         working-directory: mobile
         run: |
-          mkdir -p "$HOME/.appstoreconnect/private_keys"
-          key_path="$HOME/.appstoreconnect/private_keys/AuthKey_${APPSTORE_KEY_ID}.p8"
-          printf '%s\n' "$APPSTORE_PRIVATE_KEY" > "$key_path"
-          chmod 600 "$key_path"
-          ipa=(build/ios/ipa/*.ipa)
-          xcrun altool --upload-app --type ios \
-            --file "${ipa[0]}" \
-            --apiKey "$APPSTORE_KEY_ID" \
-            --apiIssuer "$APPSTORE_ISSUER_ID"
+          export PATH="$HOME/Library/Python/3.13/bin:$HOME/Library/Python/3.12/bin:$HOME/.local/bin:$PATH"
+          ipa="$(ls build/ios/ipa/*.ipa | head -n 1)"
+          app-store-connect publish --path "$ipa"
+
+      - name: Restore login keychain
+        if: always()
+        run: |
+          export PATH="$HOME/Library/Python/3.13/bin:$HOME/Library/Python/3.12/bin:$HOME/.local/bin:$PATH"
+          keychain use-login || true
