@@ -891,7 +891,7 @@ class AppL10nEn extends AppL10n {
   String get regionOnline => 'online';
 
   @override
-  String get regionBlurbFree => 'Apps, AI, websites';
+  String get regionBlurbFree => 'Apps and websites';
 
   @override
   String get regionBlurbGaming => 'Low ping';
@@ -1014,8 +1014,7 @@ class AppL10nEn extends AppL10n {
   String get promoHeadline => 'Enter your personal code';
 
   @override
-  String get promoBody =>
-      'Access is by invite during the closed beta. You can retry without signing out.';
+  String get promoBody => 'If you have a code, enter it here.';
 
   @override
   String get promoCodeLabel => 'Code';
@@ -1187,11 +1186,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get recoveryCodeBody =>
-      'Save this code — main way to restore after reinstall. Without it, contact support with Device ID and payment receipt.';
-
-  @override
-  String get accountHubGuestLead =>
-      'You’re in guest mode. Link a contact so you don’t lose access.';
+      'Save this code — you’ll need it after reinstall. Without it you can restore via Telegram.';
 
   @override
   String get recoveryCodeCopy => 'Copy code';
@@ -1213,7 +1208,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get restoreBody =>
-      'Enter the recovery code you saved at first unlock. Without it, contact support with Device ID and Platega receipt.';
+      'Enter the recovery code or open Telegram. Use the bot login code if you paid before this phone.';
 
   @override
   String get restorePaymentLabel => 'Payment ID';
@@ -1271,7 +1266,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get restoreBodyCode =>
-      'After reinstall, enter the recovery code shown when you first opened the app.';
+      'After reinstall, enter the recovery code or open Telegram. Use the bot login code if you paid before this phone.';
 
   @override
   String get settingsInviteDevice => 'Add device to my subscription';
@@ -1356,14 +1351,18 @@ class AppL10nEn extends AppL10n {
   String get accountHubTitle => 'Account';
 
   @override
+  String get accountHubGuestLead =>
+      'This account is on this device. Recovery code — after reinstall. Telegram — the same account.';
+
+  @override
   String get accountHubLinkedLead =>
-      'Contact linked. Account details and access are below.';
+      'Telegram is linked. Recovery code and the bot keep the same account.';
 
   @override
   String get accountHubLinkTelegram => 'Telegram';
 
   @override
-  String get accountHubLinkTelegramHint => 'Link or restore via the bot';
+  String get accountHubLinkTelegramHint => 'The same account in the bot';
 
   @override
   String get accountHubLinkEmail => 'Email';
@@ -1388,7 +1387,7 @@ class AppL10nEn extends AppL10n {
   String get accountHubPromo => 'Promo code';
 
   @override
-  String get accountHubPromoHint => 'Redeem invite or beta access code';
+  String get accountHubPromoHint => 'Redeem a code';
 
   @override
   String get accountHubAccessSection => 'Your access';
@@ -1417,23 +1416,20 @@ class AppL10nEn extends AppL10n {
   String get accountTelegramStartFailed => 'Couldn’t start Telegram linking';
 
   @override
-  String get accountTelegramVpnRequired =>
-      'Connect to Teremok first — Telegram needs the VPN in this region';
+  String get accountTelegramVpnRequired => 'Connect first.';
 
   @override
   String get restoreTelegramCta => 'Restore via Telegram';
 
   @override
-  String get restoreTelegramVpnRequired =>
-      'Connect to Teremok, then open Telegram';
+  String get restoreTelegramVpnRequired => 'Connect first.';
 
   @override
   String get homeTelegramRestoreCta =>
       'Had Teremok before? Restore via Telegram';
 
   @override
-  String get homeTelegramRestoreConnectFirst =>
-      'Connect to Teremok first, then restore via Telegram';
+  String get homeTelegramRestoreConnectFirst => 'Connect first.';
 
   @override
   String get accountEmailLead =>
@@ -1474,7 +1470,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get iosBillingUnavailableBody =>
-      'In-app payment is not available on iPhone yet. Use an invite code if you have one, or unlock Premium on Android. Free locations still work.';
+      'In-app payment is not available. Free locations still work. Account is in Telegram after you connect.';
 
   @override
   String get vpnDisclosureTitle => 'Protected connection';

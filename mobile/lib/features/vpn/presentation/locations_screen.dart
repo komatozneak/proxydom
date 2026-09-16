@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/busy/busy_overlay.dart';
 import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
+import '../../account/application/ios_account_nav.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/location_flag_icon.dart';
 import '../../../core/widgets/teremok_snackbar.dart';
@@ -245,9 +246,13 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     }
   }
 
-  void _onLockedPremiumTap() {
-    // iOS: no Platega CTA — promo / server unlock only until StoreKit (PR7).
-    context.push(hideInAppPlategaCheckout ? '/promo' : '/subscription');
+  Future<void> _onLockedPremiumTap() async {
+    // iOS: Account / Telegram bind — not /promo. Android keeps Platega.
+    if (hideInAppPlategaCheckout) {
+      await openIosPremiumAccountPath(context, ref);
+      return;
+    }
+    context.push('/subscription');
   }
 
   /// Free/online egress + always keep Premium/locked rows in the pool (gray).

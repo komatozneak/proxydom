@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/ios_store_gates.dart';
 import '../../../core/router.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../l10n/app_localizations.dart';
@@ -15,7 +16,7 @@ import '../application/telegram_identity.dart';
 import '../data/account_profile.dart';
 import 'telegram_link_dialog.dart';
 
-/// Settings → Account hub (device ID identity; recovery code + promo).
+/// Settings → Account hub (Telegram first; promo tile Android-only).
 class AccountHubScreen extends ConsumerWidget {
   const AccountHubScreen({super.key});
 
@@ -178,27 +179,6 @@ class _HubBody extends ConsumerWidget {
         _SectionCard(
           children: [
             _NavTile(
-              icon: AppIcons.shield,
-              title: l.accountHubRecovery,
-              subtitle: l.accountHubRecoveryHint,
-              onTap: () => context.push('/settings/account/recovery'),
-            ),
-            const Divider(height: 1),
-            _NavTile(
-              icon: AppIcons.crown,
-              title: l.accountHubPromo,
-              subtitle: l.accountHubPromoHint,
-              onTap: () => context.push('/settings/account/promo'),
-            ),
-            const Divider(height: 1),
-            _NavTile(
-              icon: AppIcons.devices,
-              title: l.settingsDevices,
-              subtitle: '${profile.devicesCount} / ${profile.deviceLimit}',
-              onTap: () => context.push('/settings/devices'),
-            ),
-            const Divider(height: 1),
-            _NavTile(
               icon: AppIcons.siteTelegram,
               title: l.accountHubLinkTelegram,
               subtitle: profile.telegramUsername != null
@@ -227,6 +207,29 @@ class _HubBody extends ConsumerWidget {
                 await ref.read(accountProfileProvider.notifier).refresh();
               },
             ),
+            const Divider(height: 1),
+            _NavTile(
+              icon: AppIcons.shield,
+              title: l.accountHubRecovery,
+              subtitle: l.accountHubRecoveryHint,
+              onTap: () => context.push('/settings/account/recovery'),
+            ),
+            const Divider(height: 1),
+            _NavTile(
+              icon: AppIcons.devices,
+              title: l.settingsDevices,
+              subtitle: '${profile.devicesCount} / ${profile.deviceLimit}',
+              onTap: () => context.push('/settings/devices'),
+            ),
+            if (!hideInAppPlategaCheckout) ...[
+              const Divider(height: 1),
+              _NavTile(
+                icon: AppIcons.crown,
+                title: l.accountHubPromo,
+                subtitle: l.accountHubPromoHint,
+                onTap: () => context.push('/settings/account/promo'),
+              ),
+            ],
           ],
         ),
         const SizedBox(height: 20),

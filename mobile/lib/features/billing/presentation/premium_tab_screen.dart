@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../account/application/ios_account_nav.dart';
 import '../../settings/application/subscription_status_provider.dart';
 
 /// Огонь-style «Премиум» tab — no-ads / YouTube locations upsell.
@@ -48,11 +49,15 @@ class PremiumTabScreen extends ConsumerWidget {
             )
           else
             FilledButton(
-              onPressed: () => context.go(
-                hideInAppPlategaCheckout ? '/promo' : '/subscription',
-              ),
+              onPressed: () async {
+                if (hideInAppPlategaCheckout) {
+                  await openIosPremiumAccountPath(context, ref);
+                  return;
+                }
+                context.go('/subscription');
+              },
               child: Text(
-                hideInAppPlategaCheckout ? l.navPromo : l.premiumCta,
+                hideInAppPlategaCheckout ? l.accountHubTitle : l.premiumCta,
               ),
             ),
         ],

@@ -11,6 +11,7 @@ import '../../../core/support_contact.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../account/application/ios_account_nav.dart';
 import '../../billing/data/billing_api.dart';
 import '../../home/application/vpn_provider.dart';
 import '../../settings/application/devices_list_provider.dart';
@@ -242,8 +243,11 @@ class _LockedAccessScreenState extends ConsumerState<LockedAccessScreen> {
                                 style: buttonStyle,
                                 onPressed: busy
                                     ? null
-                                    : () => context.push('/promo'),
-                                child: Text(l.navPromo),
+                                    : () => openIosPremiumAccountPath(
+                                          context,
+                                          ref,
+                                        ),
+                                child: Text(l.accountHubTitle),
                               ),
                             ]
                             else ...[

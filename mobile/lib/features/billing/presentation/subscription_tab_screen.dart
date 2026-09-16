@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/ios_store_gates.dart';
 import '../../../core/utils/format_utils.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../account/application/ios_account_nav.dart';
 import '../../beta/presentation/promo_redeem_form.dart';
 import '../../home/application/vpn_provider.dart';
 import '../../home/presentation/widgets/free_quota_bar.dart';
@@ -95,8 +96,8 @@ class SubscriptionTabScreen extends ConsumerWidget {
                     const SizedBox(height: 12),
                     FilledButton.tonal(
                       style: buttonStyle,
-                      onPressed: () => context.push('/promo'),
-                      child: Text(l.navPromo),
+                      onPressed: () => openIosPremiumAccountPath(context, ref),
+                      child: Text(l.accountHubTitle),
                     ),
                   ] else
                     FilledButton(
@@ -109,7 +110,8 @@ class SubscriptionTabScreen extends ConsumerWidget {
               ),
             ),
           ),
-          SliverFillRemaining(
+          if (!hideInAppPlategaCheckout)
+            SliverFillRemaining(
             hasScrollBody: false,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 32, 20, 24),

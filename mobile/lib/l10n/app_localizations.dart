@@ -1714,7 +1714,7 @@ abstract class AppL10n {
   /// No description provided for @regionBlurbFree.
   ///
   /// In en, this message translates to:
-  /// **'Apps, AI, websites'**
+  /// **'Apps and websites'**
   String get regionBlurbFree;
 
   /// No description provided for @regionBlurbGaming.
@@ -1936,7 +1936,7 @@ abstract class AppL10n {
   /// No description provided for @promoBody.
   ///
   /// In en, this message translates to:
-  /// **'Access is by invite during the closed beta. You can retry without signing out.'**
+  /// **'If you have a code, enter it here.'**
   String get promoBody;
 
   /// No description provided for @promoCodeLabel.
@@ -2248,14 +2248,8 @@ abstract class AppL10n {
   /// No description provided for @recoveryCodeBody.
   ///
   /// In en, this message translates to:
-  /// **'Save this code — main way to restore after reinstall. Without it, contact support with Device ID and payment receipt.'**
+  /// **'Save this code — you’ll need it after reinstall. Without it you can restore via Telegram.'**
   String get recoveryCodeBody;
-
-  /// No description provided for @accountHubGuestLead.
-  ///
-  /// In en, this message translates to:
-  /// **'You’re in guest mode. Link a contact so you don’t lose access.'**
-  String get accountHubGuestLead;
 
   /// No description provided for @recoveryCodeCopy.
   ///
@@ -2296,7 +2290,7 @@ abstract class AppL10n {
   /// No description provided for @restoreBody.
   ///
   /// In en, this message translates to:
-  /// **'Enter the recovery code you saved at first unlock. Without it, contact support with Device ID and Platega receipt.'**
+  /// **'Enter the recovery code or open Telegram. Use the bot login code if you paid before this phone.'**
   String get restoreBody;
 
   /// No description provided for @restorePaymentLabel.
@@ -2404,7 +2398,7 @@ abstract class AppL10n {
   /// No description provided for @restoreBodyCode.
   ///
   /// In en, this message translates to:
-  /// **'After reinstall, enter the recovery code shown when you first opened the app.'**
+  /// **'After reinstall, enter the recovery code or open Telegram. Use the bot login code if you paid before this phone.'**
   String get restoreBodyCode;
 
   /// No description provided for @settingsInviteDevice.
@@ -2563,10 +2557,16 @@ abstract class AppL10n {
   /// **'Account'**
   String get accountHubTitle;
 
+  /// No description provided for @accountHubGuestLead.
+  ///
+  /// In en, this message translates to:
+  /// **'This account is on this device. Recovery code — after reinstall. Telegram — the same account.'**
+  String get accountHubGuestLead;
+
   /// No description provided for @accountHubLinkedLead.
   ///
   /// In en, this message translates to:
-  /// **'Contact linked. Account details and access are below.'**
+  /// **'Telegram is linked. Recovery code and the bot keep the same account.'**
   String get accountHubLinkedLead;
 
   /// No description provided for @accountHubLinkTelegram.
@@ -2578,7 +2578,7 @@ abstract class AppL10n {
   /// No description provided for @accountHubLinkTelegramHint.
   ///
   /// In en, this message translates to:
-  /// **'Link or restore via the bot'**
+  /// **'The same account in the bot'**
   String get accountHubLinkTelegramHint;
 
   /// No description provided for @accountHubLinkEmail.
@@ -2626,7 +2626,7 @@ abstract class AppL10n {
   /// No description provided for @accountHubPromoHint.
   ///
   /// In en, this message translates to:
-  /// **'Redeem invite or beta access code'**
+  /// **'Redeem a code'**
   String get accountHubPromoHint;
 
   /// No description provided for @accountHubAccessSection.
@@ -2680,7 +2680,7 @@ abstract class AppL10n {
   /// No description provided for @accountTelegramVpnRequired.
   ///
   /// In en, this message translates to:
-  /// **'Connect to Teremok first — Telegram needs the VPN in this region'**
+  /// **'Connect first.'**
   String get accountTelegramVpnRequired;
 
   /// No description provided for @restoreTelegramCta.
@@ -2692,7 +2692,7 @@ abstract class AppL10n {
   /// No description provided for @restoreTelegramVpnRequired.
   ///
   /// In en, this message translates to:
-  /// **'Connect to Teremok, then open Telegram'**
+  /// **'Connect first.'**
   String get restoreTelegramVpnRequired;
 
   /// No description provided for @homeTelegramRestoreCta.
@@ -2704,7 +2704,7 @@ abstract class AppL10n {
   /// No description provided for @homeTelegramRestoreConnectFirst.
   ///
   /// In en, this message translates to:
-  /// **'Connect to Teremok first, then restore via Telegram'**
+  /// **'Connect first.'**
   String get homeTelegramRestoreConnectFirst;
 
   /// No description provided for @accountEmailLead.
@@ -2782,7 +2782,7 @@ abstract class AppL10n {
   /// No description provided for @iosBillingUnavailableBody.
   ///
   /// In en, this message translates to:
-  /// **'In-app payment is not available on iPhone yet. Use an invite code if you have one, or unlock Premium on Android. Free locations still work.'**
+  /// **'In-app payment is not available. Free locations still work. Account is in Telegram after you connect.'**
   String get iosBillingUnavailableBody;
 
   /// No description provided for @vpnDisclosureTitle.

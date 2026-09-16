@@ -892,7 +892,7 @@ class AppL10nRu extends AppL10n {
   String get regionOnline => 'онлайн';
 
   @override
-  String get regionBlurbFree => 'Сервисы, нейросети, сайты';
+  String get regionBlurbFree => 'Сайты и сервисы';
 
   @override
   String get regionBlurbGaming => 'Низкий пинг';
@@ -1015,8 +1015,7 @@ class AppL10nRu extends AppL10n {
   String get promoHeadline => 'Введите персональный код';
 
   @override
-  String get promoBody =>
-      'Пока бета закрытая — доступ по приглашению. Можно повторить без выхода из аккаунта.';
+  String get promoBody => 'Если есть код — введите его здесь.';
 
   @override
   String get promoCodeLabel => 'Код';
@@ -1190,11 +1189,7 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get recoveryCodeBody =>
-      'Сохраните код — основной способ восстановления после переустановки. Без кода — ID устройства и чек в поддержке.';
-
-  @override
-  String get accountHubGuestLead =>
-      'Аккаунт привязан к ID устройства. Сохраните код восстановления — после переустановки понадобится он или чек об оплате в поддержке.';
+      'Сохраните код — понадобится после переустановки. Без кода можно восстановить через Telegram.';
 
   @override
   String get recoveryCodeCopy => 'Скопировать';
@@ -1216,7 +1211,7 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get restoreBody =>
-      'Введите код восстановления. Без кода — напишите в поддержку с ID устройства и чеком Platega.';
+      'Введите код восстановления или откройте Telegram. Код входа из бота — если оплатили до этого телефона.';
 
   @override
   String get restorePaymentLabel => 'Номер платежа';
@@ -1274,7 +1269,7 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get restoreBodyCode =>
-      'После переустановки введите код, сохранённый при первом доступе.';
+      'После переустановки введите код восстановления или откройте Telegram. Код входа из бота — если оплатили до этого телефона.';
 
   @override
   String get settingsInviteDevice => 'Добавить устройство в подписку';
@@ -1361,15 +1356,18 @@ class AppL10nRu extends AppL10n {
   String get accountHubTitle => 'Аккаунт';
 
   @override
+  String get accountHubGuestLead =>
+      'Аккаунт на этом устройстве. Код восстановления — после переустановки. Telegram — тот же аккаунт.';
+
+  @override
   String get accountHubLinkedLead =>
-      'Контакт привязан. Здесь — данные аккаунта и доступ.';
+      'Telegram привязан. Код восстановления и бот — тот же аккаунт.';
 
   @override
   String get accountHubLinkTelegram => 'Telegram';
 
   @override
-  String get accountHubLinkTelegramHint =>
-      'Привязать или восстановить через бота';
+  String get accountHubLinkTelegramHint => 'Тот же аккаунт в боте';
 
   @override
   String get accountHubLinkEmail => 'Почта';
@@ -1395,8 +1393,7 @@ class AppL10nRu extends AppL10n {
   String get accountHubPromo => 'Промокод';
 
   @override
-  String get accountHubPromoHint =>
-      'Активировать код приглашения или бета-доступ';
+  String get accountHubPromoHint => 'Активировать код';
 
   @override
   String get accountHubAccessSection => 'Ваш доступ';
@@ -1426,23 +1423,20 @@ class AppL10nRu extends AppL10n {
       'Не удалось начать привязку Telegram';
 
   @override
-  String get accountTelegramVpnRequired =>
-      'Сначала подключитесь к сети Теремка — Telegram в РФ без VPN недоступен';
+  String get accountTelegramVpnRequired => 'Сначала подключитесь.';
 
   @override
   String get restoreTelegramCta => 'Восстановить через Telegram';
 
   @override
-  String get restoreTelegramVpnRequired =>
-      'Подключитесь к Теремку, затем откройте Telegram';
+  String get restoreTelegramVpnRequired => 'Сначала подключитесь.';
 
   @override
   String get homeTelegramRestoreCta =>
       'Уже был Теремок? Восстановите через Telegram';
 
   @override
-  String get homeTelegramRestoreConnectFirst =>
-      'Подключитесь к сети Теремка, затем восстановите доступ через Telegram';
+  String get homeTelegramRestoreConnectFirst => 'Сначала подключитесь.';
 
   @override
   String get accountEmailLead => 'Укажите почту — пришлём одноразовый код.';
@@ -1482,7 +1476,7 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get iosBillingUnavailableBody =>
-      'Оплата внутри приложения на iPhone пока недоступна. Если есть код доступа — введите его. Premium можно открыть на Android. Бесплатные локации работают.';
+      'Оплата в приложении недоступна. Бесплатные локации работают. Аккаунт — в Telegram после подключения.';
 
   @override
   String get vpnDisclosureTitle => 'Защищённое соединение';
