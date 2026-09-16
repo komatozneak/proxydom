@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,6 +19,13 @@ import '../application/beta_providers.dart';
 import '../application/post_auth_router.dart';
 import '../data/jwt_subject.dart';
 
+/// How long a single entitlement call may hang on /gate (dead Packet Tunnel).
+@visibleForTesting
+const Duration kGateEntitlementTimeout = Duration(seconds: 8);
+
+const kGateRetryKey = ValueKey<String>('gate_retry');
+const kGateDisconnectVpnKey = ValueKey<String>('gate_disconnect_vpn');
+
 /// Resolves entitlement → promo / onboarding / home after auth.
 ///
 /// Network / Dio failures MUST NOT soft-pass into the shell. Closed-beta gates
@@ -24,6 +33,9 @@ import '../data/jwt_subject.dart';
 ///
 /// When another VPN / Always-on blocks the network, show conflict UX with a
 /// deep-link to Android VPN settings (same path as Home Nest Connect).
+///
+/// Own leftover tunnel (common on iOS cold start) is stopped after a failed
+/// entitlement so Retry can reach the API over cellular/Wi‑Fi.
 class PostAuthGateScreen extends ConsumerStatefulWidget {
   const PostAuthGateScreen({super.key});
 
@@ -33,7 +45,7 @@ class PostAuthGateScreen extends ConsumerStatefulWidget {
 
 class _PostAuthGateScreenState extends ConsumerState<PostAuthGateScreen> {
   /// Non-null when entitlement failed for a non-conflict reason.
-  String? _error;
+  String? _errorKind;
 
   /// True when [queryVpnConflict] reports a blocking foreign Always-on / lockdown.
   bool _vpnConflict = false;
@@ -41,118 +53,232 @@ class _PostAuthGateScreenState extends ConsumerState<PostAuthGateScreen> {
   /// Optional label of the conflicting app (may be empty on Android 12+).
   String? _conflictAppLabel;
 
+  /// Own Packet Tunnel / VpnService still up — offer disconnect CTA.
+  bool _ownVpnActive = false;
+
+  bool _resolving = false;
+  bool _did401Recover = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _resolve());
   }
 
-  Future<void> _resolve() async {
-    final auth = ref.read(authProvider).valueOrNull;
-    if (auth is! AuthStateAuthenticated) {
-      if (!mounted) return;
-      if (AppConfig.authAnonymous) {
-        context.go('/bootstrap-failed');
-      } else {
-        context.go('/login');
+  Future<void> _resolve({bool stopOwnVpnFirst = false}) async {
+    if (_resolving) return;
+    _resolving = true;
+    try {
+      if (mounted) {
+        setState(() {
+          _errorKind = null;
+          _vpnConflict = false;
+          _conflictAppLabel = null;
+        });
       }
-      return;
-    }
-    final userId = jwtSubject(auth.accessToken) ?? 'unknown';
-    Object? lastError;
-    // Activity recreate / VPN flap can abort the first entitlement call
-    // (see Pixel log: Impeller restart mid-gate → betaGateError).
-    for (var attempt = 0; attempt < 3; attempt++) {
-      try {
-        final entitlement = await ref.read(betaApiProvider).fetchEntitlement();
-        final dest = await PostAuthRouter.resolveWithPrefs(
-          entitlement: entitlement,
-          userId: userId,
-        );
+
+      final auth = ref.read(authProvider).valueOrNull;
+      if (auth is! AuthStateAuthenticated) {
         if (!mounted) return;
-        switch (dest) {
-          case PostAuthDestination.promo:
-            AppRouter.postAuthResolved = false;
-            context.go('/promo');
-          case PostAuthDestination.locked:
-            AppRouter.postAuthResolved = false;
-            context.go('/locked');
-          case PostAuthDestination.onboarding:
-            await AppRouter.goAfterEntitlement(context, '/onboarding');
-          case PostAuthDestination.home:
-            await AppRouter.goAfterEntitlement(context, '/home');
+        if (AppConfig.authAnonymous) {
+          context.go('/bootstrap-failed');
+        } else {
+          context.go('/login');
         }
         return;
-      } on DioException catch (e) {
-        lastError = e;
-        if (e.response?.statusCode == 401) {
+      }
+
+      if (stopOwnVpnFirst) {
+        await _stopOwnTunnelQuietly();
+      }
+
+      final userId = jwtSubject(auth.accessToken) ?? 'unknown';
+      Object? lastError;
+      // Short attempts: dead Hy2 tunnel used to hang 30s/60s × 3.
+      for (var attempt = 0; attempt < 2; attempt++) {
+        try {
+          final entitlement = await ref
+              .read(betaApiProvider)
+              .fetchEntitlement()
+              .timeout(
+                kGateEntitlementTimeout,
+                onTimeout: () => throw DioException(
+                  requestOptions: RequestOptions(path: '/beta/entitlement'),
+                  type: DioExceptionType.connectionTimeout,
+                  message: 'gate entitlement timeout',
+                ),
+              );
+          final dest = await PostAuthRouter.resolveWithPrefs(
+            entitlement: entitlement,
+            userId: userId,
+          );
           if (!mounted) return;
-          AppRouter.postAuthResolved = false;
-          if (AppConfig.authAnonymous) {
-            await ref.read(authProvider.notifier).retryBootstrap();
-            if (mounted) context.go('/gate');
-          } else {
-            await ref.read(logoutHandlerProvider).logout();
-            if (mounted) context.go('/login');
+          _did401Recover = false;
+          switch (dest) {
+            case PostAuthDestination.promo:
+              AppRouter.postAuthResolved = false;
+              context.go('/promo');
+            case PostAuthDestination.locked:
+              AppRouter.postAuthResolved = false;
+              context.go('/locked');
+            case PostAuthDestination.onboarding:
+              await AppRouter.goAfterEntitlement(context, '/onboarding');
+            case PostAuthDestination.home:
+              await AppRouter.goAfterEntitlement(context, '/home');
           }
           return;
+        } on DioException catch (e) {
+          lastError = e;
+          if (e.response?.statusCode == 401) {
+            if (!mounted) return;
+            AppRouter.postAuthResolved = false;
+            if (AppConfig.authAnonymous) {
+              if (!_did401Recover) {
+                _did401Recover = true;
+                await ref.read(authProvider.notifier).retryBootstrap();
+                // Re-enter resolve on the same /gate route (go('/gate') is a no-op).
+                _resolving = false;
+                await _resolve(stopOwnVpnFirst: stopOwnVpnFirst);
+                return;
+              }
+              break;
+            }
+            await ref.read(logoutHandlerProvider).logout();
+            if (mounted) context.go('/login');
+            return;
+          }
+          final transient = e.type == DioExceptionType.connectionError ||
+              e.type == DioExceptionType.connectionTimeout ||
+              e.type == DioExceptionType.receiveTimeout ||
+              e.type == DioExceptionType.sendTimeout;
+          if (transient && attempt < 1) {
+            await Future<void>.delayed(Duration(milliseconds: 300 * (attempt + 1)));
+            continue;
+          }
+          break;
+        } catch (e) {
+          lastError = e;
+          break;
         }
-        final transient = e.type == DioExceptionType.connectionError ||
-            e.type == DioExceptionType.connectionTimeout ||
-            e.type == DioExceptionType.receiveTimeout ||
-            e.type == DioExceptionType.sendTimeout;
-        if (transient && attempt < 2) {
-          await Future<void>.delayed(Duration(milliseconds: 400 * (attempt + 1)));
-          continue;
-        }
-        break;
-      } catch (e) {
-        lastError = e;
-        break;
       }
-    }
-    if (!mounted) return;
-    AppRouter.postAuthResolved = false;
 
-    final conflict = await VpnController.instance.queryVpnConflict();
-    if (!mounted) return;
-    if (conflict.foreignAlwaysOn) {
-      final label = conflict.appLabel?.trim();
+      if (!mounted) return;
+      AppRouter.postAuthResolved = false;
+
+      final ownVpn = await _isOwnVpnActive();
+      // One automatic stop+retry when leftover tunnel likely ate the API path.
+      if (ownVpn && !stopOwnVpnFirst) {
+        await _stopOwnTunnelQuietly();
+        _resolving = false;
+        await _resolve(stopOwnVpnFirst: true);
+        return;
+      }
+
+      final conflict = await VpnController.instance.queryVpnConflict();
+      if (!mounted) return;
+      if (conflict.foreignAlwaysOn) {
+        final label = conflict.appLabel?.trim();
+        setState(() {
+          _vpnConflict = true;
+          _conflictAppLabel =
+              (label != null && label.isNotEmpty) ? label : null;
+          _ownVpnActive = ownVpn;
+          _errorKind = 'vpn_conflict';
+        });
+        return;
+      }
+
       setState(() {
-        _vpnConflict = true;
-        _conflictAppLabel =
-            (label != null && label.isNotEmpty) ? label : null;
-        _error = lastError?.toString() ?? 'vpn_conflict';
+        _vpnConflict = false;
+        _conflictAppLabel = null;
+        _ownVpnActive = ownVpn;
+        _errorKind = _classifyError(lastError);
       });
-      return;
+    } finally {
+      _resolving = false;
     }
-
-    setState(() {
-      _vpnConflict = false;
-      _conflictAppLabel = null;
-      _error = lastError?.toString() ?? 'unknown';
-    });
   }
 
-  void _retry() {
+  Future<bool> _isOwnVpnActive() async {
+    try {
+      if (await VpnController.instance.hasActiveSession()) return true;
+      final status = await VpnController.instance.getStatus();
+      return status == VpnNativeStatus.connected ||
+          status == VpnNativeStatus.connecting;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _stopOwnTunnelQuietly() async {
+    try {
+      await VpnController.instance.stop();
+    } catch (_) {
+      // Missing plugin / already idle — still try entitlement over LTE.
+    }
+  }
+
+  static String _classifyError(Object? error) {
+    if (error is DioException) {
+      if (error.response?.statusCode == 401) return 'unauthorized';
+      if (error.type == DioExceptionType.connectionTimeout ||
+          error.type == DioExceptionType.receiveTimeout ||
+          error.type == DioExceptionType.sendTimeout ||
+          (error.message?.contains('timeout') ?? false)) {
+        return 'timeout';
+      }
+      if (error.type == DioExceptionType.connectionError) return 'network';
+    }
+    if (error is TimeoutException) return 'timeout';
+    return 'unknown';
+  }
+
+  String _errorMessage(AppL10n l) {
+    switch (_errorKind) {
+      case 'timeout':
+        return l.betaGateErrorTimeout;
+      case 'unauthorized':
+        return l.betaGateErrorUnauthorized;
+      case 'network':
+        return l.networkErrorFriendly;
+      default:
+        return l.betaGateError;
+    }
+  }
+
+  void _retry({required bool stopVpn}) {
+    if (_resolving) return;
+    _did401Recover = false;
     setState(() {
-      _error = null;
+      _errorKind = null;
       _vpnConflict = false;
       _conflictAppLabel = null;
+      _ownVpnActive = false;
     });
-    _resolve();
+    _resolve(stopOwnVpnFirst: stopVpn);
   }
 
   @override
   Widget build(BuildContext context) {
     final l = AppL10n.of(context);
     final theme = Theme.of(context);
-    final loading = _error == null && !_vpnConflict;
+    final loading = _errorKind == null && !_vpnConflict;
 
     return Scaffold(
       body: Center(
         child: loading
-            ? const CircularProgressIndicator()
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 16),
+                  Text(
+                    l.betaGateChecking,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyLarge,
+                  ),
+                ],
+              )
             : Padding(
                 padding: const EdgeInsets.all(24),
                 child: Column(
@@ -178,32 +304,48 @@ class _PostAuthGateScreenState extends ConsumerState<PostAuthGateScreen> {
                       ),
                       const SizedBox(height: 16),
                       FilledButton.tonal(
-                        onPressed: () async {
-                          final opened =
-                              await VpnController.instance.openVpnSettings();
-                          if (!context.mounted) return;
-                          if (!opened) {
-                            showTeremokSnackBar(
-                              context,
-                              l.settingsKillSwitchOpenFailed,
-                            );
-                          }
-                        },
+                        onPressed: _resolving
+                            ? null
+                            : () async {
+                                final opened = await VpnController.instance
+                                    .openVpnSettings();
+                                if (!context.mounted) return;
+                                if (!opened) {
+                                  showTeremokSnackBar(
+                                    context,
+                                    l.settingsKillSwitchOpenFailed,
+                                  );
+                                }
+                              },
                         child: Text(l.settingsKillSwitchOpenVpn),
                       ),
                       const SizedBox(height: 12),
                     ] else ...[
                       Text(
-                        l.betaGateError,
+                        _errorMessage(l),
                         textAlign: TextAlign.center,
                         style: theme.textTheme.bodyLarge,
                       ),
                       const SizedBox(height: 16),
                     ],
                     FilledButton(
-                      onPressed: _retry,
+                      key: kGateRetryKey,
+                      onPressed:
+                          _resolving ? null : () => _retry(stopVpn: false),
                       child: Text(l.homeRetry),
                     ),
+                    if (_ownVpnActive ||
+                        _errorKind == 'timeout' ||
+                        _errorKind == 'network') ...[
+                      const SizedBox(height: 12),
+                      FilledButton.tonal(
+                        key: kGateDisconnectVpnKey,
+                        onPressed: _resolving
+                            ? null
+                            : () => _retry(stopVpn: true),
+                        child: Text(l.betaGateDisconnectVpnRetry),
+                      ),
+                    ],
                   ],
                 ),
               ),

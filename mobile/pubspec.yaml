@@ -1,7 +1,7 @@
 name: teremok_connect
 description: Teremok Connect VPN client
 publish_to: 'none'
-version: 0.1.15+2032
+version: 0.1.15+2033
 
 environment:
   sdk: ^3.5.0

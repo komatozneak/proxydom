@@ -1091,6 +1091,19 @@ class AppL10nEn extends AppL10n {
   String get betaGateError => 'Couldn’t check access. Check your connection.';
 
   @override
+  String get betaGateChecking => 'Checking access…';
+
+  @override
+  String get betaGateErrorTimeout =>
+      'The server did not respond. If VPN is on, turn it off and retry.';
+
+  @override
+  String get betaGateErrorUnauthorized => 'Session expired. Try again.';
+
+  @override
+  String get betaGateDisconnectVpnRetry => 'Disconnect VPN and retry';
+
+  @override
   String get betaGateContinueAnyway => 'Continue anyway';
 
   @override

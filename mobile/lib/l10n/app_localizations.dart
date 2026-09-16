@@ -2077,6 +2077,30 @@ abstract class AppL10n {
   /// **'Couldn’t check access. Check your connection.'**
   String get betaGateError;
 
+  /// No description provided for @betaGateChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking access…'**
+  String get betaGateChecking;
+
+  /// No description provided for @betaGateErrorTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'The server did not respond. If VPN is on, turn it off and retry.'**
+  String get betaGateErrorTimeout;
+
+  /// No description provided for @betaGateErrorUnauthorized.
+  ///
+  /// In en, this message translates to:
+  /// **'Session expired. Try again.'**
+  String get betaGateErrorUnauthorized;
+
+  /// No description provided for @betaGateDisconnectVpnRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnect VPN and retry'**
+  String get betaGateDisconnectVpnRetry;
+
   /// No description provided for @betaGateContinueAnyway.
   ///
   /// In en, this message translates to:

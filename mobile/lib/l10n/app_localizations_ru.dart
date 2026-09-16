@@ -1094,6 +1094,19 @@ class AppL10nRu extends AppL10n {
   String get betaGateError => 'Не удалось проверить доступ. Проверьте связь.';
 
   @override
+  String get betaGateChecking => 'Проверяем доступ…';
+
+  @override
+  String get betaGateErrorTimeout =>
+      'Сервер не ответил. Если VPN включён — отключите его и повторите.';
+
+  @override
+  String get betaGateErrorUnauthorized => 'Сессия устарела. Повторите вход.';
+
+  @override
+  String get betaGateDisconnectVpnRetry => 'Отключить VPN и повторить';
+
+  @override
   String get betaGateContinueAnyway => 'Продолжить всё равно';
 
   @override
