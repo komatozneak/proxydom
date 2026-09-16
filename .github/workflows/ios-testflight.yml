@@ -120,6 +120,43 @@ jobs:
         working-directory: mobile
         run: python3 ios/ci/apply_signing.py
 
+      - name: Inject team into Flutter xcconfigs
+        working-directory: mobile
+        run: |
+          # Flutter skips Development-cert lookup only when DEVELOPMENT_TEAM
+          # is already visible in xcodebuild build settings (code_signing.dart).
+          for f in ios/Flutter/Debug.xcconfig ios/Flutter/Release.xcconfig; do
+            {
+              echo ""
+              echo "// CI Manual signing (ios-testflight.yml)"
+              echo "DEVELOPMENT_TEAM=${APPLE_TEAM_ID}"
+              echo "CODE_SIGN_STYLE=Manual"
+              echo "CODE_SIGN_IDENTITY=Apple Distribution"
+            } >> "$f"
+            echo "--- $f ---"
+            cat "$f"
+          done
+
+      - name: Allow Apple Distribution in flutter_tools
+        # Flutter 3.35 regex only matches Develop(ment|er); skips Distribution.
+        # https://github.com/flutter/flutter/issues/176636
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          path = Path(os.environ["FLUTTER_ROOT"]) / "packages/flutter_tools/lib/src/ios/code_signing.dart"
+          text = path.read_text()
+          old = r'^\s*\d+\).+"(.+Develop(ment|er).+)"$'
+          new = r'^\s*\d+\).+"(.+)"$'
+          if old not in text:
+              raise SystemExit(f"regex not found in {path}")
+          path.write_text(text.replace(old, new, 1))
+          print(f"patched identity regex in {path}")
+          PY
+          # Snapshot tools so the patch is picked up (no stale kernel).
+          rm -f "$FLUTTER_ROOT/bin/cache/flutter_tools.stamp" \
+                "$FLUTTER_ROOT/bin/cache/flutter_tools.snapshot" || true
+
       - name: Write ExportOptions.plist
         working-directory: mobile
         run: |
@@ -136,18 +173,7 @@ jobs:
 
       - name: Build IPA
         working-directory: mobile
-        env:
-          # Prefer Distribution over Flutter's default Development lookup.
-          FLUTTER_XCODE_CODE_SIGN_STYLE: Manual
-        run: |
-          flutter build ipa --release \
-            --export-options-plist=ios/ExportOptions.plist \
-            -- \
-            CODE_SIGN_STYLE=Manual \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
-            "CODE_SIGN_IDENTITY[sdk=iphoneos*]=Apple Distribution" \
-            DEVELOPMENT_TEAM="${APPLE_TEAM_ID}"
-
+        run: flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
