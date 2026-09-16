@@ -35,15 +35,16 @@ final class Hy2TunnelEngine: NSObject {
         completion(error)
         return
       }
-      Hy2bind.setPacketWriter(self)
-      let startErr = Hy2bind.start(cfg.goJSON)
+      // gomobile iOS: Hy2bindStart, not Java Hy2bind.start().
+      Hy2bindSetPacketWriter(self)
+      let startErr = Hy2bindStart(cfg.goJSON) ?? ""
       if !startErr.isEmpty {
         completion(Self.err(4, startErr))
         return
       }
-      let tunErr = Hy2bind.startPacketTun(self.mtu)
+      let tunErr = Hy2bindStartPacketTun(self.mtu) ?? ""
       if !tunErr.isEmpty {
-        Hy2bind.stop()
+        Hy2bindStop()
         completion(Self.err(5, tunErr))
         return
       }
@@ -65,8 +66,8 @@ final class Hy2TunnelEngine: NSObject {
   func stop() {
     pumping = false
     #if canImport(Hy2bind)
-    Hy2bind.setPacketWriter(nil)
-    Hy2bind.stop()
+    Hy2bindSetPacketWriter(nil)
+    Hy2bindStop()
     #endif
     provider = nil
   }
@@ -77,7 +78,7 @@ final class Hy2TunnelEngine: NSObject {
       guard let self, self.pumping else { return }
       #if canImport(Hy2bind)
       for packet in packets where !packet.isEmpty {
-        let injectErr = Hy2bind.injectPacket(packet)
+        let injectErr = Hy2bindInjectPacket(packet) ?? ""
         if !injectErr.isEmpty {
           NSLog("[Teremok] injectPacket: %@", injectErr)
         }
@@ -111,7 +112,8 @@ final class Hy2TunnelEngine: NSObject {
 }
 
 #if canImport(Hy2bind)
-extension Hy2TunnelEngine: Hy2bindPacketWriter {
+// Class Hy2bindPacketWriter exists; Swift imports the ObjC protocol as *Protocol.
+extension Hy2TunnelEngine: Hy2bindPacketWriterProtocol {
   func writePacket(_ packet: Data?) throws {
     guard let packet, !packet.isEmpty, let provider else { return }
     let proto: NSNumber
