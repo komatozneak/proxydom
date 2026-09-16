@@ -55,10 +55,14 @@ jobs:
             exit 1
           fi
 
+      # macos-15 default is 16.4 (iOS 18.5 SDK on the image). 16.3's iOS 18.4
+      # platform is often missing → xcodebuild archive dies in <1s:
+      # "Unable to find a destination matching generic/platform=iOS"
+      # https://github.com/actions/runner-images/issues/12758
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: "16.3"
+          xcode-version: "16.4"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -129,6 +133,13 @@ jobs:
       - name: Set up signing certificate
         run: keychain add-certificates
 
+      - name: Generate Flutter iOS project
+        working-directory: mobile
+        # --no-codesign skips Flutter 3.35's Development-cert lookup
+        # (Distribution-only CI). Pods + Generated.xcconfig still run.
+        # Must run before use-profiles so pod install does not reset signing.
+        run: flutter build ios --release --config-only --no-codesign
+
       - name: Set up code signing settings on Xcode project
         working-directory: mobile
         run: |
@@ -142,25 +153,30 @@ jobs:
           echo "=== codesigning identities ==="
           security find-identity -v -p codesigning
 
-      - name: Generate Flutter iOS project
-        working-directory: mobile
-        # --no-codesign skips Flutter 3.35's Development-cert lookup
-        # (Distribution-only CI). Pods + Generated.xcconfig still run.
-        run: flutter build ios --release --config-only --no-codesign
-
       - name: Build IPA
         working-directory: mobile
-        # Official Codemagic sample: workspace + scheme only.
-        # --config was forwarded as invalid xcodebuild -config (exit 64).
-        # Destination flag: https://docs.codemagic.io/troubleshooting/common-ios-issues/
+        # Official Codemagic App Store sample: workspace + scheme only.
+        # Do not pass --config (becomes invalid xcodebuild -config, exit 64).
+        # Do not pass adhoc --archive-flags destination (Codemagic docs: adhoc
+        # profiles only). App Store archive uses the scheme Archive action.
+        # --disable-xcpretty: xcpretty hides the real xcodebuild error.
         run: |
           xcode-project build-ipa \
             --workspace ios/Runner.xcworkspace \
             --scheme Runner \
             --no-show-build-settings \
+            --disable-xcpretty \
             --export-options-plist "$HOME/export_options.plist" \
-            --archive-flags="-destination generic/platform=iOS" \
             --archive-xcargs "COMPILER_INDEX_STORE_ENABLE=NO CODE_SIGN_STYLE=Manual"
+
+      - name: Upload xcodebuild logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-logs
+          path: /tmp/xcodebuild_logs/*.log
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
