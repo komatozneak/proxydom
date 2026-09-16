@@ -1,7 +1,7 @@
 name: teremok_connect
 description: Teremok Connect VPN client
 publish_to: 'none'
-version: 0.1.15+2028
+version: 0.1.15+2029
 
 environment:
   sdk: ^3.5.0
@@ -76,7 +76,8 @@ flutter:
 # Source: Living House mascot (s1-flat-launcher.png) — not oak/moss shield.
 flutter_launcher_icons:
   android: true
-  ios: false
+  ios: true
+  remove_alpha_ios: true
   image_path: assets/icon/fg_teremok.png
   adaptive_icon_background: "#FAF8F3"
   adaptive_icon_foreground: assets/icon/fg_teremok.png

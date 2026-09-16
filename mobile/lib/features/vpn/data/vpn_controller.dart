@@ -366,6 +366,10 @@ class VpnController {
       return result ?? false;
     } on PlatformException {
       return false;
+    } on MissingPluginException {
+      // iOS before channel parity / hot-restart: do not block Connect.
+      // System VPN consent still happens on startVPNTunnel.
+      return true;
     }
   }
 }

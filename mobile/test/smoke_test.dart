@@ -213,6 +213,13 @@ void main() {
       expect(log.last.method, 'requestPermission');
     });
 
+    test('requestPermission() при MissingPluginException возвращает true', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+      final granted = await VpnController.instance.requestPermission();
+      expect(granted, true);
+    });
+
     test(
       'start() вызывает MethodChannel с правильными аргументами',
       () async {
