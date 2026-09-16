@@ -89,11 +89,32 @@ jobs:
 
       - name: Install provisioning profiles
         run: |
-          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
-          echo "$APP_PROVISION_BASE64" | base64 --decode > /tmp/app.mobileprovision
-          echo "$TUNNEL_PROVISION_BASE64" | base64 --decode > /tmp/tunnel.mobileprovision
-          cp /tmp/app.mobileprovision "$HOME/Library/MobileDevice/Provisioning Profiles/"
-          cp /tmp/tunnel.mobileprovision "$HOME/Library/MobileDevice/Provisioning Profiles/"
+          # Xcode 16+: ~/Library/Developer/Xcode/UserData/Provisioning Profiles/<UUID>.mobileprovision
+          # Keep legacy MobileDevice path for older tooling.
+          legacy="$HOME/Library/MobileDevice/Provisioning Profiles"
+          modern="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
+          mkdir -p "$legacy" "$modern"
+          install_profile() {
+            local b64="$1"
+            local tmp="$2"
+            echo "$b64" | base64 --decode > "$tmp"
+            local uuid
+            uuid="$(security cms -D -i "$tmp" | plutil -extract UUID raw -)"
+            echo "Installed profile UUID=$uuid"
+            cp "$tmp" "$legacy/${uuid}.mobileprovision"
+            cp "$tmp" "$modern/${uuid}.mobileprovision"
+          }
+          install_profile "$APP_PROVISION_BASE64" /tmp/app.mobileprovision
+          install_profile "$TUNNEL_PROVISION_BASE64" /tmp/tunnel.mobileprovision
+
+      - name: Verify codesigning identity
+        run: |
+          security find-identity -v -p codesigning
+          count="$(security find-identity -v -p codesigning | grep -c 'Apple Distribution' || true)"
+          if [ "$count" -lt 1 ]; then
+            echo "No Apple Distribution identity in keychain — check BUILD_CERTIFICATE_BASE64 / P12_PASSWORD"
+            exit 1
+          fi
 
       - name: Apply Manual signing
         working-directory: mobile
@@ -115,7 +136,17 @@ jobs:
 
       - name: Build IPA
         working-directory: mobile
-        run: flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
+        env:
+          # Prefer Distribution over Flutter's default Development lookup.
+          FLUTTER_XCODE_CODE_SIGN_STYLE: Manual
+        run: |
+          flutter build ipa --release \
+            --export-options-plist=ios/ExportOptions.plist \
+            -- \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            "CODE_SIGN_IDENTITY[sdk=iphoneos*]=Apple Distribution" \
+            DEVELOPMENT_TEAM="${APPLE_TEAM_ID}"
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
