@@ -47,7 +47,7 @@ void main() {
 
   group('prefs defaults', () {
     test('live RF categories default ON; TikTok stays OFF', () async {
-      expect(kOsnovnyeCategories.length, 10);
+      expect(kOsnovnyeCategories.length, 11);
       expect(
         kRfDefaultOnOsnovnyeIds,
         {
@@ -60,9 +60,10 @@ void main() {
           'avito',
           'banks',
           'gosuslugi',
+          'max',
         },
       );
-      expect(await SplitTunnelPrefs.osnovnyeEnabledCount(), 9);
+      expect(await SplitTunnelPrefs.osnovnyeEnabledCount(), 10);
       final map = await SplitTunnelPrefs.loadOsnovnyeEnabled();
       expect(map['vk'], isTrue);
       expect(map['yandex'], isTrue);
@@ -73,6 +74,7 @@ void main() {
       expect(map['avito'], isTrue);
       expect(map['banks'], isTrue);
       expect(map['gosuslugi'], isTrue);
+      expect(map['max'], isTrue);
       expect(map['tiktok'], isFalse);
       final suffixes = await SplitTunnelPrefs.enabledDomainSuffixes();
       expect(
@@ -88,6 +90,8 @@ void main() {
           'avito.ru',
           'sberbank.ru',
           'gosuslugi.ru',
+          'max.ru',
+          'oneme.ru',
         ]),
       );
       expect(suffixes, isNot(contains('tiktok.com')));
@@ -158,13 +162,13 @@ void main() {
 
     test('osnovnye vk domains feed suffixes; youtube aliases stripped for Hy2',
         () async {
-      expect(kOsnovnyeCategories.length, 10);
-      expect(await SplitTunnelPrefs.osnovnyeEnabledCount(), 9);
+      expect(kOsnovnyeCategories.length, 11);
+      expect(await SplitTunnelPrefs.osnovnyeEnabledCount(), 10);
       await SplitTunnelPrefs.setOsnovnyeEnabled('vk', true);
       final suffixes = await SplitTunnelPrefs.enabledDomainSuffixes();
       expect(suffixes, contains('vk.com'));
       expect(suffixes, isNot(contains('tiktok.com')));
-      expect(await SplitTunnelPrefs.osnovnyeEnabledCount(), 9);
+      expect(await SplitTunnelPrefs.osnovnyeEnabledCount(), 10);
       await SplitTunnelPrefs.addSite(domain: 'youtube.com');
       final withYt = await SplitTunnelPrefs.enabledDomainSuffixes();
       expect(withYt, contains('youtube.com'));
@@ -185,14 +189,14 @@ void main() {
       );
       expect(suffixes, contains('steampowered.com'));
       expect(suffixes, isNot(contains('tiktok.com')));
-      expect(await SplitTunnelPrefs.osnovnyeEnabledCount(), 9);
+      expect(await SplitTunnelPrefs.osnovnyeEnabledCount(), 10);
 
       await SplitTunnelPrefs.setOsnovnyeEnabled('vk', false);
       expect(
         await SplitTunnelPrefs.enabledDomainSuffixes(),
         isNot(contains('vk.com')),
       );
-      expect(await SplitTunnelPrefs.osnovnyeEnabledCount(), 8);
+      expect(await SplitTunnelPrefs.osnovnyeEnabledCount(), 9);
     });
 
     test('disallowed apps prefs round-trip', () async {
@@ -271,6 +275,43 @@ void main() {
         'com.vkontakte.android',
       ]);
       expect(again, isFalse);
+    });
+
+    test('v3 seed adds MAX without restoring user-off v2 packages', () async {
+      SharedPreferences.setMockInitialValues({
+        'split_tunnel_seeded_bypass_v1': true,
+        'split_tunnel_seeded_bypass_v2': true,
+      });
+      expect(kDefaultBypassPackagesV3, contains('ru.oneme.app'));
+      final added = await SplitTunnelPrefs.seedDefaultBypassIfNeeded([
+        'com.vkontakte.android',
+        'ru.oneme.app',
+      ]);
+      expect(added, isTrue);
+      expect(await SplitTunnelPrefs.loadDisallowedPackages(), {'ru.oneme.app'});
+      final again = await SplitTunnelPrefs.seedDefaultBypassIfNeeded([
+        'ru.oneme.app',
+        'com.vkontakte.android',
+      ]);
+      expect(again, isFalse);
+    });
+  });
+
+  group('iOS exact resolution hosts', () {
+    test('RuTube/Avito/MAX expand iosResolutionHosts', () async {
+      final hosts =
+          await SplitTunnelPrefs.enabledIosCatalogResolutionHosts();
+      expect(hosts, contains('static.rutube.ru'));
+      expect(hosts, contains('api.avito.ru'));
+      expect(hosts, contains('ws-api.max.ru'));
+      expect(hosts, contains('www.rutube.ru'));
+    });
+
+    test('custom site keeps only the exact typed hostname', () async {
+      await SplitTunnelPrefs.addSite(domain: 'api.example.com');
+      final hosts = await SplitTunnelPrefs.enabledIosCustomResolutionHosts();
+      expect(hosts, ['api.example.com']);
+      expect(hosts, isNot(contains('www.api.example.com')));
     });
   });
 }

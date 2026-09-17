@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:teremok_connect/features/settings/data/split_tunnel_prefs.dart';
@@ -9,6 +11,15 @@ import 'package:teremok_connect/features/vpn/data/vpn_route_policy.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  tearDown(() {
+    debugDefaultTargetPlatformOverride = null;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      const MethodChannel('teremok/vpn'),
+      null,
+    );
+  });
 
   test('stripForceProxySuffixes drops YouTube/Google keeps VK', () {
     expect(
@@ -31,6 +42,7 @@ void main() {
   });
 
   test('buildStartParamsJson ships RF defaults and strips YouTube', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
     SharedPreferences.setMockInitialValues({});
     final defaultJson = await VpnController.instance.buildStartParamsJson(
       _hy2Config(),
@@ -60,6 +72,72 @@ void main() {
     expect(suffixes, isNot(contains('googlevideo.com')));
     expect(suffixes, isNot(contains('google.com')));
     expect(suffixes, isNot(contains('tiktok.com')));
+  });
+
+  test('Android params keep hyDialer suffixes and Apps bypass', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    SharedPreferences.setMockInitialValues({});
+    await SplitTunnelPrefs.setDisallowedPackage('ru.yandex.taxi', true);
+    final map = jsonDecode(
+      await VpnController.instance.buildStartParamsJson(_hy2Config()),
+    ) as Map<String, dynamic>;
+    expect(map, contains('directDomainSuffixes'));
+    expect(
+      List<String>.from(map['disallowedApplications'] as List<dynamic>),
+      contains('ru.yandex.taxi'),
+    );
+    expect(map, isNot(contains('iosCustomResolutionHosts')));
+    expect(map, isNot(contains('iosCatalogResolutionHosts')));
+  });
+
+  test('iOS auto params use exact host groups and no Android fields', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    SharedPreferences.setMockInitialValues({});
+    await SplitTunnelPrefs.addSite(domain: 'api.example.com');
+    await SplitTunnelPrefs.setDisallowedPackage('com.example.android', true);
+
+    final map = jsonDecode(
+      await VpnController.instance.buildStartParamsJson(_hy2Config()),
+    ) as Map<String, dynamic>;
+    expect(map, isNot(contains('directDomainSuffixes')));
+    expect(map, isNot(contains('disallowedApplications')));
+    expect(
+      List<String>.from(map['iosCustomResolutionHosts'] as List<dynamic>),
+      ['api.example.com'],
+    );
+    expect(
+      List<String>.from(map['iosCatalogResolutionHosts'] as List<dynamic>),
+      contains('static.rutube.ru'),
+    );
+  });
+
+  test('iOS manual params use the same exact-host contract', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    SharedPreferences.setMockInitialValues({});
+    await SplitTunnelPrefs.addSite(domain: 'exact.example.com');
+    String? captured;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      const MethodChannel('teremok/vpn'),
+      (call) async {
+        if (call.method == 'start') {
+          final args = Map<Object?, Object?>.from(call.arguments as Map);
+          captured = args['paramsJson'] as String?;
+        }
+        return true;
+      },
+    );
+
+    await VpnController.instance.startHysteria(
+      _hy2Config().hysteriaProfile!,
+    );
+    final map = jsonDecode(captured!) as Map<String, dynamic>;
+    expect(map, isNot(contains('directDomainSuffixes')));
+    expect(map, isNot(contains('disallowedApplications')));
+    expect(
+      List<String>.from(map['iosCustomResolutionHosts'] as List<dynamic>),
+      ['exact.example.com'],
+    );
   });
 }
 

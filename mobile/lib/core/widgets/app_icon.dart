@@ -104,4 +104,5 @@ abstract final class AppIcons {
   static const IconData osnovnyeYandex = PhosphorIconsRegular.magnifyingGlass;
   static const IconData osnovnyeOzon = PhosphorIconsRegular.package;
   static const IconData osnovnyeWb = PhosphorIconsRegular.shoppingBag;
+  static const IconData osnovnyeMax = PhosphorIconsRegular.chats;
 }

@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/busy/busy_overlay.dart';
+import '../../../core/ios_store_gates.dart';
 import '../../../core/utils/format_utils.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
@@ -16,9 +18,9 @@ import '../../../l10n/app_localizations.dart';
 import '../../session/application/session_provider.dart';
 import '../../session/data/account_session_snapshot.dart';
 import '../../settings/application/subscription_status_provider.dart';
-import '../../settings/data/subscription_status.dart';
 import '../../settings/data/installed_apps_channel.dart';
 import '../../settings/data/split_tunnel_prefs.dart';
+import '../../settings/data/subscription_status.dart';
 import '../../vpn/data/node_auto_selector.dart';
 import '../../vpn/data/node_display.dart';
 import '../../vpn/data/vpn_controller.dart';
@@ -115,22 +117,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     unawaited(_refreshEntitlement());
   }
 
+  /// Android: live Apps pin + default bypass seed. iOS has no per-app split.
   Future<void> _refreshNoVpnCounter() async {
-    final apps =
-        await InstalledAppsChannel.listLauncherApps(includeIcons: false);
-    await SplitTunnelPrefs.seedDefaultBypassIfNeeded(
-      apps.map((a) => a.packageName),
-    );
-    final disallowed = await SplitTunnelPrefs.loadDisallowedPackages();
-    final counter = noVpnAppsCounter(
-      launcherPackages: apps.map((a) => a.packageName),
-      disallowedPackages: disallowed,
-    );
-    if (!mounted) return;
-    setState(() {
-      _noVpnEnabled = counter.enabled;
-      _noVpnTotal = counter.total;
-    });
+    if (kIsWeb || iosAppsSplitUnsupported) return;
+    try {
+      final apps =
+          await InstalledAppsChannel.listLauncherApps(includeIcons: false);
+      await SplitTunnelPrefs.seedDefaultBypassIfNeeded(
+        apps.map((app) => app.packageName),
+      );
+      final disallowed = await SplitTunnelPrefs.loadDisallowedPackages();
+      final counter = noVpnAppsCounter(
+        launcherPackages: apps.map((app) => app.packageName),
+        disallowedPackages: disallowed,
+      );
+      if (!mounted) return;
+      setState(() {
+        _noVpnEnabled = counter.enabled;
+        _noVpnTotal = counter.total;
+      });
+    } catch (_) {
+      // Unsupported platform / missing plugin: leave pin at last known count.
+    }
   }
 
   Future<void>? _serverCardInFlight;
@@ -767,6 +775,7 @@ class _NoVpnHomeRow extends StatelessWidget {
     final theme = Theme.of(context);
     final elevated = theme.colorScheme.surfaceContainerHighest;
     final line = theme.colorScheme.outline;
+    final showAppsPin = !iosAppsSplitUnsupported;
 
     return Material(
       color: elevated,
@@ -793,14 +802,16 @@ class _NoVpnHomeRow extends StatelessWidget {
                     ),
                   ),
                 ),
-                Text(
-                  '$enabled / $total',
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: AppBrand.primary,
-                    fontWeight: FontWeight.w700,
+                if (showAppsPin) ...[
+                  Text(
+                    '$enabled / $total',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: AppBrand.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 4),
+                  const SizedBox(width: 4),
+                ],
                 AppIcon(
                   AppIcons.chevronRight,
                   size: 18,

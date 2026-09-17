@@ -84,4 +84,40 @@ class RunnerTests: XCTestCase {
     XCTAssertFalse(TunnelStopIntent.clearsSessionActive(.noNetworkAvailable))
     XCTAssertFalse(TunnelStopIntent.clearsSessionActive(.providerFailed))
   }
+
+  func testRoutePlannerPreservesBaseAndPrioritizesCustom() {
+    let plan = TunnelRoutePlanner.build(
+      baseIPv4: ["85.155.228.235"],
+      baseIPv6: [],
+      orderedHostResults: [
+        HostRouteAddresses(v4: ["10.0.0.1", "10.0.0.2"], v6: []),
+        HostRouteAddresses(v4: ["10.0.0.3", "10.0.0.4"], v6: []),
+      ],
+      requestedHosts: 2,
+      completedHosts: 2,
+      timedOut: false,
+      maxIPv4: 3,
+      maxIPv6: 2
+    )
+    XCTAssertEqual(plan.v4, ["85.155.228.235", "10.0.0.1", "10.0.0.2"])
+    XCTAssertEqual(plan.droppedIPv4, 2)
+    XCTAssertTrue(plan.capped)
+  }
+
+  func testResolutionCollectorRejectsLateResultsAfterTimeoutSnapshot() {
+    let collector = LockedHostResolutionResults()
+    collector.submit(
+      index: 0,
+      addresses: HostRouteAddresses(v4: ["10.0.0.1"], v6: [])
+    )
+    let first = collector.finish()
+    collector.submit(
+      index: 1,
+      addresses: HostRouteAddresses(v4: ["10.0.0.2"], v6: [])
+    )
+    let second = collector.finish()
+    XCTAssertEqual(first.completed, 1)
+    XCTAssertEqual(second.completed, 1)
+    XCTAssertNil(second.results[1])
+  }
 }

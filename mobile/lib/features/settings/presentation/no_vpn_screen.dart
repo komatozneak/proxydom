@@ -239,6 +239,7 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
                           sites: _filteredSites,
                           lang: lang,
                           iconsByPackage: const {},
+                          showIosNote: true,
                           onToggleOsnovnye: (id, v) async {
                             await SplitTunnelPrefs.setOsnovnyeEnabled(id, v);
                             await _afterMutation();
@@ -529,6 +530,7 @@ class _SitesTab extends StatelessWidget {
     required this.onToggleSite,
     required this.onDeleteSite,
     required this.onAddSite,
+    this.showIosNote = false,
   });
 
   final Map<String, bool> osnovnye;
@@ -542,6 +544,7 @@ class _SitesTab extends StatelessWidget {
   final Future<void> Function(SplitTunnelSite site, bool enabled) onToggleSite;
   final Future<void> Function(SplitTunnelSite site) onDeleteSite;
   final VoidCallback onAddSite;
+  final bool showIosNote;
 
   @override
   Widget build(BuildContext context) {
@@ -554,6 +557,22 @@ class _SitesTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
+        if (showIosNote) ...[
+          Text(
+            l.splitTunnelSitesLead,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            l.splitTunnelSitesIosNote,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
         InkWell(
           onTap: onExpandOsnovnye,
           child: Row(

@@ -145,7 +145,7 @@ class AppL10nEn extends AppL10n {
   String get settingsNoVpn => 'What works without VPN?';
 
   @override
-  String get settingsNoVpnHint => 'Choose apps and sites that skip the VPN';
+  String get settingsNoVpnHint => 'Sites that skip the VPN';
 
   @override
   String get modesTitle => 'Mode';
@@ -588,24 +588,32 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get splitTunnelBundledLead =>
-      'Built into the app — one tap to enable.';
+      'Listed sites use your usual connection, not the protected one. Everything else still goes through Teremok.';
 
   @override
-  String get splitTunnelBundledRuTitle => 'Direct access for Russia';
+  String get splitTunnelBundledRuTitle => 'Ready-made lists';
 
   @override
   String get splitTunnelBundledRuSubtitle =>
-      'Russian sites and services\n.ru, .su and .рф domains\nIP addresses in Russia';
+      'VK, Yandex, marketplaces, MAX, and more — one tap';
 
   @override
   String get splitTunnelBundledInfoTitle => 'How it works';
 
   @override
   String get splitTunnelBundledInfoBody =>
-      'This list ships inside Teremok and really changes routing.\n\nThe ready-made list includes:\n• Russian sites and services\n• all .ru, .su and .рф domains\n• IP addresses in Russia\n\nOn — this traffic bypasses the VPN.\nOff — all traffic uses the VPN.\n\nIf VPN is already connected, tap Reconnect after changing.';
+      'Listed sites use your usual connection, not the protected one. Everything else still goes through Teremok.\n\nOn iPhone you cannot take a whole app out of the VPN — only a website by address. Safari usually follows the list. A bank or marketplace app may stay in the VPN.\n\nBig services use many servers. Some pages or video may still go through the VPN with the switch on. If a site should stay protected, turn it off here.\n\nTap Reconnect after you change the list.';
 
   @override
   String get splitTunnelBundledInfoClose => 'Got it';
+
+  @override
+  String get splitTunnelSitesLead =>
+      'Listed sites use your usual connection, not the protected one. Everything else still goes through Teremok.';
+
+  @override
+  String get splitTunnelSitesIosNote =>
+      'On iPhone only exact hostnames leave the VPN (not all subdomains). Whole apps cannot leave the tunnel.';
 
   @override
   String get splitTunnelCustomSection => 'My sites';
@@ -644,7 +652,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get splitTunnelEmptyBody =>
-      'Add an address — it will open directly, without the VPN.';
+      'Add an exact hostname — only that address skips the VPN, not its subdomains.';
 
   @override
   String get splitTunnelInvalidDomain => 'Enter an address like example.com';

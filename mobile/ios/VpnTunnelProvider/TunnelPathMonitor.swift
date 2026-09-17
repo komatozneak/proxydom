@@ -107,3 +107,108 @@ enum TunnelStopIntent {
     }
   }
 }
+
+struct HostRouteAddresses: Equatable {
+  var v4: [String]
+  var v6: [String]
+}
+
+struct TunnelRoutePlan: Equatable {
+  var v4: [String]
+  var v6: [String]
+  var requestedHosts: Int
+  var completedHosts: Int
+  var resolvedHosts: Int
+  var droppedIPv4: Int
+  var droppedIPv6: Int
+  var timedOut: Bool
+
+  var capped: Bool {
+    droppedIPv4 > 0 || droppedIPv6 > 0
+  }
+}
+
+/// Thread-safe collector. `finish` closes the batch so late getaddrinfo results
+/// cannot mutate state after a timeout snapshot has been returned.
+final class LockedHostResolutionResults {
+  private let lock = NSLock()
+  private var accepting = true
+  private var results: [Int: HostRouteAddresses] = [:]
+  private var completed = 0
+
+  func submit(index: Int, addresses: HostRouteAddresses) {
+    lock.lock()
+    defer { lock.unlock() }
+    guard accepting else { return }
+    completed += 1
+    results[index] = addresses
+  }
+
+  func finish() -> (results: [Int: HostRouteAddresses], completed: Int) {
+    lock.lock()
+    defer { lock.unlock() }
+    accepting = false
+    return (results, completed)
+  }
+}
+
+enum TunnelRoutePlanner {
+  /// Base endpoint/control-plane routes are never dropped. Ordered host results
+  /// are custom first, catalog second, so route caps are deterministic.
+  static func build(
+    baseIPv4: [String],
+    baseIPv6: [String],
+    orderedHostResults: [HostRouteAddresses],
+    requestedHosts: Int,
+    completedHosts: Int,
+    timedOut: Bool,
+    maxIPv4: Int,
+    maxIPv6: Int
+  ) -> TunnelRoutePlan {
+    var v4 = orderedUnique(baseIPv4)
+    var v6 = orderedUnique(baseIPv6)
+    var seenV4 = Set(v4)
+    var seenV6 = Set(v6)
+    var resolvedHosts = 0
+    var droppedV4 = 0
+    var droppedV6 = 0
+
+    for addresses in orderedHostResults {
+      if !addresses.v4.isEmpty || !addresses.v6.isEmpty {
+        resolvedHosts += 1
+      }
+      for address in addresses.v4 where !seenV4.contains(address) {
+        seenV4.insert(address)
+        if v4.count < maxIPv4 {
+          v4.append(address)
+        } else {
+          droppedV4 += 1
+        }
+      }
+      for address in addresses.v6 where !seenV6.contains(address) {
+        seenV6.insert(address)
+        if v6.count < maxIPv6 {
+          v6.append(address)
+        } else {
+          droppedV6 += 1
+        }
+      }
+    }
+
+    return TunnelRoutePlan(
+      v4: v4,
+      v6: v6,
+      requestedHosts: requestedHosts,
+      completedHosts: completedHosts,
+      resolvedHosts: resolvedHosts,
+      droppedIPv4: droppedV4,
+      droppedIPv6: droppedV6,
+      timedOut: timedOut
+    )
+  }
+
+  static func orderedUnique(_ values: [String]) -> [String] {
+    var seen = Set<String>()
+    return values.filter { seen.insert($0).inserted }
+  }
+}

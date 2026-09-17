@@ -7,13 +7,14 @@ import NetworkExtension
 import Hy2bind
 #endif
 
-/// Hysteria2 engine inside the Packet Tunnel (ADR 019).
+/// Hysteria2 engine inside the Packet Tunnel (ADR 019 / ADR 025).
 ///
 /// Honest Connected = `setTunnelNetworkSettings` + Hy2 `Start` + packet tun
 /// + `packetFlow` pump. SOCKS-only is never Connected.
 ///
 /// Path changes: `NWPathMonitor` → debounced `Hy2bindResetNetwork` (keep TUN).
 /// Hy2 endpoint IP is always in excludedRoutes /32 (WireGuard-style).
+/// Sites use exact-host OS excludedRoutes; Go hyDialer direct is disabled.
 ///
 /// IPv6: claim `::/0` so Safari/YouTube cannot leak AAAA to LTE (RF TSPU).
 /// Hy2 nodes are IPv4-only — do **not** InjectPacket IPv6 into gVisor; reply
@@ -21,6 +22,8 @@ import Hy2bind
 final class Hy2TunnelEngine: NSObject {
   private weak var provider: NEPacketTunnelProvider?
   private var pumping = false
+  private let lifecycleLock = NSLock()
+  private var lifecycleToken: UInt64 = 0
   private let mtu = 1280
   /// IPv6 packets claimed then dropped (not forwarded to Hy2).
   private var ipv6DropCount: UInt64 = 0
@@ -48,6 +51,11 @@ final class Hy2TunnelEngine: NSObject {
     completion: @escaping (Error?) -> Void
   ) {
     self.provider = provider
+    lifecycleLock.lock()
+    lifecycleToken &+= 1
+    let startToken = lifecycleToken
+    pumping = false
+    lifecycleLock.unlock()
     healthLock.lock()
     ipv6DropCount = 0
     lastIpv6DropLogged = 0
@@ -71,49 +79,35 @@ final class Hy2TunnelEngine: NSObject {
       completion(Self.err(3, "Hy2 endpoint must be IP literal for excludedRoutes"))
       return
     }
-    let excludesV4 = TunnelRouteMerge.ipv4Excludes(
+    let baseIPv4 = TunnelRouteMerge.ipv4Excludes(
       endpointHost: cfg.remoteHost,
       controlPlaneHosts: cfg.controlPlaneHosts
     )
-    let excludesV6 = TunnelRouteMerge.ipv6Excludes(
+    let baseIPv6 = TunnelRouteMerge.ipv6Excludes(
       endpointHost: cfg.remoteHost,
       controlPlaneHosts: cfg.controlPlaneHosts
     )
-    let settings = Self.networkSettings(
-      remoteHost: cfg.remoteHost,
-      mtu: mtu,
-      excludedIPv4: excludesV4,
-      excludedIPv6: excludesV6
-    )
-    if !excludesV4.isEmpty || !excludesV6.isEmpty {
-      TeremokVpnShared.appendNativeLog(
-        "PacketTunnel.exclude endpoint_api v4=\(excludesV4.count) v6=\(excludesV6.count)"
-      )
-    }
-    TeremokVpnShared.appendNativeLog("PacketTunnel.v6 claim=default")
-    provider.setTunnelNetworkSettings(settings) { [weak self] error in
+    DispatchQueue.global(qos: .userInitiated).async { [weak self] in
       guard let self else { return }
-      if let error {
-        completion(error)
-        return
+      let plan = Self.resolveExactRoutes(
+        customHosts: cfg.iosCustomResolutionHosts,
+        catalogHosts: cfg.iosCatalogResolutionHosts,
+        baseIPv4: baseIPv4,
+        baseIPv6: baseIPv6
+      )
+      DispatchQueue.main.async {
+        guard self.isCurrentStart(startToken) else {
+          completion(Self.err(6, "Hy2 start cancelled"))
+          return
+        }
+        self.applyTunnel(
+          provider: provider,
+          cfg: cfg,
+          routePlan: plan,
+          startToken: startToken,
+          completion: completion
+        )
       }
-      Hy2bindSetPacketWriter(self)
-      let startErr = Hy2bindStart(cfg.goJSON) ?? ""
-      if !startErr.isEmpty {
-        completion(Self.err(4, startErr))
-        return
-      }
-      let tunErr = Hy2bindStartPacketTun(self.mtu) ?? ""
-      if !tunErr.isEmpty {
-        Hy2bindStop()
-        completion(Self.err(5, tunErr))
-        return
-      }
-      self.pumping = true
-      self.startPathMonitor()
-      self.pumpInbound()
-      self.persistHealth(force: true)
-      completion(nil)
     }
     #else
     _ = paramsJson
@@ -126,8 +120,73 @@ final class Hy2TunnelEngine: NSObject {
     #endif
   }
 
+  #if canImport(Hy2bind)
+  private func applyTunnel(
+    provider: NEPacketTunnelProvider,
+    cfg: Hy2StartConfig,
+    routePlan: TunnelRoutePlan,
+    startToken: UInt64,
+    completion: @escaping (Error?) -> Void
+  ) {
+    let settings = Self.networkSettings(
+      remoteHost: cfg.remoteHost,
+      mtu: mtu,
+      excludedIPv4: routePlan.v4,
+      excludedIPv6: routePlan.v6
+    )
+    TeremokVpnShared.appendNativeLog(
+      "PacketTunnel.exclude requested=\(routePlan.requestedHosts) "
+        + "completed=\(routePlan.completedHosts) resolved=\(routePlan.resolvedHosts) "
+        + "v4=\(routePlan.v4.count) v6=\(routePlan.v6.count) "
+        + "dropped_v4=\(routePlan.droppedIPv4) dropped_v6=\(routePlan.droppedIPv6) "
+        + "capped=\(routePlan.capped) timeout=\(routePlan.timedOut)"
+    )
+    TeremokVpnShared.appendNativeLog("PacketTunnel.v6 claim=default")
+    provider.setTunnelNetworkSettings(settings) { [weak self] error in
+      guard let self else { return }
+      if let error {
+        completion(error)
+        return
+      }
+      self.lifecycleLock.lock()
+      guard startToken == self.lifecycleToken else {
+        self.lifecycleLock.unlock()
+        completion(Self.err(6, "Hy2 start cancelled"))
+        return
+      }
+      Hy2bindSetPacketWriter(self)
+      let startErr = Hy2bindStart(cfg.goJSON) ?? ""
+      if !startErr.isEmpty {
+        self.lifecycleLock.unlock()
+        completion(Self.err(4, startErr))
+        return
+      }
+      let tunErr = Hy2bindStartPacketTun(self.mtu) ?? ""
+      if !tunErr.isEmpty {
+        Hy2bindStop()
+        self.lifecycleLock.unlock()
+        completion(Self.err(5, tunErr))
+        return
+      }
+      self.pumping = true
+      self.startPathMonitor()
+      self.pumpInbound()
+      self.lifecycleLock.unlock()
+      self.persistHealth(force: true)
+      completion(nil)
+    }
+  }
+  #endif
+
   func stop() {
+    lifecycleLock.lock()
+    lifecycleToken &+= 1
     pumping = false
+    #if canImport(Hy2bind)
+    Hy2bindSetPacketWriter(nil)
+    Hy2bindStop()
+    #endif
+    lifecycleLock.unlock()
     stopPathMonitor()
     healthLock.lock()
     let droppedV6 = ipv6DropCount
@@ -136,11 +195,13 @@ final class Hy2TunnelEngine: NSObject {
       TeremokVpnShared.appendNativeLog("PacketTunnel.v6 drop=\(droppedV6)")
     }
     persistHealth(force: true)
-    #if canImport(Hy2bind)
-    Hy2bindSetPacketWriter(nil)
-    Hy2bindStop()
-    #endif
     provider = nil
+  }
+
+  private func isCurrentStart(_ token: UInt64) -> Bool {
+    lifecycleLock.lock()
+    defer { lifecycleLock.unlock() }
+    return token == lifecycleToken
   }
 
   func healthDictionary() -> [String: Any] {
@@ -390,6 +451,102 @@ final class Hy2TunnelEngine: NSObject {
     return settings
   }
 
+  private static let maxExcludedIPv4 = 64
+  private static let maxExcludedIPv6 = 32
+  private static let resolutionTimeout: TimeInterval = 2.5
+
+  /// Resolve custom then catalog hosts concurrently; route selection remains
+  /// deterministic because results are planned in that same priority order.
+  static func resolveExactRoutes(
+    customHosts: [String],
+    catalogHosts: [String],
+    baseIPv4: [String],
+    baseIPv6: [String]
+  ) -> TunnelRoutePlan {
+    let hosts = TunnelRoutePlanner.orderedUnique(customHosts + catalogHosts)
+    let collector = LockedHostResolutionResults()
+    let group = DispatchGroup()
+
+    for (index, raw) in hosts.enumerated() {
+      let host = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+      guard !host.isEmpty else { continue }
+      group.enter()
+      DispatchQueue.global(qos: .userInitiated).async {
+        collector.submit(index: index, addresses: resolveName(host))
+        group.leave()
+      }
+    }
+
+    let wait = group.wait(timeout: .now() + resolutionTimeout)
+    let snapshot = collector.finish()
+    let orderedResults = hosts.indices.compactMap { snapshot.results[$0] }
+    return TunnelRoutePlanner.build(
+      baseIPv4: baseIPv4,
+      baseIPv6: baseIPv6,
+      orderedHostResults: orderedResults,
+      requestedHosts: hosts.count,
+      completedHosts: snapshot.completed,
+      timedOut: wait == .timedOut,
+      maxIPv4: maxExcludedIPv4,
+      maxIPv6: maxExcludedIPv6
+    )
+  }
+
+  private static func resolveName(_ name: String) -> HostRouteAddresses {
+    if TunnelRouteMerge.isIPv4Literal(name) {
+      return HostRouteAddresses(v4: [name], v6: [])
+    }
+    if TunnelRouteMerge.isIPv6Literal(name) {
+      return HostRouteAddresses(v4: [], v6: [name])
+    }
+    var hints = addrinfo(
+      ai_flags: AI_ADDRCONFIG,
+      ai_family: AF_UNSPEC,
+      ai_socktype: SOCK_STREAM,
+      ai_protocol: 0,
+      ai_addrlen: 0,
+      ai_canonname: nil,
+      ai_addr: nil,
+      ai_next: nil
+    )
+    var result: UnsafeMutablePointer<addrinfo>?
+    let rc = getaddrinfo(name, nil, &hints, &result)
+    guard rc == 0, let first = result else {
+      return HostRouteAddresses(v4: [], v6: [])
+    }
+    defer { freeaddrinfo(first) }
+
+    var v4: [String] = []
+    var v6: [String] = []
+    var cursor: UnsafeMutablePointer<addrinfo>? = first
+    while let info = cursor {
+      if info.pointee.ai_family == AF_INET, let address = info.pointee.ai_addr {
+        var sin = address.withMemoryRebound(to: sockaddr_in.self, capacity: 1) {
+          $0.pointee
+        }
+        var buffer = [CChar](repeating: 0, count: Int(INET_ADDRSTRLEN))
+        inet_ntop(AF_INET, &sin.sin_addr, &buffer, socklen_t(INET_ADDRSTRLEN))
+        let value = String(cString: buffer)
+        if !value.isEmpty { v4.append(value) }
+      } else if info.pointee.ai_family == AF_INET6,
+                let address = info.pointee.ai_addr
+      {
+        var sin6 = address.withMemoryRebound(to: sockaddr_in6.self, capacity: 1) {
+          $0.pointee
+        }
+        var buffer = [CChar](repeating: 0, count: Int(INET6_ADDRSTRLEN))
+        inet_ntop(AF_INET6, &sin6.sin6_addr, &buffer, socklen_t(INET6_ADDRSTRLEN))
+        let value = String(cString: buffer)
+        if !value.isEmpty { v6.append(value) }
+      }
+      cursor = info.pointee.ai_next
+    }
+    return HostRouteAddresses(
+      v4: TunnelRoutePlanner.orderedUnique(v4),
+      v6: TunnelRoutePlanner.orderedUnique(v6)
+    )
+  }
+
   private static func isIPv6(_ packet: Data) -> Bool {
     guard !packet.isEmpty else { return false }
     return (packet[packet.startIndex] >> 4) == 6
@@ -493,6 +650,8 @@ struct Hy2StartConfig {
   var remoteHost: String
   var goJSON: String
   var controlPlaneHosts: [String]
+  var iosCustomResolutionHosts: [String]
+  var iosCatalogResolutionHosts: [String]
 
   static func parse(_ paramsJson: String) -> Hy2StartConfig? {
     guard
@@ -508,11 +667,8 @@ struct Hy2StartConfig {
     let socks = (obj["hysteriaSocksListen"] as? String).flatMap {
       $0.isEmpty ? nil : $0
     } ?? "127.0.0.1:10808"
-    var suffixes: [String] = []
-    if let raw = obj["directDomainSuffixes"] as? [String] {
-      suffixes = raw.map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
-        .filter { !$0.isEmpty }
-    }
+    let customHosts = normalizedHosts(obj["iosCustomResolutionHosts"])
+    let catalogHosts = normalizedHosts(obj["iosCatalogResolutionHosts"])
     var controlPlane: [String] = []
     if let raw = obj["controlPlaneHosts"] as? [String] {
       controlPlane = raw
@@ -520,15 +676,14 @@ struct Hy2StartConfig {
         .filter { !$0.isEmpty }
     }
     let host = server.split(separator: ":", maxSplits: 1).first.map(String.init) ?? server
-    var go: [String: Any] = [
+    // ADR 025: iOS never feeds direct_domain_suffixes to Go. Direct paths are
+    // only exact destination IPs in NetworkExtension excludedRoutes.
+    let go: [String: Any] = [
       "server": server,
       "auth": auth,
       "sni": sni,
       "socks_listen": socks,
     ]
-    if !suffixes.isEmpty {
-      go["direct_domain_suffixes"] = suffixes
-    }
     guard
       let goData = try? JSONSerialization.data(withJSONObject: go),
       let goJSON = String(data: goData, encoding: .utf8)
@@ -538,7 +693,20 @@ struct Hy2StartConfig {
     return Hy2StartConfig(
       remoteHost: host,
       goJSON: goJSON,
-      controlPlaneHosts: controlPlane
+      controlPlaneHosts: controlPlane,
+      iosCustomResolutionHosts: customHosts,
+      iosCatalogResolutionHosts: catalogHosts
+    )
+  }
+
+  private static func normalizedHosts(_ raw: Any?) -> [String] {
+    guard let values = raw as? [String] else { return [] }
+    return TunnelRoutePlanner.orderedUnique(
+      values
+        .map {
+          $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        }
+        .filter { !$0.isEmpty }
     )
   }
 }

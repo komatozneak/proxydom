@@ -11,7 +11,8 @@ bool get hideInAppPlategaCheckout {
 }
 
 /// Per-app split (VpnService.Builder) is Android-only; iOS consumer VPN has no
-/// equivalent without MDM. Sites/domain split may still apply via shared prefs.
+/// equivalent without MDM (ADR 025). Sites use shared prefs → iOS
+/// `excludedRoutes` (destination IP), not hyDialer-protect.
 bool get iosAppsSplitUnsupported {
   if (kIsWeb) return false;
   return defaultTargetPlatform == TargetPlatform.iOS;

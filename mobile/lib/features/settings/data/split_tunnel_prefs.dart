@@ -144,9 +144,11 @@ class SplitTunnelPrefs {
   static const _osnovnyeKey = 'split_tunnel_osnovnye_v1';
   static const _osnovnyeRfDefaultsKey = 'split_tunnel_osnovnye_rf_defaults_v1';
   static const _osnovnyeV2DefaultsKey = 'split_tunnel_osnovnye_v2_defaults_v1';
+  static const _osnovnyeV3DefaultsKey = 'split_tunnel_osnovnye_v3_defaults_v1';
   static const _disallowedAppsKey = 'split_tunnel_disallowed_apps_v1';
   static const _seededBypassKey = 'split_tunnel_seeded_bypass_v1';
   static const _seededBypassV2Key = 'split_tunnel_seeded_bypass_v2';
+  static const _seededBypassV3Key = 'split_tunnel_seeded_bypass_v3';
 
   static Map<String, bool> _osnovnyeDefaults() => {
         for (final c in kOsnovnyeCategories) c.id: c.defaultEnabled,
@@ -214,12 +216,33 @@ class SplitTunnelPrefs {
     await prefs.setBool(_osnovnyeV2DefaultsKey, true);
   }
 
-  /// Live «Основные» toggles. Defaults: RF + Steam/RuTube/Avito/banks/Gosuslugi ON,
-  /// TikTok OFF.
+  /// One-shot: add MAX sites (ADR 025). Same stickiness as v2.
+  static Future<void> _applyV3OsnovnyeDefaultsIfNeeded(
+    SharedPreferences prefs,
+  ) async {
+    if (prefs.getBool(_osnovnyeV3DefaultsKey) == true) return;
+    final map = _decodeOsnovnyeMap(prefs);
+    var changed = false;
+    for (final id in kOsnovnyeV3Ids) {
+      if (map[id] != true) {
+        map[id] = true;
+        changed = true;
+      }
+    }
+    if (changed) {
+      await prefs.setString(_osnovnyeKey, jsonEncode(map));
+      await _bumpDraft(prefs);
+    }
+    await prefs.setBool(_osnovnyeV3DefaultsKey, true);
+  }
+
+  /// Live «Основные» toggles. Defaults: RF + Steam/RuTube/Avito/banks/Gosuslugi/MAX
+  /// ON, TikTok OFF (iOS Sites same defaults as Android — ADR 025).
   static Future<Map<String, bool>> loadOsnovnyeEnabled() async {
     final prefs = await SharedPreferences.getInstance();
     await _applyRfOsnovnyeDefaultsIfNeeded(prefs);
     await _applyV2OsnovnyeDefaultsIfNeeded(prefs);
+    await _applyV3OsnovnyeDefaultsIfNeeded(prefs);
     return _decodeOsnovnyeMap(prefs);
   }
 
@@ -298,6 +321,19 @@ class SplitTunnelPrefs {
         addedAny = true;
       }
       await prefs.setBool(_seededBypassV2Key, true);
+    }
+
+    if (prefs.getBool(_seededBypassV3Key) != true) {
+      final current = await loadDisallowedPackages();
+      final toAdd =
+          kDefaultBypassPackagesV3.intersection(installed).difference(current);
+      if (toAdd.isNotEmpty) {
+        current.addAll(toAdd);
+        await prefs.setStringList(_disallowedAppsKey, current.toList()..sort());
+        await _bumpDraft(prefs);
+        addedAny = true;
+      }
+      await prefs.setBool(_seededBypassV3Key, true);
     }
 
     return addedAny;
@@ -388,6 +424,29 @@ class SplitTunnelPrefs {
     return out.toList()..sort();
   }
 
+  /// User-entered exact hostnames for iOS. No suffix or implicit `www` expansion.
+  static Future<List<String>> enabledIosCustomResolutionHosts() async {
+    final sites = await loadSites();
+    final out = <String>{};
+    for (final s in sites.where((s) => s.enabled && !s.isPreset)) {
+      final d = s.domain.trim().toLowerCase();
+      if (d.isEmpty) continue;
+      out.add(d);
+    }
+    return out.toList()..sort();
+  }
+
+  /// Selected bundled exact hosts for iOS DNS→`excludedRoutes`.
+  static Future<List<String>> enabledIosCatalogResolutionHosts() async {
+    final out = <String>{};
+    final cats = await loadOsnovnyeEnabled();
+    for (final c in kOsnovnyeCategories) {
+      if (cats[c.id] != true) continue;
+      out.addAll(c.resolutionHostsForIos);
+    }
+    return out.toList()..sort();
+  }
+
   /// DC / CDN IP ranges when user adds matching custom domains (e.g. telegram.org).
   static Future<List<String>> enabledProxyIpCidrs() async {
     final sites = await loadSites();
@@ -449,7 +508,12 @@ const kDefaultBypassPackagesV2 = <String>{
   'com.wildberries.ru',
 };
 
-/// Curated TUN-exclude packages (Yandex Go / banks / Gosuslugi / VK / Ozon / WB).
+/// Packages added by the v3 Apps seed (MAX messenger). Android-only Apps tab.
+const kDefaultBypassPackagesV3 = <String>{
+  'ru.oneme.app',
+};
+
+/// Curated TUN-exclude packages (Yandex Go / banks / Gosuslugi / VK / Ozon / WB / MAX).
 /// Only seeded when the package is installed; missing ids are skipped.
 const kDefaultBypassPackages = <String>{
   'ru.yandex.taxi',
@@ -463,9 +527,10 @@ const kDefaultBypassPackages = <String>{
   'ru.vtb24.mobilebanking.android',
   'ru.gosuslugi.mobile',
   ...kDefaultBypassPackagesV2,
+  ...kDefaultBypassPackagesV3,
 };
 
-/// Live RF site lists that default ON (suffix → Hy2 direct). Not TikTok.
+/// Live RF site lists that default ON (suffix → Hy2 direct / iOS exclude). Not TikTok.
 const kRfDefaultOnOsnovnyeIds = <String>{
   'vk',
   'yandex',
@@ -476,6 +541,7 @@ const kRfDefaultOnOsnovnyeIds = <String>{
   'avito',
   'banks',
   'gosuslugi',
+  'max',
 };
 
 /// Category ids shipped in osnovnye v2 (one-shot migrate).
@@ -487,6 +553,11 @@ const kOsnovnyeV2Ids = <String>{
   'gosuslugi',
 };
 
+/// Category ids shipped in osnovnye v3 (MAX — ADR 025).
+const kOsnovnyeV3Ids = <String>{
+  'max',
+};
+
 /// One row under Sites → Основные.
 class OsnovnyeCategory {
   const OsnovnyeCategory({
@@ -495,6 +566,7 @@ class OsnovnyeCategory {
     required this.labelEn,
     required this.badge,
     required this.domains,
+    this.iosResolutionHosts = const [],
     this.defaultEnabled = false,
   });
 
@@ -502,10 +574,17 @@ class OsnovnyeCategory {
   final String labelRu;
   final String labelEn;
   final String badge;
+  /// Android hyDialer suffixes (may imply subdomain matching in Go).
   final List<String> domains;
+  /// Exact hostnames for iOS DNS→`excludedRoutes` (apex ≠ CDN). Empty → [domains].
+  final List<String> iosResolutionHosts;
   final bool defaultEnabled;
 
   String label(String languageCode) => languageCode == 'en' ? labelEn : labelRu;
+
+  /// Hosts to resolve on iOS at connect time.
+  List<String> get resolutionHostsForIos =>
+      iosResolutionHosts.isNotEmpty ? iosResolutionHosts : domains;
 }
 
 /// Live Hy2 suffix lists. Geosite ru/gov placeholders were removed — no matcher.
@@ -599,6 +678,13 @@ const kOsnovnyeCategories = <OsnovnyeCategory>[
     badge: 'RT',
     defaultEnabled: true,
     domains: ['rutube.ru'],
+    iosResolutionHosts: [
+      'rutube.ru',
+      'www.rutube.ru',
+      'static.rutube.ru',
+      'pic.rutube.ru',
+      'preview.rutube.ru',
+    ],
   ),
   OsnovnyeCategory(
     id: 'avito',
@@ -607,6 +693,30 @@ const kOsnovnyeCategories = <OsnovnyeCategory>[
     badge: 'AV',
     defaultEnabled: true,
     domains: ['avito.ru', 'avito.st'],
+    iosResolutionHosts: [
+      'avito.ru',
+      'www.avito.ru',
+      'm.avito.ru',
+      'api.avito.ru',
+      'avito.st',
+    ],
+  ),
+  OsnovnyeCategory(
+    id: 'max',
+    labelRu: 'MAX',
+    labelEn: 'MAX',
+    badge: 'MX',
+    defaultEnabled: true,
+    // v2fly mailru-group Messenger MAX + public API hosts. No okcdn.ru / apptracer.
+    domains: ['max.ru', 'oneme.ru'],
+    iosResolutionHosts: [
+      'max.ru',
+      'www.max.ru',
+      'web.max.ru',
+      'api.max.ru',
+      'ws-api.max.ru',
+      'oneme.ru',
+    ],
   ),
   OsnovnyeCategory(
     id: 'banks',

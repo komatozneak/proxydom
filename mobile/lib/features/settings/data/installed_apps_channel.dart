@@ -35,7 +35,7 @@ class LauncherAppInfo {
   }
 }
 
-/// Pure counter for Home «Что работает без VPN?» row.
+/// Pure counter for Android Home «Что работает без VPN?» pin (`enabled / total`).
 ({int enabled, int total}) noVpnAppsCounter({
   required Iterable<String> launcherPackages,
   required Set<String> disallowedPackages,
@@ -88,6 +88,7 @@ IconData? osnovnyeCategoryIcon(String categoryId) {
     'yandex' => AppIcons.osnovnyeYandex,
     'ozon' => AppIcons.osnovnyeOzon,
     'wb' => AppIcons.osnovnyeWb,
+    'max' => AppIcons.osnovnyeMax,
     _ => null,
   };
 }

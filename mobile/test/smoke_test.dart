@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,6 +17,7 @@ import 'package:teremok_connect/features/auth/application/logout_handler.dart';
 import 'package:teremok_connect/features/home/application/vpn_provider.dart';
 import 'package:teremok_connect/features/home/presentation/home_screen.dart';
 import 'package:teremok_connect/features/home/presentation/widgets/server_card.dart';
+import 'package:teremok_connect/features/settings/data/split_tunnel_prefs.dart';
 import 'package:teremok_connect/features/vpn/data/vpn_config.dart';
 import 'package:teremok_connect/features/vpn/data/vpn_controller.dart';
 import 'package:teremok_connect/features/vpn/data/vpn_node.dart';
@@ -91,11 +93,17 @@ Map<String, dynamic> _vpnJson({
 void main() {
   testWidgets('Home screen shows Connect button when not connected',
       (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
     const vpnChannel = MethodChannel('teremok/vpn');
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(vpnChannel, (call) async {
       if (call.method == 'getStatus') return 'idle';
       if (call.method == 'getLastError') return '';
+      if (call.method == 'listLauncherApps') {
+        return [
+          {'packageName': 'ru.oneme.app', 'label': 'MAX'},
+        ];
+      }
       return null;
     });
     addTearDown(() {
@@ -131,12 +139,71 @@ void main() {
 
     expect(find.text('Не подключено'), findsOneWidget);
     expect(find.byType(ServerCard), findsOneWidget);
+    expect(find.text('Что работает без VPN?'), findsOneWidget);
+    expect(find.text('1 / 1'), findsOneWidget);
+    expect(
+      await SplitTunnelPrefs.loadDisallowedPackages(),
+      contains('ru.oneme.app'),
+    );
     // ↓/↑ live only in shade notification — not on Home.
     expect(find.text('Скачивание'), findsNothing);
     expect(find.text('Отправка'), findsNothing);
     // Session clock is inside ServerCard only when connected.
     expect(find.text('СЕССИЯ'), findsNothing);
 
+    debugDefaultTargetPlatformOverride = null;
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 1));
+  });
+
+  testWidgets('iOS Home keeps NoVPN row without Apps pin', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    const vpnChannel = MethodChannel('teremok/vpn');
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(vpnChannel, (call) async {
+      if (call.method == 'getStatus') return 'idle';
+      if (call.method == 'getLastError') return '';
+      if (call.method == 'listLauncherApps') {
+        return [
+          {'packageName': 'ru.oneme.app', 'label': 'MAX'},
+        ];
+      }
+      return null;
+    });
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(vpnChannel, null);
+    });
+
+    SharedPreferences.setMockInitialValues({});
+    AppLocale.set(const Locale('ru'));
+
+    final container = ProviderContainer(
+      overrides: [
+        vpnNodesRepositoryProvider.overrideWithValue(_FakeVpnNodesRepository()),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          locale: const Locale('ru'),
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          home: const HomeScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 2));
+
+    expect(find.text('Что работает без VPN?'), findsOneWidget);
+    expect(find.text('1 / 1'), findsNothing);
+    expect(find.text('0 / 0'), findsNothing);
+
+    debugDefaultTargetPlatformOverride = null;
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 1));
   });

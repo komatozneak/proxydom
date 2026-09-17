@@ -10,6 +10,9 @@ import 'vpn_route_policy.dart';
 import 'vpn_service_config.dart';
 import 'vpn_session_snapshot.dart';
 
+bool get _isIosSplit =>
+    !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
+
 /// Bridge between Flutter UI and Android VpnService (Hysteria2, ADR 018).
 ///
 /// Uses [MethodChannel] `teremok/vpn` for commands and [EventChannel]
@@ -41,11 +44,24 @@ class VpnController {
     if (!config.isHysteriaSession || profile == null) {
       throw VpnControllerException('hy2_provision_failed');
     }
-    final disallowedApps =
-        (await SplitTunnelPrefs.loadDisallowedPackages()).toList()..sort();
-    final directSuffixes = stripForceProxySuffixes(
-      await SplitTunnelPrefs.enabledDomainSuffixes(),
-    );
+    final disallowedApps = _isIosSplit
+        ? const <String>[]
+        : ((await SplitTunnelPrefs.loadDisallowedPackages()).toList()..sort());
+    final directSuffixes = _isIosSplit
+        ? const <String>[]
+        : stripForceProxySuffixes(
+            await SplitTunnelPrefs.enabledDomainSuffixes(),
+          );
+    final iosCustomHosts = !_isIosSplit
+        ? const <String>[]
+        : stripForceProxySuffixes(
+            await SplitTunnelPrefs.enabledIosCustomResolutionHosts(),
+          );
+    final iosCatalogHosts = !_isIosSplit
+        ? const <String>[]
+        : stripForceProxySuffixes(
+            await SplitTunnelPrefs.enabledIosCatalogResolutionHosts(),
+          );
     return jsonEncode({
       'schemaVersion': 2,
       'vpnCore': 'hysteria',
@@ -67,7 +83,12 @@ class VpnController {
         'hysteriaBandwidthDown': profile.bandwidthDown,
       'controlPlaneHosts': VpnServiceConfig.controlPlaneHostsOf(),
       if (disallowedApps.isNotEmpty) 'disallowedApplications': disallowedApps,
+      // Android: Go hyDialer suffixes. iOS: prioritized OS routes only.
       if (directSuffixes.isNotEmpty) 'directDomainSuffixes': directSuffixes,
+      if (iosCustomHosts.isNotEmpty)
+        'iosCustomResolutionHosts': iosCustomHosts,
+      if (iosCatalogHosts.isNotEmpty)
+        'iosCatalogResolutionHosts': iosCatalogHosts,
     });
   }
 
@@ -105,11 +126,25 @@ class VpnController {
     String? displayLabel,
   }) async {
     try {
-      final disallowedApps =
-          (await SplitTunnelPrefs.loadDisallowedPackages()).toList()..sort();
-      final directSuffixes = stripForceProxySuffixes(
-        await SplitTunnelPrefs.enabledDomainSuffixes(),
-      );
+      final disallowedApps = _isIosSplit
+          ? const <String>[]
+          : ((await SplitTunnelPrefs.loadDisallowedPackages()).toList()
+            ..sort());
+      final directSuffixes = _isIosSplit
+          ? const <String>[]
+          : stripForceProxySuffixes(
+              await SplitTunnelPrefs.enabledDomainSuffixes(),
+            );
+      final iosCustomHosts = !_isIosSplit
+          ? const <String>[]
+          : stripForceProxySuffixes(
+              await SplitTunnelPrefs.enabledIosCustomResolutionHosts(),
+            );
+      final iosCatalogHosts = !_isIosSplit
+          ? const <String>[]
+          : stripForceProxySuffixes(
+              await SplitTunnelPrefs.enabledIosCatalogResolutionHosts(),
+            );
       final paramsJson = jsonEncode({
         'schemaVersion': 2,
         'vpnCore': 'hysteria',
@@ -130,6 +165,10 @@ class VpnController {
         'controlPlaneHosts': VpnServiceConfig.controlPlaneHostsOf(),
         if (disallowedApps.isNotEmpty) 'disallowedApplications': disallowedApps,
         if (directSuffixes.isNotEmpty) 'directDomainSuffixes': directSuffixes,
+        if (iosCustomHosts.isNotEmpty)
+          'iosCustomResolutionHosts': iosCustomHosts,
+        if (iosCatalogHosts.isNotEmpty)
+          'iosCatalogResolutionHosts': iosCatalogHosts,
       });
 
       final result = await _methodChannel.invokeMethod<bool>(

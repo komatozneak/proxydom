@@ -269,6 +269,8 @@ jobs:
         run: |
           uv run pytest tests/test_auth_refresh.py tests/test_vpn_endpoints.py -v --tb=short
 
+  # Compile gate only. Does NOT codesign, does NOT upload to TestFlight.
+  # Device IPA: workflow "iOS TestFlight" (ios-testflight.yml).
   build-ios-no-codesign:
     name: Build iOS (no codesign)
     runs-on: macos-latest

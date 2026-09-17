@@ -63,7 +63,7 @@ import 'app_localizations_ru.dart';
 /// property.
 abstract class AppL10n {
   AppL10n(String locale)
-      : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+    : localeName = intl.Intl.canonicalizedLocale(locale.toString());
 
   final String localeName;
 
@@ -85,16 +85,16 @@ abstract class AppL10n {
   /// of delegates is preferred or required.
   static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
       <LocalizationsDelegate<dynamic>>[
-    delegate,
-    GlobalMaterialLocalizations.delegate,
-    GlobalCupertinoLocalizations.delegate,
-    GlobalWidgetsLocalizations.delegate,
-  ];
+        delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ];
 
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[
     Locale('en'),
-    Locale('ru')
+    Locale('ru'),
   ];
 
   /// Title shown in app bar and OS task switcher
@@ -364,7 +364,7 @@ abstract class AppL10n {
   /// No description provided for @settingsNoVpnHint.
   ///
   /// In en, this message translates to:
-  /// **'Choose apps and sites that skip the VPN'**
+  /// **'Sites that skip the VPN'**
   String get settingsNoVpnHint;
 
   /// No description provided for @modesTitle.
@@ -1168,19 +1168,19 @@ abstract class AppL10n {
   /// No description provided for @splitTunnelBundledLead.
   ///
   /// In en, this message translates to:
-  /// **'Built into the app — one tap to enable.'**
+  /// **'Listed sites use your usual connection, not the protected one. Everything else still goes through Teremok.'**
   String get splitTunnelBundledLead;
 
   /// No description provided for @splitTunnelBundledRuTitle.
   ///
   /// In en, this message translates to:
-  /// **'Direct access for Russia'**
+  /// **'Ready-made lists'**
   String get splitTunnelBundledRuTitle;
 
   /// No description provided for @splitTunnelBundledRuSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Russian sites and services\n.ru, .su and .рф domains\nIP addresses in Russia'**
+  /// **'VK, Yandex, marketplaces, MAX, and more — one tap'**
   String get splitTunnelBundledRuSubtitle;
 
   /// No description provided for @splitTunnelBundledInfoTitle.
@@ -1192,7 +1192,7 @@ abstract class AppL10n {
   /// No description provided for @splitTunnelBundledInfoBody.
   ///
   /// In en, this message translates to:
-  /// **'This list ships inside Teremok and really changes routing.\n\nThe ready-made list includes:\n• Russian sites and services\n• all .ru, .su and .рф domains\n• IP addresses in Russia\n\nOn — this traffic bypasses the VPN.\nOff — all traffic uses the VPN.\n\nIf VPN is already connected, tap Reconnect after changing.'**
+  /// **'Listed sites use your usual connection, not the protected one. Everything else still goes through Teremok.\n\nOn iPhone you cannot take a whole app out of the VPN — only a website by address. Safari usually follows the list. A bank or marketplace app may stay in the VPN.\n\nBig services use many servers. Some pages or video may still go through the VPN with the switch on. If a site should stay protected, turn it off here.\n\nTap Reconnect after you change the list.'**
   String get splitTunnelBundledInfoBody;
 
   /// No description provided for @splitTunnelBundledInfoClose.
@@ -1200,6 +1200,18 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Got it'**
   String get splitTunnelBundledInfoClose;
+
+  /// No description provided for @splitTunnelSitesLead.
+  ///
+  /// In en, this message translates to:
+  /// **'Listed sites use your usual connection, not the protected one. Everything else still goes through Teremok.'**
+  String get splitTunnelSitesLead;
+
+  /// No description provided for @splitTunnelSitesIosNote.
+  ///
+  /// In en, this message translates to:
+  /// **'On iPhone only exact hostnames leave the VPN (not all subdomains). Whole apps cannot leave the tunnel.'**
+  String get splitTunnelSitesIosNote;
 
   /// No description provided for @splitTunnelCustomSection.
   ///
@@ -1270,7 +1282,7 @@ abstract class AppL10n {
   /// No description provided for @splitTunnelEmptyBody.
   ///
   /// In en, this message translates to:
-  /// **'Add an address — it will open directly, without the VPN.'**
+  /// **'Add an exact hostname — only that address skips the VPN, not its subdomains.'**
   String get splitTunnelEmptyBody;
 
   /// No description provided for @splitTunnelInvalidDomain.
@@ -2968,8 +2980,9 @@ AppL10n lookupAppL10n(Locale locale) {
   }
 
   throw FlutterError(
-      'AppL10n.delegate failed to load unsupported locale "$locale". This is likely '
-      'an issue with the localizations generation tool. Please file an issue '
-      'on GitHub with a reproducible sample app and the gen-l10n configuration '
-      'that was used.');
+    'AppL10n.delegate failed to load unsupported locale "$locale". This is likely '
+    'an issue with the localizations generation tool. Please file an issue '
+    'on GitHub with a reproducible sample app and the gen-l10n configuration '
+    'that was used.',
+  );
 }

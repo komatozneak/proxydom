@@ -145,7 +145,7 @@ class AppL10nRu extends AppL10n {
   String get settingsNoVpn => 'Что работает без VPN?';
 
   @override
-  String get settingsNoVpnHint => 'Приложения и сайты, которые идут мимо VPN';
+  String get settingsNoVpnHint => 'Сайты, которые идут мимо VPN';
 
   @override
   String get modesTitle => 'Режим';
@@ -587,24 +587,32 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get splitTunnelBundledLead =>
-      'Уже в приложении — включается одним касанием.';
+      'Сайты из списка открываются обычным интернетом, не через защиту. Остальное — через Теремок.';
 
   @override
-  String get splitTunnelBundledRuTitle => 'Прямой доступ для РФ';
+  String get splitTunnelBundledRuTitle => 'Готовые списки';
 
   @override
   String get splitTunnelBundledRuSubtitle =>
-      'Российские сайты и сервисы\nДомены .ru, .su и .рф\nIP-адреса в России';
+      'VK, Яндекс, маркетплейсы, MAX и другие — одним касанием';
 
   @override
   String get splitTunnelBundledInfoTitle => 'Как это работает';
 
   @override
   String get splitTunnelBundledInfoBody =>
-      'Список вшит в Теремок и реально задаёт маршруты.\n\nВ готовый список входит:\n• российские сайты и сервисы\n• все домены .ru, .su и .рф\n• IP-адреса в России\n\nВкл — этот трафик идёт мимо VPN.\nВыкл — весь трафик через VPN.\n\nЕсли VPN уже подключён, после смены нажмите «Переподключить».';
+      'Сайты из списка открываются обычным интернетом, не через защиту. Остальное по-прежнему через Теремок.\n\nНа iPhone нельзя вытащить из VPN целое приложение — только сайт по адресу. В Safari обычно срабатывает. Приложение банка или маркетплейса может остаться в VPN: у них свои адреса.\n\nКрупные сервисы сидят на куче серверов. Часть страниц или видео может идти через защиту, даже если тумблер включён. Если сайт должен быть под защитой — выключите его здесь.\n\nПосле изменения нажмите «Переподключить».';
 
   @override
   String get splitTunnelBundledInfoClose => 'Понятно';
+
+  @override
+  String get splitTunnelSitesLead =>
+      'Сайты из списка открываются обычным интернетом, не через защиту. Остальное — через Теремок.';
+
+  @override
+  String get splitTunnelSitesIosNote =>
+      'На iPhone из VPN выходит только точный hostname (не все поддомены). Целое приложение вытащить нельзя.';
 
   @override
   String get splitTunnelCustomSection => 'Мои сайты';
@@ -643,7 +651,7 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get splitTunnelEmptyBody =>
-      'Добавьте адрес — он будет открываться напрямую, без VPN.';
+      'Добавьте точный hostname — без VPN пойдёт только он, не его поддомены.';
 
   @override
   String get splitTunnelInvalidDomain => 'Введите адрес вида example.com';

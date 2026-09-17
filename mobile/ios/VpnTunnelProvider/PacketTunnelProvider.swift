@@ -39,9 +39,24 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
       paramsJson: paramsJson
     ) { [weak self] error in
       guard let self else { return }
+      guard self.engine === hy2 else {
+        // stopTunnel or a newer start owns the provider now.
+        TeremokVpnShared.appendNativeLog(
+          "PacketTunnel.startCompletion stale gen=\(self.sessionGeneration)"
+        )
+        completionHandler(
+          error ?? NSError(
+            domain: "online.teremokconnect.app.vpn",
+            code: 6,
+            userInfo: [NSLocalizedDescriptionKey: "Hy2 start cancelled"]
+          )
+        )
+        return
+      }
       if let error {
+        let nsError = error as NSError
         self.finishStart(
-          errorCode: (error as NSError).code,
+          errorCode: nsError.code,
           message: error.localizedDescription,
           completionHandler: completionHandler
         )
