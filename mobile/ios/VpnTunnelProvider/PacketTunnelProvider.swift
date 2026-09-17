@@ -15,6 +15,9 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     completionHandler: @escaping (Error?) -> Void
   ) {
     sessionGeneration = TeremokVpnShared.currentGeneration()
+    TeremokVpnShared.appendNativeLog(
+      "PacketTunnel.startTunnel gen=\(sessionGeneration)"
+    )
     TeremokVpnShared.setStatus("connecting", generation: sessionGeneration)
     TeremokVpnShared.setLastError(nil, generation: sessionGeneration)
 
@@ -44,6 +47,9 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         )
         return
       }
+      TeremokVpnShared.appendNativeLog(
+        "PacketTunnel.connected gen=\(self.sessionGeneration)"
+      )
       TeremokVpnShared.setStatus("connected", generation: self.sessionGeneration)
       TeremokVpnShared.setLastError(nil, generation: self.sessionGeneration)
       completionHandler(nil)
@@ -54,6 +60,10 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     with reason: NEProviderStopReason,
     completionHandler: @escaping () -> Void
   ) {
+    // reason rawValue lands in TestFlight reports (why tunnel died in background).
+    TeremokVpnShared.appendNativeLog(
+      "PacketTunnel.stopTunnel reason=\(reason.rawValue) gen=\(sessionGeneration)"
+    )
     NSLog(
       "[Teremok] PacketTunnelProvider.stopTunnel reason=%d gen=%d",
       reason.rawValue,
@@ -72,6 +82,9 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     message: String,
     completionHandler: @escaping (Error?) -> Void
   ) {
+    TeremokVpnShared.appendNativeLog(
+      "PacketTunnel.startFailed code=\(errorCode) msg=\(message)"
+    )
     NSLog("[Teremok] PacketTunnelProvider start failed: %@", message)
     engine?.stop()
     engine = nil

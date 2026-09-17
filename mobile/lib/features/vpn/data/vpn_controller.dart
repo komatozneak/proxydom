@@ -228,6 +228,17 @@ class VpnController {
   Future<String?> getSingBoxStderrTail({int maxLines = 400}) =>
       getVpnCoreStderrTail(maxLines: maxLines);
 
+  /// iOS App Group ring (Runner + Packet Tunnel). Android → null.
+  Future<String?> getNativeLogTail() async {
+    try {
+      return await _methodChannel.invokeMethod<String>('getNativeLogTail');
+    } on PlatformException {
+      return null;
+    } on MissingPluginException {
+      return null;
+    }
+  }
+
   Future<String?> getUnderlyingNetworkInterface() async {
     try {
       return await _methodChannel.invokeMethod<String>(

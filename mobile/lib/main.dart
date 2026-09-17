@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io' as io;
 
 import 'package:flutter/material.dart';
@@ -24,8 +25,9 @@ import 'features/beta/application/beta_usage_tracker.dart';
 void main() async {
   // Required before flutter_secure_storage / path_provider on cold start.
   WidgetsFlutterBinding.ensureInitialized();
-  await RiveNative.init();
+  final boot = Stopwatch()..start();
 
+  // Persist first so boot phases land in «Отправить отчёт» even if discovery hangs.
   try {
     final dir = await getApplicationSupportDirectory();
     await AppLogBuffer.instance.attachPersistFile(
@@ -34,21 +36,25 @@ void main() async {
   } catch (_) {
     // Persist is best-effort; in-memory ring still feeds reports.
   }
+  AppLogBuffer.instance.info('app.boot t0 ms=${boot.elapsedMilliseconds}');
 
-  // Android 17: INTERNET grant, then pin sockets off leftover tun0 (errno 13).
+  final riveSw = Stopwatch()..start();
+  await RiveNative.init();
+  AppLogBuffer.instance.info(
+    'app.boot rive.init_ms=${riveSw.elapsedMilliseconds}',
+  );
+
+  // Android 17: INTERNET grant (iOS no-op). Do not await discovery here —
+  // LaunchScreen stays white until runApp; 8s Dio probes used to block first frame.
   final internetOk = await ensureInternetPermissionGranted();
-  await bindProcessToUnderlyingNetwork();
-  if (!internetOk) {
-    // ignore: avoid_print
-    print('[api.discovery] skipped: INTERNET permission denied');
-  } else {
-    // ADR 009: probe discovery hosts before auth/register.
-    try {
-      await ApiDiscovery.instance.refreshAndSelect();
-    } catch (e) {
-      // ignore: avoid_print
-      print('[api.discovery] skipped: $e');
-    }
+  AppLogBuffer.instance.info(
+    'app.boot internet_ok=$internetOk ms=${boot.elapsedMilliseconds}',
+  );
+
+  try {
+    await ApiDiscovery.instance.loadCachedOrigin();
+  } catch (e) {
+    AppLogBuffer.instance.warn('app.boot cache_origin fail: $e');
   }
 
   final container = ProviderContainer();
@@ -61,7 +67,9 @@ void main() async {
       }
     },
   );
-  AppLogBuffer.instance.info('[app] started baseUrl=${AppConfig.baseUrl}');
+  AppLogBuffer.instance.info(
+    'app.boot started baseUrl=${AppConfig.baseUrl} ms=${boot.elapsedMilliseconds}',
+  );
   if (AppConfig.baseUrl.contains('10.0.2.2')) {
     // ignore: avoid_print
     print(
@@ -101,10 +109,43 @@ void main() async {
     fireImmediately: true,
   );
 
+  AppLogBuffer.instance.info(
+    'app.boot runApp ms=${boot.elapsedMilliseconds}',
+  );
   runApp(
     UncontrolledProviderScope(
       container: container,
       child: const TeremokApp(),
     ),
   );
+
+  // Discovery + bind after first frame (cached origin already applied).
+  unawaited(_bootDiscoveryInBackground(internetOk: internetOk, boot: boot));
+}
+
+Future<void> _bootDiscoveryInBackground({
+  required bool internetOk,
+  required Stopwatch boot,
+}) async {
+  try {
+    await bindProcessToUnderlyingNetwork();
+  } catch (e) {
+    AppLogBuffer.instance.warn('app.boot bind_underlying fail: $e');
+  }
+  if (!internetOk) {
+    AppLogBuffer.instance.warn('app.boot discovery skipped: INTERNET denied');
+    return;
+  }
+  final disc = Stopwatch()..start();
+  try {
+    final origin = await ApiDiscovery.instance.refreshAndSelect();
+    AppLogBuffer.instance.info(
+      'app.boot discovery_ms=${disc.elapsedMilliseconds} '
+      'origin=${origin ?? 'none'} total_ms=${boot.elapsedMilliseconds}',
+    );
+  } catch (e) {
+    AppLogBuffer.instance.warn(
+      'app.boot discovery fail ms=${disc.elapsedMilliseconds}: $e',
+    );
+  }
 }

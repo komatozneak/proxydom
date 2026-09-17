@@ -58,6 +58,7 @@ class DiagnosticsService {
     final stderrTail = await VpnController.instance.getVpnCoreStderrTail(
       maxLines: 400,
     );
+    final nativeLogTail = await VpnController.instance.getNativeLogTail();
     final underlying = await VpnController.instance.getUnderlyingNetworkInterface();
 
     final sessionMeta = await VpnSessionMeta.load();
@@ -103,6 +104,8 @@ class DiagnosticsService {
       ..writeln('last_prove: ${lastProve ?? '(none)'}')
       ..writeln('vpn_stderr_tail:')
       ..writeln(stderrTail ?? '(unsupported)')
+      ..writeln('ios_native_tail:')
+      ..writeln(nativeLogTail ?? '(unsupported)')
       ..writeln('last_vpn_error: $lastVpnError')
       ..writeln('last_flutter_error: ${lastFlutterError ?? '(none)'}')
       ..writeln('--- recent_log ---')

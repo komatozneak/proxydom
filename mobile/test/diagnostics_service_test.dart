@@ -1,10 +1,25 @@
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:teremok_connect/core/diagnostics/diagnostics_service.dart';
 import 'package:teremok_connect/core/diagnostics/egress_verify.dart';
+import 'package:teremok_connect/features/auth/application/auth_state.dart';
+import 'package:teremok_connect/features/home/application/vpn_status.dart';
+import 'package:teremok_connect/features/vpn/data/vpn_controller.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  const vpnChannel = MethodChannel('teremok/vpn');
+  final messenger =
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+
+  tearDown(() {
+    messenger.setMockMethodCallHandler(vpnChannel, null);
+  });
+
   group('DiagnosticsService.clipForPost', () {
     test('keeps short reports intact', () {
       const report = 'short bundle';
@@ -112,6 +127,62 @@ void main() {
       expect(saved.file, isNotNull);
       expect(saved.file!.existsSync(), isTrue);
       expect(saved.file!.readAsStringSync(), saved.body);
+    });
+  });
+
+  group('ios_native_tail', () {
+    test('VpnController.getNativeLogTail returns channel string', () async {
+      messenger.setMockMethodCallHandler(vpnChannel, (call) async {
+        if (call.method == 'getNativeLogTail') {
+          return 'PacketTunnel.stopTunnel reason=1 gen=2';
+        }
+        return null;
+      });
+      final tail = await VpnController.instance.getNativeLogTail();
+      expect(tail, contains('stopTunnel reason=1'));
+    });
+
+    test('buildReport includes ios_native_tail block', () async {
+      SharedPreferences.setMockInitialValues({});
+      const packageChannel =
+          MethodChannel('dev.fluttercommunity.plus/package_info');
+      messenger.setMockMethodCallHandler(packageChannel, (call) async {
+        return <String, dynamic>{
+          'appName': 'Teremok',
+          'packageName': 'online.teremokconnect.app',
+          'version': '0.1.15',
+          'buildNumber': '2034',
+        };
+      });
+      addTearDown(() {
+        messenger.setMockMethodCallHandler(packageChannel, null);
+      });
+
+      messenger.setMockMethodCallHandler(vpnChannel, (call) async {
+        switch (call.method) {
+          case 'getStatus':
+            return 'idle';
+          case 'getLastError':
+            return null;
+          case 'isLockdownEnabled':
+            return false;
+          case 'getSingBoxStderrTail':
+            return null;
+          case 'getNativeLogTail':
+            return 'NEVPNStatusDidChange mapped=idle';
+          case 'getUnderlyingNetworkInterface':
+            return null;
+          default:
+            return null;
+        }
+      });
+
+      final report = await DiagnosticsService().buildReport(
+        authState: const AuthStateUnauthenticated(),
+        vpnUi: const VpnDisconnected(),
+      );
+      expect(report, contains('ios_native_tail:'));
+      expect(report, contains('NEVPNStatusDidChange mapped=idle'));
     });
   });
 }

@@ -11,9 +11,35 @@ enum TeremokVpnShared {
   /// Bumped by Runner on each start so a late `stopTunnel` cannot wipe
   /// status / lastError from a newer connect (YouTube hot-switch race).
   static let generationKey = "vpn.generation"
+  /// Ring buffer for Runner + Packet Tunnel lines (no secrets) → diagnostics.
+  static let nativeLogKey = "vpn.nativeLog"
+  static let nativeLogMaxLines = 128
 
   static var defaults: UserDefaults? {
     UserDefaults(suiteName: appGroupId)
+  }
+
+  private static let isoFormatter: ISO8601DateFormatter = {
+    let f = ISO8601DateFormatter()
+    f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    return f
+  }()
+
+  /// Append one line to the App Group ring (survives UI kill / appex stop).
+  static func appendNativeLog(_ message: String) {
+    let stamp = isoFormatter.string(from: Date())
+    let line = "\(stamp) \(message)"
+    var lines = defaults?.stringArray(forKey: nativeLogKey) ?? []
+    lines.append(line)
+    if lines.count > nativeLogMaxLines {
+      lines = Array(lines.suffix(nativeLogMaxLines))
+    }
+    defaults?.set(lines, forKey: nativeLogKey)
+  }
+
+  static func nativeLogTail() -> String {
+    let lines = defaults?.stringArray(forKey: nativeLogKey) ?? []
+    return lines.isEmpty ? "(empty)" : lines.joined(separator: "\n")
   }
 
   static func currentGeneration() -> Int {

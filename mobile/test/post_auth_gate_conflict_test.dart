@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -273,7 +275,7 @@ void main() {
     final stops = <String>[];
     mockVpn(status: 'connected', hasSession: true, stopLog: stops);
 
-    // First resolve: two short attempts fail; then auto-stop + third fetch OK.
+    // Parallel leftover stop + two short fails, then post-stop resolve OK.
     final api = _CountingBetaApi(
       results: [_connErr(), _connErr(), _okEntitlement],
     );
@@ -288,6 +290,8 @@ void main() {
 
     await tester.pumpWidget(_gateApp(container));
     await tester.pump();
+    // House loading UI (not bare white spinner) while resolving.
+    expect(find.text('Проверяем доступ…'), findsOneWidget);
     await tester.pump(const Duration(seconds: 3));
     await tester.pumpAndSettle();
 
@@ -301,6 +305,35 @@ void main() {
           'checking=${find.text('Проверяем доступ…').evaluate().length} '
           'onboarding=${find.textContaining('Далее').evaluate().length}',
     );
+  });
+
+  testWidgets('leftover VPN stop runs before entitlement hang finishes',
+      (tester) async {
+    final stops = <String>[];
+    mockVpn(status: 'connected', hasSession: true, stopLog: stops);
+
+    final api = _HangThenOkBetaApi();
+    final container = ProviderContainer(
+      overrides: [
+        authProvider.overrideWith(_AuthedNotifier.new),
+        betaApiProvider.overrideWithValue(api),
+      ],
+    );
+    addTearDown(container.dispose);
+    await container.read(authProvider.future);
+
+    await tester.pumpWidget(_gateApp(container));
+    await tester.pump();
+    await api.firstFetchStarted.future;
+    // Parallel stop must fire without waiting full hang.
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(stops, contains('stop'));
+    expect(kGateEntitlementTimeout, const Duration(seconds: 2));
+
+    // Let gate timeouts + post-stop resolve complete.
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+    expect(find.text('HOME'), findsOneWidget);
   });
 
   testWidgets('401 on gate re-resolves without stuck white loader',
@@ -345,6 +378,22 @@ void main() {
       expect(find.text('LOGIN'), findsOneWidget);
     }
   });
+}
+
+class _HangThenOkBetaApi extends BetaApi {
+  final Completer<void> firstFetchStarted = Completer<void>();
+  int calls = 0;
+
+  @override
+  Future<BetaEntitlement> fetchEntitlement() async {
+    calls += 1;
+    if (calls == 1) {
+      if (!firstFetchStarted.isCompleted) firstFetchStarted.complete();
+      // Never completes — gate .timeout cancels the wait without a pending Timer.
+      return Completer<BetaEntitlement>().future;
+    }
+    return _okEntitlement;
+  }
 }
 
 class _RecordingLogoutHandler extends LogoutHandler {

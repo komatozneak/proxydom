@@ -15,6 +15,7 @@
 		A2E000000000000000000001 /* PacketTunnelProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2E000000000000000000010 /* PacketTunnelProvider.swift */; };
 		A2E000000000000000000002 /* Hy2TunnelEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2E000000000000000000011 /* Hy2TunnelEngine.swift */; };
 		A2E000000000000000000003 /* TeremokVpnShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2E000000000000000000012 /* TeremokVpnShared.swift */; };
+		A2E000000000000000000004 /* TeremokVpnShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2E000000000000000000012 /* TeremokVpnShared.swift */; };
 		A2E000000000000000000004 /* Hy2bind.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = A2E000000000000000000015 /* Hy2bind.xcframework */; };
 		A2E000000000000000000005 /* Hy2bind.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = A2E000000000000000000015 /* Hy2bind.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		A2E000000000000000000006 /* VpnTunnelProvider.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = A2E000000000000000000016 /* VpnTunnelProvider.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -371,6 +372,7 @@
 			files = (
 				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
 				A1B2C3D41F00000100TEREMOK /* TeremokVpnChannel.swift in Sources */,
+				A2E000000000000000000004 /* TeremokVpnShared.swift in Sources */,
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
 				7884E8682EC3CC0700C636F2 /* SceneDelegate.swift in Sources */,
 			);

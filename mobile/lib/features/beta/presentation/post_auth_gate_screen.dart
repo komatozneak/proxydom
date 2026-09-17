@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/config.dart';
+import '../../../core/diagnostics/app_log_buffer.dart';
 import '../../../core/router.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/teremok_snackbar.dart';
@@ -13,6 +14,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../auth/application/auth_provider.dart';
 import '../../auth/application/auth_state.dart';
 import '../../auth/application/logout_handler.dart';
+import '../../auth/presentation/bootstrap_loading_screen.dart';
 import '../../onboarding/data/onboarding_prefs.dart';
 import '../../vpn/data/vpn_controller.dart';
 import '../application/beta_providers.dart';
@@ -21,7 +23,7 @@ import '../data/jwt_subject.dart';
 
 /// How long a single entitlement call may hang on /gate (dead Packet Tunnel).
 @visibleForTesting
-const Duration kGateEntitlementTimeout = Duration(seconds: 8);
+const Duration kGateEntitlementTimeout = Duration(seconds: 2);
 
 const kGateRetryKey = ValueKey<String>('gate_retry');
 const kGateDisconnectVpnKey = ValueKey<String>('gate_disconnect_vpn');
@@ -34,8 +36,8 @@ const kGateDisconnectVpnKey = ValueKey<String>('gate_disconnect_vpn');
 /// When another VPN / Always-on blocks the network, show conflict UX with a
 /// deep-link to Android VPN settings (same path as Home Nest Connect).
 ///
-/// Own leftover tunnel (common on iOS cold start) is stopped after a failed
-/// entitlement so Retry can reach the API over cellular/Wi‑Fi.
+/// Own leftover tunnel (common on iOS cold start) is stopped in parallel with
+/// the first entitlement attempt so Retry can reach the API over cellular/Wi‑Fi.
 class PostAuthGateScreen extends ConsumerStatefulWidget {
   const PostAuthGateScreen({super.key});
 
@@ -68,6 +70,9 @@ class _PostAuthGateScreenState extends ConsumerState<PostAuthGateScreen> {
   Future<void> _resolve({bool stopOwnVpnFirst = false}) async {
     if (_resolving) return;
     _resolving = true;
+    AppLogBuffer.instance.info(
+      'gate.resolve start stopOwnVpnFirst=$stopOwnVpnFirst',
+    );
     try {
       if (mounted) {
         setState(() {
@@ -89,13 +94,29 @@ class _PostAuthGateScreenState extends ConsumerState<PostAuthGateScreen> {
       }
 
       if (stopOwnVpnFirst) {
-        await _stopOwnTunnelQuietly();
+        await _stopOwnTunnelQuietly(reason: 'retry_after_fail');
+      }
+
+      // Leftover Packet Tunnel: stop in parallel with first fetch (do not wait
+      // for a full timeout before tearing down).
+      var earlyStopScheduled = false;
+      Future<void>? earlyStop;
+      if (!stopOwnVpnFirst) {
+        final ownEarly = await _isOwnVpnActive();
+        if (ownEarly) {
+          earlyStopScheduled = true;
+          AppLogBuffer.instance.info(
+            'gate.stop_own_tunnel reason=leftover parallel=true',
+          );
+          earlyStop = _stopOwnTunnelQuietly(reason: 'leftover');
+        }
       }
 
       final userId = jwtSubject(auth.accessToken) ?? 'unknown';
       Object? lastError;
       // Short attempts: dead Hy2 tunnel used to hang 30s/60s × 3.
       for (var attempt = 0; attempt < 2; attempt++) {
+        final sw = Stopwatch()..start();
         try {
           final entitlement = await ref
               .read(betaApiProvider)
@@ -108,12 +129,17 @@ class _PostAuthGateScreenState extends ConsumerState<PostAuthGateScreen> {
                   message: 'gate entitlement timeout',
                 ),
               );
+          AppLogBuffer.instance.info(
+            'gate.entitlement ok ms=${sw.elapsedMilliseconds} attempt=$attempt',
+          );
+          if (earlyStop != null) await earlyStop;
           final dest = await PostAuthRouter.resolveWithPrefs(
             entitlement: entitlement,
             userId: userId,
           );
           if (!mounted) return;
           _did401Recover = false;
+          AppLogBuffer.instance.info('gate.dest=${dest.name}');
           switch (dest) {
             case PostAuthDestination.promo:
               AppRouter.postAuthResolved = false;
@@ -129,12 +155,19 @@ class _PostAuthGateScreenState extends ConsumerState<PostAuthGateScreen> {
           return;
         } on DioException catch (e) {
           lastError = e;
+          AppLogBuffer.instance.warn(
+            'gate.entitlement fail ms=${sw.elapsedMilliseconds} '
+            'attempt=$attempt type=${e.type.name} '
+            'status=${e.response?.statusCode ?? '-'}',
+          );
           if (e.response?.statusCode == 401) {
             if (!mounted) return;
             AppRouter.postAuthResolved = false;
             if (AppConfig.authAnonymous) {
               if (!_did401Recover) {
                 _did401Recover = true;
+                AppLogBuffer.instance.info('gate.401 retryBootstrap');
+                if (earlyStop != null) await earlyStop;
                 await ref.read(authProvider.notifier).retryBootstrap();
                 // Re-enter resolve on the same /gate route (go('/gate') is a no-op).
                 _resolving = false;
@@ -143,6 +176,7 @@ class _PostAuthGateScreenState extends ConsumerState<PostAuthGateScreen> {
               }
               break;
             }
+            if (earlyStop != null) await earlyStop;
             await ref.read(logoutHandlerProvider).logout();
             if (mounted) context.go('/login');
             return;
@@ -158,17 +192,26 @@ class _PostAuthGateScreenState extends ConsumerState<PostAuthGateScreen> {
           break;
         } catch (e) {
           lastError = e;
+          AppLogBuffer.instance.warn(
+            'gate.entitlement fail ms=${sw.elapsedMilliseconds} '
+            'attempt=$attempt err=$e',
+          );
           break;
         }
       }
+
+      if (earlyStop != null) await earlyStop;
 
       if (!mounted) return;
       AppRouter.postAuthResolved = false;
 
       final ownVpn = await _isOwnVpnActive();
       // One automatic stop+retry when leftover tunnel likely ate the API path.
-      if (ownVpn && !stopOwnVpnFirst) {
-        await _stopOwnTunnelQuietly();
+      // Also retry once if we already kicked an early stop in parallel.
+      if (!stopOwnVpnFirst && (ownVpn || earlyStopScheduled)) {
+        if (ownVpn) {
+          await _stopOwnTunnelQuietly(reason: 'after_fail');
+        }
         _resolving = false;
         await _resolve(stopOwnVpnFirst: true);
         return;
@@ -194,6 +237,9 @@ class _PostAuthGateScreenState extends ConsumerState<PostAuthGateScreen> {
         _ownVpnActive = ownVpn;
         _errorKind = _classifyError(lastError);
       });
+      AppLogBuffer.instance.warn(
+        'gate.error kind=$_errorKind ownVpn=$ownVpn',
+      );
     } finally {
       _resolving = false;
     }
@@ -201,19 +247,27 @@ class _PostAuthGateScreenState extends ConsumerState<PostAuthGateScreen> {
 
   Future<bool> _isOwnVpnActive() async {
     try {
-      if (await VpnController.instance.hasActiveSession()) return true;
+      final session = await VpnController.instance.hasActiveSession();
       final status = await VpnController.instance.getStatus();
-      return status == VpnNativeStatus.connected ||
+      final active = session ||
+          status == VpnNativeStatus.connected ||
           status == VpnNativeStatus.connecting;
-    } catch (_) {
+      AppLogBuffer.instance.info(
+        'gate.vpn_probe session=$session status=${status.name} active=$active',
+      );
+      return active;
+    } catch (e) {
+      AppLogBuffer.instance.warn('gate.vpn_probe fail: $e');
       return false;
     }
   }
 
-  Future<void> _stopOwnTunnelQuietly() async {
+  Future<void> _stopOwnTunnelQuietly({required String reason}) async {
     try {
+      AppLogBuffer.instance.info('gate.stop_own_tunnel reason=$reason');
       await VpnController.instance.stop();
-    } catch (_) {
+    } catch (e) {
+      AppLogBuffer.instance.warn('gate.stop_own_tunnel fail: $e');
       // Missing plugin / already idle — still try entitlement over LTE.
     }
   }
@@ -249,6 +303,7 @@ class _PostAuthGateScreenState extends ConsumerState<PostAuthGateScreen> {
   void _retry({required bool stopVpn}) {
     if (_resolving) return;
     _did401Recover = false;
+    AppLogBuffer.instance.info('gate.retry stopVpn=$stopVpn');
     setState(() {
       _errorKind = null;
       _vpnConflict = false;
@@ -270,7 +325,12 @@ class _PostAuthGateScreenState extends ConsumerState<PostAuthGateScreen> {
             ? Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const CircularProgressIndicator(),
+                  const AppIcon(AppIcons.house, size: 48),
+                  const SizedBox(height: 24),
+                  CircularProgressIndicator(
+                    key: BootstrapLoadingScreen.progressKey,
+                    color: theme.colorScheme.primary,
+                  ),
                   const SizedBox(height: 16),
                   Text(
                     l.betaGateChecking,

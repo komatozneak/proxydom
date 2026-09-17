@@ -55,12 +55,20 @@ enum TeremokVpnChannel {
       case "stop", "wipeSession":
         stopTunnel(wipe: call.method == "wipeSession", result: result)
       case "getStatus":
-        result(resolveStatus())
+        let s = resolveStatus()
+        TeremokVpnShared.appendNativeLog("channel.getStatus=\(s)")
+        result(s)
       case "hasActiveSession":
         let s = resolveStatus()
-        result(s == "connected" || s == "connecting")
+        let active = s == "connected" || s == "connecting"
+        TeremokVpnShared.appendNativeLog(
+          "channel.hasActiveSession=\(active) status=\(s)"
+        )
+        result(active)
       case "getLastError":
         result(UserDefaults(suiteName: appGroupId)?.string(forKey: lastErrorKey))
+      case "getNativeLogTail":
+        result(TeremokVpnShared.nativeLogTail())
       case "requestPermission":
         // Android: VpnService.prepare. iOS consent is the system VPN dialog on
         // startVPNTunnel — do not block Connect with MissingPluginException.
@@ -162,6 +170,9 @@ enum TeremokVpnChannel {
       guard let connection = note.object as? NEVPNConnection else { return }
       cachedNEVPNStatus = connection.status
       let mapped = mapNEVPNStatus(connection.status)
+      TeremokVpnShared.appendNativeLog(
+        "NEVPNStatusDidChange raw=\(connection.status.rawValue) mapped=\(mapped)"
+      )
       statusHandler?.emit(mapped)
       sessionHandler?.emit(forStatus: mapped)
     }
@@ -186,6 +197,7 @@ enum TeremokVpnChannel {
       )
       return
     }
+    TeremokVpnShared.appendNativeLog("channel.startTunnel")
     bumpGeneration()
     defaults()?.set(paramsJson, forKey: paramsKey)
     defaults()?.removeObject(forKey: lastErrorKey)
@@ -250,6 +262,7 @@ enum TeremokVpnChannel {
   }
 
   private static func stopTunnel(wipe: Bool, result: @escaping FlutterResult) {
+    TeremokVpnShared.appendNativeLog("channel.stopTunnel wipe=\(wipe)")
     NETunnelProviderManager.loadAllFromPreferences { managers, _ in
       let ours = managers?.filter {
         ($0.protocolConfiguration as? NETunnelProviderProtocol)?
@@ -263,6 +276,9 @@ enum TeremokVpnChannel {
       }
       for manager in ours {
         let status = manager.connection.status
+        TeremokVpnShared.appendNativeLog(
+          "channel.stopTunnel nevpn=\(status.rawValue)"
+        )
         if status == .connected || status == .connecting || status == .reasserting {
           manager.connection.stopVPNTunnel()
         }
