@@ -10,6 +10,7 @@ import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/teremok_nav_icon.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../beta/application/cold_start_entitlement.dart';
 import '../../home/application/vpn_provider.dart';
 
 /// Bumped when user opens the Locations tab — triggers a reload.
@@ -17,7 +18,7 @@ final modesTabTickProvider = StateProvider<int>((ref) => 0);
 
 /// Authenticated shell — branch indices MUST match [AppRouter] StatefulShellRoute:
 /// 0=Locations, 1=Home(VPN), 2=Settings.
-class MainShell extends ConsumerWidget {
+class MainShell extends ConsumerStatefulWidget {
   const MainShell({super.key, required this.navigationShell});
 
   final StatefulNavigationShell navigationShell;
@@ -29,32 +30,46 @@ class MainShell extends ConsumerWidget {
   /// Legacy alias (Modes → Locations).
   static const int modesIndex = locationsIndex;
 
-  void _onTap(WidgetRef ref, int index) {
+  @override
+  ConsumerState<MainShell> createState() => _MainShellState();
+}
+
+class _MainShellState extends ConsumerState<MainShell> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(ColdStartEntitlement.runOnce(ref, context));
+    });
+  }
+
+  void _onTap(int index) {
     if (ref.read(busyOverlayProvider).isBusy) return;
-    if (index == locationsIndex) {
+    if (index == MainShell.locationsIndex) {
       ref.read(modesTabTickProvider.notifier).state++;
     }
-    if (index == homeIndex) {
+    if (index == MainShell.homeIndex) {
       unawaited(ref.read(vpnProvider.notifier).syncFromNative());
     }
-    navigationShell.goBranch(
+    widget.navigationShell.goBranch(
       index,
-      initialLocation: index == navigationShell.currentIndex,
+      initialLocation: index == widget.navigationShell.currentIndex,
     );
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l = AppL10n.of(context);
     final theme = Theme.of(context);
-    final selected = navigationShell.currentIndex;
+    final selected = widget.navigationShell.currentIndex;
     final elevated = theme.colorScheme.surfaceContainerHighest;
     final line = theme.colorScheme.outline;
 
     return Stack(
       children: [
         Scaffold(
-          body: navigationShell,
+          body: widget.navigationShell,
           bottomNavigationBar: DecoratedBox(
             decoration: BoxDecoration(
               color: elevated,
@@ -70,23 +85,23 @@ class MainShell extends ConsumerWidget {
                       child: _SideNavGlyph(
                         icon: AppIcons.mapPin,
                         label: l.navLocations,
-                        selected: selected == locationsIndex,
-                        onTap: () => _onTap(ref, locationsIndex),
+                        selected: selected == MainShell.locationsIndex,
+                        onTap: () => _onTap(MainShell.locationsIndex),
                       ),
                     ),
                     Expanded(
                       child: _CenterNavMark(
-                        selected: selected == homeIndex,
+                        selected: selected == MainShell.homeIndex,
                         semanticLabel: l.navVpn,
-                        onTap: () => _onTap(ref, homeIndex),
+                        onTap: () => _onTap(MainShell.homeIndex),
                       ),
                     ),
                     Expanded(
                       child: _SideNavGlyph(
                         icon: AppIcons.settings,
                         label: l.navSettings,
-                        selected: selected == settingsIndex,
-                        onTap: () => _onTap(ref, settingsIndex),
+                        selected: selected == MainShell.settingsIndex,
+                        onTap: () => _onTap(MainShell.settingsIndex),
                       ),
                     ),
                   ],

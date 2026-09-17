@@ -56,7 +56,7 @@ Widget _bootstrapApp(
         return loc == '/bootstrap-failed' ? null : '/bootstrap-failed';
       }
       if (auth is AuthStateAuthenticated && loc == '/bootstrap') {
-        return '/gate';
+        return '/home';
       }
       return null;
     },
@@ -68,6 +68,10 @@ Widget _bootstrapApp(
       GoRoute(
         path: '/bootstrap-failed',
         builder: (_, __) => const BootstrapFailedScreen(),
+      ),
+      GoRoute(
+        path: '/home',
+        builder: (_, __) => const Scaffold(body: Text('home')),
       ),
       GoRoute(
         path: '/gate',
@@ -137,7 +141,7 @@ void main() {
     expect(find.text('Повторить'), findsOneWidget);
   });
 
-  testWidgets('authenticated bootstrap leaves the spinner for the gate',
+  testWidgets('authenticated bootstrap leaves the spinner for Home',
       (tester) async {
     final container = ProviderContainer(
       overrides: [authProvider.overrideWith(_AuthedAuth.new)],
@@ -148,7 +152,7 @@ void main() {
     await tester.pumpWidget(_bootstrapApp(container));
     await tester.pumpAndSettle();
 
-    expect(find.text('gate'), findsOneWidget);
+    expect(find.text('home'), findsOneWidget);
     expect(find.byKey(BootstrapLoadingScreen.progressKey), findsNothing);
   });
 }

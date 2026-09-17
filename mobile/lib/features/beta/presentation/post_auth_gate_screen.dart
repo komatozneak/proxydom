@@ -36,8 +36,8 @@ const kGateDisconnectVpnKey = ValueKey<String>('gate_disconnect_vpn');
 /// When another VPN / Always-on blocks the network, show conflict UX with a
 /// deep-link to Android VPN settings (same path as Home Nest Connect).
 ///
-/// Own leftover tunnel (common on iOS cold start) is stopped in parallel with
-/// the first entitlement attempt so Retry can reach the API over cellular/Wi‑Fi.
+/// Own Packet Tunnel is never auto-stopped (iOS UI ≠ dataplane). Only the
+/// manual «Отключить VPN и повторить» CTA calls [VpnController.stop].
 class PostAuthGateScreen extends ConsumerStatefulWidget {
   const PostAuthGateScreen({super.key});
 
@@ -93,23 +93,9 @@ class _PostAuthGateScreenState extends ConsumerState<PostAuthGateScreen> {
         return;
       }
 
+      // Manual CTA only — never auto-stop leftover own tunnel for entitlement.
       if (stopOwnVpnFirst) {
-        await _stopOwnTunnelQuietly(reason: 'retry_after_fail');
-      }
-
-      // Leftover Packet Tunnel: stop in parallel with first fetch (do not wait
-      // for a full timeout before tearing down).
-      var earlyStopScheduled = false;
-      Future<void>? earlyStop;
-      if (!stopOwnVpnFirst) {
-        final ownEarly = await _isOwnVpnActive();
-        if (ownEarly) {
-          earlyStopScheduled = true;
-          AppLogBuffer.instance.info(
-            'gate.stop_own_tunnel reason=leftover parallel=true',
-          );
-          earlyStop = _stopOwnTunnelQuietly(reason: 'leftover');
-        }
+        await _stopOwnTunnelQuietly(reason: 'manual_cta');
       }
 
       final userId = jwtSubject(auth.accessToken) ?? 'unknown';
@@ -132,7 +118,6 @@ class _PostAuthGateScreenState extends ConsumerState<PostAuthGateScreen> {
           AppLogBuffer.instance.info(
             'gate.entitlement ok ms=${sw.elapsedMilliseconds} attempt=$attempt',
           );
-          if (earlyStop != null) await earlyStop;
           final dest = await PostAuthRouter.resolveWithPrefs(
             entitlement: entitlement,
             userId: userId,
@@ -167,7 +152,6 @@ class _PostAuthGateScreenState extends ConsumerState<PostAuthGateScreen> {
               if (!_did401Recover) {
                 _did401Recover = true;
                 AppLogBuffer.instance.info('gate.401 retryBootstrap');
-                if (earlyStop != null) await earlyStop;
                 await ref.read(authProvider.notifier).retryBootstrap();
                 // Re-enter resolve on the same /gate route (go('/gate') is a no-op).
                 _resolving = false;
@@ -176,7 +160,6 @@ class _PostAuthGateScreenState extends ConsumerState<PostAuthGateScreen> {
               }
               break;
             }
-            if (earlyStop != null) await earlyStop;
             await ref.read(logoutHandlerProvider).logout();
             if (mounted) context.go('/login');
             return;
@@ -200,23 +183,10 @@ class _PostAuthGateScreenState extends ConsumerState<PostAuthGateScreen> {
         }
       }
 
-      if (earlyStop != null) await earlyStop;
-
       if (!mounted) return;
       AppRouter.postAuthResolved = false;
 
       final ownVpn = await _isOwnVpnActive();
-      // One automatic stop+retry when leftover tunnel likely ate the API path.
-      // Also retry once if we already kicked an early stop in parallel.
-      if (!stopOwnVpnFirst && (ownVpn || earlyStopScheduled)) {
-        if (ownVpn) {
-          await _stopOwnTunnelQuietly(reason: 'after_fail');
-        }
-        _resolving = false;
-        await _resolve(stopOwnVpnFirst: true);
-        return;
-      }
-
       final conflict = await VpnController.instance.queryVpnConflict();
       if (!mounted) return;
       if (conflict.foreignAlwaysOn) {

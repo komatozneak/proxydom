@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import NetworkExtension
 
@@ -27,8 +28,14 @@ final class Hy2TunnelEngine: NSObject {
     }
     let settings = Self.networkSettings(
       remoteHost: cfg.remoteHost,
-      mtu: mtu
+      mtu: mtu,
+      excludedHosts: cfg.controlPlaneHosts
     )
+    if !cfg.controlPlaneHosts.isEmpty {
+      TeremokVpnShared.appendNativeLog(
+        "PacketTunnel.exclude api=\(cfg.controlPlaneHosts.joined(separator: ","))"
+      )
+    }
     provider.setTunnelNetworkSettings(settings) { [weak self] error in
       guard let self else { return }
       if let error {
@@ -88,18 +95,36 @@ final class Hy2TunnelEngine: NSObject {
     }
   }
 
-  static func networkSettings(remoteHost: String, mtu: Int) -> NEPacketTunnelNetworkSettings {
+  static func networkSettings(
+    remoteHost: String,
+    mtu: Int,
+    excludedHosts: [String] = []
+  ) -> NEPacketTunnelNetworkSettings {
     let settings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: remoteHost)
     let ipv4 = NEIPv4Settings(
       addresses: ["10.255.255.1"],
       subnetMasks: ["255.255.255.252"]
     )
     ipv4.includedRoutes = [NEIPv4Route.default()]
+    // Parity with Android excludeRoute: API master must stay on LTE/Wi‑Fi.
+    let v4Excludes = excludedHosts.compactMap { host -> NEIPv4Route? in
+      let trimmed = host.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard Self.isIPv4(trimmed) else { return nil }
+      return NEIPv4Route(destinationAddress: trimmed, subnetMask: "255.255.255.255")
+    }
+    if !v4Excludes.isEmpty {
+      ipv4.excludedRoutes = v4Excludes
+    }
     settings.ipv4Settings = ipv4
     settings.mtu = NSNumber(value: mtu)
     let dns = NEDNSSettings(servers: ["1.1.1.1", "8.8.8.8"])
     settings.dnsSettings = dns
     return settings
+  }
+
+  private static func isIPv4(_ host: String) -> Bool {
+    var addr = in_addr()
+    return host.withCString { inet_pton(AF_INET, $0, &addr) == 1 }
   }
 
   private static func err(_ code: Int, _ message: String) -> NSError {
@@ -131,6 +156,7 @@ extension Hy2TunnelEngine: Hy2bindPacketWriterProtocol {
 struct Hy2StartConfig {
   var remoteHost: String
   var goJSON: String
+  var controlPlaneHosts: [String]
 
   static func parse(_ paramsJson: String) -> Hy2StartConfig? {
     guard
@@ -151,6 +177,12 @@ struct Hy2StartConfig {
       suffixes = raw.map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
         .filter { !$0.isEmpty }
     }
+    var controlPlane: [String] = []
+    if let raw = obj["controlPlaneHosts"] as? [String] {
+      controlPlane = raw
+        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        .filter { !$0.isEmpty }
+    }
     let host = server.split(separator: ":", maxSplits: 1).first.map(String.init) ?? server
     var go: [String: Any] = [
       "server": server,
@@ -167,6 +199,10 @@ struct Hy2StartConfig {
     else {
       return nil
     }
-    return Hy2StartConfig(remoteHost: host, goJSON: goJSON)
+    return Hy2StartConfig(
+      remoteHost: host,
+      goJSON: goJSON,
+      controlPlaneHosts: controlPlane
+    )
   }
 }

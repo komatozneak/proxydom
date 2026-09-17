@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -30,17 +31,29 @@ import 'config.dart';
 
 /// Роутер приложения.
 ///
-/// Funnel (anonymous): bootstrap → /gate → locked? → recovery? → onboarding? → shell.
+/// Funnel (anonymous): bootstrap → /home (JWT) → soft entitlement in shell;
+/// /gate only for promo / locked / restore / manual retry.
 class AppRouter {
   AppRouter._();
 
   /// Cached welcome flag so redirect stays sync (warmed in main / gate).
   static bool? welcomeSeenCache;
 
-  /// After [PostAuthGateScreen] (or promo redeem) grants shell/onboarding.
-  /// Cold restore hits /home → redirect to /gate until this is true.
+  /// After JWT cold start, [PostAuthGateScreen], or promo redeem grants shell.
+  /// Cold restore with JWT sets this true immediately so /home is not blocked
+  /// by full-screen /gate (entitlement runs in background).
   /// MUST stay false while on /promo — never set true before destination is known.
   static bool postAuthResolved = false;
+
+  /// JWT present → allow shell without waiting for entitlement.
+  ///
+  /// Used by redirect on cold bootstrap so Packet Tunnel stays up and Home
+  /// paints immediately. Entitlement soft-check runs in [MainShell].
+  @visibleForTesting
+  static String enterShellForAuthedColdStart() {
+    postAuthResolved = true;
+    return '/home';
+  }
 
   /// Soften recovery UX: one-shot code after register; Settings can recover.
   static String? pendingRecoveryCode;
@@ -86,7 +99,7 @@ class AppRouter {
   static final GoRouter config = GoRouter(
     navigatorKey: rootNavigatorKey,
     // First frame is /bootstrap so cold register never blocks runApp.
-    // Authed users redirect through /gate once [authProvider] resolves.
+    // Authed JWT → Home immediately; entitlement soft-check in shell.
     initialLocation: '/bootstrap',
     refreshListenable: refreshNotifier,
     redirect: (context, state) {
@@ -122,7 +135,7 @@ class AppRouter {
       final isAuthed = auth is AuthStateAuthenticated;
 
       if (goingToBootstrap) {
-        if (isAuthed) return '/gate';
+        if (isAuthed) return enterShellForAuthedColdStart();
         if (auth is AuthStateUnauthenticated) {
           return AppConfig.authAnonymous ? '/welcome' : '/bootstrap-failed';
         }
@@ -151,14 +164,14 @@ class AppRouter {
         return '/bootstrap-failed';
       }
 
-      // Authed: leave welcome for the entitlement gate.
+      // Authed: leave welcome / bootstrap-fail for Home (soft entitlement later).
       if (goingToWelcome || goingToBootstrapFail) {
-        return '/gate';
+        return enterShellForAuthedColdStart();
       }
       if (goingToGate || goingToPromo || goingToLocked || goingToRecovery || goingToRestore) {
         return null;
       }
-      // Onboarding + shell only after entitlement (or gate-off soft-pass) resolved.
+      // Onboarding + shell after cold-start flag or explicit gate resolution.
       // Do NOT allow /onboarding without postAuthResolved — that skipped promo.
       if ((goingToOnboarding || inShell || goingToBillingTabs) &&
           !postAuthResolved) {
@@ -167,7 +180,7 @@ class AppRouter {
       if (goingToOnboarding || inShell || goingToBillingTabs) {
         return null;
       }
-      return '/gate';
+      return enterShellForAuthedColdStart();
     },
     routes: [
       GoRoute(

@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:teremok_connect/core/config.dart';
+import 'package:teremok_connect/core/router.dart';
 import 'package:teremok_connect/core/theme.dart';
 import 'package:teremok_connect/features/auth/application/auth_provider.dart';
 import 'package:teremok_connect/features/auth/application/auth_state.dart';
@@ -122,6 +123,7 @@ void main() {
     mockSecureStorage();
     await OnboardingPrefs.markCompleted(userId: 'unknown');
     await RecoveryCodeStorage.instance.markShown();
+    AppRouter.postAuthResolved = false;
   });
 
   void mockVpn({
@@ -271,14 +273,13 @@ void main() {
     expect(api.calls, greaterThan(callsAfterFail));
   });
 
-  testWidgets('own VPN up stops tunnel then reaches home', (tester) async {
+  testWidgets(
+      'leftover own VPN connected does not auto-stop; entitlement reaches home',
+      (tester) async {
     final stops = <String>[];
     mockVpn(status: 'connected', hasSession: true, stopLog: stops);
 
-    // Parallel leftover stop + two short fails, then post-stop resolve OK.
-    final api = _CountingBetaApi(
-      results: [_connErr(), _connErr(), _okEntitlement],
-    );
+    final api = _CountingBetaApi(results: [_okEntitlement]);
     final container = ProviderContainer(
       overrides: [
         authProvider.overrideWith(_AuthedNotifier.new),
@@ -290,24 +291,16 @@ void main() {
 
     await tester.pumpWidget(_gateApp(container));
     await tester.pump();
-    // House loading UI (not bare white spinner) while resolving.
-    expect(find.text('Проверяем доступ…'), findsOneWidget);
-    await tester.pump(const Duration(seconds: 3));
+    await tester.pump(const Duration(seconds: 2));
     await tester.pumpAndSettle();
 
-    expect(stops, contains('stop'), reason: 'api.calls=${api.calls}');
-    expect(api.calls, greaterThanOrEqualTo(3));
-    expect(
-      find.text('HOME'),
-      findsOneWidget,
-      reason:
-          'error=${find.text('Нет связи с сервером. Попробуйте снова').evaluate().length} '
-          'checking=${find.text('Проверяем доступ…').evaluate().length} '
-          'onboarding=${find.textContaining('Далее').evaluate().length}',
-    );
+    expect(stops, isEmpty, reason: 'must not kill Packet Tunnel for leftover');
+    expect(api.calls, 1);
+    expect(find.text('HOME'), findsOneWidget);
   });
 
-  testWidgets('leftover VPN stop runs before entitlement hang finishes',
+  testWidgets(
+      'leftover VPN never auto-stops while entitlement hangs',
       (tester) async {
     final stops = <String>[];
     mockVpn(status: 'connected', hasSession: true, stopLog: stops);
@@ -325,14 +318,46 @@ void main() {
     await tester.pumpWidget(_gateApp(container));
     await tester.pump();
     await api.firstFetchStarted.future;
-    // Parallel stop must fire without waiting full hang.
     await tester.pump(const Duration(milliseconds: 50));
-    expect(stops, contains('stop'));
+    expect(stops, isEmpty);
     expect(kGateEntitlementTimeout, const Duration(seconds: 2));
 
-    // Let gate timeouts + post-stop resolve complete.
+    // Timeouts + second attempt (ok) — still no auto-stop.
     await tester.pump(const Duration(seconds: 5));
     await tester.pumpAndSettle();
+    expect(stops, isEmpty);
+    expect(find.text('HOME'), findsOneWidget);
+  });
+
+  testWidgets('manual disconnect CTA stops tunnel then retries', (tester) async {
+    final stops = <String>[];
+    mockVpn(status: 'connected', hasSession: true, stopLog: stops);
+
+    // Fail until user taps disconnect CTA (stopOwnVpnFirst), then succeed.
+    final api = _CountingBetaApi(
+      results: [_connErr(), _connErr(), _okEntitlement],
+    );
+    final container = ProviderContainer(
+      overrides: [
+        authProvider.overrideWith(_AuthedNotifier.new),
+        betaApiProvider.overrideWithValue(api),
+      ],
+    );
+    addTearDown(container.dispose);
+    await container.read(authProvider.future);
+
+    await tester.pumpWidget(_gateApp(container));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 3));
+    expect(find.byKey(kGateDisconnectVpnKey), findsOneWidget);
+    expect(stops, isEmpty);
+
+    await tester.tap(find.byKey(kGateDisconnectVpnKey));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+
+    expect(stops, contains('stop'));
     expect(find.text('HOME'), findsOneWidget);
   });
 
@@ -377,6 +402,12 @@ void main() {
       expect(logoutCalls, 1);
       expect(find.text('LOGIN'), findsOneWidget);
     }
+  });
+
+  test('authed cold start helper grants Home without waiting entitlement', () {
+    AppRouter.postAuthResolved = false;
+    expect(AppRouter.enterShellForAuthedColdStart(), '/home');
+    expect(AppRouter.postAuthResolved, isTrue);
   });
 }
 
