@@ -95,6 +95,10 @@ class _LockedAccessScreenState extends ConsumerState<LockedAccessScreen> {
   }
 
   Future<void> _pay(String plan) async {
+    if (hideInAppPlategaCheckout) {
+      await openIosPremiumAccountPath(context, ref);
+      return;
+    }
     setState(() {
       _payBusy = true;
       _error = null;
@@ -330,15 +334,17 @@ class _LockedAccessScreenState extends ConsumerState<LockedAccessScreen> {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 12),
-                          Text(
-                            l.lockedVerifyCode('PLAT'),
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: muted,
-                              letterSpacing: 0.3,
+                          if (!hideInAppPlategaCheckout) ...[
+                            const SizedBox(height: 12),
+                            Text(
+                              l.lockedVerifyCode('PLAT'),
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: muted,
+                                letterSpacing: 0.3,
+                              ),
                             ),
-                          ),
+                          ],
                           const SizedBox(height: 20),
                           InkWell(
                             onTap: busy

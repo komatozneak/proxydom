@@ -1,15 +1,20 @@
 import 'package:dio/dio.dart';
 
 import '../../../core/api_client.dart';
+import '../../../core/ios_store_gates.dart';
 
 /// Platega hosted checkout (ADR 017): Free Play listing, not Play Billing.
 /// Do not add BillingClient / com.android.vending.BILLING.
+/// iOS must not call hosted checkout (guideline 3.1.1); see [hideInAppPlategaCheckout].
 class BillingApi {
   BillingApi({Dio? dio}) : _dio = dio ?? ApiClient.instance;
 
   final Dio _dio;
 
   Future<PlategaCreateResult> createPlategaPayment({required String plan}) async {
+    if (hideInAppPlategaCheckout) {
+      throw UnsupportedError('in-app checkout is not available');
+    }
     final resp = await _dio.post<Map<String, dynamic>>(
       '/billing/platega/create',
       data: {'plan': plan},

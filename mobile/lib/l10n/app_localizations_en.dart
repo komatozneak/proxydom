@@ -1491,7 +1491,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get iosBillingUnavailableBody =>
-      'In-app payment is not available. Free locations still work. Account is in Telegram after you connect.';
+      'In-app payment is not available. Free locations still work.';
 
   @override
   String get vpnDisclosureTitle => 'Protected connection';

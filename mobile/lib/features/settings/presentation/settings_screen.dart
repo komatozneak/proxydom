@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/config.dart';
 import '../../../core/diagnostics/diagnostics_service.dart';
+import '../../../core/ios_store_gates.dart';
 import '../../../core/install_id_storage.dart';
 import '../../../core/support_contact.dart';
 import '../../../core/theme.dart';
@@ -549,13 +550,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
                 child: Text(l.settingsTerms),
               ),
-              TextButton(
-                onPressed: () => launchUrl(
-                  Uri.parse(AppConfig.pricingUrl),
-                  mode: LaunchMode.externalApplication,
+              if (!hideInAppPlategaCheckout)
+                TextButton(
+                  onPressed: () => launchUrl(
+                    Uri.parse(AppConfig.pricingUrl),
+                    mode: LaunchMode.externalApplication,
+                  ),
+                  child: Text(l.settingsPricing),
                 ),
-                child: Text(l.settingsPricing),
-              ),
               TextButton(
                 onPressed: () => launchUrl(
                   Uri.parse(AppConfig.supportPageUrl),

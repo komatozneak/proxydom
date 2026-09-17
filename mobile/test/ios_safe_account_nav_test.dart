@@ -10,6 +10,7 @@ import 'package:teremok_connect/features/billing/presentation/premium_tab_screen
 import 'package:teremok_connect/features/settings/application/devices_list_provider.dart';
 import 'package:teremok_connect/features/settings/application/subscription_status_provider.dart';
 import 'package:teremok_connect/features/settings/data/subscription_status.dart';
+import 'package:teremok_connect/features/settings/presentation/settings_screen.dart';
 import 'package:teremok_connect/l10n/app_localizations.dart';
 
 class _FixedSubNotifier extends SubscriptionStatusNotifier {
@@ -54,6 +55,9 @@ void main() {
     expect(ru.regionBlurbFree, isNot(contains('нейросет')));
     expect(ru.iosBillingUnavailableBody.toLowerCase(), isNot(contains('android')));
     expect(ru.iosBillingUnavailableBody.toLowerCase(), isNot(contains('промо')));
+    expect(ru.iosBillingUnavailableBody.toLowerCase(), isNot(contains('telegram')));
+    expect(ru.iosBillingUnavailableBody.toLowerCase(), isNot(contains('t.me')));
+    expect(en.iosBillingUnavailableBody.toLowerCase(), isNot(contains('telegram')));
     expect(ru.accountTelegramVpnRequired, 'Сначала подключитесь.');
     expect(en.regionBlurbFree.toLowerCase(), isNot(contains('ai')));
     expect(en.promoBody.toLowerCase(), isNot(contains('closed beta')));
@@ -101,6 +105,10 @@ void main() {
     await tester.pump(const Duration(milliseconds: 200));
 
     expect(find.text('Код доступа'), findsNothing);
+    expect(find.text('Тарифы'), findsNothing);
+    expect(find.text('Код проверки: PLAT'), findsNothing);
+    expect(find.text('Оплатить 199 ₽'), findsNothing);
+    expect(find.textContaining('Telegram'), findsNothing);
     expect(find.text('Аккаунт'), findsWidgets);
     await tester.tap(find.widgetWithText(FilledButton, 'Аккаунт'));
     await tester.pumpAndSettle();
@@ -152,6 +160,43 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('ACCOUNT_HUB'), findsOneWidget);
     expect(find.text('PROMO_DEAD'), findsNothing);
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('iOS Settings footer hides pricing link', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final container = ProviderContainer(
+      overrides: [
+        subscriptionStatusProvider.overrideWith(
+          () => _FixedSubNotifier(_freeQuota),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          locale: Locale('ru'),
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          home: SettingsScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Настройки'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Политика конфиденциальности'),
+      400,
+    );
+    expect(find.text('Тарифы'), findsNothing);
+    expect(find.text('Политика конфиденциальности'), findsOneWidget);
     debugDefaultTargetPlatformOverride = null;
   });
 }

@@ -2818,7 +2818,7 @@ abstract class AppL10n {
   /// No description provided for @iosBillingUnavailableBody.
   ///
   /// In en, this message translates to:
-  /// **'In-app payment is not available. Free locations still work. Account is in Telegram after you connect.'**
+  /// **'In-app payment is not available. Free locations still work.'**
   String get iosBillingUnavailableBody;
 
   /// No description provided for @vpnDisclosureTitle.
