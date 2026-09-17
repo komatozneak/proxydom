@@ -759,6 +759,9 @@ class VpnNotifier extends Notifier<VpnStatus> {
             '[VPN] syncFromNative idle drop phase=$_lastSessionPhase ui=$state',
           );
           await _confirmIdleDrop(force: true);
+          // iOS may tear NEVPN without our stop; sessionActive (KEY_ACTIVE) means
+          // the user still wants VPN — reconnect without requiring Settings toggle.
+          await _reconnectIfSessionActive(reason: 'idle_drop_connected');
           return;
         }
         if (state is VpnConnecting) {
@@ -1792,7 +1795,10 @@ class VpnNotifier extends Notifier<VpnStatus> {
         if (state is VpnConnecting && _connectInFlight == null) {
           unawaited(_failConnectingIdle());
         } else if (state is VpnConnected) {
-          unawaited(_confirmIdleDrop());
+          unawaited(() async {
+            await _confirmIdleDrop();
+            await _reconnectIfSessionActive(reason: 'native_idle_event');
+          }());
         }
       case VpnNativeStatus.revoked:
         _endSessionWalk();
@@ -1945,6 +1951,25 @@ class VpnNotifier extends Notifier<VpnStatus> {
       _lastSessionPhase = VpnSessionPhase.idle;
       _logUiTransition('disconnected', 'idle_connected');
       state = const VpnDisconnected();
+    }
+  }
+
+  /// After unexpected native idle: if the user still wants VPN (sessionActive),
+  /// start again. Intentional stop clears sessionActive on iOS/Android.
+  Future<void> _reconnectIfSessionActive({required String reason}) async {
+    if (_suppressAutoReconnect) return;
+    if (_connectInFlight != null || _autoReconnectArmed) {
+      _vpnLog('[VPN] reconnect skip in-flight reason=$reason');
+      return;
+    }
+    final sessionActive = await VpnController.instance.hasActiveSession();
+    if (!sessionActive) return;
+    _autoReconnectArmed = true;
+    _vpnLog('[VPN] syncFromNative: $reason sessionActive → connect()');
+    try {
+      await connect();
+    } finally {
+      _autoReconnectArmed = false;
     }
   }
 }

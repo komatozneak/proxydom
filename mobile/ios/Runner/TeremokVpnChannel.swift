@@ -28,6 +28,8 @@ enum TeremokVpnChannel {
   private static var pingHandler: StubMapStreamHandler?
   /// Last observed system VPN status (NEVPNStatusDidChange + load callbacks).
   private static var cachedNEVPNStatus: NEVPNStatus = .invalid
+  /// After first `loadAllFromPreferences`, `.invalid` is treated like disconnected.
+  private static var nevpnPreferencesLoaded = false
   private static var nevpnObserver: NSObjectProtocol?
 
   static func register(messenger: FlutterBinaryMessenger) {
@@ -55,14 +57,13 @@ enum TeremokVpnChannel {
       case "stop", "wipeSession":
         stopTunnel(wipe: call.method == "wipeSession", result: result)
       case "getStatus":
-        let s = resolveStatus()
-        TeremokVpnShared.appendNativeLog("channel.getStatus=\(s)")
+        let s = resolveStatus(log: true)
         result(s)
       case "hasActiveSession":
-        let s = resolveStatus()
-        let active = s == "connected" || s == "connecting"
+        // Parity with Android KEY_ACTIVE — not live NEVPN (idle+session → reconnect).
+        let active = TeremokVpnShared.isSessionActive()
         TeremokVpnShared.appendNativeLog(
-          "channel.hasActiveSession=\(active) status=\(s)"
+          "channel.hasActiveSession=\(active) status=\(resolveStatus(log: false))"
         )
         result(active)
       case "getLastError":
@@ -137,21 +138,45 @@ enum TeremokVpnChannel {
     defaults()?.string(forKey: statusKey) ?? "idle"
   }
 
-  /// Prefer live NEVPN; App Group is fallback when manager is not yet loaded.
-  private static func resolveStatus() -> String {
+  /// Clear stale App Group `connected` when NEVPN is already down (iOS killed tunnel).
+  private static func clearStaleAppGroupConnected() {
+    let group = readAppGroupStatus()
+    if group == "connected" || group == "connecting" {
+      defaults()?.set("idle", forKey: statusKey)
+    }
+  }
+
+  /// Live NEVPN is SoT. Never invent Connected from a leftover App Group row
+  /// after iOS tears the Packet Tunnel down without our `stopTunnel`.
+  private static func resolveStatus(log: Bool) -> String {
+    let group = readAppGroupStatus()
+    let out: String
     switch cachedNEVPNStatus {
     case .connecting, .reasserting:
-      return "connecting"
+      out = "connecting"
     case .connected:
-      return "connected"
-    case .disconnecting:
-      return "disconnecting"
-    case .disconnected, .invalid:
-      // Extension may have written honest status before NEVPN settles.
-      return readAppGroupStatus()
+      out = "connected"
+    case .disconnecting, .disconnected:
+      clearStaleAppGroupConnected()
+      out = "idle"
+    case .invalid:
+      if !nevpnPreferencesLoaded {
+        // Pre-load: never trust App Group Connected without live NEVPN.
+        out = (group == "connected") ? "connecting" : group
+      } else {
+        clearStaleAppGroupConnected()
+        out = "idle"
+      }
     @unknown default:
-      return readAppGroupStatus()
+      clearStaleAppGroupConnected()
+      out = "idle"
     }
+    if log {
+      TeremokVpnShared.appendNativeLog(
+        "channel.resolve nevpn=\(cachedNEVPNStatus.rawValue) group=\(group) out=\(out)"
+      )
+    }
+    return out
   }
 
   private static func publishStatus(_ status: String) {
@@ -173,6 +198,11 @@ enum TeremokVpnChannel {
       TeremokVpnShared.appendNativeLog(
         "NEVPNStatusDidChange raw=\(connection.status.rawValue) mapped=\(mapped)"
       )
+      // Keep App Group honest when iOS drops the tunnel without channel.stop.
+      if mapped == "idle" {
+        clearStaleAppGroupConnected()
+        defaults()?.set("idle", forKey: statusKey)
+      }
       statusHandler?.emit(mapped)
       sessionHandler?.emit(forStatus: mapped)
     }
@@ -180,13 +210,24 @@ enum TeremokVpnChannel {
 
   private static func refreshCachedNEVPNStatus() {
     NETunnelProviderManager.loadAllFromPreferences { managers, _ in
+      nevpnPreferencesLoaded = true
       let ours = managers?.first {
         ($0.protocolConfiguration as? NETunnelProviderProtocol)?
           .providerBundleIdentifier == tunnelBundleId
       }
       if let ours {
         cachedNEVPNStatus = ours.connection.status
+        if mapNEVPNStatus(ours.connection.status) == "idle" {
+          clearStaleAppGroupConnected()
+        }
+      } else {
+        // No manager → not connected.
+        cachedNEVPNStatus = .disconnected
+        clearStaleAppGroupConnected()
       }
+      let out = resolveStatus(log: true)
+      statusHandler?.emit(out)
+      sessionHandler?.emit(forStatus: out)
     }
   }
 
@@ -201,11 +242,13 @@ enum TeremokVpnChannel {
     bumpGeneration()
     defaults()?.set(paramsJson, forKey: paramsKey)
     defaults()?.removeObject(forKey: lastErrorKey)
+    TeremokVpnShared.setSessionActive(true)
     publishStatus("connecting")
 
     loadManager(paramsJson: paramsJson) { manager, error in
       if let error {
         defaults()?.set(error.localizedDescription, forKey: lastErrorKey)
+        TeremokVpnShared.setSessionActive(false)
         publishStatus("idle")
         result(
           FlutterError(
@@ -217,6 +260,7 @@ enum TeremokVpnChannel {
         return
       }
       guard let manager else {
+        TeremokVpnShared.setSessionActive(false)
         result(
           FlutterError(code: "manager", message: "nil manager", details: nil)
         )
@@ -231,6 +275,7 @@ enum TeremokVpnChannel {
               "previous tunnel still disconnecting",
               forKey: lastErrorKey
             )
+            TeremokVpnShared.setSessionActive(false)
             publishStatus("idle")
             result(
               FlutterError(
@@ -248,6 +293,7 @@ enum TeremokVpnChannel {
           result(true)
         } catch {
           defaults()?.set(error.localizedDescription, forKey: lastErrorKey)
+          TeremokVpnShared.setSessionActive(false)
           publishStatus("idle")
           result(
             FlutterError(
@@ -263,7 +309,10 @@ enum TeremokVpnChannel {
 
   private static func stopTunnel(wipe: Bool, result: @escaping FlutterResult) {
     TeremokVpnShared.appendNativeLog("channel.stopTunnel wipe=\(wipe)")
+    // User-initiated stop — do not auto-reconnect.
+    TeremokVpnShared.setSessionActive(false)
     NETunnelProviderManager.loadAllFromPreferences { managers, _ in
+      nevpnPreferencesLoaded = true
       let ours = managers?.filter {
         ($0.protocolConfiguration as? NETunnelProviderProtocol)?
           .providerBundleIdentifier == tunnelBundleId
@@ -344,6 +393,7 @@ enum TeremokVpnChannel {
     completion: @escaping (NETunnelProviderManager?, Error?) -> Void
   ) {
     NETunnelProviderManager.loadAllFromPreferences { managers, error in
+      nevpnPreferencesLoaded = true
       if let error {
         completion(nil, error)
         return
@@ -396,7 +446,8 @@ enum TeremokVpnChannel {
     case .connected:
       return "connected"
     case .disconnecting:
-      return "disconnecting"
+      // Surface as idle so Flutter does not keep Nest Connected during tear-down.
+      return "idle"
     @unknown default:
       return "idle"
     }
@@ -505,6 +556,6 @@ private final class StubMapStreamHandler: NSObject, FlutterStreamHandler {
 
 extension TeremokVpnChannel {
   fileprivate static func readStatusPublic() -> String {
-    resolveStatus()
+    resolveStatus(log: false)
   }
 }

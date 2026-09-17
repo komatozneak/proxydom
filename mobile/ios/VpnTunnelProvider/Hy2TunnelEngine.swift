@@ -10,10 +10,17 @@ import Hy2bind
 ///
 /// Honest Connected = `setTunnelNetworkSettings` + Hy2 `Start` + packet tun
 /// + `packetFlow` pump. SOCKS-only is never Connected.
+///
+/// IPv6: claim `::/0` so Safari/YouTube cannot leak AAAA to LTE (RF TSPU).
+/// Hy2 nodes are IPv4-only — do **not** InjectPacket IPv6 into gVisor; reply
+/// ICMPv6 Destination Unreachable so Happy Eyeballs falls back to IPv4 in TUN.
 final class Hy2TunnelEngine: NSObject {
   private weak var provider: NEPacketTunnelProvider?
   private var pumping = false
   private let mtu = 1280
+  /// IPv6 packets claimed then dropped (not forwarded to Hy2).
+  private var ipv6DropCount: UInt64 = 0
+  private var lastIpv6DropLogged: UInt64 = 0
 
   func start(
     provider: NEPacketTunnelProvider,
@@ -21,6 +28,8 @@ final class Hy2TunnelEngine: NSObject {
     completion: @escaping (Error?) -> Void
   ) {
     self.provider = provider
+    ipv6DropCount = 0
+    lastIpv6DropLogged = 0
     #if canImport(Hy2bind)
     guard let cfg = Hy2StartConfig.parse(paramsJson) else {
       completion(Self.err(2, "invalid Hy2 paramsJson"))
@@ -36,6 +45,7 @@ final class Hy2TunnelEngine: NSObject {
         "PacketTunnel.exclude api=\(cfg.controlPlaneHosts.joined(separator: ","))"
       )
     }
+    TeremokVpnShared.appendNativeLog("PacketTunnel.v6 claim=default")
     provider.setTunnelNetworkSettings(settings) { [weak self] error in
       guard let self else { return }
       if let error {
@@ -72,6 +82,9 @@ final class Hy2TunnelEngine: NSObject {
 
   func stop() {
     pumping = false
+    if ipv6DropCount > 0 {
+      TeremokVpnShared.appendNativeLog("PacketTunnel.v6 drop=\(ipv6DropCount)")
+    }
     #if canImport(Hy2bind)
     Hy2bindSetPacketWriter(nil)
     Hy2bindStop()
@@ -83,15 +96,47 @@ final class Hy2TunnelEngine: NSObject {
     guard pumping, let flow = provider?.packetFlow else { return }
     flow.readPackets { [weak self] packets, _ in
       guard let self, self.pumping else { return }
+      var icmpReplies: [Data] = []
+      var icmpProtos: [NSNumber] = []
       #if canImport(Hy2bind)
       for packet in packets where !packet.isEmpty {
+        if Self.isIPv6(packet) {
+          self.noteIpv6Drop()
+          if let icmp = Self.icmpv6DestinationUnreachable(for: packet) {
+            icmpReplies.append(icmp)
+            icmpProtos.append(NSNumber(value: AF_INET6))
+          }
+          continue
+        }
         let injectErr = Hy2bindInjectPacket(packet) ?? ""
         if !injectErr.isEmpty {
           NSLog("[Teremok] injectPacket: %@", injectErr)
         }
       }
+      #else
+      for packet in packets where !packet.isEmpty {
+        if Self.isIPv6(packet) {
+          self.noteIpv6Drop()
+          if let icmp = Self.icmpv6DestinationUnreachable(for: packet) {
+            icmpReplies.append(icmp)
+            icmpProtos.append(NSNumber(value: AF_INET6))
+          }
+        }
+      }
       #endif
+      if !icmpReplies.isEmpty {
+        flow.writePackets(icmpReplies, withProtocols: icmpProtos)
+      }
       self.pumpInbound()
+    }
+  }
+
+  private func noteIpv6Drop() {
+    ipv6DropCount += 1
+    // First drop + every 64 thereafter (App Group ring stays readable).
+    if ipv6DropCount == 1 || ipv6DropCount - lastIpv6DropLogged >= 64 {
+      lastIpv6DropLogged = ipv6DropCount
+      TeremokVpnShared.appendNativeLog("PacketTunnel.v6 drop=\(ipv6DropCount)")
     }
   }
 
@@ -116,6 +161,16 @@ final class Hy2TunnelEngine: NSObject {
       ipv4.excludedRoutes = v4Excludes
     }
     settings.ipv4Settings = ipv4
+
+    // Claim ::/0 so dual-stack apps cannot leak AAAA to LTE. ULA TUN addr only;
+    // IPv6 payloads are dropped in pumpInbound (Hy2 egress is IPv4-only).
+    let ipv6 = NEIPv6Settings(
+      addresses: ["fd00:9e3a::1"],
+      networkPrefixLengths: [NSNumber(value: 64)]
+    )
+    ipv6.includedRoutes = [NEIPv6Route.default()]
+    settings.ipv6Settings = ipv6
+
     settings.mtu = NSNumber(value: mtu)
     let dns = NEDNSSettings(servers: ["1.1.1.1", "8.8.8.8"])
     settings.dnsSettings = dns
@@ -125,6 +180,90 @@ final class Hy2TunnelEngine: NSObject {
   private static func isIPv4(_ host: String) -> Bool {
     var addr = in_addr()
     return host.withCString { inet_pton(AF_INET, $0, &addr) == 1 }
+  }
+
+  private static func isIPv6(_ packet: Data) -> Bool {
+    guard !packet.isEmpty else { return false }
+    return (packet[packet.startIndex] >> 4) == 6
+  }
+
+  /// ICMPv6 Destination Unreachable (type 1, code 1 = administratively prohibited).
+  /// Speeds Happy Eyeballs onto IPv4 through the same TUN.
+  static func icmpv6DestinationUnreachable(for original: Data) -> Data? {
+    // Need IPv6 header (40) + at least a few payload bytes for the quote.
+    guard original.count >= 40 else { return nil }
+    // Do not answer ICMP errors with more ICMP errors (next header 58).
+    let nextHeader = original[original.startIndex + 6]
+    if nextHeader == 58 { return nil }
+
+    // ULA TUN address fd00:9e3a::1 (network order).
+    let srcAddr: [UInt8] = [
+      0xfd, 0x00, 0x9e, 0x3a, 0x00, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
+    ]
+    // Original source becomes ICMP destination (bytes 8..23 of IPv6 header).
+    let dstAddr = Array(original[(original.startIndex + 8)..<(original.startIndex + 24)])
+
+    // Quote as much of the original as fits under common ICMPv6 size (~1232).
+    let maxQuote = min(original.count, 1232)
+    let quote = original[original.startIndex..<(original.startIndex + maxQuote)]
+
+    // ICMPv6: type=1, code=1, checksum=0, unused=0, + quoted packet.
+    var icmp = Data(capacity: 8 + quote.count)
+    icmp.append(1) // Destination Unreachable
+    icmp.append(1) // Administratively prohibited
+    icmp.append(contentsOf: [0, 0]) // checksum placeholder
+    icmp.append(contentsOf: [0, 0, 0, 0]) // unused
+    icmp.append(quote)
+
+    let checksum = icmpv6Checksum(
+      src: srcAddr,
+      dst: dstAddr,
+      icmp: icmp
+    )
+    icmp[2] = UInt8((checksum >> 8) & 0xff)
+    icmp[3] = UInt8(checksum & 0xff)
+
+    let payloadLen = UInt16(icmp.count)
+    var out = Data(capacity: 40 + icmp.count)
+    // Version 6, traffic class 0, flow 0
+    out.append(0x60)
+    out.append(contentsOf: [0, 0, 0])
+    out.append(UInt8((payloadLen >> 8) & 0xff))
+    out.append(UInt8(payloadLen & 0xff))
+    out.append(58) // next header ICMPv6
+    out.append(64) // hop limit
+    out.append(contentsOf: srcAddr)
+    out.append(contentsOf: dstAddr)
+    out.append(icmp)
+    return out
+  }
+
+  /// RFC 4443 ICMPv6 checksum over IPv6 pseudo-header + ICMP body.
+  private static func icmpv6Checksum(src: [UInt8], dst: [UInt8], icmp: Data) -> UInt16 {
+    var sum: UInt32 = 0
+    func addBytes(_ bytes: [UInt8]) {
+      var i = 0
+      while i + 1 < bytes.count {
+        sum += UInt32(bytes[i]) << 8 | UInt32(bytes[i + 1])
+        i += 2
+      }
+      if i < bytes.count {
+        sum += UInt32(bytes[i]) << 8
+      }
+    }
+    addBytes(src)
+    addBytes(dst)
+    let len = UInt32(icmp.count)
+    sum += (len >> 16) & 0xffff
+    sum += len & 0xffff
+    sum += 58 // next header
+    let icmpBytes = [UInt8](icmp)
+    addBytes(icmpBytes)
+    while sum >> 16 != 0 {
+      sum = (sum & 0xffff) + (sum >> 16)
+    }
+    return ~UInt16(sum & 0xffff)
   }
 
   private static func err(_ code: Int, _ message: String) -> NSError {

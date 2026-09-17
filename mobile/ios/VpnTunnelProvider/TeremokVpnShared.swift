@@ -8,6 +8,9 @@ enum TeremokVpnShared {
   static let paramsKey = "vpn.paramsJson"
   static let statusKey = "vpn.status"
   static let lastErrorKey = "vpn.lastError"
+  /// User wanted VPN on (parity with Android KEY_ACTIVE). Survives NEVPN idle
+  /// so Flutter can auto-reconnect after iOS tears the tunnel down.
+  static let sessionActiveKey = "vpn.sessionActive"
   /// Bumped by Runner on each start so a late `stopTunnel` cannot wipe
   /// status / lastError from a newer connect (YouTube hot-switch race).
   static let generationKey = "vpn.generation"
@@ -66,5 +69,13 @@ enum TeremokVpnShared {
     } else {
       defaults?.removeObject(forKey: lastErrorKey)
     }
+  }
+
+  static func setSessionActive(_ active: Bool) {
+    defaults?.set(active, forKey: sessionActiveKey)
+  }
+
+  static func isSessionActive() -> Bool {
+    defaults?.bool(forKey: sessionActiveKey) ?? false
   }
 }
