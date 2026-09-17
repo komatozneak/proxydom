@@ -55,7 +55,10 @@ class _CancelTrackingNotifier extends VpnNotifier {
   VpnStatus build() => _status;
 
   @override
-  Future<void> disconnect() async {
+  Future<void> disconnect({
+    String reason = 'user_tap',
+    bool wipeNativeSession = false,
+  }) async {
     disconnectCalls++;
   }
 

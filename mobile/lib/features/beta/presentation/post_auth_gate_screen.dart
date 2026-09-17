@@ -235,7 +235,7 @@ class _PostAuthGateScreenState extends ConsumerState<PostAuthGateScreen> {
   Future<void> _stopOwnTunnelQuietly({required String reason}) async {
     try {
       AppLogBuffer.instance.info('gate.stop_own_tunnel reason=$reason');
-      await VpnController.instance.stop();
+      await VpnController.instance.stop(reason: 'gate_manual');
     } catch (e) {
       AppLogBuffer.instance.warn('gate.stop_own_tunnel fail: $e');
       // Missing plugin / already idle — still try entitlement over LTE.

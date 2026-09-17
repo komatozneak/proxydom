@@ -106,22 +106,8 @@ func Start(configJSON string) string {
 	if cfg.SocksListen == "" {
 		cfg.SocksListen = "127.0.0.1:10808"
 	}
-	udpAddr, err := net.ResolveUDPAddr("udp", cfg.Server)
-	if err != nil {
-		return fmt.Sprintf("resolve: %v", err)
-	}
 
-	c, _, err := client.NewClient(&client.Config{
-		ConnFactory: &protectedFactory{},
-		ServerAddr:  udpAddr,
-		Auth:        cfg.Auth,
-		TLSConfig: client.TLSConfig{
-			ServerName: cfg.SNI,
-		},
-		// Official TUN clients set this: TCP() returns before the server
-		// confirms the dest, saving one RTT on every YouTube/page socket.
-		FastOpen: true,
-	})
+	c, err := newManagedFromConfig(cfg)
 	if err != nil {
 		return fmt.Sprintf("hy2 client: %v", err)
 	}
@@ -139,6 +125,7 @@ func Start(configJSON string) string {
 		_ = c.Close()
 		return "already running"
 	}
+	rememberStartConfig(cfg)
 	hyClient = c
 	socksLn = ln
 	mu.Unlock()
@@ -221,6 +208,9 @@ func Stop() {
 	socksLn = nil
 	hyClient = nil
 	mu.Unlock()
+	startCfgMu.Lock()
+	lastStartCfg = startConfig{}
+	startCfgMu.Unlock()
 	if ln != nil {
 		_ = ln.Close()
 	}

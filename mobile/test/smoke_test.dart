@@ -89,7 +89,8 @@ Map<String, dynamic> _vpnJson({
     };
 
 void main() {
-  testWidgets('Home screen shows Connect button when not connected', (tester) async {
+  testWidgets('Home screen shows Connect button when not connected',
+      (tester) async {
     const vpnChannel = MethodChannel('teremok/vpn');
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(vpnChannel, (call) async {
@@ -140,7 +141,8 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
   });
 
-  test('AuthState sealed: defaults to Unauthenticated when no tokens', () async {
+  test('AuthState sealed: defaults to Unauthenticated when no tokens',
+      () async {
     // Используем чистый sub-тест: build() подхватит реальный TokenStorage,
     // который в тестах не имеет плагина → провайдер упадёт в AsyncError.
     // Поэтому проверяем сам факт, что Unauthenticated() — singleton-конструктор.
@@ -199,6 +201,17 @@ void main() {
       final result = await VpnController.instance.stop();
       expect(result, true);
       expect(log.last.method, 'stop');
+      expect(log.last.arguments, {'reason': 'user_tap'});
+    });
+
+    test('wipeSession() sends one tagged native wipe', () async {
+      final result = await VpnController.instance.wipeSession(
+        reason: 'identity_change',
+      );
+      expect(result, true);
+      expect(log, hasLength(1));
+      expect(log.single.method, 'wipeSession');
+      expect(log.single.arguments, {'reason': 'identity_change'});
     });
 
     test('getStatus() возвращает idle (мок)', () async {
@@ -207,13 +220,15 @@ void main() {
       expect(log.last.method, 'getStatus');
     });
 
-    test('requestPermission() вызывает MethodChannel и возвращает true', () async {
+    test('requestPermission() вызывает MethodChannel и возвращает true',
+        () async {
       final granted = await VpnController.instance.requestPermission();
       expect(granted, true);
       expect(log.last.method, 'requestPermission');
     });
 
-    test('requestPermission() при MissingPluginException возвращает true', () async {
+    test('requestPermission() при MissingPluginException возвращает true',
+        () async {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(channel, null);
       final granted = await VpnController.instance.requestPermission();
@@ -322,7 +337,8 @@ void main() {
       expect(service.outboundTlsSni, 'real-sni.example');
     });
 
-    test('resolveVpnDisplayLabel: node_host maps to known place over outbound', () {
+    test('resolveVpnDisplayLabel: node_host maps to known place over outbound',
+        () {
       final config = VpnConfig.fromJson(
         _vpnJson(
           username: 'u_3',
@@ -418,7 +434,8 @@ void main() {
   test('AppConfig dev switch via APP_ENV=dev dart-define', () {
     expect(AppConfig.baseUrlForEnvironment('prod'), AppConfig.vpsBaseUrl);
     expect(AppConfig.baseUrlForEnvironment('dev'), AppConfig.androidBaseUrl);
-    expect(AppConfig.baseUrlForEnvironment('dev'), isNot(equals(AppConfig.vpsBaseUrl)));
+    expect(AppConfig.baseUrlForEnvironment('dev'),
+        isNot(equals(AppConfig.vpsBaseUrl)));
   });
 
   group('AppTheme (Material 3)', () {
@@ -485,7 +502,8 @@ void main() {
   });
 
   test('TokenStorage can be cleared safely on empty storage', () async {
-    const channel = MethodChannel('plugins.it_nomads.com/flutter_secure_storage');
+    const channel =
+        MethodChannel('plugins.it_nomads.com/flutter_secure_storage');
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async => null);
     addTearDown(() {

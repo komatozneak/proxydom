@@ -134,9 +134,14 @@ bool nativeIdleMustNotDemote({
   required bool sessionOwnsUi,
   required VpnSessionPhase lastPhase,
   bool userStopping = false,
+  bool uiConnected = false,
+  bool nativeSyncComplete = true,
 }) {
   if (userStopping) return false;
+  if (!nativeSyncComplete) return true;
   if (walkActive || sessionOwnsUi) return true;
+  // Cold start: sync painted Connected before EventChannel seeded phase.
+  if (uiConnected && lastPhase == VpnSessionPhase.unknown) return true;
   switch (lastPhase) {
     case VpnSessionPhase.binding:
     case VpnSessionPhase.tunUp:

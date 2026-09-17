@@ -1,17 +1,16 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../home/application/vpn_provider.dart';
-import '../../vpn/data/vpn_controller.dart';
 
 /// After accept / leave / revoke the HMAC and VPN creds rotated — drop the tunnel.
 Future<void> teardownVpnAfterIdentityChange(WidgetRef ref) async {
   try {
-    await ref.read(vpnProvider.notifier).disconnect();
-  } catch (_) {}
-  try {
-    // Rotated creds make the persisted native session stale — wipe it so a
-    // QS-tile / Always-on restart cannot resurrect the previous identity.
-    await VpnController.instance.wipeSession();
+    // Rotated creds make the persisted native session stale — stop and wipe
+    // in one native operation so no old identity can be resurrected.
+    await ref.read(vpnProvider.notifier).disconnect(
+          reason: 'identity_change',
+          wipeNativeSession: true,
+        );
   } catch (_) {}
   try {
     await ref.read(vpnNodesRepositoryProvider).refreshAfterEntitlementChange();

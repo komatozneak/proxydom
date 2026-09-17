@@ -60,7 +60,11 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     with reason: NEProviderStopReason,
     completionHandler: @escaping () -> Void
   ) {
-    // reason rawValue lands in TestFlight reports (why tunnel died in background).
+    if TunnelStopIntent.clearsSessionActive(reason) {
+      TeremokVpnShared.setSessionActive(false)
+    }
+    let reasonTag = "nevpn_\(reason.rawValue)"
+    TeremokVpnShared.setLastStopReason(reasonTag)
     TeremokVpnShared.appendNativeLog(
       "PacketTunnel.stopTunnel reason=\(reason.rawValue) gen=\(sessionGeneration)"
     )
@@ -71,10 +75,27 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     )
     engine?.stop()
     engine = nil
-    // Only clear if this session still owns App Group (not a newer start).
     TeremokVpnShared.setStatus("idle", generation: sessionGeneration)
     TeremokVpnShared.setLastError(nil, generation: sessionGeneration)
     completionHandler()
+  }
+
+  override func handleAppMessage(
+    _ messageData: Data,
+    completionHandler: ((Data?) -> Void)?
+  ) {
+    guard let completionHandler else { return }
+    let cmd = String(data: messageData, encoding: .utf8) ?? ""
+    if cmd == "health" || cmd.hasPrefix("health") {
+      if let live = engine?.healthJSON() {
+        completionHandler(live.data(using: .utf8))
+        return
+      }
+      let persisted = TeremokVpnShared.lastTunnelHealth()
+      completionHandler(persisted.data(using: .utf8))
+      return
+    }
+    completionHandler(nil)
   }
 
   private func finishStart(

@@ -147,9 +147,12 @@ class VpnController {
     }
   }
 
-  Future<bool> stop() async {
+  Future<bool> stop({String reason = 'user_tap'}) async {
     try {
-      final result = await _methodChannel.invokeMethod<bool>('stop').timeout(
+      final result = await _methodChannel.invokeMethod<bool>(
+        'stop',
+        {'reason': reason},
+      ).timeout(
         stopTimeout,
         onTimeout: () {
           throw VpnControllerException(
@@ -168,14 +171,28 @@ class VpnController {
   /// Logout / identity change: stop the tunnel AND wipe persisted native
   /// session params (dataplane passwords) so the QS tile / Always-on restart
   /// cannot resurrect the previous account's VPN.
-  Future<bool> wipeSession() async {
+  Future<bool> wipeSession({String reason = 'logout'}) async {
     try {
-      final result = await _methodChannel.invokeMethod<bool>('wipeSession');
+      final result = await _methodChannel.invokeMethod<bool>(
+        'wipeSession',
+        {'reason': reason},
+      );
       return result ?? false;
     } on PlatformException {
       return false;
     } on MissingPluginException {
       return false;
+    }
+  }
+
+  /// Live or persisted Packet Tunnel health JSON (iOS); null elsewhere.
+  Future<String?> getTunnelHealth() async {
+    try {
+      return await _methodChannel.invokeMethod<String>('getTunnelHealth');
+    } on PlatformException {
+      return null;
+    } on MissingPluginException {
+      return null;
     }
   }
 

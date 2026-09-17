@@ -16,6 +16,8 @@
 		A2E000000000000000000002 /* Hy2TunnelEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2E000000000000000000011 /* Hy2TunnelEngine.swift */; };
 		A2E000000000000000000003 /* TeremokVpnShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2E000000000000000000012 /* TeremokVpnShared.swift */; };
 		A2E000000000000000000007 /* TeremokVpnShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2E000000000000000000012 /* TeremokVpnShared.swift */; };
+		A2E000000000000000000008 /* TunnelPathMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2E000000000000000000017 /* TunnelPathMonitor.swift */; };
+		A2E000000000000000000009 /* TunnelPathMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2E000000000000000000017 /* TunnelPathMonitor.swift */; };
 		A2E000000000000000000004 /* Hy2bind.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = A2E000000000000000000015 /* Hy2bind.xcframework */; };
 		A2E000000000000000000005 /* Hy2bind.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = A2E000000000000000000015 /* Hy2bind.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		A2E000000000000000000006 /* VpnTunnelProvider.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = A2E000000000000000000016 /* VpnTunnelProvider.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -80,6 +82,7 @@
 		A2E000000000000000000010 /* PacketTunnelProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PacketTunnelProvider.swift; sourceTree = "<group>"; };
 		A2E000000000000000000011 /* Hy2TunnelEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Hy2TunnelEngine.swift; sourceTree = "<group>"; };
 		A2E000000000000000000012 /* TeremokVpnShared.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeremokVpnShared.swift; sourceTree = "<group>"; };
+		A2E000000000000000000017 /* TunnelPathMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TunnelPathMonitor.swift; sourceTree = "<group>"; };
 		A2E000000000000000000013 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A2E000000000000000000014 /* VpnTunnelProvider.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = VpnTunnelProvider.entitlements; sourceTree = "<group>"; };
 		A2E000000000000000000015 /* Hy2bind.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = Hy2bind.xcframework; path = Frameworks/Hy2bind.xcframework; sourceTree = "<group>"; };
@@ -162,6 +165,7 @@
 				A2E000000000000000000010 /* PacketTunnelProvider.swift */,
 				A2E000000000000000000011 /* Hy2TunnelEngine.swift */,
 				A2E000000000000000000012 /* TeremokVpnShared.swift */,
+				A2E000000000000000000017 /* TunnelPathMonitor.swift */,
 				A2E000000000000000000013 /* Info.plist */,
 				A2E000000000000000000014 /* VpnTunnelProvider.entitlements */,
 			);
@@ -373,6 +377,7 @@
 				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
 				A1B2C3D41F00000100TEREMOK /* TeremokVpnChannel.swift in Sources */,
 				A2E000000000000000000007 /* TeremokVpnShared.swift in Sources */,
+				A2E000000000000000000009 /* TunnelPathMonitor.swift in Sources */,
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
 				7884E8682EC3CC0700C636F2 /* SceneDelegate.swift in Sources */,
 			);
@@ -385,6 +390,7 @@
 				A2E000000000000000000001 /* PacketTunnelProvider.swift in Sources */,
 				A2E000000000000000000002 /* Hy2TunnelEngine.swift in Sources */,
 				A2E000000000000000000003 /* TeremokVpnShared.swift in Sources */,
+				A2E000000000000000000008 /* TunnelPathMonitor.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

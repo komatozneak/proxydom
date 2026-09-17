@@ -7,7 +7,6 @@ import '../../../core/install_id_storage.dart';
 import '../../../core/router.dart';
 import '../../../core/token_storage.dart';
 import '../../home/application/vpn_provider.dart';
-import '../../vpn/data/vpn_controller.dart';
 import '../data/recovery_code_storage.dart';
 import 'auth_provider.dart';
 
@@ -49,14 +48,6 @@ class LogoutHandler {
         await _stopVpnWithTimeout();
       } catch (e) {
         errors.add('VPN stop: $e');
-      }
-
-      try {
-        // Native prefs hold dataplane passwords (params_json) — stopping the
-        // tunnel alone leaves them for the QS tile / Always-on restart.
-        await VpnController.instance.wipeSession();
-      } catch (e) {
-        errors.add('VPN wipeSession: $e');
       }
 
       try {
@@ -111,7 +102,11 @@ class LogoutHandler {
 
   Future<void> _stopVpnWithTimeout() async {
     final vpnNotifier = _ref.read(vpnProvider.notifier);
-    await vpnNotifier.disconnect();
+    // One native call owns stop + persisted credential wipe.
+    await vpnNotifier.disconnect(
+      reason: 'logout',
+      wipeNativeSession: true,
+    );
   }
 }
 

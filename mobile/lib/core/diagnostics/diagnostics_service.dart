@@ -59,6 +59,7 @@ class DiagnosticsService {
       maxLines: 400,
     );
     final nativeLogTail = await VpnController.instance.getNativeLogTail();
+    final tunnelHealth = await VpnController.instance.getTunnelHealth();
     final underlying = await VpnController.instance.getUnderlyingNetworkInterface();
 
     final sessionMeta = await VpnSessionMeta.load();
@@ -106,6 +107,12 @@ class DiagnosticsService {
       ..writeln(stderrTail ?? '(unsupported)')
       ..writeln('ios_native_tail:')
       ..writeln(nativeLogTail ?? '(unsupported)')
+      ..writeln('ios_tunnel_health:')
+      ..writeln(
+        (tunnelHealth == null || tunnelHealth.isEmpty)
+            ? '(none)'
+            : tunnelHealth,
+      )
       ..writeln('last_vpn_error: $lastVpnError')
       ..writeln('last_flutter_error: ${lastFlutterError ?? '(none)'}')
       ..writeln('--- recent_log ---')

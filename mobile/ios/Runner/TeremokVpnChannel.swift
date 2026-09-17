@@ -55,7 +55,15 @@ enum TeremokVpnChannel {
         }
         startTunnel(paramsJson: first, result: result)
       case "stop", "wipeSession":
-        stopTunnel(wipe: call.method == "wipeSession", result: result)
+        let args = call.arguments as? [String: Any]
+        let reason = args?["reason"] as? String
+        stopTunnel(
+          wipe: call.method == "wipeSession",
+          reason: reason,
+          result: result
+        )
+      case "getTunnelHealth":
+        fetchTunnelHealth(result: result)
       case "getStatus":
         let s = resolveStatus(log: true)
         result(s)
@@ -307,8 +315,17 @@ enum TeremokVpnChannel {
     }
   }
 
-  private static func stopTunnel(wipe: Bool, result: @escaping FlutterResult) {
-    TeremokVpnShared.appendNativeLog("channel.stopTunnel wipe=\(wipe)")
+  private static func stopTunnel(
+    wipe: Bool,
+    reason: String?,
+    result: @escaping FlutterResult
+  ) {
+    let tag = reason?.trimmingCharacters(in: .whitespacesAndNewlines)
+    let reasonTag = (tag?.isEmpty == false) ? tag! : (wipe ? "wipe" : "user_tap")
+    TeremokVpnShared.setLastStopReason(reasonTag)
+    TeremokVpnShared.appendNativeLog(
+      "channel.stopTunnel wipe=\(wipe) reason=\(reasonTag)"
+    )
     // User-initiated stop — do not auto-reconnect.
     TeremokVpnShared.setSessionActive(false)
     NETunnelProviderManager.loadAllFromPreferences { managers, _ in
@@ -346,6 +363,41 @@ enum TeremokVpnChannel {
         cachedNEVPNStatus = .disconnected
         publishStatus("idle")
         result(true)
+      }
+    }
+  }
+
+  private static func fetchTunnelHealth(result: @escaping FlutterResult) {
+    NETunnelProviderManager.loadAllFromPreferences { managers, _ in
+      nevpnPreferencesLoaded = true
+      let ours = managers?.first {
+        ($0.protocolConfiguration as? NETunnelProviderProtocol)?
+          .providerBundleIdentifier == tunnelBundleId
+      }
+      guard
+        let manager = ours,
+        let session = manager.connection as? NETunnelProviderSession,
+        manager.connection.status == .connected
+          || manager.connection.status == .connecting
+          || manager.connection.status == .reasserting
+      else {
+        let persisted = TeremokVpnShared.lastTunnelHealth()
+        result(persisted.isEmpty ? nil : persisted)
+        return
+      }
+      let msg = "health".data(using: .utf8)!
+      do {
+        try session.sendProviderMessage(msg) { data in
+          if let data, let s = String(data: data, encoding: .utf8), !s.isEmpty {
+            result(s)
+            return
+          }
+          let persisted = TeremokVpnShared.lastTunnelHealth()
+          result(persisted.isEmpty ? nil : persisted)
+        }
+      } catch {
+        let persisted = TeremokVpnShared.lastTunnelHealth()
+        result(persisted.isEmpty ? nil : persisted)
       }
     }
   }

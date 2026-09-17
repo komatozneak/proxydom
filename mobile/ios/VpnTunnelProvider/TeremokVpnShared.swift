@@ -17,6 +17,9 @@ enum TeremokVpnShared {
   /// Ring buffer for Runner + Packet Tunnel lines (no secrets) → diagnostics.
   static let nativeLogKey = "vpn.nativeLog"
   static let nativeLogMaxLines = 128
+  /// Last tunnel health JSON (generation-scoped; survives appex stop).
+  static let tunnelHealthKey = "vpn.tunnelHealth"
+  static let lastStopReasonKey = "vpn.lastStopReason"
 
   static var defaults: UserDefaults? {
     UserDefaults(suiteName: appGroupId)
@@ -77,5 +80,21 @@ enum TeremokVpnShared {
 
   static func isSessionActive() -> Bool {
     defaults?.bool(forKey: sessionActiveKey) ?? false
+  }
+
+  static func setLastStopReason(_ reason: String) {
+    defaults?.set(reason, forKey: lastStopReasonKey)
+  }
+
+  static func lastStopReason() -> String {
+    defaults?.string(forKey: lastStopReasonKey) ?? ""
+  }
+
+  static func persistTunnelHealth(_ json: String) {
+    defaults?.set(json, forKey: tunnelHealthKey)
+  }
+
+  static func lastTunnelHealth() -> String {
+    defaults?.string(forKey: tunnelHealthKey) ?? ""
   }
 }
