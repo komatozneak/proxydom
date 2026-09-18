@@ -494,13 +494,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                 ],
               ],
-              const _CardDivider(),
-              _SettingsRow(
-                icon: AppIcons.sliders,
-                title: l.settingsNoVpn,
-                subtitle: l.settingsNoVpnHint,
-                onTap: () => context.go('/settings/no-vpn'),
-              ),
+              if (!hideInAppPlategaCheckout) ...[
+                const _CardDivider(),
+                _SettingsRow(
+                  icon: AppIcons.sliders,
+                  title: l.settingsNoVpn,
+                  subtitle: l.settingsNoVpnHint,
+                  onTap: () => context.go('/settings/no-vpn'),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 20),

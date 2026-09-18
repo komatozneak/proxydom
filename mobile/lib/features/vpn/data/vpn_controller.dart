@@ -47,6 +47,9 @@ class VpnController {
     final disallowedApps = _isIosSplit
         ? const <String>[]
         : ((await SplitTunnelPrefs.loadDisallowedPackages()).toList()..sort());
+    if (_isIosSplit) {
+      await SplitTunnelPrefs.ensureIosSitesAllEnabledIfNeeded();
+    }
     final directSuffixes = _isIosSplit
         ? const <String>[]
         : stripForceProxySuffixes(

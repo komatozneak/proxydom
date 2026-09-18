@@ -1500,6 +1500,9 @@ class AppL10nRu extends AppL10n {
       'Оплата в приложении недоступна. Бесплатные локации работают.';
 
   @override
+  String get iosAdvancedFeaturesCta => 'Расширенные возможности';
+
+  @override
   String get vpnDisclosureTitle => 'Защищённое соединение';
 
   @override

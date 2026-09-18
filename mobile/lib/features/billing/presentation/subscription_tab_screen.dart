@@ -15,6 +15,7 @@ import '../../settings/data/subscription_status.dart';
 
 const kSubscriptionPayKey = ValueKey<String>('subscription_pay');
 const kSubscriptionPromoKey = ValueKey<String>('subscription_promo');
+const kSubscriptionAdvancedKey = ValueKey<String>('subscription_advanced');
 
 /// Огонь-style «Подписка» — status + pay on top, promo at the bottom.
 class SubscriptionTabScreen extends ConsumerWidget {
@@ -95,9 +96,11 @@ class SubscriptionTabScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 12),
                     FilledButton.tonal(
+                      key: kSubscriptionAdvancedKey,
                       style: buttonStyle,
-                      onPressed: () => openIosPremiumAccountPath(context, ref),
-                      child: Text(l.accountHubTitle),
+                      onPressed: () =>
+                          openIosAdvancedFeaturesPath(context, ref),
+                      child: Text(l.iosAdvancedFeaturesCta),
                     ),
                   ] else
                     FilledButton(

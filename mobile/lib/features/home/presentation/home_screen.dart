@@ -117,9 +117,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     unawaited(_refreshEntitlement());
   }
 
-  /// Android: live Apps pin + default bypass seed. iOS has no per-app split.
+  /// Android: live Apps pin + default bypass seed.
+  /// iOS: one-shot enable all Sites «Основные» (NoVPN UI is hidden).
   Future<void> _refreshNoVpnCounter() async {
-    if (kIsWeb || iosAppsSplitUnsupported) return;
+    if (kIsWeb) return;
+    if (iosAppsSplitUnsupported) {
+      await SplitTunnelPrefs.ensureIosSitesAllEnabledIfNeeded();
+      return;
+    }
     try {
       final apps =
           await InstalledAppsChannel.listLauncherApps(includeIcons: false);
@@ -602,8 +607,12 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
               ),
             ),
             exhaustedLabel: l.homeTrafficExhausted,
-            teaser: l.homeQuotaUnlimitedTeaser,
-            ctaLabel: l.homeQuotaUnlimitedCta,
+            teaser: hideInAppPlategaCheckout
+                ? null
+                : l.homeQuotaUnlimitedTeaser,
+            ctaLabel: hideInAppPlategaCheckout
+                ? null
+                : l.homeQuotaUnlimitedCta,
             onTap: widget.onOpenSubscription,
           ),
           const SizedBox(height: 8),
@@ -680,13 +689,15 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
           ),
         ],
         const SizedBox(height: 16),
-        _NoVpnHomeRow(
-          label: l.homeNoVpnRow,
-          enabled: widget.noVpnEnabled,
-          total: widget.noVpnTotal,
-          onTap: widget.onOpenNoVpn,
-        ),
-        const SizedBox(height: 8),
+        if (!hideInAppPlategaCheckout) ...[
+          _NoVpnHomeRow(
+            label: l.homeNoVpnRow,
+            enabled: widget.noVpnEnabled,
+            total: widget.noVpnTotal,
+            onTap: widget.onOpenNoVpn,
+          ),
+          const SizedBox(height: 8),
+        ],
         ServerCard(
           title: widget.serverTitle,
           subtitle: widget.serverSubtitle,

@@ -1494,6 +1494,9 @@ class AppL10nEn extends AppL10n {
       'In-app payment is not available. Free locations still work.';
 
   @override
+  String get iosAdvancedFeaturesCta => 'Advanced features';
+
+  @override
   String get vpnDisclosureTitle => 'Protected connection';
 
   @override

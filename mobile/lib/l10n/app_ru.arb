@@ -505,6 +505,7 @@
   "accountEmailDebugHint": "DEBUG: код подставлен из ответа API",
   "navPromo": "Код доступа",
   "iosBillingUnavailableBody": "Оплата в приложении недоступна. Бесплатные локации работают.",
+  "iosAdvancedFeaturesCta": "Расширенные возможности",
   "vpnDisclosureTitle": "Защищённое соединение",
   "vpnDisclosureLead": "Перед первым подключением коротко объясняем, как работает VPN в Теремке и какие данные нужны для сервиса.",
   "vpnDisclosureVpnTitle": "Зачем нужен VPN на Android",

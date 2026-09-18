@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// One site in the Modes «По сайтам» pool (preset or custom).
@@ -149,6 +150,7 @@ class SplitTunnelPrefs {
   static const _seededBypassKey = 'split_tunnel_seeded_bypass_v1';
   static const _seededBypassV2Key = 'split_tunnel_seeded_bypass_v2';
   static const _seededBypassV3Key = 'split_tunnel_seeded_bypass_v3';
+  static const _iosAllOnKey = 'split_tunnel_ios_all_on_v1';
 
   static Map<String, bool> _osnovnyeDefaults() => {
         for (final c in kOsnovnyeCategories) c.id: c.defaultEnabled,
@@ -244,6 +246,30 @@ class SplitTunnelPrefs {
     await _applyV2OsnovnyeDefaultsIfNeeded(prefs);
     await _applyV3OsnovnyeDefaultsIfNeeded(prefs);
     return _decodeOsnovnyeMap(prefs);
+  }
+
+  /// iOS: one-shot turn ON every Sites «Основные» row that is still off.
+  ///
+  /// NoVPN UI is hidden on iOS; this keeps excludedRoutes useful in the
+  /// background (including TikTok). Runs once per install; later toggles stick.
+  static Future<bool> ensureIosSitesAllEnabledIfNeeded() async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) return false;
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(_iosAllOnKey) == true) return false;
+    final map = await loadOsnovnyeEnabled();
+    var changed = false;
+    for (final c in kOsnovnyeCategories) {
+      if (map[c.id] != true) {
+        map[c.id] = true;
+        changed = true;
+      }
+    }
+    if (changed) {
+      await prefs.setString(_osnovnyeKey, jsonEncode(map));
+      await _bumpDraft(prefs);
+    }
+    await prefs.setBool(_iosAllOnKey, true);
+    return changed;
   }
 
   static Future<void> setOsnovnyeEnabled(String id, bool value) async {

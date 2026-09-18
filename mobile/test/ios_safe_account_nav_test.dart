@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:teremok_connect/features/auth/data/auth_api.dart';
 import 'package:teremok_connect/features/beta/presentation/locked_access_screen.dart';
 import 'package:teremok_connect/features/billing/presentation/premium_tab_screen.dart';
+import 'package:teremok_connect/features/billing/presentation/subscription_tab_screen.dart';
 import 'package:teremok_connect/features/settings/application/devices_list_provider.dart';
 import 'package:teremok_connect/features/settings/application/subscription_status_provider.dart';
 import 'package:teremok_connect/features/settings/data/subscription_status.dart';
@@ -196,7 +197,42 @@ void main() {
       400,
     );
     expect(find.text('Тарифы'), findsNothing);
+    expect(find.text('Что работает без VPN?'), findsNothing);
     expect(find.text('Политика конфиденциальности'), findsOneWidget);
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('iOS Subscription shows Advanced features, not Account pay',
+      (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final container = ProviderContainer(
+      overrides: [
+        subscriptionStatusProvider.overrideWith(
+          () => _FixedSubNotifier(_freeQuota),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          locale: Locale('ru'),
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          home: SubscriptionTabScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(find.byKey(kSubscriptionAdvancedKey), findsOneWidget);
+    expect(find.text('Расширенные возможности'), findsOneWidget);
+    expect(find.byKey(kSubscriptionPayKey), findsNothing);
+    expect(find.text('Оплатить'), findsNothing);
     debugDefaultTargetPlatformOverride = null;
   });
 }

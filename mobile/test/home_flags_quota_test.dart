@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -259,6 +260,39 @@ void main() {
     final quotaY = tester.getTopLeft(find.byKey(kHomeQuotaBarKey)).dy;
     final nestY = tester.getTopLeft(find.byKey(kHomeSignalNestKey)).dy;
     expect(quotaY, lessThan(nestY));
+  });
+
+  testWidgets('iOS Free quota meter has no Premium curtain or NoVPN row',
+      (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    addTearDown(() {
+      debugDefaultTargetPlatformOverride = null;
+    });
+    final container = ProviderContainer(
+      overrides: [
+        vpnNodesRepositoryProvider.overrideWithValue(
+          _FakeVpnNodesRepository(_euUsPool),
+        ),
+        vpnProvider.overrideWith(
+          () => _FixedVpnNotifier(const VpnDisconnected()),
+        ),
+        subscriptionStatusProvider.overrideWith(
+          () => _FixedSubNotifier(_freeQuota),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester
+        .pumpWidget(_app(container: container, home: const HomeScreen()));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.byKey(kHomeQuotaBarKey), findsOneWidget);
+    expect(find.text('Безлимит с Premium'), findsNothing);
+    expect(find.text('Подключить безлимит'), findsNothing);
+    expect(find.text('Что работает без VPN?'), findsNothing);
+    debugDefaultTargetPlatformOverride = null;
   });
 
   testWidgets('quota bar stays mounted and does not jump during refresh',

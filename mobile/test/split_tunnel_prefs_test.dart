@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:teremok_connect/features/settings/data/split_tunnel_prefs.dart';
@@ -209,6 +210,30 @@ void main() {
       expect(await SplitTunnelPrefs.hasPendingChanges(), isTrue);
       await SplitTunnelPrefs.setDisallowedPackage('com.example.app', false);
       expect(await SplitTunnelPrefs.loadDisallowedPackages(), isEmpty);
+    });
+
+    test('ensureIosSitesAllEnabledIfNeeded turns off rows on once', () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      SharedPreferences.setMockInitialValues({});
+      await SplitTunnelPrefs.loadOsnovnyeEnabled();
+      await SplitTunnelPrefs.setOsnovnyeEnabled('tiktok', false);
+      await SplitTunnelPrefs.setOsnovnyeEnabled('vk', false);
+      expect((await SplitTunnelPrefs.loadOsnovnyeEnabled())['tiktok'], isFalse);
+      expect((await SplitTunnelPrefs.loadOsnovnyeEnabled())['vk'], isFalse);
+
+      final first = await SplitTunnelPrefs.ensureIosSitesAllEnabledIfNeeded();
+      expect(first, isTrue);
+      final map = await SplitTunnelPrefs.loadOsnovnyeEnabled();
+      expect(map.values.every((v) => v), isTrue);
+      expect(map['tiktok'], isTrue);
+
+      final second = await SplitTunnelPrefs.ensureIosSitesAllEnabledIfNeeded();
+      expect(second, isFalse);
+      await SplitTunnelPrefs.setOsnovnyeEnabled('tiktok', false);
+      final third = await SplitTunnelPrefs.ensureIosSitesAllEnabledIfNeeded();
+      expect(third, isFalse);
+      expect((await SplitTunnelPrefs.loadOsnovnyeEnabled())['tiktok'], isFalse);
     });
 
     test('seedDefaultBypassIfNeeded adds only installed curated packages',

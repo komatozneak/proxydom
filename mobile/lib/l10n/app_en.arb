@@ -706,6 +706,7 @@
   "accountEmailDebugHint": "DEBUG: code filled from API response",
   "navPromo": "Invite code",
   "iosBillingUnavailableBody": "In-app payment is not available. Free locations still work.",
+  "iosAdvancedFeaturesCta": "Advanced features",
   "vpnDisclosureTitle": "Protected connection",
   "vpnDisclosureLead": "Before the first connect, we explain how VPN works in Teremok and which data the service needs.",
   "vpnDisclosureVpnTitle": "Why Android VPN is required",

@@ -2821,6 +2821,12 @@ abstract class AppL10n {
   /// **'In-app payment is not available. Free locations still work.'**
   String get iosBillingUnavailableBody;
 
+  /// No description provided for @iosAdvancedFeaturesCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced features'**
+  String get iosAdvancedFeaturesCta;
+
   /// No description provided for @vpnDisclosureTitle.
   ///
   /// In en, this message translates to:
