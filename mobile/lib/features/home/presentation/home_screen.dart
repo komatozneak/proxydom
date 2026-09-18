@@ -15,6 +15,7 @@ import '../../../core/widgets/connect_button.dart';
 import '../../../core/widgets/signal_nest_hero.dart';
 import '../../../core/widgets/teremok_snackbar.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../account/application/ios_account_nav.dart';
 import '../../session/application/session_provider.dart';
 import '../../session/data/account_session_snapshot.dart';
 import '../../settings/application/subscription_status_provider.dart';
@@ -92,6 +93,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   Future<void> _openSubscription() async {
     if (_openingSubscription || !mounted) return;
+    if (hideInAppPlategaCheckout) {
+      await openIosPremiumAccountPath(context, ref);
+      return;
+    }
     // Imperative /subscription can leave matchedLocation on /home; rely on
     // route currency so a second tap does not push a duplicate page key.
     final route = ModalRoute.of(context);
@@ -564,7 +569,9 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
       VpnError(:final code) when code == 'device_limit_reached' =>
         l.settingsDevicesHint,
       VpnError(:final code) when code == 'quota_exceeded' =>
-        l.homeQuotaExceededHint,
+        hideInAppPlategaCheckout
+            ? l.iosBillingUnavailableBody
+            : l.homeQuotaExceededHint,
       VpnError(:final code) when code == kVpnPathIncompatibleErrorCode =>
         l.homePathIncompatibleHint,
       VpnError() => l.homeErrorFriendly,
@@ -684,8 +691,14 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
         if (showQuotaCta) ...[
           const SizedBox(height: 12),
           FilledButton.tonal(
-            onPressed: () => context.push('/locked'),
-            child: Text(l.homeQuotaUpgradeCta),
+            onPressed: hideInAppPlategaCheckout
+                ? () => openIosPremiumAccountPath(context, ref)
+                : () => context.push('/locked'),
+            child: Text(
+              hideInAppPlategaCheckout
+                  ? l.accountHubTitle
+                  : l.homeQuotaUpgradeCta,
+            ),
           ),
         ],
         const SizedBox(height: 16),

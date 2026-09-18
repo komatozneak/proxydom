@@ -216,7 +216,9 @@ class _LockedAccessScreenState extends ConsumerState<LockedAccessScreen> {
                             ),
                             const SizedBox(height: 14),
                             Text(
-                              l.lockedBody,
+                              hideInAppPlategaCheckout
+                                  ? l.iosBillingUnavailableBody
+                                  : l.lockedBody,
                               style: theme.textTheme.bodyLarge?.copyWith(
                                 color: muted,
                                 height: 1.45,
@@ -234,15 +236,6 @@ class _LockedAccessScreenState extends ConsumerState<LockedAccessScreen> {
                                 textAlign: TextAlign.center,
                               )
                             else if (hideInAppPlategaCheckout) ...[
-                              Text(
-                                l.iosBillingUnavailableBody,
-                                style: theme.textTheme.bodyLarge?.copyWith(
-                                  color: muted,
-                                  height: 1.45,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 16),
                               FilledButton.tonal(
                                 style: buttonStyle,
                                 onPressed: busy

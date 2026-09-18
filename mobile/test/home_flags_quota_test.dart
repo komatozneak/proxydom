@@ -390,6 +390,145 @@ void main() {
     expect(find.text('SUB_PAGE'), findsOneWidget);
   });
 
+  testWidgets('iOS quota bar tap opens Account, not /subscription',
+      (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+
+    final router = GoRouter(
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (_, __) => const HomeScreen(),
+        ),
+        GoRoute(
+          path: '/subscription',
+          builder: (_, __) => const Scaffold(body: Text('SUB_PAGE')),
+        ),
+        GoRoute(
+          path: '/settings/account',
+          builder: (_, __) => const Scaffold(body: Text('ACCOUNT_HUB')),
+        ),
+        GoRoute(
+          path: '/locations',
+          builder: (_, __) => const Scaffold(body: Text('LOC')),
+        ),
+        GoRoute(
+          path: '/settings/no-vpn',
+          builder: (_, __) => const Scaffold(body: Text('NOVPN')),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    final container = ProviderContainer(
+      overrides: [
+        vpnNodesRepositoryProvider.overrideWithValue(
+          _FakeVpnNodesRepository(_euUsPool),
+        ),
+        vpnProvider.overrideWith(
+          () => _FixedVpnNotifier(const VpnDisconnected()),
+        ),
+        subscriptionStatusProvider.overrideWith(
+          () => _FixedSubNotifier(_freeQuota),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp.router(
+          locale: const Locale('ru'),
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          routerConfig: router,
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.text('Подключить безлимит'), findsNothing);
+    await tester.tap(find.byKey(kHomeQuotaBarKey));
+    await tester.pumpAndSettle();
+    expect(find.text('ACCOUNT_HUB'), findsOneWidget);
+    expect(find.text('SUB_PAGE'), findsNothing);
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('iOS quota exceeded CTA is Account, not Оформить Premium',
+      (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+
+    final router = GoRouter(
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (_, __) => const HomeScreen(),
+        ),
+        GoRoute(
+          path: '/locked',
+          builder: (_, __) => const Scaffold(body: Text('LOCKED')),
+        ),
+        GoRoute(
+          path: '/settings/account',
+          builder: (_, __) => const Scaffold(body: Text('ACCOUNT_HUB')),
+        ),
+        GoRoute(
+          path: '/locations',
+          builder: (_, __) => const Scaffold(body: Text('LOC')),
+        ),
+        GoRoute(
+          path: '/settings/no-vpn',
+          builder: (_, __) => const Scaffold(body: Text('NOVPN')),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    final container = ProviderContainer(
+      overrides: [
+        vpnNodesRepositoryProvider.overrideWithValue(
+          _FakeVpnNodesRepository(_euUsPool),
+        ),
+        vpnProvider.overrideWith(
+          () => _FixedVpnNotifier(
+            const VpnError(message: 'quota', code: 'quota_exceeded'),
+          ),
+        ),
+        subscriptionStatusProvider.overrideWith(
+          () => _FixedSubNotifier(_freeQuota),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp.router(
+          locale: const Locale('ru'),
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          routerConfig: router,
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.text('Оформить Premium'), findsNothing);
+    expect(find.textContaining('Оформите Premium'), findsNothing);
+    await tester.tap(find.widgetWithText(FilledButton, 'Аккаунт'));
+    await tester.pumpAndSettle();
+    expect(find.text('ACCOUNT_HUB'), findsOneWidget);
+    expect(find.text('LOCKED'), findsNothing);
+    debugDefaultTargetPlatformOverride = null;
+  });
+
   testWidgets('two fast taps from StatefulShellRoute open one /subscription',
       (tester) async {
     final rootKey = GlobalKey<NavigatorState>(debugLabel: 'root');

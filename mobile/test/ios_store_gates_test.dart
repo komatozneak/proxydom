@@ -11,11 +11,13 @@ void main() {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
     expect(hideInAppPlategaCheckout, isTrue);
     expect(iosAppsSplitUnsupported, isTrue);
+    expect(referralLandingPath, '/settings/account');
   });
 
   test('hideInAppPlategaCheckout false on Android', () {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     expect(hideInAppPlategaCheckout, isFalse);
     expect(iosAppsSplitUnsupported, isFalse);
+    expect(referralLandingPath, '/settings/account/promo');
   });
 }

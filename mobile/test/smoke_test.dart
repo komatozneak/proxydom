@@ -156,7 +156,7 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
   });
 
-  testWidgets('iOS Home keeps NoVPN row without Apps pin', (tester) async {
+  testWidgets('iOS Home hides NoVPN row and Apps pin', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
     const vpnChannel = MethodChannel('teremok/vpn');
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -199,7 +199,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 2));
 
-    expect(find.text('Что работает без VPN?'), findsOneWidget);
+    expect(find.text('Что работает без VPN?'), findsNothing);
     expect(find.text('1 / 1'), findsNothing);
     expect(find.text('0 / 0'), findsNothing);
 

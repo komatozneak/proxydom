@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:teremok_connect/core/ios_store_gates.dart';
 import 'package:teremok_connect/features/auth/data/auth_api.dart';
 import 'package:teremok_connect/features/beta/presentation/locked_access_screen.dart';
 import 'package:teremok_connect/features/billing/presentation/premium_tab_screen.dart';
@@ -109,7 +110,13 @@ void main() {
     expect(find.text('Тарифы'), findsNothing);
     expect(find.text('Код проверки: PLAT'), findsNothing);
     expect(find.text('Оплатить 199 ₽'), findsNothing);
+    expect(
+      find.text('Оформите подписку — и подключайтесь в один тап.'),
+      findsNothing,
+    );
     expect(find.textContaining('Telegram'), findsNothing);
+    expect(find.text('Оплата в приложении недоступна. Бесплатные локации работают.'),
+        findsOneWidget);
     expect(find.text('Аккаунт'), findsWidgets);
     await tester.tap(find.widgetWithText(FilledButton, 'Аккаунт'));
     await tester.pumpAndSettle();
@@ -234,5 +241,12 @@ void main() {
     expect(find.byKey(kSubscriptionPayKey), findsNothing);
     expect(find.text('Оплатить'), findsNothing);
     debugDefaultTargetPlatformOverride = null;
+  });
+
+  test('iOS referral deep link lands on Account, not promo', () {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    expect(referralLandingPath, '/settings/account');
+    expect(referralLandingPath, isNot(contains('promo')));
   });
 }

@@ -17,3 +17,9 @@ bool get iosAppsSplitUnsupported {
   if (kIsWeb) return false;
   return defaultTargetPlatform == TargetPlatform.iOS;
 }
+
+/// `teremokconnect://ref` landing. iOS has no in-app promo cashier.
+String get referralLandingPath {
+  if (hideInAppPlategaCheckout) return '/settings/account';
+  return '/settings/account/promo';
+}

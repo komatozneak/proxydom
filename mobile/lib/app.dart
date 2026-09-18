@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/app_locale.dart';
+import 'core/ios_store_gates.dart';
 import 'core/router.dart';
 import 'core/theme.dart';
 import 'core/updates/update_check_service.dart';
@@ -65,7 +66,7 @@ class _SeatJoinHost extends ConsumerWidget {
   }
 }
 
-/// Opens Account → promo when a `teremokconnect://ref` code arrives.
+/// Opens Account (iOS) or Account → promo (Android) for `teremokconnect://ref`.
 class _ReferralLinkHost extends ConsumerWidget {
   const _ReferralLinkHost({required this.child});
 
@@ -77,7 +78,7 @@ class _ReferralLinkHost extends ConsumerWidget {
       final code = next?.trim();
       if (code == null || code.isEmpty) return;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        AppRouter.config.go('/settings/account/promo');
+        AppRouter.config.go(referralLandingPath);
       });
     });
     return child;
