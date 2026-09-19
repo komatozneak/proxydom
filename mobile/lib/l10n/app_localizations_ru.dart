@@ -1085,6 +1085,10 @@ class AppL10nRu extends AppL10n {
       'На главном экране нажмите «Подключиться». Android один раз спросит разрешение VPN — так и должно быть.';
 
   @override
+  String get onboardingConnectBodyIos =>
+      'На главном экране нажмите «Подключиться». iPhone один раз спросит разрешение VPN — так и должно быть.';
+
+  @override
   String get onboardingRegionTitle => 'Регион';
 
   @override

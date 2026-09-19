@@ -188,6 +188,45 @@ void main() {
     );
   });
 
+  testWidgets('HP track is taller than 10px and gutter is not card surface',
+      (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        locale: const Locale('ru'),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        home: const Scaffold(
+          body: FreeQuotaBar(
+            remainingFraction: 0.82,
+            title: 'Остаток трафика',
+            amountLabel: '3,44 / 4,20 ГБ',
+            exhaustedLabel: 'Трафик закончился',
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final track = tester.getSize(find.byKey(kFreeQuotaTrackKey));
+    expect(track.height, kFreeQuotaTrackHeight);
+    expect(track.height, greaterThan(10));
+
+    final gutterBox = tester
+        .widgetList<DecoratedBox>(
+          find.descendant(
+            of: find.byKey(kFreeQuotaTrackKey),
+            matching: find.byType(DecoratedBox),
+          ),
+        )
+        .first;
+    final decoration = gutterBox.decoration as BoxDecoration;
+    final card = AppTheme.light.colorScheme.surfaceContainerHighest;
+    final page = AppTheme.light.colorScheme.surface;
+    expect(decoration.color, isNot(card));
+    expect(decoration.color, isNot(page));
+  });
+
   testWidgets('Home curtain teaser is shown when provided', (tester) async {
     await tester.pumpWidget(
       MaterialApp(

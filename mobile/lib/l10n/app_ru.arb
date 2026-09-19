@@ -378,6 +378,7 @@
   "onboardingDone": "Начать",
   "onboardingConnectTitle": "Подключение",
   "onboardingConnectBody": "На главном экране нажмите «Подключиться». Android один раз спросит разрешение VPN — так и должно быть.",
+  "onboardingConnectBodyIos": "На главном экране нажмите «Подключиться». iPhone один раз спросит разрешение VPN — так и должно быть.",
   "onboardingRegionTitle": "Регион",
   "onboardingRegionBody": "Рекомендуем автоматический выбор. Позже регион можно сменить в списке.",
   "onboardingHelpTitle": "Помощь и приватность",

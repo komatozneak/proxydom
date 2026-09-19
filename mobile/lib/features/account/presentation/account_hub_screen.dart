@@ -188,7 +188,7 @@ class _HubBody extends ConsumerWidget {
                       : l.accountTelegramVpnRequired),
               onTap: () async {
                 if (profile.telegramUsername != null) {
-                  await TelegramLinkDialog.show(context);
+                  await launchTelegramBotStart();
                   return;
                 }
                 if (!vpnOk) {

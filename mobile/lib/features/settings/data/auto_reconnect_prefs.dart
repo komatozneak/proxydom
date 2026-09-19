@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// In-app auto-reconnect after unexpected VPN drop (revoked / error).
@@ -8,8 +9,12 @@ class AutoReconnectPrefs {
 
   static const _key = 'auto_reconnect_enabled';
 
-  /// Default OFF — opt-in for new installs.
+  /// Android: default OFF (opt-in). iOS: always on — Packet Tunnel /
+  /// `sessionActive` is the source of truth, not this pref.
   static Future<bool> isEnabled() async {
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+      return true;
+    }
     final prefs = await SharedPreferences.getInstance();
     return prefs.getBool(_key) ?? false;
   }

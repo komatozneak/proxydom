@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/config.dart';
 import '../../../core/device_info_helper.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
@@ -33,29 +34,45 @@ class TelegramLinkDialog extends ConsumerStatefulWidget {
 }
 
 /// Prefer the native Telegram app so `start=` is not dropped by the browser.
-Uri telegramStartUri(
-    {required String botUsername, required String startPayload}) {
+///
+/// Omit [startPayload] for a plain `/start` (profile), not `start=tariffs`.
+Uri telegramStartUri({
+  required String botUsername,
+  String? startPayload,
+}) {
   final bot = botUsername.replaceAll('@', '').trim();
-  return Uri(
-    scheme: 'tg',
-    host: 'resolve',
-    queryParameters: {'domain': bot, 'start': startPayload},
-  );
+  final params = <String, String>{'domain': bot};
+  final start = startPayload?.trim() ?? '';
+  if (start.isNotEmpty) {
+    params['start'] = start;
+  }
+  return Uri(scheme: 'tg', host: 'resolve', queryParameters: params);
 }
 
 Uri telegramHttpsStartUri({
   required String botUsername,
-  required String startPayload,
+  String? startPayload,
 }) {
   final bot = botUsername.replaceAll('@', '').trim();
-  return Uri.https('t.me', bot, {'start': startPayload});
+  final start = startPayload?.trim() ?? '';
+  if (start.isEmpty) {
+    return Uri.https('t.me', bot);
+  }
+  return Uri.https('t.me', bot, {'start': start});
+}
+
+/// Product bot with no `start=` payload — Telegram sends plain `/start`.
+Future<void> launchTelegramBotStart() {
+  return launchTelegramDeepLink(
+    telegramHttpsStartUri(botUsername: AppConfig.telegramBotUsername)
+        .toString(),
+  );
 }
 
 ({String bot, String start})? parseTelegramDeepLink(String deepLink) {
   final uri = Uri.tryParse(deepLink.trim());
   if (uri == null) return null;
   final start = uri.queryParameters['start']?.trim() ?? '';
-  if (start.isEmpty) return null;
   if (uri.scheme == 'tg') {
     final bot = (uri.queryParameters['domain'] ?? '').trim();
     if (bot.isEmpty) return null;
@@ -134,12 +151,9 @@ class _TelegramLinkDialogState extends ConsumerState<TelegramLinkDialog>
   Future<void> _startLink() async {
     final existing = ref.read(sessionProvider).valueOrNull;
     if (existing != null && existing.telegramUsername != null) {
-      setState(() {
-        _starting = false;
-        _linked = true;
-        _linkedUsername = existing.telegramUsername;
-        _error = null;
-      });
+      await launchTelegramBotStart();
+      if (!mounted) return;
+      Navigator.of(context).pop(TelegramLinkDialogResult.linked);
       return;
     }
 
@@ -274,6 +288,7 @@ class _TelegramLinkDialogState extends ConsumerState<TelegramLinkDialog>
           _pollTimer?.cancel();
           await ref.read(sessionProvider.notifier).refresh();
           if (!mounted) return;
+          unawaited(reconnectVpnAfterIdentityChange(ref));
           final session = ref.read(sessionProvider).valueOrNull;
           setState(() {
             _linked = true;
@@ -281,6 +296,9 @@ class _TelegramLinkDialogState extends ConsumerState<TelegramLinkDialog>
             _restoreIsMember = false;
             _linkedUsername = session?.telegramUsername;
           });
+          await launchTelegramBotStart();
+          if (!mounted) return;
+          Navigator.of(context).pop(TelegramLinkDialogResult.linked);
           return;
         }
         if (outcome.status == TelegramPollStatus.confirmed) {
@@ -309,12 +327,16 @@ class _TelegramLinkDialogState extends ConsumerState<TelegramLinkDialog>
       if (!mounted) return;
       if (session != null && session.telegramUsername != null) {
         _pollTimer?.cancel();
+        unawaited(reconnectVpnAfterIdentityChange(ref));
         setState(() {
           _linked = true;
           _restored = false;
           _restoreIsMember = false;
           _linkedUsername = session.telegramUsername;
         });
+        await launchTelegramBotStart();
+        if (!mounted) return;
+        Navigator.of(context).pop(TelegramLinkDialogResult.linked);
       }
     } catch (_) {
       _pollFailures++;

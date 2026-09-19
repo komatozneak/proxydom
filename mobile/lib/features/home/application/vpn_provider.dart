@@ -430,6 +430,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
     // Auto SOCKS prove: session snapshot is SoT. Binding+TUN in the shade
     // must still paint Nest Connected (ConnectedHealthy can lag / miss).
     if (_sessionProving) return;
+    if (_suppressAutoReconnect) return;
     final effectiveGen = gen ?? _activeConnectGen ?? _connectGeneration;
     if (_enterConnectedGenInFlight == effectiveGen) {
       return;
@@ -456,6 +457,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
       walkActive: _sessionWalkActive,
       sessionOwnsUi: _sessionOwnsUi,
       nativeConnected: native == VpnNativeStatus.connected,
+      userStopping: _suppressAutoReconnect,
     )) {
       _vpnLog(
         '[VPN] enter_connected refused native=$native '
@@ -520,6 +522,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
       walkActive: _sessionWalkActive,
       sessionOwnsUi: _sessionOwnsUi,
       nativeConnected: nativeAfter == VpnNativeStatus.connected,
+      userStopping: _suppressAutoReconnect,
     )) {
       return;
     }
@@ -641,6 +644,11 @@ class VpnNotifier extends Notifier<VpnStatus> {
   /// After TUN is up: icanhazip vs catalog IPv4 (not SNI / expected_egress_host).
   Future<void> _logEgressProbe({int? token}) async {
     final mine = token ?? _egressProbeToken;
+    if (_suppressAutoReconnect ||
+        _lastSessionPhase == VpnSessionPhase.stopping ||
+        _lastSessionPhase == VpnSessionPhase.idle) {
+      return;
+    }
     try {
       var winnerId = _autoActiveNodeId;
       if (winnerId == null || winnerId.isEmpty) {
@@ -666,7 +674,11 @@ class VpnNotifier extends Notifier<VpnStatus> {
       }
       _catalogHost = catalogHost;
       final ip = await fetchExternalIp();
-      if (mine != _egressProbeToken || state is! VpnConnected) {
+      if (mine != _egressProbeToken ||
+          state is! VpnConnected ||
+          _suppressAutoReconnect ||
+          _lastSessionPhase == VpnSessionPhase.stopping ||
+          _lastSessionPhase == VpnSessionPhase.idle) {
         return;
       }
       final check = egressCheckLabel(externalIp: ip, catalogHost: catalogHost);
@@ -1623,9 +1635,9 @@ class VpnNotifier extends Notifier<VpnStatus> {
       _vpnLog('[VPN] disconnect watchdog fired ui=$state');
       _connectInFlight = null;
       final still = await VpnController.instance.getStatus();
-      if (still == VpnNativeStatus.connected) {
+      if (still == VpnNativeStatus.connected && !_suppressAutoReconnect) {
         await _enterConnected(freshSession: false);
-      } else if (state is VpnConnecting) {
+      } else {
         await _clearConnectedSince();
         _lastSessionPhase = VpnSessionPhase.idle;
         state = const VpnDisconnected();
@@ -1649,13 +1661,12 @@ class VpnNotifier extends Notifier<VpnStatus> {
       _autoReconnectArmed = false;
       _connectInFlight = null;
       final after = await VpnController.instance.getStatus();
-      if (after == VpnNativeStatus.connected) {
+      _subscribeToStatus();
+      if (after == VpnNativeStatus.connected && !_suppressAutoReconnect) {
         // stop did not tear down — stay honest with native.
-        _subscribeToStatus();
         await _enterConnected(freshSession: false);
       } else {
         await _clearConnectedSince();
-        _subscribeToStatus();
         _lastSessionPhase = VpnSessionPhase.idle;
         state = const VpnDisconnected();
       }
@@ -1850,6 +1861,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
   void _onNativeStatus(VpnNativeStatus nativeStatus) {
     switch (nativeStatus) {
       case VpnNativeStatus.connected:
+        if (_suppressAutoReconnect) return;
         if (state is VpnConnected) return;
         // SOCKS prove: ignore native connected. Binding+TUN (shade Connected)
         // must paint Nest. Confirmed TUN up heals sticky VpnError.
@@ -1952,10 +1964,15 @@ class VpnNotifier extends Notifier<VpnStatus> {
     if (!_shouldDropConnectingOnIdle()) return;
     await _clearConnectedSince();
     if (!_shouldDropConnectingOnIdle()) return;
-    final detail = await VpnController.instance.getLastError();
-    if (!_shouldDropConnectingOnIdle()) return;
     _cancelConnectingWatchdog();
     _endSessionWalk();
+    if (_suppressAutoReconnect) {
+      _logUiTransition('disconnected', 'idle_connecting');
+      state = const VpnDisconnected();
+      return;
+    }
+    final detail = await VpnController.instance.getLastError();
+    if (!_shouldDropConnectingOnIdle()) return;
     if (detail != null && detail.trim().isNotEmpty) {
       _logUiTransition('error', 'idle_connecting');
       state = vpnErrorFromNativeDetail(detail);

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -111,6 +112,8 @@ void main() {
 
   test('AutoReconnectPrefs remains independent storage', () async {
     SharedPreferences.setMockInitialValues({});
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
     expect(await AutoReconnectPrefs.isEnabled(), isFalse);
     await AutoReconnectPrefs.setEnabled(true);
     expect(await AutoReconnectPrefs.isEnabled(), isTrue);

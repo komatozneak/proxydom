@@ -1082,6 +1082,10 @@ class AppL10nEn extends AppL10n {
       'Tap Connect on Home. Android will ask for VPN permission once — that’s normal.';
 
   @override
+  String get onboardingConnectBodyIos =>
+      'Tap Connect on Home. iPhone will ask for VPN permission once — that’s normal.';
+
+  @override
   String get onboardingRegionTitle => 'Region';
 
   @override

@@ -390,7 +390,7 @@ void main() {
     expect(find.text('SUB_PAGE'), findsOneWidget);
   });
 
-  testWidgets('iOS quota bar tap opens Account, not /subscription',
+  testWidgets('iOS quota bar tap without VPN asks to connect, not /subscription',
       (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
@@ -452,13 +452,15 @@ void main() {
 
     expect(find.text('Подключить безлимит'), findsNothing);
     await tester.tap(find.byKey(kHomeQuotaBarKey));
-    await tester.pumpAndSettle();
-    expect(find.text('ACCOUNT_HUB'), findsOneWidget);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.text('Сначала подключитесь.'), findsOneWidget);
+    expect(find.text('ACCOUNT_HUB'), findsNothing);
     expect(find.text('SUB_PAGE'), findsNothing);
     debugDefaultTargetPlatformOverride = null;
   });
 
-  testWidgets('iOS quota exceeded CTA is Account, not Оформить Premium',
+  testWidgets('iOS quota exceeded CTA asks to connect, not Оформить Premium',
       (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
@@ -523,8 +525,10 @@ void main() {
     expect(find.text('Оформить Premium'), findsNothing);
     expect(find.textContaining('Оформите Premium'), findsNothing);
     await tester.tap(find.widgetWithText(FilledButton, 'Аккаунт'));
-    await tester.pumpAndSettle();
-    expect(find.text('ACCOUNT_HUB'), findsOneWidget);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.text('Сначала подключитесь.'), findsOneWidget);
+    expect(find.text('ACCOUNT_HUB'), findsNothing);
     expect(find.text('LOCKED'), findsNothing);
     debugDefaultTargetPlatformOverride = null;
   });

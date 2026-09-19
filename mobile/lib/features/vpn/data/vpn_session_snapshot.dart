@@ -216,7 +216,9 @@ bool shouldRefuseEnterConnected({
   required bool walkActive,
   required bool sessionOwnsUi,
   required bool nativeConnected,
+  bool userStopping = false,
 }) {
+  if (userStopping) return true;
   if (sessionProving) return true;
   if (connectGen != null && connectGen != currentGen) return true;
   if (walkActive || sessionOwnsUi) return false;

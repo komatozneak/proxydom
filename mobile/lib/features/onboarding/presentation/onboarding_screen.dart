@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -11,6 +12,18 @@ import '../../auth/application/auth_state.dart';
 import '../../beta/application/beta_usage_tracker.dart';
 import '../../beta/data/jwt_subject.dart';
 import '../data/onboarding_prefs.dart';
+
+/// Connect-card copy: iOS must not mention Android VPN permission.
+String onboardingConnectBodyForPlatform(AppL10n l) {
+  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+    return l.onboardingConnectBodyIos;
+  }
+  return l.onboardingConnectBody;
+}
+
+Color onboardingGlyphColor(ColorScheme scheme) => scheme.onSurface;
+
+Color onboardingInactiveDotColor(ColorScheme scheme) => scheme.outline;
 
 class _OnboardingCard {
   const _OnboardingCard({
@@ -46,7 +59,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         _OnboardingCard(
           icon: AppIcons.power,
           title: l.onboardingConnectTitle,
-          body: l.onboardingConnectBody,
+          body: onboardingConnectBodyForPlatform(l),
         ),
         _OnboardingCard(
           icon: AppIcons.servers,
@@ -116,7 +129,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                           child: AppIcon(
                             card.icon,
                             size: 44,
-                            color: AppBrand.primary,
+                            color: onboardingGlyphColor(theme.colorScheme),
                           ),
                         ),
                         const SizedBox(height: 28),
@@ -129,7 +142,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                         Text(
                           card.body,
                           style: theme.textTheme.bodyLarge?.copyWith(
-                            color: theme.colorScheme.onSurface.withOpacity(0.75),
+                            color: theme.colorScheme.onSurfaceVariant,
                           ),
                           textAlign: TextAlign.center,
                         ),
@@ -151,7 +164,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   decoration: BoxDecoration(
                     color: active
                         ? AppBrand.secondary
-                        : AppBrand.primary.withOpacity(0.25),
+                        : onboardingInactiveDotColor(theme.colorScheme),
                     borderRadius: BorderRadius.circular(4),
                   ),
                 );

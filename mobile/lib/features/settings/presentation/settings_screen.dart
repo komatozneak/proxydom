@@ -55,10 +55,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _bootstrap() async {
     final futures = <Future<void>>[
-      _loadAutoReconnect(),
       _loadVersion(),
       _loadInstallId(),
     ];
+    if (!hideInAppPlategaCheckout) {
+      futures.add(_loadAutoReconnect());
+    }
     if (VpnNotificationPrefs.isSupported) {
       futures.add(_loadNotif());
     }
@@ -373,8 +375,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final l = AppL10n.of(context);
     final theme = Theme.of(context);
     final showNotif = VpnNotificationPrefs.isSupported;
+    final showAutoReconnect = !hideInAppPlategaCheckout;
+    final showNoVpn = !hideInAppPlategaCheckout;
     final notifOn = _notifEnabled ?? true;
     final autoOn = _autoReconnect ?? false;
+    final showConnectionSection =
+        showAutoReconnect || showNotif || showNoVpn;
     final subAsync = ref.watch(subscriptionStatusProvider);
     final themeMode =
         ref.watch(themeModeProvider).valueOrNull ?? ThemeMode.system;
@@ -449,62 +455,65 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 20),
-          _SectionLabel(l.settingsSectionConnection),
-          _SettingsCard(
-            children: [
-              _SettingsRow(
-                icon: AppIcons.refresh,
-                title: l.settingsAutoReconnect,
-                subtitle: l.settingsAutoReconnectHint,
-                trailing: Switch.adaptive(
-                  value: autoOn,
-                  onChanged: _autoReconnectLoading || _autoReconnect == null
-                      ? null
-                      : _onAutoReconnectChanged,
-                ),
-              ),
-              if (showNotif) ...[
-                const _CardDivider(),
-                _SettingsRow(
-                  icon: AppIcons.notifications,
-                  title: l.settingsVpnNotificationTitle,
-                  subtitle: l.settingsVpnNotificationHint,
-                  trailing: Switch.adaptive(
-                    value: notifOn,
-                    onChanged: _notifLoading || _notifEnabled == null
-                        ? null
-                        : _onNotifChanged,
-                  ),
-                ),
-                if (QsTilePrefs.isSupported) ...[
-                  const _CardDivider(),
+          if (showConnectionSection) ...[
+            const SizedBox(height: 20),
+            _SectionLabel(l.settingsSectionConnection),
+            _SettingsCard(
+              children: [
+                if (showAutoReconnect)
                   _SettingsRow(
-                    icon: AppIcons.house,
-                    title: l.settingsQsTileTitle,
-                    subtitle: l.settingsQsTileHint,
-                    onTap: _qsAdding ? null : _onAddQsTile,
-                    trailing: _qsAdding
-                        ? const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : null,
+                    icon: AppIcons.refresh,
+                    title: l.settingsAutoReconnect,
+                    subtitle: l.settingsAutoReconnectHint,
+                    trailing: Switch(
+                      value: autoOn,
+                      onChanged: _autoReconnectLoading || _autoReconnect == null
+                          ? null
+                          : _onAutoReconnectChanged,
+                    ),
+                  ),
+                if (showNotif) ...[
+                  if (showAutoReconnect) const _CardDivider(),
+                  _SettingsRow(
+                    icon: AppIcons.notifications,
+                    title: l.settingsVpnNotificationTitle,
+                    subtitle: l.settingsVpnNotificationHint,
+                    trailing: Switch(
+                      value: notifOn,
+                      onChanged: _notifLoading || _notifEnabled == null
+                          ? null
+                          : _onNotifChanged,
+                    ),
+                  ),
+                  if (QsTilePrefs.isSupported) ...[
+                    const _CardDivider(),
+                    _SettingsRow(
+                      icon: AppIcons.house,
+                      title: l.settingsQsTileTitle,
+                      subtitle: l.settingsQsTileHint,
+                      onTap: _qsAdding ? null : _onAddQsTile,
+                      trailing: _qsAdding
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : null,
+                    ),
+                  ],
+                ],
+                if (showNoVpn) ...[
+                  if (showAutoReconnect || showNotif) const _CardDivider(),
+                  _SettingsRow(
+                    icon: AppIcons.sliders,
+                    title: l.settingsNoVpn,
+                    subtitle: l.settingsNoVpnHint,
+                    onTap: () => context.go('/settings/no-vpn'),
                   ),
                 ],
               ],
-              if (!hideInAppPlategaCheckout) ...[
-                const _CardDivider(),
-                _SettingsRow(
-                  icon: AppIcons.sliders,
-                  title: l.settingsNoVpn,
-                  subtitle: l.settingsNoVpnHint,
-                  onTap: () => context.go('/settings/no-vpn'),
-                ),
-              ],
-            ],
-          ),
+            ),
+          ],
           const SizedBox(height: 20),
           _SectionLabel(l.settingsSectionApp),
           _SettingsCard(

@@ -49,8 +49,14 @@ class AppBrand {
 
   static const Color surfaceDark = Color(0xFF121212);
 
-  /// Dark elevated — near mark charcoal family.
-  static const Color surfaceVariantDark = Color(0xFF1C1C1E);
+  /// Dark elevated cards — enough lift off [surfaceDark] so numbers read.
+  static const Color surfaceVariantDark = Color(0xFF2C2C32);
+
+  /// Unselected Material switch track in dark — lighter than card zinc.
+  static const Color switchTrackOffDark = Color(0xFFB0B0B8);
+
+  /// Thin rim on the unselected dark track so it does not melt into the card.
+  static const Color switchTrackOutlineDark = Color(0xFFE4E4E7);
 
   static const Color surfaceElevatedLight = Color(0xFFFFFFFF);
 
@@ -59,12 +65,12 @@ class AppBrand {
   static const Color lineLight = Color(0xFFE4E4E7);
 
   static const Color inkDark = Color(0xFFF5F5F5);
-  static const Color inkMutedDark = Color(0xFFA1A1AA);
-  static const Color lineDark = Color(0xFF2A2A2E);
+  static const Color inkMutedDark = Color(0xFFC8C8D0);
+  static const Color lineDark = Color(0xFF73737C);
 
   static const Color info = Color(0xFF558B2F);
 
-  static const Color onSurfaceVariantDark = Color(0xFFA1A1AA);
+  static const Color onSurfaceVariantDark = Color(0xFFC8C8D0);
 
   /// Free quota HP bar: healthy → caution → critical, then depleted grey.
   static const Color quotaHealthy = success;
@@ -217,8 +223,16 @@ class AppTheme {
           (s) => AppBrand.surfaceElevatedLight,
         ),
         trackColor: WidgetStateProperty.resolveWith((s) {
-          if (s.contains(WidgetState.selected)) return chrome;
-          return line;
+          if (s.contains(WidgetState.selected)) {
+            return AppBrand.secondary;
+          }
+          return isDark ? AppBrand.switchTrackOffDark : AppBrand.inkMutedLight;
+        }),
+        trackOutlineColor: WidgetStateProperty.resolveWith((s) {
+          if (!isDark || s.contains(WidgetState.selected)) {
+            return Colors.transparent;
+          }
+          return AppBrand.switchTrackOutlineDark;
         }),
       ),
       inputDecorationTheme: InputDecorationTheme(

@@ -381,6 +381,21 @@ void main() {
       );
     });
 
+    test('refuses Connected paint while the user is stopping', () {
+      expect(
+        shouldRefuseEnterConnected(
+          sessionProving: false,
+          connectGen: 2,
+          currentGen: 2,
+          walkActive: false,
+          sessionOwnsUi: false,
+          nativeConnected: true,
+          userStopping: true,
+        ),
+        isTrue,
+      );
+    });
+
     test('allows paint when native is connected and generation matches', () {
       expect(
         shouldRefuseEnterConnected(

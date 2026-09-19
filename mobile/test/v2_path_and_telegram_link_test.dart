@@ -32,4 +32,18 @@ void main() {
     expect(uri.queryParameters['domain'], 'vpn_teremok_bot');
     expect(uri.queryParameters['start'], 'link_abc123');
   });
+
+  test('plain bot /start URI has no start= payload', () {
+    final tg = telegramStartUri(botUsername: 'vpn_teremok_bot');
+    expect(tg.queryParameters['domain'], 'vpn_teremok_bot');
+    expect(tg.queryParameters.containsKey('start'), isFalse);
+    final https = telegramHttpsStartUri(botUsername: 'vpn_teremok_bot');
+    expect(https.host, 't.me');
+    expect(https.path, '/vpn_teremok_bot');
+    expect(https.queryParameters.containsKey('start'), isFalse);
+    final parsed = parseTelegramDeepLink(https.toString());
+    expect(parsed, isNotNull);
+    expect(parsed!.bot, 'vpn_teremok_bot');
+    expect(parsed.start, isEmpty);
+  });
 }

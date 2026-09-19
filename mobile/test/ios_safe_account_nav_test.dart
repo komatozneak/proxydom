@@ -67,7 +67,7 @@ void main() {
     expect(en.accountTelegramVpnRequired, 'Connect first.');
   });
 
-  testWidgets('iOS locked CTA opens Account, not promo', (tester) async {
+  testWidgets('iOS locked CTA without VPN asks to connect, not promo', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
     final container = ProviderContainer(
@@ -120,12 +120,13 @@ void main() {
     expect(find.text('Аккаунт'), findsWidgets);
     await tester.tap(find.widgetWithText(FilledButton, 'Аккаунт'));
     await tester.pumpAndSettle();
-    expect(find.text('ACCOUNT_HUB'), findsOneWidget);
+    expect(find.text('Сначала подключитесь.'), findsOneWidget);
+    expect(find.text('ACCOUNT_HUB'), findsNothing);
     expect(find.text('PROMO_DEAD'), findsNothing);
     debugDefaultTargetPlatformOverride = null;
   });
 
-  testWidgets('iOS Premium tab opens Account, not promo', (tester) async {
+  testWidgets('iOS Premium tab without VPN asks to connect, not promo', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
     final container = ProviderContainer(
@@ -166,7 +167,8 @@ void main() {
     expect(find.text('Код доступа'), findsNothing);
     await tester.tap(find.widgetWithText(FilledButton, 'Аккаунт'));
     await tester.pumpAndSettle();
-    expect(find.text('ACCOUNT_HUB'), findsOneWidget);
+    expect(find.text('Сначала подключитесь.'), findsOneWidget);
+    expect(find.text('ACCOUNT_HUB'), findsNothing);
     expect(find.text('PROMO_DEAD'), findsNothing);
     debugDefaultTargetPlatformOverride = null;
   });

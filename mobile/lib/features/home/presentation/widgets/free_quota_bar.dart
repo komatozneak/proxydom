@@ -156,6 +156,12 @@ class _FreeQuotaBarState extends State<FreeQuotaBar> {
   }
 }
 
+/// Visible HP gutter on the white quota card (`surfaceContainerHighest`).
+const Key kFreeQuotaTrackKey = Key('free_quota_hp_track');
+
+/// Track height — 10px on `surface` used to vanish into the cream card.
+const double kFreeQuotaTrackHeight = 16;
+
 class _QuotaTrack extends StatelessWidget {
   const _QuotaTrack({required this.fraction});
 
@@ -165,14 +171,22 @@ class _QuotaTrack extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final exhausted = fraction <= 0;
+    final card = theme.colorScheme.surfaceContainerHighest;
+    // Cream page `surface` (#F4F4F5) is the card's neighbour — use a muted
+    // wash so the empty gutter reads as a trough, not a missing widget.
+    final gutter = Color.alphaBlend(
+      theme.colorScheme.outline.withValues(alpha: 0.28),
+      card,
+    );
     return SizedBox(
-      height: 10,
+      key: kFreeQuotaTrackKey,
+      height: kFreeQuotaTrackHeight,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
+          color: gutter,
           borderRadius: BorderRadius.circular(AppBrand.radiusNavPill),
           border: Border.all(
-            color: theme.colorScheme.outline.withValues(alpha: 0.45),
+            color: theme.colorScheme.outline.withValues(alpha: 0.72),
           ),
         ),
         child: Padding(
