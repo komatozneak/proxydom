@@ -1386,13 +1386,13 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get accountHubLinkedLead =>
-      'Telegram привязан. Код восстановления и бот — тот же аккаунт.';
+      'Telegram привязан. Бот — тот же аккаунт: подписка и восстановление.';
 
   @override
   String get accountHubLinkTelegram => 'Telegram';
 
   @override
-  String get accountHubLinkTelegramHint => 'Тот же аккаунт в боте';
+  String get accountHubLinkTelegramHint => 'Подписка и восстановление в боте';
 
   @override
   String get accountHubLinkEmail => 'Почта';
@@ -1558,7 +1558,7 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get accountTelegramLinkedBody =>
-      'После переустановки доступ можно восстановить через этот Telegram.';
+      'После переустановки доступ восстанавливается через этот Telegram. Подписка тоже в боте.';
 
   @override
   String get accountTelegramOwnerRestoredTitle => 'Аккаунт восстановлен';

@@ -61,6 +61,13 @@ void main() {
     expect(ru.iosBillingUnavailableBody.toLowerCase(), isNot(contains('t.me')));
     expect(en.iosBillingUnavailableBody.toLowerCase(), isNot(contains('telegram')));
     expect(ru.accountTelegramVpnRequired, 'Сначала подключитесь.');
+    expect(ru.accountHubLinkTelegramHint.toLowerCase(), isNot(contains('оплат')));
+    expect(ru.accountHubLinkTelegramHint, isNot(contains('₽')));
+    expect(ru.accountHubLinkedLead.toLowerCase(), isNot(contains('оплат')));
+    expect(ru.accountTelegramLinkedBody.toLowerCase(), isNot(contains('оплат')));
+    expect(ru.accountHubLinkTelegramHint, contains('боте'));
+    expect(en.accountHubLinkTelegramHint.toLowerCase(), isNot(contains('pay')));
+    expect(en.accountHubLinkTelegramHint.toLowerCase(), contains('bot'));
     expect(en.regionBlurbFree.toLowerCase(), isNot(contains('ai')));
     expect(en.promoBody.toLowerCase(), isNot(contains('closed beta')));
     expect(en.restoreBody.toLowerCase(), isNot(contains('platega')));

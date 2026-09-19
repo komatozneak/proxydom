@@ -670,9 +670,9 @@
   "bootstrapFailed": "Couldn’t start the session. Check your connection.",
   "accountHubTitle": "Account",
   "accountHubGuestLead": "This account is on this device. Recovery code — after reinstall. Telegram — the same account.",
-  "accountHubLinkedLead": "Telegram is linked. Recovery code and the bot keep the same account.",
+  "accountHubLinkedLead": "Telegram is linked. The bot is the same account: subscription and restore.",
   "accountHubLinkTelegram": "Telegram",
-  "accountHubLinkTelegramHint": "The same account in the bot",
+  "accountHubLinkTelegramHint": "Subscription and restore in the bot",
   "accountHubLinkEmail": "Email",
   "accountHubLinkEmailHint": "Link with a code from email",
   "accountHubRecovery": "Recovery code",
@@ -727,7 +727,7 @@
       "handle": {"type": "String"}
     }
   },
-  "accountTelegramLinkedBody": "You can restore access with this Telegram after reinstall.",
+  "accountTelegramLinkedBody": "After reinstall, restore access with this Telegram. Subscription is in the bot too.",
   "accountTelegramOwnerRestoredTitle": "Your account is restored",
   "accountTelegramOwnerRestoredBody": "You can manage the subscription and restore access via Telegram.",
   "accountTelegramMemberRestoredTitle": "You’re back in the subscription",

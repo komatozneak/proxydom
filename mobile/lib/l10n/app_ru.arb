@@ -469,9 +469,9 @@
   "bootstrapFailed": "Не удалось начать сессию. Проверьте связь.",
   "accountHubTitle": "Аккаунт",
   "accountHubGuestLead": "Аккаунт на этом устройстве. Код восстановления — после переустановки. Telegram — тот же аккаунт.",
-  "accountHubLinkedLead": "Telegram привязан. Код восстановления и бот — тот же аккаунт.",
+  "accountHubLinkedLead": "Telegram привязан. Бот — тот же аккаунт: подписка и восстановление.",
   "accountHubLinkTelegram": "Telegram",
-  "accountHubLinkTelegramHint": "Тот же аккаунт в боте",
+  "accountHubLinkTelegramHint": "Подписка и восстановление в боте",
   "accountHubLinkEmail": "Почта",
   "accountHubLinkEmailHint": "Привязать по коду из письма",
   "accountHubRecovery": "Код восстановления",
@@ -526,7 +526,7 @@
       "handle": {"type": "String"}
     }
   },
-  "accountTelegramLinkedBody": "После переустановки доступ можно восстановить через этот Telegram.",
+  "accountTelegramLinkedBody": "После переустановки доступ восстанавливается через этот Telegram. Подписка тоже в боте.",
   "accountTelegramOwnerRestoredTitle": "Аккаунт восстановлен",
   "accountTelegramOwnerRestoredBody": "Теперь можно управлять подпиской и восстанавливать доступ через Telegram.",
   "accountTelegramMemberRestoredTitle": "Вернулись в подписку",
