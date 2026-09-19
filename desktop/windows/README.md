@@ -13,7 +13,7 @@ dotnet test TeremokConnect.slnx -c Release
 .\scripts\package-msi.ps1
 ```
 
-Then double-click **TeremokVPN-0.4.22.exe** from `C:\TeremokMsi` or the Desktop copy
+Then double-click **TeremokVPN-0.4.23.exe** from `C:\TeremokMsi` or the Desktop copy
 (not from a mapped `Z:\` drive). Uninstall from Apps is allowed while Connected.
 Hiddify on this PC: only Disconnect while testing Teremok; do not uninstall it.
 
