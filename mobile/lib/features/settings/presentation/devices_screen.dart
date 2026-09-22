@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -13,6 +14,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../auth/application/auth_provider.dart';
 import '../../auth/application/logout_handler.dart';
 import '../../auth/data/auth_api.dart';
+import '../../auth/data/seat_outcome.dart';
 import '../../auth/data/recovery_code_storage.dart';
 import '../../session/application/identity_reconnect.dart';
 import '../../session/application/session_provider.dart';
@@ -88,6 +90,15 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
       await teardownVpnAfterIdentityChange(ref);
       if (!mounted) return;
       showTeremokSnackBar(context, l.devicesRevoked);
+    } on DioException catch (e) {
+      if (!mounted) return;
+      final code = parseApiErrorCode(e.response?.data);
+      final ownerOnly = code == 'seat_forbidden_not_owner' ||
+          code == 'seat_cannot_revoke_owner';
+      showTeremokSnackBar(
+        context,
+        ownerOnly ? l.settingsSeatForbidden : l.devicesRevokeFailed,
+      );
     } catch (_) {
       if (!mounted) return;
       showTeremokSnackBar(context, l.devicesRevokeFailed);
@@ -348,7 +359,10 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
                   onRename: (ordered[i].isCurrent || currentIsOwner) && !_busy
                       ? () => _rename(ordered[i])
                       : null,
-                  onRevoke: !ordered[i].isCurrent && !_busy
+                  onRevoke: currentIsOwner &&
+                          !ordered[i].isCurrent &&
+                          !ordered[i].isOwner &&
+                          !_busy
                       ? () => _revoke(ordered[i])
                       : null,
                 ),

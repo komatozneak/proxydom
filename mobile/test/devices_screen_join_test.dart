@@ -132,7 +132,7 @@ void main() {
   });
 
   testWidgets(
-    'member with others can revoke',
+    'member with others leaves, does not revoke',
     skip: !anonymous,
     (tester) async {
     await tester.pumpWidget(
@@ -150,7 +150,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Это устройство'), findsOneWidget);
-    expect(find.text('Удалить'), findsOneWidget);
+    expect(find.text('Удалить'), findsNothing);
+    expect(find.text('Покинуть чужую подписку'), findsOneWidget);
     expect(find.text('Pixel'), findsOneWidget);
   });
 }
