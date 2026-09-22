@@ -1,10 +1,13 @@
 # Teremok VPN for Windows (ADR 023)
 
-Visible **EXE** wizard (WiX Burn + oak/moss WPF) → one window → Connect (Hysteria2 TUN).
-Start Menu shortcut always; desktop shortcut is on by default.
+Public install file is **`Teremok VPN 0.4.26.msi`** (WiX, standard Windows installer).
+That is what the site and the in-app update offer. Explorer shows the generic MSI icon;
+the house icon is on the **Теремок VPN** shortcut after install.
+
+The Burn EXE (`TeremokVPN-0.4.26.exe`) is a local wizard only. Do not publish it:
+SmartScreen treats the unsigned EXE as a threat.
 
 Do **not** run `TeremokConnect.VpnService.exe` by hand. Do **not** pass `--console`.
-Install the EXE; the MSI inside starts `TeremokConnectVpn` as LocalSystem.
 
 ```powershell
 cd desktop/windows/dotnet
@@ -13,8 +16,9 @@ dotnet test TeremokConnect.slnx -c Release
 .\scripts\package-msi.ps1
 ```
 
-Then double-click **TeremokVPN-0.4.26.exe** from `C:\TeremokMsi` or the Desktop copy
-(not from a mapped `Z:\` drive). Uninstall from Apps is allowed while Connected.
-Hiddify on this PC: only Disconnect while testing Teremok; do not uninstall it.
+The script writes `artifacts\msi\TeremokConnect-0.4.26.msi` and copies the EXE to `C:\TeremokMsi`.
+Ship the MSI. Launch installers from `C:`, not from a mapped `Z:\` drive.
+
+Only the subscription owner can remove other devices. A member can leave.
 
 Bins (`hysteria.exe`, `wintun.dll`) are fetched, not committed. Pins: `SHA256SUMS`.
