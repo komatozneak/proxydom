@@ -29,7 +29,7 @@ AccountProfile profileFromSession(AccountSessionSnapshot snap) {
     hasAccess: snap.hasAccess,
     devicesCount: snap.devices.length,
     deviceLimit: snap.deviceLimit,
-    contactLinked: snap.telegramUsername != null,
+    contactLinked: snap.contactLinked || snap.telegramUsername != null,
     telegramUsername: snap.telegramUsername,
     hasRecoveryCode: snap.manageAccount,
     seatRole: snap.manageAccount ? 'owner' : 'member',

@@ -114,11 +114,11 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
-    expect(await AutoReconnectPrefs.isEnabled(), isFalse);
-    await AutoReconnectPrefs.setEnabled(true);
     expect(await AutoReconnectPrefs.isEnabled(), isTrue);
     await AutoReconnectPrefs.setEnabled(false);
     expect(await AutoReconnectPrefs.isEnabled(), isFalse);
+    await AutoReconnectPrefs.setEnabled(true);
+    expect(await AutoReconnectPrefs.isEnabled(), isTrue);
   });
 
   test('Settings does not ship a kill-switch tile (ADR 020)', () {

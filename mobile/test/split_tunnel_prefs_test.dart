@@ -47,55 +47,53 @@ void main() {
   });
 
   group('prefs defaults', () {
-    test('live RF categories default ON; TikTok stays OFF', () async {
-      expect(kOsnovnyeCategories.length, 11);
+    test('popular RU categories default ON including TikTok', () async {
       expect(
-        kRfDefaultOnOsnovnyeIds,
-        {
-          'vk',
-          'yandex',
-          'ozon',
-          'wb',
-          'steam',
-          'rutube',
-          'avito',
-          'banks',
-          'gosuslugi',
-          'max',
-        },
+        kOsnovnyeCategories.every((c) => c.defaultEnabled),
+        isTrue,
       );
-      expect(await SplitTunnelPrefs.osnovnyeEnabledCount(), 10);
+      expect(
+        await SplitTunnelPrefs.osnovnyeEnabledCount(),
+        kOsnovnyeCategories.length,
+      );
       final map = await SplitTunnelPrefs.loadOsnovnyeEnabled();
       expect(map['vk'], isTrue);
-      expect(map['yandex'], isTrue);
-      expect(map['ozon'], isTrue);
-      expect(map['wb'], isTrue);
-      expect(map['steam'], isTrue);
-      expect(map['rutube'], isTrue);
-      expect(map['avito'], isTrue);
+      expect(map['tiktok'], isTrue);
       expect(map['banks'], isTrue);
-      expect(map['gosuslugi'], isTrue);
-      expect(map['max'], isTrue);
-      expect(map['tiktok'], isFalse);
+      expect(map['shops'], isTrue);
+      expect(map['mailok'], isTrue);
+      expect(map['telecom'], isTrue);
+      expect(map['media'], isTrue);
+      expect(map['transport'], isTrue);
       final suffixes = await SplitTunnelPrefs.enabledDomainSuffixes();
       expect(
         suffixes,
         containsAll([
           'vk.com',
+          'tiktok.com',
           'yandex.ru',
           'kinopoisk.ru',
+          'dzen.ru',
           'ozon.ru',
           'wildberries.ru',
+          'wbstatic.net',
           'steampowered.com',
           'rutube.ru',
           'avito.ru',
           'sberbank.ru',
+          'yoomoney.ru',
+          'gazprombank.ru',
           'gosuslugi.ru',
+          'mos.ru',
           'max.ru',
-          'oneme.ru',
+          'rustore.ru',
+          'mail.ru',
+          'ok.ru',
+          'mts.ru',
+          'ivi.ru',
+          '2gis.ru',
         ]),
       );
-      expect(suffixes, isNot(contains('tiktok.com')));
     });
 
     test('custom list empty; add/toggle/pending', () async {
@@ -163,13 +161,16 @@ void main() {
 
     test('osnovnye vk domains feed suffixes; youtube aliases stripped for Hy2',
         () async {
-      expect(kOsnovnyeCategories.length, 11);
-      expect(await SplitTunnelPrefs.osnovnyeEnabledCount(), 10);
+      expect(
+        await SplitTunnelPrefs.osnovnyeEnabledCount(),
+        kOsnovnyeCategories.length,
+      );
       await SplitTunnelPrefs.setOsnovnyeEnabled('vk', true);
       final suffixes = await SplitTunnelPrefs.enabledDomainSuffixes();
       expect(suffixes, contains('vk.com'));
-      expect(suffixes, isNot(contains('tiktok.com')));
-      expect(await SplitTunnelPrefs.osnovnyeEnabledCount(), 10);
+      expect(suffixes, contains('tiktok.com'));
+      expect(await SplitTunnelPrefs.osnovnyeEnabledCount(),
+          kOsnovnyeCategories.length);
       await SplitTunnelPrefs.addSite(domain: 'youtube.com');
       final withYt = await SplitTunnelPrefs.enabledDomainSuffixes();
       expect(withYt, contains('youtube.com'));
@@ -189,15 +190,21 @@ void main() {
         containsAll(['vk.com', 'yandex.ru', 'ozon.ru', 'wildberries.ru']),
       );
       expect(suffixes, contains('steampowered.com'));
-      expect(suffixes, isNot(contains('tiktok.com')));
-      expect(await SplitTunnelPrefs.osnovnyeEnabledCount(), 10);
+      expect(suffixes, contains('tiktok.com'));
+      expect(
+        await SplitTunnelPrefs.osnovnyeEnabledCount(),
+        kOsnovnyeCategories.length,
+      );
 
       await SplitTunnelPrefs.setOsnovnyeEnabled('vk', false);
       expect(
         await SplitTunnelPrefs.enabledDomainSuffixes(),
         isNot(contains('vk.com')),
       );
-      expect(await SplitTunnelPrefs.osnovnyeEnabledCount(), 9);
+      expect(
+        await SplitTunnelPrefs.osnovnyeEnabledCount(),
+        kOsnovnyeCategories.length - 1,
+      );
     });
 
     test('disallowed apps prefs round-trip', () async {
@@ -298,6 +305,32 @@ void main() {
       final again = await SplitTunnelPrefs.seedDefaultBypassIfNeeded([
         'ru.yandex.taxi',
         'com.vkontakte.android',
+      ]);
+      expect(again, isFalse);
+    });
+
+    test('v4 seed adds TikTok/Avito without restoring user-off v3 packages',
+        () async {
+      SharedPreferences.setMockInitialValues({
+        'split_tunnel_seeded_bypass_v1': true,
+        'split_tunnel_seeded_bypass_v2': true,
+        'split_tunnel_seeded_bypass_v3': true,
+      });
+      expect(kDefaultBypassPackagesV4, contains('ru.avito'));
+      expect(kDefaultBypassPackagesV4, contains('com.zhiliaoapp.musically'));
+      final added = await SplitTunnelPrefs.seedDefaultBypassIfNeeded([
+        'ru.oneme.app',
+        'ru.avito',
+        'com.zhiliaoapp.musically',
+      ]);
+      expect(added, isTrue);
+      expect(await SplitTunnelPrefs.loadDisallowedPackages(), {
+        'com.zhiliaoapp.musically',
+        'ru.avito',
+      });
+      final again = await SplitTunnelPrefs.seedDefaultBypassIfNeeded([
+        'ru.oneme.app',
+        'ru.avito',
       ]);
       expect(again, isFalse);
     });

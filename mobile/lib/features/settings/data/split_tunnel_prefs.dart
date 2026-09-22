@@ -146,10 +146,12 @@ class SplitTunnelPrefs {
   static const _osnovnyeRfDefaultsKey = 'split_tunnel_osnovnye_rf_defaults_v1';
   static const _osnovnyeV2DefaultsKey = 'split_tunnel_osnovnye_v2_defaults_v1';
   static const _osnovnyeV3DefaultsKey = 'split_tunnel_osnovnye_v3_defaults_v1';
+  static const _osnovnyeV4DefaultsKey = 'split_tunnel_osnovnye_v4_defaults_v1';
   static const _disallowedAppsKey = 'split_tunnel_disallowed_apps_v1';
   static const _seededBypassKey = 'split_tunnel_seeded_bypass_v1';
   static const _seededBypassV2Key = 'split_tunnel_seeded_bypass_v2';
   static const _seededBypassV3Key = 'split_tunnel_seeded_bypass_v3';
+  static const _seededBypassV4Key = 'split_tunnel_seeded_bypass_v4';
   static const _iosAllOnKey = 'split_tunnel_ios_all_on_v1';
 
   static Map<String, bool> _osnovnyeDefaults() => {
@@ -238,13 +240,35 @@ class SplitTunnelPrefs {
     await prefs.setBool(_osnovnyeV3DefaultsKey, true);
   }
 
-  /// Live «Основные» toggles. Defaults: RF + Steam/RuTube/Avito/banks/Gosuslugi/MAX
-  /// ON, TikTok OFF (iOS Sites same defaults as Android — ADR 025).
+  /// One-shot: TikTok + popular RU shops/mail/telecom/media/transport ON.
+  ///
+  /// Older RF migrate left TikTok off. After this flag, a user OFF sticks.
+  static Future<void> _applyV4OsnovnyeDefaultsIfNeeded(
+    SharedPreferences prefs,
+  ) async {
+    if (prefs.getBool(_osnovnyeV4DefaultsKey) == true) return;
+    final map = _decodeOsnovnyeMap(prefs);
+    var changed = false;
+    for (final id in kOsnovnyeV4Ids) {
+      if (map[id] != true) {
+        map[id] = true;
+        changed = true;
+      }
+    }
+    if (changed) {
+      await prefs.setString(_osnovnyeKey, jsonEncode(map));
+      await _bumpDraft(prefs);
+    }
+    await prefs.setBool(_osnovnyeV4DefaultsKey, true);
+  }
+
+  /// Live «Основные» toggles. Popular RU Direct defaults ON, including TikTok.
   static Future<Map<String, bool>> loadOsnovnyeEnabled() async {
     final prefs = await SharedPreferences.getInstance();
     await _applyRfOsnovnyeDefaultsIfNeeded(prefs);
     await _applyV2OsnovnyeDefaultsIfNeeded(prefs);
     await _applyV3OsnovnyeDefaultsIfNeeded(prefs);
+    await _applyV4OsnovnyeDefaultsIfNeeded(prefs);
     return _decodeOsnovnyeMap(prefs);
   }
 
@@ -360,6 +384,19 @@ class SplitTunnelPrefs {
         addedAny = true;
       }
       await prefs.setBool(_seededBypassV3Key, true);
+    }
+
+    if (prefs.getBool(_seededBypassV4Key) != true) {
+      final current = await loadDisallowedPackages();
+      final toAdd =
+          kDefaultBypassPackagesV4.intersection(installed).difference(current);
+      if (toAdd.isNotEmpty) {
+        current.addAll(toAdd);
+        await prefs.setStringList(_disallowedAppsKey, current.toList()..sort());
+        await _bumpDraft(prefs);
+        addedAny = true;
+      }
+      await prefs.setBool(_seededBypassV4Key, true);
     }
 
     return addedAny;
@@ -539,8 +576,35 @@ const kDefaultBypassPackagesV3 = <String>{
   'ru.oneme.app',
 };
 
-/// Curated TUN-exclude packages (Yandex Go / banks / Gosuslugi / VK / Ozon / WB / MAX).
-/// Only seeded when the package is installed; missing ids are skipped.
+/// v4: popular RU apps that skip DNS (shops, maps, mail/OK, media, TikTok).
+const kDefaultBypassPackagesV4 = <String>{
+  'ru.avito',
+  'ru.rutube.app',
+  'com.valvesoftware.android.steam.community',
+  'ru.vk.store',
+  'ru.dublgis.dgismobile',
+  'ru.ok.android',
+  'ru.mail.mailapp',
+  'ru.yandex.yandexmaps',
+  'com.yandex.browser',
+  'ru.yandex.searchplugin',
+  'com.zhiliaoapp.musically',
+  'com.ss.android.ugc.trill',
+  'ru.ivi.client',
+  'ru.more.play',
+  'ru.dns.shop.android',
+  'ru.sberbank.sbermarket',
+  'ru.kuper',
+  'ru.cian.main',
+  'ru.gazprombank.android.mobilebank.app',
+  'ru.mts.mymts',
+  'ru.megafon.mlk',
+  'ru.beeline.services',
+  'ru.tele2.mytele2',
+  'ru.rzd.rzd',
+};
+
+/// Curated TUN-exclude packages. Only seeded when the package is installed.
 const kDefaultBypassPackages = <String>{
   'ru.yandex.taxi',
   'ru.yandex.android.taxi',
@@ -554,11 +618,13 @@ const kDefaultBypassPackages = <String>{
   'ru.gosuslugi.mobile',
   ...kDefaultBypassPackagesV2,
   ...kDefaultBypassPackagesV3,
+  ...kDefaultBypassPackagesV4,
 };
 
-/// Live RF site lists that default ON (suffix → Hy2 direct / iOS exclude). Not TikTok.
+/// Live RF site lists that default ON (suffix → Hy2 direct / iOS exclude).
 const kRfDefaultOnOsnovnyeIds = <String>{
   'vk',
+  'tiktok',
   'yandex',
   'ozon',
   'wb',
@@ -568,6 +634,11 @@ const kRfDefaultOnOsnovnyeIds = <String>{
   'banks',
   'gosuslugi',
   'max',
+  'shops',
+  'mailok',
+  'telecom',
+  'media',
+  'transport',
 };
 
 /// Category ids shipped in osnovnye v2 (one-shot migrate).
@@ -582,6 +653,16 @@ const kOsnovnyeV2Ids = <String>{
 /// Category ids shipped in osnovnye v3 (MAX — ADR 025).
 const kOsnovnyeV3Ids = <String>{
   'max',
+};
+
+/// TikTok + remaining popular RU rows (shops / Mail·OK / telecom / media / maps).
+const kOsnovnyeV4Ids = <String>{
+  'tiktok',
+  'shops',
+  'mailok',
+  'telecom',
+  'media',
+  'transport',
 };
 
 /// One row under Sites → Основные.
@@ -629,6 +710,8 @@ const kOsnovnyeCategories = <OsnovnyeCategory>[
       'userapi.com',
       'vkuseraudio.net',
       'vkuserphoto.ru',
+      'vk-cdn.net',
+      'vk-cdn.me',
     ],
   ),
   OsnovnyeCategory(
@@ -636,6 +719,8 @@ const kOsnovnyeCategories = <OsnovnyeCategory>[
     labelRu: 'TikTok',
     labelEn: 'TikTok',
     badge: 'TT',
+    // Owner: popular RU Direct, not "keep TikTok on the tunnel".
+    defaultEnabled: true,
     domains: [
       'tiktok.com',
       'tiktokv.com',
@@ -661,6 +746,8 @@ const kOsnovnyeCategories = <OsnovnyeCategory>[
       'yandexcloud.net',
       'yastatic.net',
       'kinopoisk.ru',
+      'dzen.ru',
+      'dzenstatic.ru',
     ],
   ),
   OsnovnyeCategory(
@@ -669,7 +756,7 @@ const kOsnovnyeCategories = <OsnovnyeCategory>[
     labelEn: 'Ozon',
     badge: 'OZ',
     defaultEnabled: true,
-    domains: ['ozon.ru', 'ozon.com', 'ozonusercontent.com'],
+    domains: ['ozon.ru', 'ozon.com', 'ozone.ru', 'ozonusercontent.com'],
   ),
   OsnovnyeCategory(
     id: 'wb',
@@ -677,7 +764,7 @@ const kOsnovnyeCategories = <OsnovnyeCategory>[
     labelEn: 'Wildberries',
     badge: 'WB',
     defaultEnabled: true,
-    domains: ['wildberries.ru', 'wb.ru', 'wbbasket.ru'],
+    domains: ['wildberries.ru', 'wb.ru', 'wbbasket.ru', 'wbstatic.net'],
   ),
   OsnovnyeCategory(
     id: 'steam',
@@ -753,11 +840,26 @@ const kOsnovnyeCategories = <OsnovnyeCategory>[
     domains: [
       'sberbank.ru',
       'sber.ru',
+      'sbrf.ru',
+      'sberbank.com',
+      'sberpay.ru',
       'tbank.ru',
       'tinkoff.ru',
+      't-bank.ru',
       'alfabank.ru',
+      'alfa-bank.ru',
+      'alfabank.st',
       'vtb.ru',
+      'gazprombank.ru',
+      'gpb.ru',
+      'psbank.ru',
+      'psb.ru',
+      'raiffeisen.ru',
       'nspk.ru',
+      'mironline.ru',
+      'privetmir.ru',
+      'yoomoney.ru',
+      'yoomoney.tech',
     ],
   ),
   OsnovnyeCategory(
@@ -766,7 +868,103 @@ const kOsnovnyeCategories = <OsnovnyeCategory>[
     labelEn: 'Gosuslugi',
     badge: 'GU',
     defaultEnabled: true,
-    domains: ['gosuslugi.ru', 'nalog.ru'],
+    domains: [
+      'gosuslugi.ru',
+      'gosuslugi.org',
+      'gu-st.ru',
+      'nalog.ru',
+      'nalog.gov.ru',
+      'mos.ru',
+      'emias.info',
+      'pfrf.ru',
+      'sfr.gov.ru',
+      'rosreestr.ru',
+      'rosreestr.gov.ru',
+      'kadastr.ru',
+    ],
+  ),
+  OsnovnyeCategory(
+    id: 'shops',
+    labelRu: 'Магазины',
+    labelEn: 'Shops',
+    badge: 'SH',
+    defaultEnabled: true,
+    domains: [
+      'rustore.ru',
+      'vkstore.ru',
+      'dns-shop.ru',
+      'dns-shop.st',
+      'kuper.ru',
+      'kupercdn.ru',
+      'sbermarket.ru',
+      'cian.ru',
+      'cdn-cian.ru',
+      'lamoda.ru',
+      'megamarket.ru',
+    ],
+  ),
+  OsnovnyeCategory(
+    id: 'mailok',
+    labelRu: 'Mail и ОК',
+    labelEn: 'Mail and OK',
+    badge: 'OK',
+    defaultEnabled: true,
+    domains: [
+      'mail.ru',
+      'ok.ru',
+      'ok.me',
+      'okcdn.ru',
+    ],
+  ),
+  OsnovnyeCategory(
+    id: 'telecom',
+    labelRu: 'Связь',
+    labelEn: 'Telecom',
+    badge: 'TL',
+    defaultEnabled: true,
+    domains: [
+      'mts.ru',
+      'megafon.ru',
+      'beeline.ru',
+      't2.ru',
+      'tele2.ru',
+      'rt.ru',
+      'rostelecom.ru',
+      'dom.ru',
+    ],
+  ),
+  OsnovnyeCategory(
+    id: 'media',
+    labelRu: 'Кино',
+    labelEn: 'Video',
+    badge: 'TV',
+    defaultEnabled: true,
+    domains: [
+      'ivi.ru',
+      'ivi-cdn.ru',
+      'okko.tv',
+      'okko.sport',
+      'wink.ru',
+      'premier.one',
+      'start.ru',
+    ],
+  ),
+  OsnovnyeCategory(
+    id: 'transport',
+    labelRu: 'Карты и дорога',
+    labelEn: 'Maps and travel',
+    badge: 'MP',
+    defaultEnabled: true,
+    domains: [
+      '2gis.ru',
+      '2gis.com',
+      'rzd.ru',
+      'aeroflot.ru',
+      's7.ru',
+      'whoosh.bike',
+      'delimobil.ru',
+      'samokat.ru',
+    ],
   ),
 ];
 

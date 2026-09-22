@@ -1,4 +1,5 @@
-import 'package:dio/dio.dart';
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,6 +17,7 @@ import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/teremok_snackbar.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../account/application/ios_account_nav.dart';
 import '../../auth/application/auth_provider.dart';
 import '../../auth/application/auth_state.dart';
 import '../../auth/application/logout_handler.dart';
@@ -179,14 +181,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         switch (accessCopyKind(s)) {
           case AccessCopyKind.paidOrTrial:
             if (s.expiresAt != null) {
-              return l.settingsAccessActiveUntil(_formatAccessDate(s.expiresAt!));
+              return l
+                  .settingsAccessActiveUntil(_formatAccessDate(s.expiresAt!));
             }
             return l.settingsAccessBetaSubtitle;
           case AccessCopyKind.cancelled:
             return l.settingsAccessCancelledSubtitle;
           case AccessCopyKind.closedBeta:
             if (s.expiresAt != null) {
-              return l.settingsAccessActiveUntil(_formatAccessDate(s.expiresAt!));
+              return l
+                  .settingsAccessActiveUntil(_formatAccessDate(s.expiresAt!));
             }
             return l.settingsAccessBetaSubtitle;
           case AccessCopyKind.free:
@@ -195,7 +199,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             return l.settingsAccessNoneSubtitle;
           case AccessCopyKind.generic:
             if (s.status == 'expired' && s.expiresAt != null) {
-              return l.settingsAccessActiveUntil(_formatAccessDate(s.expiresAt!));
+              return l
+                  .settingsAccessActiveUntil(_formatAccessDate(s.expiresAt!));
             }
             return l.settingsAccessNoneSubtitle;
         }
@@ -262,27 +267,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       );
       final saved = await DiagnosticsService.persistLocal(report);
       await Clipboard.setData(ClipboardData(text: saved.body));
-
-      var delivered = false;
-      if (auth is AuthStateAuthenticated) {
-        try {
-          await service.submit(report: saved.body, dumpToLogcat: false);
-          delivered = true;
-        } on DioException {
-          delivered = false;
-        }
-      }
       if (!mounted) return;
-      if (delivered) {
-        await SupportContact.openBot();
-      }
-      if (!mounted) return;
-      showTeremokSnackBar(
-        context,
-        delivered
-            ? l.settingsReportSent
-            : l.settingsReportTelegramFailed,
-      );
+      showTeremokSnackBar(context, l.settingsReportCopied);
     } catch (_) {
       if (!mounted) return;
       showTeremokSnackBar(context, l.settingsReportFailed);
@@ -305,8 +291,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _pickThemeMode() async {
     final l = AppL10n.of(context);
-    final current =
-        ref.read(themeModeProvider).valueOrNull ?? ThemeMode.system;
+    final current = ref.read(themeModeProvider).valueOrNull ?? ThemeMode.system;
     // Auto → Light → Dark (ThemeMode.values is system, light, dark).
     const options = [ThemeMode.system, ThemeMode.light, ThemeMode.dark];
     final chosen = await showModalBottomSheet<ThemeMode>(
@@ -339,8 +324,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _pickLocale() async {
     final l = AppL10n.of(context);
-    final current = ref.read(localeProvider).valueOrNull ??
-        Localizations.localeOf(context);
+    final current =
+        ref.read(localeProvider).valueOrNull ?? Localizations.localeOf(context);
     const options = [Locale('ru'), Locale('en')];
     final chosen = await showModalBottomSheet<Locale>(
       context: context,
@@ -379,13 +364,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final showNoVpn = !hideInAppPlategaCheckout;
     final notifOn = _notifEnabled ?? true;
     final autoOn = _autoReconnect ?? false;
-    final showConnectionSection =
-        showAutoReconnect || showNotif || showNoVpn;
+    final showConnectionSection = showAutoReconnect || showNotif || showNoVpn;
     final subAsync = ref.watch(subscriptionStatusProvider);
     final themeMode =
         ref.watch(themeModeProvider).valueOrNull ?? ThemeMode.system;
-    final locale =
-        ref.watch(localeProvider).valueOrNull ?? Localizations.localeOf(context);
+    final locale = ref.watch(localeProvider).valueOrNull ??
+        Localizations.localeOf(context);
     final localeLabel = _localeLabel(l, locale);
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
@@ -401,217 +385,228 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
             const SizedBox(height: 20),
-          _SectionLabel(l.settingsSectionAccount),
-          _SettingsCard(
-            children: [
-              _SettingsRow(
-                leading: _AccessStatusGlyph(status: subAsync),
-                title: _accessTitle(l, subAsync),
-                subtitle: _accessSubtitle(l, subAsync),
-                onTap: () => context.push('/settings/account'),
-                trailing: subAsync.when(
-                  data: (_) => const AppIcon(AppIcons.chevronRight, size: 18),
-                  loading: () => const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                  error: (_, __) => TextButton(
-                    onPressed: () =>
-                        ref.read(subscriptionStatusProvider.notifier).refresh(),
-                    child: Text(l.homeRetry),
-                  ),
-                ),
-              ),
-              if (AppConfig.authAnonymous) ...[
-                const _CardDivider(),
-                _SettingsRow(
-                  icon: AppIcons.devices,
-                  title: l.settingsDevices,
-                  subtitle: l.settingsDevicesHint,
-                  onTap: () => context.push('/settings/devices'),
-                ),
-                const _CardDivider(),
-                _SettingsRow(
-                  icon: AppIcons.siteTelegram,
-                  title: l.settingsSupport,
-                  subtitle: l.settingsSupportHint,
-                  onTap: () => SupportContact.open(screen: 'Настройки'),
-                ),
-              ],
-              const _CardDivider(),
-              _SettingsRow(
-                icon: AppIcons.bug,
-                title: l.settingsSendReport,
-                subtitle: l.settingsSendReportHint,
-                onTap: _reportSending ? null : _onSendReportPressed,
-                trailing: _reportSending
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : null,
-              ),
-            ],
-          ),
-          if (showConnectionSection) ...[
-            const SizedBox(height: 20),
-            _SectionLabel(l.settingsSectionConnection),
-            _SettingsCard(
-              children: [
-                if (showAutoReconnect)
-                  _SettingsRow(
-                    icon: AppIcons.refresh,
-                    title: l.settingsAutoReconnect,
-                    subtitle: l.settingsAutoReconnectHint,
-                    trailing: Switch(
-                      value: autoOn,
-                      onChanged: _autoReconnectLoading || _autoReconnect == null
-                          ? null
-                          : _onAutoReconnectChanged,
-                    ),
-                  ),
-                if (showNotif) ...[
-                  if (showAutoReconnect) const _CardDivider(),
-                  _SettingsRow(
-                    icon: AppIcons.notifications,
-                    title: l.settingsVpnNotificationTitle,
-                    subtitle: l.settingsVpnNotificationHint,
-                    trailing: Switch(
-                      value: notifOn,
-                      onChanged: _notifLoading || _notifEnabled == null
-                          ? null
-                          : _onNotifChanged,
-                    ),
-                  ),
-                  if (QsTilePrefs.isSupported) ...[
-                    const _CardDivider(),
-                    _SettingsRow(
-                      icon: AppIcons.house,
-                      title: l.settingsQsTileTitle,
-                      subtitle: l.settingsQsTileHint,
-                      onTap: _qsAdding ? null : _onAddQsTile,
-                      trailing: _qsAdding
-                          ? const SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : null,
-                    ),
-                  ],
-                ],
-                if (showNoVpn) ...[
-                  if (showAutoReconnect || showNotif) const _CardDivider(),
-                  _SettingsRow(
-                    icon: AppIcons.sliders,
-                    title: l.settingsNoVpn,
-                    subtitle: l.settingsNoVpnHint,
-                    onTap: () => context.go('/settings/no-vpn'),
-                  ),
-                ],
-              ],
-            ),
-          ],
-          const SizedBox(height: 20),
-          _SectionLabel(l.settingsSectionApp),
-          _SettingsCard(
-            children: [
-              _SettingsRow(
-                icon: AppIcons.globe,
-                title: l.settingsLanguage,
-                subtitle: localeLabel,
-                onTap: _pickLocale,
-              ),
-              const _CardDivider(),
-              _SettingsRow(
-                icon: AppIcons.palette,
-                title: l.settingsAppearance,
-                subtitle: _themeModeLabel(l, themeMode),
-                onTap: _pickThemeMode,
-              ),
-            ],
-          ),
-          const SizedBox(height: 28),
-          if (_versionLabel.isNotEmpty)
-            Text(
-              l.settingsVersion(_versionLabel),
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          Wrap(
-            alignment: WrapAlignment.center,
-            spacing: 4,
-            runSpacing: 0,
-            children: [
-              TextButton(
-                onPressed: () => launchUrl(
-                  Uri.parse(AppConfig.privacyPolicyUrl),
-                  mode: LaunchMode.externalApplication,
-                ),
-                child: Text(l.settingsPrivacyPlaceholder),
-              ),
-              TextButton(
-                onPressed: () => launchUrl(
-                  Uri.parse(AppConfig.termsOfServiceUrl),
-                  mode: LaunchMode.externalApplication,
-                ),
-                child: Text(l.settingsTerms),
-              ),
-              if (!hideInAppPlategaCheckout)
-                TextButton(
-                  onPressed: () => launchUrl(
-                    Uri.parse(AppConfig.pricingUrl),
-                    mode: LaunchMode.externalApplication,
-                  ),
-                  child: Text(l.settingsPricing),
-                ),
-              TextButton(
-                onPressed: () => launchUrl(
-                  Uri.parse(AppConfig.supportPageUrl),
-                  mode: LaunchMode.externalApplication,
-                ),
-                child: Text(l.settingsSupport),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          if (AppConfig.authAnonymous)
+            _SectionLabel(l.settingsSectionAccount),
             _SettingsCard(
               children: [
                 _SettingsRow(
-                  icon: AppIcons.devices,
-                  title: l.settingsDeviceId,
-                  subtitle: _installId ?? l.settingsDeviceIdHint,
-                  onTap: _installId == null ? null : _copyInstallId,
-                  trailing: _installId == null
+                  leading: _AccessStatusGlyph(status: subAsync),
+                  title: _accessTitle(l, subAsync),
+                  subtitle: _accessSubtitle(l, subAsync),
+                  onTap: () => context.push('/settings/account'),
+                  trailing: subAsync.when(
+                    data: (_) => const AppIcon(AppIcons.chevronRight, size: 18),
+                    loading: () => const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    error: (_, __) => TextButton(
+                      onPressed: () => ref
+                          .read(subscriptionStatusProvider.notifier)
+                          .refresh(),
+                      child: Text(l.homeRetry),
+                    ),
+                  ),
+                ),
+                if (AppConfig.authAnonymous) ...[
+                  const _CardDivider(),
+                  _SettingsRow(
+                    icon: AppIcons.devices,
+                    title: l.settingsDevices,
+                    subtitle: l.settingsDevicesHint,
+                    onTap: () => context.push('/settings/devices'),
+                  ),
+                  const _CardDivider(),
+                  _SettingsRow(
+                    icon: AppIcons.siteTelegram,
+                    title: l.settingsSupport,
+                    subtitle: hideInAppPlategaCheckout
+                        ? l.settingsSupportHintIos
+                        : l.settingsSupportHint,
+                    onTap: () {
+                      if (hideInAppPlategaCheckout) {
+                        unawaited(openIosTelegramBotTariffsPath(context, ref));
+                        return;
+                      }
+                      SupportContact.open(screen: 'Настройки');
+                    },
+                  ),
+                ],
+                const _CardDivider(),
+                _SettingsRow(
+                  icon: AppIcons.bug,
+                  title: l.settingsSendReport,
+                  subtitle: l.settingsSendReportHint,
+                  onTap: _reportSending ? null : _onSendReportPressed,
+                  trailing: _reportSending
                       ? const SizedBox(
                           width: 22,
                           height: 22,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : Icon(
-                          Icons.copy_outlined,
-                          size: 20,
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                ),
-              ],
-            )
-          else
-            _SettingsCard(
-              children: [
-                _LogoutRow(
-                  label: l.logoutTooltip,
-                  inProgress: _logoutInProgress,
-                  onTap: _logoutInProgress ? null : _onLogoutPressed,
+                      : null,
                 ),
               ],
             ),
-        ],
+            if (showConnectionSection) ...[
+              const SizedBox(height: 20),
+              _SectionLabel(l.settingsSectionConnection),
+              _SettingsCard(
+                children: [
+                  if (showAutoReconnect)
+                    _SettingsRow(
+                      icon: AppIcons.refresh,
+                      title: l.settingsAutoReconnect,
+                      subtitle: l.settingsAutoReconnectHint,
+                      trailing: Switch(
+                        value: autoOn,
+                        onChanged:
+                            _autoReconnectLoading || _autoReconnect == null
+                                ? null
+                                : _onAutoReconnectChanged,
+                      ),
+                    ),
+                  if (showNotif) ...[
+                    if (showAutoReconnect) const _CardDivider(),
+                    _SettingsRow(
+                      icon: AppIcons.notifications,
+                      title: l.settingsVpnNotificationTitle,
+                      subtitle: l.settingsVpnNotificationHint,
+                      trailing: Switch(
+                        value: notifOn,
+                        onChanged: _notifLoading || _notifEnabled == null
+                            ? null
+                            : _onNotifChanged,
+                      ),
+                    ),
+                    if (QsTilePrefs.isSupported) ...[
+                      const _CardDivider(),
+                      _SettingsRow(
+                        icon: AppIcons.house,
+                        title: l.settingsQsTileTitle,
+                        subtitle: l.settingsQsTileHint,
+                        onTap: _qsAdding ? null : _onAddQsTile,
+                        trailing: _qsAdding
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : null,
+                      ),
+                    ],
+                  ],
+                  if (showNoVpn) ...[
+                    if (showAutoReconnect || showNotif) const _CardDivider(),
+                    _SettingsRow(
+                      icon: AppIcons.sliders,
+                      title: l.settingsNoVpn,
+                      subtitle: l.settingsNoVpnHint,
+                      onTap: () => context.go('/settings/no-vpn'),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+            const SizedBox(height: 20),
+            _SectionLabel(l.settingsSectionApp),
+            _SettingsCard(
+              children: [
+                _SettingsRow(
+                  icon: AppIcons.globe,
+                  title: l.settingsLanguage,
+                  subtitle: localeLabel,
+                  onTap: _pickLocale,
+                ),
+                const _CardDivider(),
+                _SettingsRow(
+                  icon: AppIcons.palette,
+                  title: l.settingsAppearance,
+                  subtitle: _themeModeLabel(l, themeMode),
+                  onTap: _pickThemeMode,
+                ),
+              ],
+            ),
+            const SizedBox(height: 28),
+            if (_versionLabel.isNotEmpty)
+              Text(
+                l.settingsVersion(_versionLabel),
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 4,
+              runSpacing: 0,
+              children: [
+                TextButton(
+                  onPressed: () => launchUrl(
+                    Uri.parse(AppConfig.privacyPolicyUrl),
+                    mode: LaunchMode.externalApplication,
+                  ),
+                  child: Text(l.settingsPrivacyPlaceholder),
+                ),
+                TextButton(
+                  onPressed: () => launchUrl(
+                    Uri.parse(AppConfig.termsOfServiceUrl),
+                    mode: LaunchMode.externalApplication,
+                  ),
+                  child: Text(l.settingsTerms),
+                ),
+                if (!hideInAppPlategaCheckout)
+                  TextButton(
+                    onPressed: () => launchUrl(
+                      Uri.parse(AppConfig.pricingUrl),
+                      mode: LaunchMode.externalApplication,
+                    ),
+                    child: Text(l.settingsPricing),
+                  ),
+                TextButton(
+                  onPressed: () => launchUrl(
+                    Uri.parse(AppConfig.supportPageUrl),
+                    mode: LaunchMode.externalApplication,
+                  ),
+                  child: Text(l.settingsSupport),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (AppConfig.authAnonymous)
+              _SettingsCard(
+                children: [
+                  _SettingsRow(
+                    icon: AppIcons.devices,
+                    title: l.settingsDeviceId,
+                    subtitle: _installId ?? l.settingsDeviceIdHint,
+                    onTap: _installId == null ? null : _copyInstallId,
+                    trailing: _installId == null
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Icon(
+                            Icons.copy_outlined,
+                            size: 20,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                  ),
+                ],
+              )
+            else
+              _SettingsCard(
+                children: [
+                  _LogoutRow(
+                    label: l.logoutTooltip,
+                    inProgress: _logoutInProgress,
+                    onTap: _logoutInProgress ? null : _onLogoutPressed,
+                  ),
+                ],
+              ),
+          ],
         ),
       ),
     );
@@ -669,7 +664,8 @@ class _CardDivider extends StatelessWidget {
       height: 1,
       thickness: 1,
       indent: 56,
-      color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.5),
+      color:
+          Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.5),
     );
   }
 }

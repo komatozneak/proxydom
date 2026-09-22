@@ -28,6 +28,7 @@ import '../../vpn/data/vpn_controller.dart';
 import '../../vpn/data/vpn_node.dart';
 import '../../vpn/domain/vpn_connect_error.dart';
 import '../../vpn/presentation/vpn_disclosure_dialog.dart';
+import '../../vpn/presentation/vpn_platform_copy.dart';
 import '../application/vpn_provider.dart';
 import '../application/vpn_status.dart';
 import 'widgets/free_quota_bar.dart';
@@ -562,10 +563,10 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
       VpnError(:final code, :final message)
           when code == kVpnConflictErrorCode =>
         (message.isNotEmpty && message != 'vpn_conflict')
-            ? l.homeVpnConflictHintNamed(message)
-            : l.homeVpnConflictHint,
+            ? homeVpnConflictHintNamedForPlatform(l, message)
+            : homeVpnConflictHintForPlatform(l),
       VpnError(:final code) when code == 'permission_denied' =>
-        l.homeVpnPermissionHint,
+        homeVpnPermissionHintForPlatform(l),
       VpnError(:final code) when code == 'device_limit_reached' =>
         l.settingsDevicesHint,
       VpnError(:final code) when code == 'quota_exceeded' =>
@@ -632,7 +633,7 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
             vpnConnected: status is VpnConnected,
             onTap: () {
               if (status is VpnConnected) {
-                context.push('/settings/account/recovery');
+                context.push('/restore');
               }
             },
           ),
@@ -674,7 +675,7 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
               if (!opened) {
                 showTeremokSnackBar(
                   context,
-                  l.settingsKillSwitchOpenFailed,
+                  settingsKillSwitchOpenFailedForPlatform(l),
                 );
               }
             },
@@ -728,8 +729,9 @@ bool _showTelegramRestoreBanner({
   required SubscriptionStatus? quota,
   required AccountSessionSnapshot? session,
 }) {
+  // Bound contact is not "restore". Username-only missed contact_linked.
   if (session == null) return false;
-  if (session.telegramUsername != null) return false;
+  if (session.contactLinked || session.telegramUsername != null) return false;
   if (quota != null && quota.unlocksPremium) return false;
   if (session.hasAccess) return false;
   return true;

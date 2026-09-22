@@ -5,6 +5,23 @@ import UIKit
 
 /// iOS side of MethodChannel `teremok/vpn` (same name as Android).
 /// Starts `NETunnelProviderManager` → Packet Tunnel appex (ADR 019).
+private final class TunnelHealthOnce {
+  var done = false
+  let result: FlutterResult
+
+  init(_ result: @escaping FlutterResult) {
+    self.result = result
+  }
+
+  func finish(_ value: Any?) {
+    DispatchQueue.main.async {
+      guard !self.done else { return }
+      self.done = true
+      self.result(value)
+    }
+  }
+}
+
 enum TeremokVpnChannel {
   static let methodChannelName = "teremok/vpn"
   static let statusEventChannelName = "teremok/vpn/status"
@@ -368,6 +385,11 @@ enum TeremokVpnChannel {
   }
 
   private static func fetchTunnelHealth(result: @escaping FlutterResult) {
+    let once = TunnelHealthOnce(result)
+    DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+      let persisted = TeremokVpnShared.lastTunnelHealth()
+      once.finish(persisted.isEmpty ? nil : persisted)
+    }
     NETunnelProviderManager.loadAllFromPreferences { managers, _ in
       nevpnPreferencesLoaded = true
       let ours = managers?.first {
@@ -382,22 +404,22 @@ enum TeremokVpnChannel {
           || manager.connection.status == .reasserting
       else {
         let persisted = TeremokVpnShared.lastTunnelHealth()
-        result(persisted.isEmpty ? nil : persisted)
+        once.finish(persisted.isEmpty ? nil : persisted)
         return
       }
       let msg = "health".data(using: .utf8)!
       do {
         try session.sendProviderMessage(msg) { data in
           if let data, let s = String(data: data, encoding: .utf8), !s.isEmpty {
-            result(s)
+            once.finish(s)
             return
           }
           let persisted = TeremokVpnShared.lastTunnelHealth()
-          result(persisted.isEmpty ? nil : persisted)
+          once.finish(persisted.isEmpty ? nil : persisted)
         }
       } catch {
         let persisted = TeremokVpnShared.lastTunnelHealth()
-        result(persisted.isEmpty ? nil : persisted)
+        once.finish(persisted.isEmpty ? nil : persisted)
       }
     }
   }

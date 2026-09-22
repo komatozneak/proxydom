@@ -10,11 +10,13 @@ import '../../../core/device_info_helper.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../account/application/account_profile_provider.dart';
 import '../../account/application/telegram_identity.dart';
 import '../../account/presentation/telegram_link_dialog.dart';
 import '../../home/application/vpn_provider.dart';
 import '../../session/application/identity_reconnect.dart';
 import '../../session/application/session_provider.dart';
+import '../../vpn/presentation/vpn_platform_copy.dart';
 import '../application/auth_provider.dart';
 import '../application/auth_state.dart';
 import '../application/pending_pair_token_provider.dart';
@@ -46,7 +48,7 @@ class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      unawaited(_consumePendingPairToken());
+      unawaited(_onOpened());
     });
   }
 
@@ -55,6 +57,17 @@ class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
     _pollTimer?.cancel();
     _controller.dispose();
     super.dispose();
+  }
+
+  Future<void> _onOpened() async {
+    // Reinstall is still AuthStateAuthenticated (new guest JWT). Pop only
+    // when Telegram is already bound — otherwise this screen is the restore.
+    final auth = ref.read(authProvider).valueOrNull;
+    if (auth is AuthStateAuthenticated && _sessionTelegramBound()) {
+      await _leaveAfterBind();
+      return;
+    }
+    await _consumePendingPairToken();
   }
 
   Future<void> _consumePendingPairToken() async {
@@ -168,9 +181,37 @@ class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
     }
   }
 
+  bool _sessionTelegramBound() {
+    final session = ref.read(sessionProvider).valueOrNull;
+    if (session != null &&
+        (session.contactLinked || session.telegramUsername != null)) {
+      return true;
+    }
+    return ref.read(accountProfileProvider).valueOrNull?.contactLinked ?? false;
+  }
+
+  Future<void> _leaveAfterBind() async {
+    setState(() => _tgBusy = false);
+    await ref.read(sessionProvider.notifier).refresh();
+    await ref.read(accountProfileProvider.notifier).refresh();
+    if (!mounted) return;
+    if (context.canPop()) {
+      context.pop();
+      return;
+    }
+    AppRouter.postAuthResolved = true;
+    context.go('/gate');
+  }
+
   Future<void> _submitTelegram() async {
     if (!telegramIdentityAllowed(ref.read(vpnProvider))) {
       setState(() => _error = AppL10n.of(context).restoreTelegramVpnRequired);
+      return;
+    }
+    final auth = ref.read(authProvider).valueOrNull;
+    final authed = auth is AuthStateAuthenticated;
+    if (authed && _sessionTelegramBound()) {
+      await _leaveAfterBind();
       return;
     }
     setState(() {
@@ -179,8 +220,6 @@ class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
       _error = null;
     });
     try {
-      final auth = ref.read(authProvider).valueOrNull;
-      final authed = auth is AuthStateAuthenticated;
       final model = await DeviceInfoHelper.getDeviceModelName();
       final res = authed
           ? await AuthApi().startTelegramLink(deviceName: model)
@@ -275,10 +314,8 @@ class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
             }
           } else if (outcome.status == TelegramPollStatus.linked) {
             timer.cancel();
-            await ref.read(sessionProvider.notifier).refresh();
             if (!mounted) return;
-            AppRouter.postAuthResolved = true;
-            context.go('/gate');
+            await _leaveAfterBind();
           } else if (outcome.status == TelegramPollStatus.confirmed) {
             timer.cancel();
             if (!mounted) return;
@@ -392,6 +429,11 @@ class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
     final l = AppL10n.of(context);
     final theme = Theme.of(context);
     final vpnOk = telegramIdentityAllowed(ref.watch(vpnProvider));
+    ref.watch(sessionProvider);
+    ref.watch(accountProfileProvider);
+    final auth = ref.watch(authProvider).valueOrNull;
+    final hideTelegramCta =
+        auth is AuthStateAuthenticated && _sessionTelegramBound();
     ref.listen<String?>(pendingPairTokenProvider, (prev, next) {
       final token = next?.trim();
       if (token == null || token.isEmpty) return;
@@ -422,7 +464,7 @@ class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
               Text(l.restoreHeadlineCode, style: theme.textTheme.headlineSmall),
               const SizedBox(height: 12),
               Text(
-                l.restoreBodyCode,
+                restoreBodyCodeForPlatform(l),
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurface.withValues(alpha: 0.75),
                 ),
@@ -452,39 +494,41 @@ class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
                 ),
               ],
               const Spacer(),
-              OutlinedButton(
-                onPressed: (_busy || _tgBusy)
-                    ? null
-                    : (vpnOk ? _submitTelegram : null),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(48),
-                ),
-                child: _tgBusy
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const AppIcon(AppIcons.siteTelegram, size: 20),
-                          const SizedBox(width: 8),
-                          Text(l.restoreTelegramCta),
-                        ],
-                      ),
-              ),
-              if (!vpnOk) ...[
-                const SizedBox(height: 8),
-                Text(
-                  l.restoreTelegramVpnRequired,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+              if (!hideTelegramCta) ...[
+                OutlinedButton(
+                  onPressed: (_busy || _tgBusy)
+                      ? null
+                      : (vpnOk ? _submitTelegram : null),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(48),
                   ),
+                  child: _tgBusy
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const AppIcon(AppIcons.siteTelegram, size: 20),
+                            const SizedBox(width: 8),
+                            Text(l.restoreTelegramCta),
+                          ],
+                        ),
                 ),
+                if (!vpnOk) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    l.restoreTelegramVpnRequired,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 12),
               ],
-              const SizedBox(height: 12),
               FilledButton(
                 onPressed: (_busy || _tgBusy) ? null : _submit,
                 style: FilledButton.styleFrom(

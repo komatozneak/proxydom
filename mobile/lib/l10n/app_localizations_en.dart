@@ -107,14 +107,14 @@ class AppL10nEn extends AppL10n {
   String get homeNoVpnRow => 'What works without VPN?';
 
   @override
-  String get premiumHeadline => 'Without ads';
+  String get premiumHeadline => 'More locations';
 
   @override
   String get premiumBody =>
-      'Premium unlocks no-AdSense exits, up to 5 devices, and removes the free 4.20 GB cap.';
+      'Premium unlocks extra locations, up to 5 devices, and removes the free 4.20 GB cap.';
 
   @override
-  String get premiumFeatureYt => 'YouTube locations without mid-roll ads';
+  String get premiumFeatureYt => 'Extra locations for streaming';
 
   @override
   String get premiumFeatureSpeed => 'Priority exits for streaming';
@@ -130,7 +130,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get subscriptionTabHint =>
-      'Manage plans and promo codes. Premium unlocks YouTube locations.';
+      'Manage plans and promo codes. Premium unlocks extra locations.';
 
   @override
   String get subscriptionPay => 'Pay';
@@ -316,13 +316,26 @@ class AppL10nEn extends AppL10n {
       'Turn off the other VPN in Android settings, then connect again.';
 
   @override
+  String get homeVpnConflictHintIos =>
+      'Turn off the other VPN in Settings → VPN.';
+
+  @override
   String homeVpnConflictHintNamed(String app) {
     return 'Turn off “$app” in Android settings, then connect again.';
   }
 
   @override
+  String homeVpnConflictHintNamedIos(String app) {
+    return 'Turn off “$app” in Settings → VPN.';
+  }
+
+  @override
   String get homeVpnPermissionHint =>
       'Allow the VPN in the Android system prompt, then tap connect again.';
+
+  @override
+  String get homeVpnPermissionHintIos =>
+      'Allow VPN in the system prompt, then connect again.';
 
   @override
   String get homeConfigErrorFriendly =>
@@ -422,6 +435,10 @@ class AppL10nEn extends AppL10n {
   @override
   String get settingsKillSwitchOpenFailed =>
       'Couldn\'t open VPN settings. Open Settings → Network & internet → VPN.';
+
+  @override
+  String get settingsKillSwitchOpenFailedIos =>
+      'Couldn\'t open VPN settings. Open Settings → VPN.';
 
   @override
   String get settingsAutoReconnect => 'Auto-reconnect';
@@ -745,7 +762,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get settingsSendReportHint =>
-      'Prepares a text dump of network and protocol diagnostics for Telegram support.';
+      'Copies diagnostics. Paste them into support yourself.';
 
   @override
   String get settingsSendReportConfirm => 'Send';
@@ -753,6 +770,9 @@ class AppL10nEn extends AppL10n {
   @override
   String get settingsReportSent =>
       'Report sent to support via the bot. Also copied.';
+
+  @override
+  String get settingsReportCopied => 'Report text copied';
 
   @override
   String settingsReportSaved(String id) {
@@ -878,6 +898,9 @@ class AppL10nEn extends AppL10n {
   String get regionSectionYoutube => 'Premium';
 
   @override
+  String get regionSectionYoutubeIos => 'Services';
+
+  @override
   String get regionSectionFree => 'Free';
 
   @override
@@ -905,10 +928,10 @@ class AppL10nEn extends AppL10n {
   String get regionBlurbGaming => 'Low ping';
 
   @override
-  String get regionBlurbYoutube => 'Without ads';
+  String get regionBlurbYoutube => 'Comfortable streaming';
 
   @override
-  String get regionBlurbIndia => 'Local apps and prices';
+  String get regionBlurbIndia => 'Apps and websites';
 
   @override
   String get regionOffline => 'offline';
@@ -1140,6 +1163,9 @@ class AppL10nEn extends AppL10n {
   String get settingsSupportHint => 'Telegram — transfer after reinstall';
 
   @override
+  String get settingsSupportHintIos => 'Questions in the Telegram bot';
+
+  @override
   String get lockedPay1m => 'Pay 1 month';
 
   @override
@@ -1232,8 +1258,10 @@ class AppL10nEn extends AppL10n {
   String get restoreHeadline => 'Enter recovery code';
 
   @override
-  String get restoreBody =>
-      'Enter the recovery code or open Telegram. Use the bot login code if you paid before this phone.';
+  String get restoreBody => 'Enter the recovery code or open Telegram.';
+
+  @override
+  String get restoreBodyIos => 'Enter the recovery code or open Telegram.';
 
   @override
   String get restorePaymentLabel => 'Payment ID';
@@ -1291,7 +1319,11 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get restoreBodyCode =>
-      'After reinstall, enter the recovery code or open Telegram. Use the bot login code if you paid before this phone.';
+      'After reinstall, enter the recovery code or open Telegram.';
+
+  @override
+  String get restoreBodyCodeIos =>
+      'After reinstall, enter the recovery code or open Telegram.';
 
   @override
   String get settingsInviteDevice => 'Add device to my subscription';
@@ -1384,10 +1416,19 @@ class AppL10nEn extends AppL10n {
       'Telegram is linked. The bot is the same account: subscription and restore.';
 
   @override
+  String get accountHubLinkedLeadIos =>
+      'Telegram is linked. The bot is the same account and restore.';
+
+  @override
+  String get accountHubRecoveryMissing =>
+      'This phone already saved the code. After reinstall, open Telegram with the same account.';
+
+  @override
   String get accountHubLinkTelegram => 'Telegram';
 
   @override
-  String get accountHubLinkTelegramHint => 'Subscription and restore in the bot';
+  String get accountHubLinkTelegramHint =>
+      'Subscription and restore in the bot';
 
   @override
   String get accountHubLinkEmail => 'Email';

@@ -168,7 +168,11 @@ class AppRouter {
       if (goingToWelcome || goingToBootstrapFail) {
         return enterShellForAuthedColdStart();
       }
-      if (goingToGate || goingToPromo || goingToLocked || goingToRecovery || goingToRestore) {
+      if (goingToGate ||
+          goingToPromo ||
+          goingToLocked ||
+          goingToRecovery ||
+          goingToRestore) {
         return null;
       }
       // Onboarding + shell after cold-start flag or explicit gate resolution.
@@ -264,6 +268,11 @@ class AppRouter {
                       GoRoute(
                         path: 'recovery',
                         builder: (c, s) => const RestoreAccessScreen(),
+                      ),
+                      GoRoute(
+                        path: 'recovery-code',
+                        builder: (c, s) =>
+                            const RecoveryCodeScreen(viewOnly: true),
                       ),
                     ],
                   ),

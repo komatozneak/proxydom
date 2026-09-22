@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
@@ -16,7 +17,7 @@ import '../../features/vpn/data/vpn_config.dart';
 import '../../features/vpn/data/vpn_controller.dart';
 import '../../features/vpn/data/vpn_session_meta.dart';
 
-/// Collects a beta diagnostic bundle and sends it to the owner via backend.
+/// Collects a local diagnostic bundle for the user to paste into support.
 class DiagnosticsService {
   DiagnosticsService({Dio? dio}) : _dio = dio ?? ApiClient.instance;
 
@@ -31,6 +32,13 @@ class DiagnosticsService {
   static const int postMaxChars = 110000;
 
   static const int logcatChunkChars = 800;
+
+  /// Native health/logs must not hang Settings (iOS sendProviderMessage).
+  @visibleForTesting
+  static Duration nativeProbeTimeout = const Duration(seconds: 3);
+
+  @visibleForTesting
+  static Duration egressProbeTimeout = const Duration(seconds: 5);
 
   /// Catalog `VpnNode.host` for Pixel E2E (IP↔IP vs icanhazip, not SNI).
   static String formatCatalogHost(String? host) {
@@ -52,22 +60,28 @@ class DiagnosticsService {
     final packageInfo = await PackageInfo.fromPlatform();
     final appLabel = 'Теремок VPN ${packageInfo.version}+${packageInfo.buildNumber}';
 
-    final nativeStatus = await VpnController.instance.getStatus();
-    final nativeError = await VpnController.instance.getLastError();
-    final lockdown = await VpnController.instance.isLockdownEnabled();
-    final stderrTail = await VpnController.instance.getVpnCoreStderrTail(
-      maxLines: 400,
+    final nativeStatus = await _probe(
+          VpnController.instance.getStatus(),
+        ) ??
+        VpnNativeStatus.unknown;
+    final nativeError = await _probe(VpnController.instance.getLastError());
+    final lockdown =
+        await _probe(VpnController.instance.isLockdownEnabled()) ?? false;
+    final stderrTail = await _probe(
+      VpnController.instance.getVpnCoreStderrTail(maxLines: 400),
     );
-    final nativeLogTail = await VpnController.instance.getNativeLogTail();
-    final tunnelHealth = await VpnController.instance.getTunnelHealth();
-    final underlying = await VpnController.instance.getUnderlyingNetworkInterface();
+    final nativeLogTail = await _probe(VpnController.instance.getNativeLogTail());
+    final tunnelHealth = await _probeHealth();
+    final underlying = await _probe(
+      VpnController.instance.getUnderlyingNetworkInterface(),
+    );
 
     final sessionMeta = await VpnSessionMeta.load();
     final config = cachedConfig ?? VpnConfigCache.instance.current;
     final expectedHost =
         sessionMeta.expectedEgressHost ?? config?.expectedEgressHost;
 
-    final egress = await verifyEgress(expectedHost: expectedHost);
+    final egress = await _probeEgress(expectedHost);
 
     final authLine = authState is AuthStateAuthenticated
         ? 'authenticated (tokens present, phone redacted)'
@@ -108,11 +122,7 @@ class DiagnosticsService {
       ..writeln('ios_native_tail:')
       ..writeln(nativeLogTail ?? '(unsupported)')
       ..writeln('ios_tunnel_health:')
-      ..writeln(
-        (tunnelHealth == null || tunnelHealth.isEmpty)
-            ? '(none)'
-            : tunnelHealth,
-      )
+      ..writeln(tunnelHealth)
       ..writeln('last_vpn_error: $lastVpnError')
       ..writeln('last_flutter_error: ${lastFlutterError ?? '(none)'}')
       ..writeln('--- recent_log ---')
@@ -186,6 +196,49 @@ class DiagnosticsService {
         response: resp,
         type: DioExceptionType.badResponse,
         message: 'diagnostics failed: $code',
+      );
+    }
+  }
+
+  Future<T?> _probe<T>(Future<T?> future) async {
+    try {
+      return await future.timeout(nativeProbeTimeout);
+    } on TimeoutException {
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<String> _probeHealth() async {
+    try {
+      final health = await VpnController.instance
+          .getTunnelHealth()
+          .timeout(nativeProbeTimeout);
+      if (health == null || health.isEmpty) return '(none)';
+      return health;
+    } on TimeoutException {
+      return '(timeout)';
+    } catch (_) {
+      return '(none)';
+    }
+  }
+
+  Future<EgressVerifyResult> _probeEgress(String? expectedHost) async {
+    try {
+      return await verifyEgress(expectedHost: expectedHost)
+          .timeout(egressProbeTimeout);
+    } on TimeoutException {
+      return EgressVerifyResult(
+        externalIp: null,
+        expectedHost: expectedHost,
+        egressOk: null,
+      );
+    } catch (_) {
+      return EgressVerifyResult(
+        externalIp: null,
+        expectedHost: expectedHost,
+        egressOk: null,
       );
     }
   }

@@ -107,14 +107,14 @@ class AppL10nRu extends AppL10n {
   String get homeNoVpnRow => 'Что работает без VPN?';
 
   @override
-  String get premiumHeadline => 'Без рекламы';
+  String get premiumHeadline => 'Расширенные локации';
 
   @override
   String get premiumBody =>
-      'Премиум открывает ноды без рекламы YouTube, до 5 устройств и снимает лимит 4,20 ГБ.';
+      'Премиум открывает дополнительные локации, до 5 устройств и снимает лимит 4,20 ГБ.';
 
   @override
-  String get premiumFeatureYt => 'Локации YouTube без mid-roll рекламы';
+  String get premiumFeatureYt => 'Дополнительные локации для просмотра';
 
   @override
   String get premiumFeatureSpeed => 'Приоритетные выходы для стриминга';
@@ -130,7 +130,7 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get subscriptionTabHint =>
-      'Тарифы и промокоды. Премиум открывает YouTube-локации.';
+      'Тарифы и промокоды. Премиум открывает дополнительные локации.';
 
   @override
   String get subscriptionPay => 'Оплатить';
@@ -317,13 +317,26 @@ class AppL10nRu extends AppL10n {
       'Отключите другой VPN в настройках Android, затем подключитесь снова.';
 
   @override
+  String get homeVpnConflictHintIos =>
+      'Отключите другой VPN в Настройках → VPN.';
+
+  @override
   String homeVpnConflictHintNamed(String app) {
     return 'Отключите «$app» в настройках Android, затем подключитесь снова.';
   }
 
   @override
+  String homeVpnConflictHintNamedIos(String app) {
+    return 'Отключите «$app» в Настройках → VPN.';
+  }
+
+  @override
   String get homeVpnPermissionHint =>
       'Разрешите VPN в системном запросе Android, затем нажмите подключение снова.';
+
+  @override
+  String get homeVpnPermissionHintIos =>
+      'Разрешите VPN в системном запросе, затем подключитесь снова.';
 
   @override
   String get homeConfigErrorFriendly =>
@@ -420,6 +433,10 @@ class AppL10nRu extends AppL10n {
   @override
   String get settingsKillSwitchOpenFailed =>
       'Не удалось открыть настройки VPN. Откройте Настройки → Сеть и интернет → VPN.';
+
+  @override
+  String get settingsKillSwitchOpenFailedIos =>
+      'Не удалось открыть настройки VPN. Откройте Настройки → VPN.';
 
   @override
   String get settingsAutoReconnect => 'Авто-переподключение';
@@ -745,7 +762,7 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get settingsSendReportHint =>
-      'Готовит текст с диагностикой сети и протокола — для поддержки в Telegram.';
+      'Копирует диагностику. Вставьте её в поддержку сами.';
 
   @override
   String get settingsSendReportConfirm => 'Отправить';
@@ -753,6 +770,9 @@ class AppL10nRu extends AppL10n {
   @override
   String get settingsReportSent =>
       'Отчёт ушёл в поддержку через бота. Текст также скопирован.';
+
+  @override
+  String get settingsReportCopied => 'Текст отчёта скопирован';
 
   @override
   String settingsReportSaved(String id) {
@@ -879,6 +899,9 @@ class AppL10nRu extends AppL10n {
   String get regionSectionYoutube => 'Премиум';
 
   @override
+  String get regionSectionYoutubeIos => 'Сервис';
+
+  @override
   String get regionSectionFree => 'Бесплатно';
 
   @override
@@ -906,10 +929,10 @@ class AppL10nRu extends AppL10n {
   String get regionBlurbGaming => 'Низкий пинг';
 
   @override
-  String get regionBlurbYoutube => 'Без рекламы';
+  String get regionBlurbYoutube => 'Комфортный просмотр';
 
   @override
-  String get regionBlurbIndia => 'Местные сервисы и цены';
+  String get regionBlurbIndia => 'Сервисы';
 
   @override
   String get regionOffline => 'офлайн';
@@ -1143,6 +1166,9 @@ class AppL10nRu extends AppL10n {
   String get settingsSupportHint => 'Telegram — перенос после переустановки';
 
   @override
+  String get settingsSupportHintIos => 'Вопросы в Telegram-боте';
+
+  @override
   String get lockedPay1m => 'Оплатить 1 месяц';
 
   @override
@@ -1235,8 +1261,11 @@ class AppL10nRu extends AppL10n {
   String get restoreHeadline => 'Восстановить доступ';
 
   @override
-  String get restoreBody =>
-      'Введите код восстановления или откройте Telegram. Код входа из бота — если оплатили до этого телефона.';
+  String get restoreBody => 'Введите код восстановления или откройте Telegram.';
+
+  @override
+  String get restoreBodyIos =>
+      'Введите код восстановления или откройте Telegram.';
 
   @override
   String get restorePaymentLabel => 'Номер платежа';
@@ -1294,7 +1323,11 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get restoreBodyCode =>
-      'После переустановки введите код восстановления или откройте Telegram. Код входа из бота — если оплатили до этого телефона.';
+      'После переустановки введите код восстановления или откройте Telegram.';
+
+  @override
+  String get restoreBodyCodeIos =>
+      'После переустановки введите код восстановления или откройте Telegram.';
 
   @override
   String get settingsInviteDevice => 'Добавить устройство в подписку';
@@ -1387,6 +1420,14 @@ class AppL10nRu extends AppL10n {
   @override
   String get accountHubLinkedLead =>
       'Telegram привязан. Бот — тот же аккаунт: подписка и восстановление.';
+
+  @override
+  String get accountHubLinkedLeadIos =>
+      'Telegram привязан. Бот — тот же аккаунт и восстановление.';
+
+  @override
+  String get accountHubRecoveryMissing =>
+      'Код на этом телефоне уже сохраняли. После переустановки откройте Telegram с тем же аккаунтом.';
 
   @override
   String get accountHubLinkTelegram => 'Telegram';

@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import '../../settings/data/installed_apps_channel.dart';
 import '../../settings/data/split_tunnel_prefs.dart';
 import 'vpn_config.dart';
 import 'vpn_route_policy.dart';
@@ -43,6 +44,20 @@ class VpnController {
     final profile = config.hysteriaProfile;
     if (!config.isHysteriaSession || profile == null) {
       throw VpnControllerException('hy2_provision_failed');
+    }
+    if (!_isIosSplit) {
+      try {
+        final apps = await InstalledAppsChannel.listLauncherApps(
+          includeIcons: false,
+        );
+        if (apps.isNotEmpty) {
+          // Empty list would still set one-shot seed flags and skip later
+          // Home/connect once the plugin is ready.
+          await SplitTunnelPrefs.seedDefaultBypassIfNeeded(
+            apps.map((a) => a.packageName),
+          );
+        }
+      } catch (_) {}
     }
     final disallowedApps = _isIosSplit
         ? const <String>[]

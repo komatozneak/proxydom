@@ -14,6 +14,7 @@ import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/location_flag_icon.dart';
 import '../../../core/widgets/teremok_snackbar.dart';
 import '../../../l10n/app_localizations.dart';
+import 'vpn_platform_copy.dart';
 import '../../home/application/vpn_provider.dart';
 import '../../home/application/vpn_status.dart';
 import '../../settings/application/subscription_status_provider.dart';
@@ -421,7 +422,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
           onTap: () => _pick(kRegionAutoId),
         ),
         if (sections[LocationSection.premium]!.isNotEmpty) ...[
-          sectionHeader(l.regionSectionYoutube),
+          sectionHeader(regionSectionYoutubeForPlatform(l)),
           ...sectionTiles(sections[LocationSection.premium]!),
         ],
         if (sections[LocationSection.general]!.isNotEmpty) ...[

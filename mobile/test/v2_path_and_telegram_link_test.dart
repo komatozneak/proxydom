@@ -46,4 +46,19 @@ void main() {
     expect(parsed!.bot, 'vpn_teremok_bot');
     expect(parsed.start, isEmpty);
   });
+
+  test('telegramHttpsStartUri tariffs payload matches bot /start tariffs', () {
+    final https = telegramHttpsStartUri(
+      botUsername: 'vpn_teremok_bot',
+      startPayload: 'tariffs',
+    );
+    expect(https.host, 't.me');
+    expect(https.path, '/vpn_teremok_bot');
+    expect(https.queryParameters['start'], 'tariffs');
+    final tg = telegramStartUri(
+      botUsername: 'vpn_teremok_bot',
+      startPayload: 'tariffs',
+    );
+    expect(tg.queryParameters['start'], 'tariffs');
+  });
 }

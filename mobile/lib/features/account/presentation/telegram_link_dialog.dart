@@ -150,7 +150,8 @@ class _TelegramLinkDialogState extends ConsumerState<TelegramLinkDialog>
 
   Future<void> _startLink() async {
     final existing = ref.read(sessionProvider).valueOrNull;
-    if (existing != null && existing.telegramUsername != null) {
+    if (existing != null &&
+        (existing.contactLinked || existing.telegramUsername != null)) {
       await launchTelegramBotStart();
       if (!mounted) return;
       Navigator.of(context).pop(TelegramLinkDialogResult.linked);
@@ -286,15 +287,13 @@ class _TelegramLinkDialogState extends ConsumerState<TelegramLinkDialog>
         }
         if (outcome.status == TelegramPollStatus.linked) {
           _pollTimer?.cancel();
-          await ref.read(sessionProvider.notifier).refresh();
           if (!mounted) return;
+          unawaited(ref.read(sessionProvider.notifier).refresh());
           unawaited(reconnectVpnAfterIdentityChange(ref));
-          final session = ref.read(sessionProvider).valueOrNull;
           setState(() {
             _linked = true;
             _restored = false;
             _restoreIsMember = false;
-            _linkedUsername = session?.telegramUsername;
           });
           await launchTelegramBotStart();
           if (!mounted) return;
@@ -325,7 +324,8 @@ class _TelegramLinkDialogState extends ConsumerState<TelegramLinkDialog>
       await ref.read(sessionProvider.notifier).refresh();
       final session = ref.read(sessionProvider).valueOrNull;
       if (!mounted) return;
-      if (session != null && session.telegramUsername != null) {
+      if (session != null &&
+          (session.contactLinked || session.telegramUsername != null)) {
         _pollTimer?.cancel();
         unawaited(reconnectVpnAfterIdentityChange(ref));
         setState(() {

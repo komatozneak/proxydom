@@ -11,6 +11,7 @@ import '../../home/application/vpn_provider.dart';
 import '../../settings/application/subscription_status_provider.dart';
 import '../../settings/data/access_status_copy.dart';
 import '../../settings/data/subscription_status.dart';
+import '../../vpn/presentation/vpn_platform_copy.dart';
 import '../application/account_profile_provider.dart';
 import '../application/telegram_identity.dart';
 import '../data/account_profile.dart';
@@ -169,7 +170,7 @@ class _HubBody extends ConsumerWidget {
       children: [
         Text(
           profile.contactLinked
-              ? l.accountHubLinkedLead
+              ? accountHubLinkedLeadForPlatform(l)
               : l.accountHubGuestLead,
           style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
@@ -187,7 +188,7 @@ class _HubBody extends ConsumerWidget {
                       ? l.accountHubLinkTelegramHint
                       : l.accountTelegramVpnRequired),
               onTap: () async {
-                if (profile.telegramUsername != null) {
+                if (profile.contactLinked) {
                   await launchTelegramBotStart();
                   return;
                 }
@@ -212,7 +213,7 @@ class _HubBody extends ConsumerWidget {
               icon: AppIcons.shield,
               title: l.accountHubRecovery,
               subtitle: l.accountHubRecoveryHint,
-              onTap: () => context.push('/settings/account/recovery'),
+              onTap: () => context.push('/settings/account/recovery-code'),
             ),
             const Divider(height: 1),
             _NavTile(

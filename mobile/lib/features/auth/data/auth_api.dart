@@ -1,6 +1,7 @@
 import '../../../core/api_client.dart';
 import '../../../core/api_secret_storage.dart';
 import '../../../core/device_label.dart';
+import '../../../core/device_platform.dart';
 import '../../../core/install_id_storage.dart';
 import '../../session/data/account_session_snapshot.dart';
 import 'restore_device_choice.dart';
@@ -29,7 +30,7 @@ class AuthApi {
       '/auth/register',
       data: {
         'device_uuid': id,
-        'platform': platform ?? 'android',
+        'platform': platform ?? devicePlatformCode(),
         'device_name': await _deviceName(deviceName),
       },
     );
@@ -56,7 +57,7 @@ class AuthApi {
       data: {
         'recovery_code': recoveryCode,
         'device_uuid': id,
-        'platform': platform ?? 'android',
+        'platform': platform ?? devicePlatformCode(),
         'device_name': await _deviceName(deviceName),
         if (replaceDeviceId != null) 'replace_device_id': replaceDeviceId,
       },
@@ -108,7 +109,7 @@ class AuthApi {
       data: {
         'code': code,
         'device_uuid': id,
-        'platform': 'android',
+        'platform': devicePlatformCode(),
         'device_name': await _deviceName(deviceName),
         'consent_version': seatAcceptConsentVersion,
       },
@@ -141,7 +142,7 @@ class AuthApi {
     final resp = await ApiClient.instance.post(
       '/auth/contact/telegram/start',
       data: {
-        'platform': 'android',
+        'platform': devicePlatformCode(),
         if (deviceName != null && deviceName.isNotEmpty)
           'device_name': deviceName,
       },
@@ -178,7 +179,7 @@ class AuthApi {
       '/auth/recover/telegram/start',
       data: {
         'device_uuid': id,
-        'platform': 'android',
+        'platform': devicePlatformCode(),
         'device_name': await _deviceName(deviceName),
       },
     );
@@ -246,7 +247,7 @@ class AuthApi {
       data: {
         'token': token,
         'device_uuid': id,
-        'platform': 'android',
+        'platform': devicePlatformCode(),
         'device_name': await _deviceName(deviceName),
       },
     );

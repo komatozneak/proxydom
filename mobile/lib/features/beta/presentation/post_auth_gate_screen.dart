@@ -17,6 +17,7 @@ import '../../auth/application/logout_handler.dart';
 import '../../auth/presentation/bootstrap_loading_screen.dart';
 import '../../onboarding/data/onboarding_prefs.dart';
 import '../../vpn/data/vpn_controller.dart';
+import '../../vpn/presentation/vpn_platform_copy.dart';
 import '../application/beta_providers.dart';
 import '../application/post_auth_router.dart';
 import '../data/jwt_subject.dart';
@@ -327,8 +328,11 @@ class _PostAuthGateScreenState extends ConsumerState<PostAuthGateScreen> {
                       const SizedBox(height: 8),
                       Text(
                         _conflictAppLabel != null
-                            ? l.homeVpnConflictHintNamed(_conflictAppLabel!)
-                            : l.homeVpnConflictHint,
+                            ? homeVpnConflictHintNamedForPlatform(
+                                l,
+                                _conflictAppLabel!,
+                              )
+                            : homeVpnConflictHintForPlatform(l),
                         textAlign: TextAlign.center,
                         style: theme.textTheme.bodyLarge,
                       ),
@@ -343,7 +347,7 @@ class _PostAuthGateScreenState extends ConsumerState<PostAuthGateScreen> {
                                 if (!opened) {
                                   showTeremokSnackBar(
                                     context,
-                                    l.settingsKillSwitchOpenFailed,
+                                    settingsKillSwitchOpenFailedForPlatform(l),
                                   );
                                 }
                               },

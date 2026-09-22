@@ -207,6 +207,10 @@ void main() {
     }
     expect(en.regionBlurbYoutube.toLowerCase(), isNot(contains('youtube')));
     expect(ru.regionBlurbYoutube.toLowerCase(), isNot(contains('youtube')));
+    expect(en.regionBlurbYoutube.toLowerCase(), isNot(contains('without ads')));
+    expect(ru.regionBlurbYoutube, isNot(contains('реклам')));
+    expect(en.regionBlurbIndia.toLowerCase(), isNot(contains('prices')));
+    expect(ru.regionBlurbIndia, isNot(contains('цен')));
   });
 
   test('sanitizeHomeLabel strips Premium suffix like Locations titles', () {

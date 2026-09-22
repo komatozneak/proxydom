@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -40,6 +41,13 @@ void main() {
     expect(env.deviceId, isNotEmpty);
     expect(env.deviceName, isNotNull);
     expect(env.deviceName, isNotEmpty);
+  });
+
+  test('buildDeviceEnvelope sends ios when target platform is iOS', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final env = await buildDeviceEnvelope();
+    expect(env.platform, 'ios');
   });
 
   test('DeviceInfoHelper returns fallback name when platform channel missing', () async {

@@ -13,6 +13,8 @@ import 'package:teremok_connect/features/settings/application/devices_list_provi
 import 'package:teremok_connect/features/settings/application/subscription_status_provider.dart';
 import 'package:teremok_connect/features/settings/data/subscription_status.dart';
 import 'package:teremok_connect/features/settings/presentation/settings_screen.dart';
+import 'package:teremok_connect/features/onboarding/presentation/onboarding_screen.dart';
+import 'package:teremok_connect/features/vpn/presentation/vpn_platform_copy.dart';
 import 'package:teremok_connect/l10n/app_localizations.dart';
 
 class _FixedSubNotifier extends SubscriptionStatusNotifier {
@@ -55,16 +57,32 @@ void main() {
     expect(ru.restoreBodyCode.toLowerCase(), isNot(contains('platega')));
     expect(ru.promoBody.toLowerCase(), isNot(contains('бета')));
     expect(ru.regionBlurbFree, isNot(contains('нейросет')));
-    expect(ru.iosBillingUnavailableBody.toLowerCase(), isNot(contains('android')));
-    expect(ru.iosBillingUnavailableBody.toLowerCase(), isNot(contains('промо')));
-    expect(ru.iosBillingUnavailableBody.toLowerCase(), isNot(contains('telegram')));
+    expect(
+        ru.iosBillingUnavailableBody.toLowerCase(), isNot(contains('android')));
+    expect(
+        ru.iosBillingUnavailableBody.toLowerCase(), isNot(contains('промо')));
+    expect(ru.iosBillingUnavailableBody.toLowerCase(),
+        isNot(contains('telegram')));
     expect(ru.iosBillingUnavailableBody.toLowerCase(), isNot(contains('t.me')));
-    expect(en.iosBillingUnavailableBody.toLowerCase(), isNot(contains('telegram')));
+    expect(en.iosBillingUnavailableBody.toLowerCase(),
+        isNot(contains('telegram')));
     expect(ru.accountTelegramVpnRequired, 'Сначала подключитесь.');
-    expect(ru.accountHubLinkTelegramHint.toLowerCase(), isNot(contains('оплат')));
+    expect(
+        ru.accountHubLinkTelegramHint.toLowerCase(), isNot(contains('оплат')));
     expect(ru.accountHubLinkTelegramHint, isNot(contains('₽')));
     expect(ru.accountHubLinkedLead.toLowerCase(), isNot(contains('оплат')));
-    expect(ru.accountTelegramLinkedBody.toLowerCase(), isNot(contains('оплат')));
+    expect(ru.accountHubLinkedLeadIos.toLowerCase(), isNot(contains('оплат')));
+    expect(
+        ru.accountHubLinkedLeadIos.toLowerCase(), isNot(contains('подписк')));
+    expect(ru.settingsSupportHintIos.toLowerCase(), isNot(contains('оплат')));
+    expect(ru.restoreBodyCode.toLowerCase(), isNot(contains('оплат')));
+    expect(ru.restoreBody.toLowerCase(), isNot(contains('оплат')));
+    expect(ru.restoreBodyCodeIos.toLowerCase(), isNot(contains('оплат')));
+    expect(en.settingsSupportHintIos.toLowerCase(), isNot(contains('pay')));
+    expect(en.restoreBodyCode.toLowerCase(), isNot(contains('paid')));
+    expect(en.restoreBody.toLowerCase(), isNot(contains('paid')));
+    expect(
+        ru.accountTelegramLinkedBody.toLowerCase(), isNot(contains('оплат')));
     expect(ru.accountHubLinkTelegramHint, contains('боте'));
     expect(en.accountHubLinkTelegramHint.toLowerCase(), isNot(contains('pay')));
     expect(en.accountHubLinkTelegramHint.toLowerCase(), contains('bot'));
@@ -74,7 +92,102 @@ void main() {
     expect(en.accountTelegramVpnRequired, 'Connect first.');
   });
 
-  testWidgets('iOS locked CTA without VPN asks to connect, not promo', (tester) async {
+  test('location and premium copy has no circumvention freeze words', () {
+    final ru = lookupAppL10n(const Locale('ru'));
+    final en = lookupAppL10n(const Locale('en'));
+    for (final s in [
+      ru.regionBlurbYoutube,
+      ru.regionBlurbIndia,
+      ru.premiumHeadline,
+      ru.premiumBody,
+      ru.premiumFeatureYt,
+      ru.subscriptionTabHint,
+      en.regionBlurbYoutube,
+      en.regionBlurbIndia,
+      en.premiumHeadline,
+      en.premiumBody,
+      en.premiumFeatureYt,
+      en.subscriptionTabHint,
+    ]) {
+      final lower = s.toLowerCase();
+      expect(lower, isNot(contains('реклам')));
+      expect(lower, isNot(contains('цен')));
+      expect(lower, isNot(contains('нейросет')));
+      expect(lower, isNot(contains('mid-roll')));
+      expect(lower, isNot(contains('adsense')));
+      expect(lower, isNot(contains('without ads')));
+      expect(lower, isNot(contains('prices')));
+    }
+    expect(ru.regionBlurbYoutube, 'Комфортный просмотр');
+    expect(en.regionBlurbYoutube, 'Comfortable streaming');
+    expect(ru.onboardingConnectBodyIos, contains('iPhone'));
+    expect(ru.onboardingConnectBodyIos, isNot(contains('Android')));
+    expect(ru.homeVpnConflictHintIos.toLowerCase(), isNot(contains('android')));
+    expect(
+        ru.homeVpnPermissionHintIos.toLowerCase(), isNot(contains('android')));
+    expect(ru.settingsKillSwitchOpenFailedIos.toLowerCase(),
+        isNot(contains('android')));
+    expect(ru.homeVpnConflictHint, contains('Android'));
+    expect(ru.settingsReportCopied.toLowerCase(), isNot(contains('бот')));
+    expect(en.settingsReportCopied.toLowerCase(), isNot(contains('bot')));
+    expect(ru.settingsSendReportHint.toLowerCase(), isNot(contains('бот')));
+    expect(en.settingsSendReportHint.toLowerCase(), isNot(contains('bot')));
+  });
+
+  test('iOS Home, gate, disclosure and onboarding copy has no Android', () {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final ru = lookupAppL10n(const Locale('ru'));
+    final en = lookupAppL10n(const Locale('en'));
+    for (final s in [
+      ...visibleVpnGuidanceCopy(ru),
+      onboardingConnectBodyForPlatform(ru),
+      ...visibleVpnGuidanceCopy(en),
+      onboardingConnectBodyForPlatform(en),
+    ]) {
+      expect(s.toLowerCase(), isNot(contains('android')));
+    }
+    expect(ru.onboardingConnectBody, contains('Android'));
+    expect(en.homeVpnConflictHint, contains('Android'));
+  });
+
+  test('iOS Locations header is Сервис, Android stays Премиум', () {
+    final ru = lookupAppL10n(const Locale('ru'));
+    final en = lookupAppL10n(const Locale('en'));
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    expect(regionSectionYoutubeForPlatform(ru), 'Сервис');
+    expect(regionSectionYoutubeForPlatform(ru), isNot(contains('Премиум')));
+    expect(regionSectionYoutubeForPlatform(en), 'Services');
+    expect(regionSectionYoutubeForPlatform(en).toLowerCase(),
+        isNot(contains('premium')));
+    expect(ru.settingsSupportHintIos, contains('боте'));
+    expect(ru.settingsSupportHintIos.toLowerCase(), isNot(contains('оплат')));
+    expect(ru.settingsSupportHintIos.toLowerCase(),
+        isNot(contains('переустанов')));
+    expect(accountHubLinkedLeadForPlatform(ru), ru.accountHubLinkedLeadIos);
+    expect(restoreBodyCodeForPlatform(ru), ru.restoreBodyCodeIos);
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    expect(regionSectionYoutubeForPlatform(ru), 'Премиум');
+    expect(regionSectionYoutubeForPlatform(en), 'Premium');
+    expect(settingsSupportHintForPlatform(ru), ru.settingsSupportHint);
+    expect(accountHubLinkedLeadForPlatform(ru), ru.accountHubLinkedLead);
+    expect(restoreBodyCodeForPlatform(ru), ru.restoreBodyCode);
+  });
+
+  test('Android Home, gate and onboarding copy still mentions Android', () {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final ru = lookupAppL10n(const Locale('ru'));
+    final en = lookupAppL10n(const Locale('en'));
+    expect(visibleVpnGuidanceCopy(ru).join(' '), contains('Android'));
+    expect(onboardingConnectBodyForPlatform(ru), contains('Android'));
+    expect(visibleVpnGuidanceCopy(en).join(' '), contains('Android'));
+    expect(onboardingConnectBodyForPlatform(en), contains('Android'));
+  });
+
+  testWidgets('iOS locked CTA without VPN asks to connect, not promo',
+      (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
     final container = ProviderContainer(
@@ -122,7 +235,9 @@ void main() {
       findsNothing,
     );
     expect(find.textContaining('Telegram'), findsNothing);
-    expect(find.text('Оплата в приложении недоступна. Бесплатные локации работают.'),
+    expect(
+        find.text(
+            'Оплата в приложении недоступна. Бесплатные локации работают.'),
         findsOneWidget);
     expect(find.text('Аккаунт'), findsWidgets);
     await tester.tap(find.widgetWithText(FilledButton, 'Аккаунт'));
@@ -133,7 +248,8 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
-  testWidgets('iOS Premium tab without VPN asks to connect, not promo', (tester) async {
+  testWidgets('iOS Premium tab without VPN asks to connect, not promo',
+      (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
     final container = ProviderContainer(

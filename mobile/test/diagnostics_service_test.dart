@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
@@ -183,6 +184,50 @@ void main() {
       );
       expect(report, contains('ios_native_tail:'));
       expect(report, contains('NEVPNStatusDidChange mapped=idle'));
+    });
+
+    test('buildReport returns when getTunnelHealth never completes', () async {
+      SharedPreferences.setMockInitialValues({});
+      DiagnosticsService.nativeProbeTimeout = const Duration(milliseconds: 40);
+      DiagnosticsService.egressProbeTimeout = const Duration(milliseconds: 40);
+      addTearDown(() {
+        DiagnosticsService.nativeProbeTimeout = const Duration(seconds: 3);
+        DiagnosticsService.egressProbeTimeout = const Duration(seconds: 5);
+      });
+      const packageChannel =
+          MethodChannel('dev.fluttercommunity.plus/package_info');
+      messenger.setMockMethodCallHandler(packageChannel, (call) async {
+        return <String, dynamic>{
+          'appName': 'Teremok',
+          'packageName': 'online.teremokconnect.app',
+          'version': '0.1.15',
+          'buildNumber': '2034',
+        };
+      });
+      addTearDown(() {
+        messenger.setMockMethodCallHandler(packageChannel, null);
+      });
+
+      messenger.setMockMethodCallHandler(vpnChannel, (call) async {
+        if (call.method == 'getTunnelHealth') {
+          await Completer<void>().future;
+        }
+        switch (call.method) {
+          case 'getStatus':
+            return 'idle';
+          case 'isLockdownEnabled':
+            return false;
+          default:
+            return null;
+        }
+      });
+
+      final report = await DiagnosticsService().buildReport(
+        authState: const AuthStateUnauthenticated(),
+        vpnUi: const VpnDisconnected(),
+      );
+      expect(report, contains('ios_tunnel_health:'));
+      expect(report, contains('(timeout)'));
     });
   });
 }

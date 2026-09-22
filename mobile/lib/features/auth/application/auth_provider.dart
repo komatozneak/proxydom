@@ -5,6 +5,7 @@ import '../../../core/api_discovery.dart';
 import '../../../core/api_secret_storage.dart';
 import '../../../core/config.dart';
 import '../../../core/device_info_helper.dart';
+import '../../../core/device_platform.dart';
 import '../../../core/install_id_storage.dart';
 import '../../../core/internet_permission.dart';
 import '../../../core/router.dart';
@@ -59,7 +60,7 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
     try {
       final model = await DeviceInfoHelper.getDeviceModelName();
       final result = await AuthApi()
-          .register(platform: 'android', deviceName: model)
+          .register(platform: devicePlatformCode(), deviceName: model)
           .timeout(
             const Duration(seconds: 45),
           );
@@ -196,6 +197,7 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
           .recover(
             recoveryCode: recoveryCode,
             deviceName: model,
+            platform: devicePlatformCode(),
             replaceDeviceId: replaceDeviceId,
           )
           .timeout(const Duration(seconds: 45));

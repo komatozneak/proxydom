@@ -9,14 +9,14 @@ class AutoReconnectPrefs {
 
   static const _key = 'auto_reconnect_enabled';
 
-  /// Android: default OFF (opt-in). iOS: always on — Packet Tunnel /
+  /// Android: default ON. iOS: always on — Packet Tunnel /
   /// `sessionActive` is the source of truth, not this pref.
   static Future<bool> isEnabled() async {
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
       return true;
     }
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_key) ?? false;
+    return prefs.getBool(_key) ?? true;
   }
 
   static Future<void> setEnabled(bool value) async {

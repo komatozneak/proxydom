@@ -1,6 +1,3 @@
-import 'dart:io' show Platform;
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -8,6 +5,7 @@ import '../../../core/config.dart';
 import '../../../core/theme.dart';
 import '../../../l10n/app_localizations.dart';
 import '../data/vpn_disclosure_prefs.dart';
+import 'vpn_platform_copy.dart';
 
 /// Prominent VPN disclosure before first Connect (Play + App Store 5.4).
 ///
@@ -15,8 +13,6 @@ import '../data/vpn_disclosure_prefs.dart';
 /// unset so the next Nest tap shows this again.
 class VpnDisclosureDialog extends StatelessWidget {
   const VpnDisclosureDialog({super.key});
-
-  static bool get _isIos => !kIsWeb && Platform.isIOS;
 
   /// Returns true if the user already accepted, or accepts now.
   static Future<bool> ensureAccepted(BuildContext context) async {
@@ -35,10 +31,9 @@ class VpnDisclosureDialog extends StatelessWidget {
     final l = AppL10n.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final vpnTitle = _isIos ? l.vpnDisclosureVpnTitleIos : l.vpnDisclosureVpnTitle;
-    final vpnBody = _isIos ? l.vpnDisclosureVpnBodyIos : l.vpnDisclosureVpnBody;
-    final dataBody =
-        _isIos ? l.vpnDisclosureDataBodyIos : l.vpnDisclosureDataBody;
+    final vpnTitle = vpnDisclosureVpnTitleForPlatform(l);
+    final vpnBody = vpnDisclosureVpnBodyForPlatform(l);
+    final dataBody = vpnDisclosureDataBodyForPlatform(l);
 
     return Dialog.fullscreen(
       backgroundColor: scheme.surface,

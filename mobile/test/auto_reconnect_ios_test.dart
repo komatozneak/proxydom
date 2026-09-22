@@ -51,13 +51,13 @@ void main() {
     expect(await AutoReconnectPrefs.isEnabled(), isTrue);
   });
 
-  test('Android auto-reconnect stays default off', () async {
+  test('Android auto-reconnect stays default on', () async {
     SharedPreferences.setMockInitialValues({});
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
-    expect(await AutoReconnectPrefs.isEnabled(), isFalse);
-    await AutoReconnectPrefs.setEnabled(true);
     expect(await AutoReconnectPrefs.isEnabled(), isTrue);
+    await AutoReconnectPrefs.setEnabled(false);
+    expect(await AutoReconnectPrefs.isEnabled(), isFalse);
   });
 
   testWidgets('iOS Settings hides the auto-reconnect switch', (tester) async {

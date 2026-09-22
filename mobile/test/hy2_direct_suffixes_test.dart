@@ -55,7 +55,9 @@ void main() {
     expect(defaultSuffixes, contains('yandex.ru'));
     expect(defaultSuffixes, contains('ozon.ru'));
     expect(defaultSuffixes, contains('wildberries.ru'));
-    expect(defaultSuffixes, isNot(contains('tiktok.com')));
+    expect(defaultSuffixes, contains('tiktok.com'));
+    expect(defaultSuffixes, contains('yoomoney.ru'));
+    expect(defaultSuffixes, contains('rustore.ru'));
 
     await SplitTunnelPrefs.setOsnovnyeEnabled('vk', true);
     await SplitTunnelPrefs.addSite(domain: 'example.com');
@@ -71,7 +73,7 @@ void main() {
     expect(suffixes, isNot(contains('youtube.com')));
     expect(suffixes, isNot(contains('googlevideo.com')));
     expect(suffixes, isNot(contains('google.com')));
-    expect(suffixes, isNot(contains('tiktok.com')));
+    expect(suffixes, contains('tiktok.com'));
   });
 
   test('Android params keep hyDialer suffixes and Apps bypass', () async {

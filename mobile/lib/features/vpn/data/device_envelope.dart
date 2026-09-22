@@ -1,8 +1,5 @@
-import 'dart:io' show Platform;
-
-import 'package:flutter/foundation.dart';
-
 import '../../../core/device_info_helper.dart';
+import '../../../core/device_platform.dart';
 import '../../../core/install_id_storage.dart';
 
 /// Envelope sent with GET /vpn/config for per-device slots.
@@ -34,16 +31,6 @@ Future<DeviceEnvelope> buildDeviceEnvelope({
   return DeviceEnvelope(
     deviceId: id,
     deviceName: name,
-    platform: _platformCode(),
+    platform: devicePlatformCode(),
   );
-}
-
-String _platformCode() {
-  if (kIsWeb) return 'web';
-  if (Platform.isAndroid) return 'android';
-  if (Platform.isIOS) return 'ios';
-  if (Platform.isMacOS) return 'macos';
-  if (Platform.isWindows) return 'windows';
-  if (Platform.isLinux) return 'linux';
-  return 'unknown';
 }

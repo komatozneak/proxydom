@@ -292,19 +292,19 @@ abstract class AppL10n {
   /// No description provided for @premiumHeadline.
   ///
   /// In en, this message translates to:
-  /// **'Without ads'**
+  /// **'More locations'**
   String get premiumHeadline;
 
   /// No description provided for @premiumBody.
   ///
   /// In en, this message translates to:
-  /// **'Premium unlocks no-AdSense exits, up to 5 devices, and removes the free 4.20 GB cap.'**
+  /// **'Premium unlocks extra locations, up to 5 devices, and removes the free 4.20 GB cap.'**
   String get premiumBody;
 
   /// No description provided for @premiumFeatureYt.
   ///
   /// In en, this message translates to:
-  /// **'YouTube locations without mid-roll ads'**
+  /// **'Extra locations for streaming'**
   String get premiumFeatureYt;
 
   /// No description provided for @premiumFeatureSpeed.
@@ -334,7 +334,7 @@ abstract class AppL10n {
   /// No description provided for @subscriptionTabHint.
   ///
   /// In en, this message translates to:
-  /// **'Manage plans and promo codes. Premium unlocks YouTube locations.'**
+  /// **'Manage plans and promo codes. Premium unlocks extra locations.'**
   String get subscriptionTabHint;
 
   /// No description provided for @subscriptionPay.
@@ -679,17 +679,35 @@ abstract class AppL10n {
   /// **'Turn off the other VPN in Android settings, then connect again.'**
   String get homeVpnConflictHint;
 
+  /// No description provided for @homeVpnConflictHintIos.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn off the other VPN in Settings → VPN.'**
+  String get homeVpnConflictHintIos;
+
   /// No description provided for @homeVpnConflictHintNamed.
   ///
   /// In en, this message translates to:
   /// **'Turn off “{app}” in Android settings, then connect again.'**
   String homeVpnConflictHintNamed(String app);
 
+  /// No description provided for @homeVpnConflictHintNamedIos.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn off “{app}” in Settings → VPN.'**
+  String homeVpnConflictHintNamedIos(String app);
+
   /// No description provided for @homeVpnPermissionHint.
   ///
   /// In en, this message translates to:
   /// **'Allow the VPN in the Android system prompt, then tap connect again.'**
   String get homeVpnPermissionHint;
+
+  /// No description provided for @homeVpnPermissionHintIos.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow VPN in the system prompt, then connect again.'**
+  String get homeVpnPermissionHintIos;
 
   /// No description provided for @homeConfigErrorFriendly.
   ///
@@ -864,6 +882,12 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Couldn\'t open VPN settings. Open Settings → Network & internet → VPN.'**
   String get settingsKillSwitchOpenFailed;
+
+  /// No description provided for @settingsKillSwitchOpenFailedIos.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open VPN settings. Open Settings → VPN.'**
+  String get settingsKillSwitchOpenFailedIos;
 
   /// No description provided for @settingsAutoReconnect.
   ///
@@ -1456,7 +1480,7 @@ abstract class AppL10n {
   /// No description provided for @settingsSendReportHint.
   ///
   /// In en, this message translates to:
-  /// **'Prepares a text dump of network and protocol diagnostics for Telegram support.'**
+  /// **'Copies diagnostics. Paste them into support yourself.'**
   String get settingsSendReportHint;
 
   /// No description provided for @settingsSendReportConfirm.
@@ -1470,6 +1494,12 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Report sent to support via the bot. Also copied.'**
   String get settingsReportSent;
+
+  /// No description provided for @settingsReportCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Report text copied'**
+  String get settingsReportCopied;
 
   /// No description provided for @settingsReportSaved.
   ///
@@ -1681,6 +1711,12 @@ abstract class AppL10n {
   /// **'Premium'**
   String get regionSectionYoutube;
 
+  /// No description provided for @regionSectionYoutubeIos.
+  ///
+  /// In en, this message translates to:
+  /// **'Services'**
+  String get regionSectionYoutubeIos;
+
   /// No description provided for @regionSectionFree.
   ///
   /// In en, this message translates to:
@@ -1738,13 +1774,13 @@ abstract class AppL10n {
   /// No description provided for @regionBlurbYoutube.
   ///
   /// In en, this message translates to:
-  /// **'Without ads'**
+  /// **'Comfortable streaming'**
   String get regionBlurbYoutube;
 
   /// No description provided for @regionBlurbIndia.
   ///
   /// In en, this message translates to:
-  /// **'Local apps and prices'**
+  /// **'Apps and websites'**
   String get regionBlurbIndia;
 
   /// No description provided for @regionOffline.
@@ -2167,6 +2203,12 @@ abstract class AppL10n {
   /// **'Telegram — transfer after reinstall'**
   String get settingsSupportHint;
 
+  /// No description provided for @settingsSupportHintIos.
+  ///
+  /// In en, this message translates to:
+  /// **'Questions in the Telegram bot'**
+  String get settingsSupportHintIos;
+
   /// No description provided for @lockedPay1m.
   ///
   /// In en, this message translates to:
@@ -2332,8 +2374,14 @@ abstract class AppL10n {
   /// No description provided for @restoreBody.
   ///
   /// In en, this message translates to:
-  /// **'Enter the recovery code or open Telegram. Use the bot login code if you paid before this phone.'**
+  /// **'Enter the recovery code or open Telegram.'**
   String get restoreBody;
+
+  /// No description provided for @restoreBodyIos.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the recovery code or open Telegram.'**
+  String get restoreBodyIos;
 
   /// No description provided for @restorePaymentLabel.
   ///
@@ -2440,8 +2488,14 @@ abstract class AppL10n {
   /// No description provided for @restoreBodyCode.
   ///
   /// In en, this message translates to:
-  /// **'After reinstall, enter the recovery code or open Telegram. Use the bot login code if you paid before this phone.'**
+  /// **'After reinstall, enter the recovery code or open Telegram.'**
   String get restoreBodyCode;
+
+  /// No description provided for @restoreBodyCodeIos.
+  ///
+  /// In en, this message translates to:
+  /// **'After reinstall, enter the recovery code or open Telegram.'**
+  String get restoreBodyCodeIos;
 
   /// No description provided for @settingsInviteDevice.
   ///
@@ -2608,8 +2662,20 @@ abstract class AppL10n {
   /// No description provided for @accountHubLinkedLead.
   ///
   /// In en, this message translates to:
-  /// **'Telegram is linked. Recovery code and the bot keep the same account.'**
+  /// **'Telegram is linked. The bot is the same account: subscription and restore.'**
   String get accountHubLinkedLead;
+
+  /// No description provided for @accountHubLinkedLeadIos.
+  ///
+  /// In en, this message translates to:
+  /// **'Telegram is linked. The bot is the same account and restore.'**
+  String get accountHubLinkedLeadIos;
+
+  /// No description provided for @accountHubRecoveryMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'This phone already saved the code. After reinstall, open Telegram with the same account.'**
+  String get accountHubRecoveryMissing;
 
   /// No description provided for @accountHubLinkTelegram.
   ///
@@ -2620,7 +2686,7 @@ abstract class AppL10n {
   /// No description provided for @accountHubLinkTelegramHint.
   ///
   /// In en, this message translates to:
-  /// **'The same account in the bot'**
+  /// **'Subscription and restore in the bot'**
   String get accountHubLinkTelegramHint;
 
   /// No description provided for @accountHubLinkEmail.
@@ -2920,7 +2986,7 @@ abstract class AppL10n {
   /// No description provided for @accountTelegramLinkedBody.
   ///
   /// In en, this message translates to:
-  /// **'You can restore access with this Telegram after reinstall.'**
+  /// **'After reinstall, restore access with this Telegram. Subscription is in the bot too.'**
   String get accountTelegramLinkedBody;
 
   /// No description provided for @accountTelegramOwnerRestoredTitle.

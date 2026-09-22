@@ -95,6 +95,29 @@ void main() {
     expect(snap.hasAccess, isTrue);
     expect(snap.manageAccount, isFalse);
     expect(snap.telegramUsername, 'misha');
+    expect(snap.contactLinked, isFalse);
     expect(snap.currentCaps, ['revoke_self']);
+  });
+
+  test('session contact_linked is independent of username', () {
+    final snap = AccountSessionSnapshot.fromJson({
+      'version': 5,
+      'account': {
+        'id': 1,
+        'plan': 'free',
+        'device_limit': 1,
+        'contact_linked': true,
+        'entitlement': {'tier': 'free', 'has_access': false},
+      },
+      'device': {
+        'id': 10,
+        'install_id': 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+        'caps': ['manage_account'],
+        'is_current': true,
+      },
+      'devices': [],
+    });
+    expect(snap.contactLinked, isTrue);
+    expect(snap.telegramUsername, isNull);
   });
 }

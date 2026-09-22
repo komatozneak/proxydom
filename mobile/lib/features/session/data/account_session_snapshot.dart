@@ -9,6 +9,7 @@ class AccountSessionSnapshot {
     required this.devices,
     this.plan,
     this.telegramUsername,
+    this.contactLinked = false,
     this.endsAt,
     this.currentDeviceId,
     this.currentCaps = const [],
@@ -19,6 +20,7 @@ class AccountSessionSnapshot {
   final int accountId;
   final String? plan;
   final String? telegramUsername;
+  final bool contactLinked;
   final String tier;
   final bool hasAccess;
   final DateTime? endsAt;
@@ -36,16 +38,17 @@ class AccountSessionSnapshot {
         ? Map<String, dynamic>.from(account)
         : <String, dynamic>{};
     final ent = accountMap['entitlement'];
-    final entMap = ent is Map ? Map<String, dynamic>.from(ent) : <String, dynamic>{};
+    final entMap =
+        ent is Map ? Map<String, dynamic>.from(ent) : <String, dynamic>{};
     final device = json['device'];
-    final deviceMap =
-        device is Map ? Map<String, dynamic>.from(device) : null;
+    final deviceMap = device is Map ? Map<String, dynamic>.from(device) : null;
     final rawDevices = json['devices'];
     final devices = <SessionDeviceItem>[];
     if (rawDevices is List) {
       for (final item in rawDevices) {
         if (item is Map) {
-          devices.add(SessionDeviceItem.fromJson(Map<String, dynamic>.from(item)));
+          devices
+              .add(SessionDeviceItem.fromJson(Map<String, dynamic>.from(item)));
         }
       }
     }
@@ -59,6 +62,7 @@ class AccountSessionSnapshot {
       accountId: (accountMap['id'] as num?)?.toInt() ?? 0,
       plan: accountMap['plan'] as String?,
       telegramUsername: accountMap['telegram_username'] as String?,
+      contactLinked: accountMap['contact_linked'] == true,
       tier: (entMap['tier'] as String?) ?? 'free',
       hasAccess: entMap['has_access'] == true,
       endsAt: ends,
