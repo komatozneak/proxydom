@@ -50,6 +50,12 @@ class VpnSessionEngine(
         fun persistAutoWinner(candidate: AutoCandidate) {}
         /** Auto pool missed — do not let Always-on resurrect the previous hop. */
         fun markPersistedInactive() {}
+
+        /**
+         * Text already stored by failStart (SOCKS probe, protect, Hy2).
+         * Engine must not replace it with a generic establish failure.
+         */
+        fun lastStartFailure(): String? = null
     }
 
     private val dispatcher: ExecutorService = Executors.newSingleThreadExecutor { r ->
@@ -244,7 +250,9 @@ class VpnSessionEngine(
                         phase = SessionPhase.Error,
                         generation = gen,
                         reason = SessionReason.EgressTimeout,
-                        detail = "establish returned false",
+                        candidateId = nodeIdFromParams(params),
+                        candidateHost = hostFromParams(params),
+                        detail = establishFailureDetail(host.lastStartFailure()),
                     ),
                 )
                 host.teardownGeneration(gen)
@@ -431,6 +439,15 @@ class VpnSessionEngine(
 
     companion object {
         private const val TAG = "VpnSessionEngine"
+
+        /**
+         * Keep failStart text (SOCKS probe, protect). A blank prior is the
+         * only case that becomes the generic establish failure.
+         */
+        fun establishFailureDetail(prior: String?): String {
+            val trimmed = prior?.trim().orEmpty()
+            return if (trimmed.isEmpty()) "establish returned false" else trimmed
+        }
 
         /** Shared generation clock (MethodChannel allocate + Engine enqueue). */
         private val generationClock = AtomicLong(0L)

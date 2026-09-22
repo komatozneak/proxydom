@@ -51,7 +51,7 @@ class HysteriaBridge private constructor() {
         } catch (t: Throwable) {
             lastErrorMessage = t.message ?: t.toString()
             Log.e(TAG, "loadLibrary: hyjni failed", t)
-            DiagnosticRing.append(TAG, "vpn.prove id=hysteria ok=false reason=load_failed")
+            DiagnosticRing.append(TAG, "hy2.socks start ok=false reason=load_failed")
             false
         }
     }
@@ -96,17 +96,17 @@ class HysteriaBridge private constructor() {
             if (!err.isNullOrBlank()) {
                 lastErrorMessage = err
                 Log.e(TAG, "start: Hy2bind.start error=$err")
-                DiagnosticRing.append(TAG, "vpn.prove id=hysteria ok=false reason=hy2_start")
+                DiagnosticRing.append(TAG, "hy2.socks start ok=false reason=hy2_start")
                 return false
             }
             isRunning.set(true)
             Log.i(TAG, "start: Hy2 SOCKS on $socksListen server=$server")
-            DiagnosticRing.append(TAG, "vpn.prove id=hysteria ok=true")
+            DiagnosticRing.append(TAG, "hy2.socks start ok=true")
             true
         } catch (t: Throwable) {
             lastErrorMessage = t.message ?: t.toString()
             Log.e(TAG, "start: failed", t)
-            DiagnosticRing.append(TAG, "vpn.prove id=hysteria ok=false reason=start_failed")
+            DiagnosticRing.append(TAG, "hy2.socks start ok=false reason=start_failed")
             false
         }
     }

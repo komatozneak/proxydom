@@ -50,14 +50,40 @@ internal object VpnUnderlyingNetworkPolicy {
         }
         val net = DefaultNetworkMonitor.defaultNetwork ?: return false
         val iface = DefaultNetworkMonitor.currentInterfaceName ?: "(unknown)"
+        return bindProcessTo(context, net, iface)
+    }
+
+    /**
+     * Pin Dart DNS/sockets to [network]. Call on every physical iface change:
+     * a boot-time bind stays on the old [Network] after Wi‑Fi/LTE flap and
+     * getaddrinfo then returns EAI_NODATA (errno 7).
+     */
+    fun bindProcessTo(context: Context, network: Network, iface: String): Boolean {
         val cm = context.getSystemService(ConnectivityManager::class.java)
         return runCatching {
-            val ok = cm.bindProcessToNetwork(net)
+            val ok = cm.bindProcessToNetwork(network)
             Log.i(TAG, "bindProcessToNetwork iface=$iface ok=$ok")
             DiagnosticRing.append(TAG, "bind.process $iface ok=$ok")
             ok
         }.getOrElse {
             Log.w(TAG, "bindProcessToNetwork failed iface=$iface", it)
+            false
+        }
+    }
+
+    /**
+     * Drop the process bind so the OS default is used.
+     * Only when TUN is down — null while the tunnel is up sends Dio into tun0.
+     */
+    fun clearProcessBind(context: Context): Boolean {
+        val cm = context.getSystemService(ConnectivityManager::class.java)
+        return runCatching {
+            val ok = cm.bindProcessToNetwork(null)
+            Log.i(TAG, "bindProcessToNetwork clear ok=$ok")
+            DiagnosticRing.append(TAG, "bind.process clear ok=$ok")
+            ok
+        }.getOrElse {
+            Log.w(TAG, "bindProcessToNetwork clear failed", it)
             false
         }
     }

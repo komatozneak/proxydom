@@ -28,6 +28,7 @@ internal object DefaultNetworkMonitor {
         private set
 
     private var connectivity: ConnectivityManager? = null
+    private var appContext: Context? = null
     private var defaultCallback: ConnectivityManager.NetworkCallback? = null
     private var physicalCallback: ConnectivityManager.NetworkCallback? = null
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -67,6 +68,7 @@ internal object DefaultNetworkMonitor {
             .build()
 
     private fun start(context: Context) {
+        appContext = context.applicationContext
         if (defaultCallback != null) return
         val cm = context.getSystemService(ConnectivityManager::class.java)
         connectivity = cm
@@ -109,7 +111,8 @@ internal object DefaultNetworkMonitor {
             }
 
             override fun onLost(network: Network) {
-                if (defaultNetwork == network) {
+                val lostPinned = defaultNetwork == network
+                if (lostPinned) {
                     defaultNetwork = null
                     currentInterfaceName = null
                     Log.i(TAG, "physical underlying lost")
@@ -118,6 +121,9 @@ internal object DefaultNetworkMonitor {
                 val active = cm.activeNetwork
                 if (!isVpn(cm, active)) {
                     consider(cm, active, allowReplace = true)
+                }
+                if (lostPinned && defaultNetwork == null) {
+                    releaseProcessBindIfTunDown()
                 }
             }
         }
@@ -202,10 +208,29 @@ internal object DefaultNetworkMonitor {
         currentInterfaceName = iface
         Log.i(TAG, "default interface: $iface")
         DiagnosticRing.append(TAG, "net.iface $iface")
+        val ctx = appContext
+        if (ctx != null) {
+            VpnUnderlyingNetworkPolicy.bindProcessTo(ctx, network, iface)
+        }
         val vpn = TeremokVpnService.currentInstance() ?: return
         VpnUnderlyingNetworkPolicy.applyTo(
             vpn,
             VpnUnderlyingNetworkPolicy.Underlying(network, iface),
         )
+    }
+
+    /**
+     * Pinned network is gone and no replacement physical exists.
+     * Clearing the bind while TUN is up would route Dart through tun0.
+     */
+    private fun releaseProcessBindIfTunDown() {
+        val ctx = appContext ?: return
+        val tunUp = TeremokVpnService.currentInstance()?.hasLiveTun() == true
+        if (tunUp) {
+            Log.i(TAG, "keep process bind — TUN up, no replacement physical")
+            DiagnosticRing.append(TAG, "bind.process keep tun_up")
+            return
+        }
+        VpnUnderlyingNetworkPolicy.clearProcessBind(ctx)
     }
 }

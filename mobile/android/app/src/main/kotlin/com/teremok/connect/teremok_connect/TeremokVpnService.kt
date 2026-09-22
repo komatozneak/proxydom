@@ -526,6 +526,8 @@ class TeremokVpnService : VpnService() {
         override fun markPersistedInactive() {
             markSessionInactive()
         }
+
+        override fun lastStartFailure(): String? = VpnStatusBroadcaster.lastError()
     }
 
     /**

@@ -4,6 +4,7 @@ import com.teremok.connect.teremok_connect.session.PathTransport
 import com.teremok.connect.teremok_connect.session.SessionPhase
 import com.teremok.connect.teremok_connect.session.SessionReason
 import com.teremok.connect.teremok_connect.session.SessionSnapshot
+import com.teremok.connect.teremok_connect.session.VpnSessionEngine
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -92,5 +93,19 @@ class SessionSnapshotTest {
         assertEquals(SessionReason.None, SessionReason.fromWire(null))
         assertEquals(SessionReason.Unknown, SessionReason.fromWire("not-a-reason"))
         assertTrue(SessionReason.fromWire("UnderlyingBad") == SessionReason.UnderlyingBad)
+    }
+
+    @Test
+    fun `establish failure keeps socks probe detail`() {
+        val probe = "eu-hy2-1@217.60.3.9:443: SOCKS HTTPS probe failed"
+        assertEquals(probe, VpnSessionEngine.establishFailureDetail(probe))
+        assertEquals(
+            "establish returned false",
+            VpnSessionEngine.establishFailureDetail(null),
+        )
+        assertEquals(
+            "establish returned false",
+            VpnSessionEngine.establishFailureDetail("  "),
+        )
     }
 }

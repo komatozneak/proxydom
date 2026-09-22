@@ -1,3 +1,8 @@
+import 'dart:async';
+import 'dart:io';
+
+import 'package:dio/dio.dart';
+
 import '../../home/application/vpn_status.dart';
 import '../data/vpn_session_snapshot.dart';
 
@@ -7,8 +12,20 @@ const kVpnProbeFailedErrorCode = 'server_probe_failed';
 /// Auto walk: no candidate passed data-plane prove.
 const kVpnPathIncompatibleErrorCode = 'path_incompatible';
 
+/// Control plane (DNS / TCP to the API) failed before any config was minted.
+const kVpnApiUnreachableErrorCode = 'api_unreachable';
+
+/// Why an Auto mint produced no config.
+enum AutoMintSkipKind {
+  /// DNS, connect, or timeout talking to the API.
+  connection,
+
+  /// HTTP / parse / other skip. Not a transport failure.
+  other,
+}
+
 final RegExp _socksProbeFailPattern = RegExp(
-  r'^(.+?)@([^:\s]+):\s*SOCKS HTTPS probe failed\s*$',
+  r'^(.+?)@([^:\s]+)(?::\d+)?:\s*SOCKS HTTPS probe failed\s*$',
   caseSensitive: false,
 );
 
@@ -75,4 +92,33 @@ VpnError vpnErrorFromSession(
     snap.detail,
     fallbackMessage: fallbackMessage,
   );
+}
+
+/// DNS / connect / timeout to the API. HTTP status errors are not this.
+bool isControlPlaneTransportError(Object error) {
+  if (error is SocketException || error is TimeoutException) return true;
+  if (error is DioException) {
+    switch (error.type) {
+      case DioExceptionType.connectionError:
+      case DioExceptionType.connectionTimeout:
+        return true;
+      case DioExceptionType.unknown:
+        final inner = error.error;
+        return inner is SocketException || inner is TimeoutException;
+      default:
+        return false;
+    }
+  }
+  return false;
+}
+
+/// Empty Auto mint: transport misses are [kVpnApiUnreachableErrorCode].
+/// A data-plane path miss stays [kVpnPathIncompatibleErrorCode].
+String autoMintEmptyFailCode(Iterable<AutoMintSkipKind> skips) {
+  final list = skips.toList();
+  if (list.isNotEmpty &&
+      list.every((skip) => skip == AutoMintSkipKind.connection)) {
+    return kVpnApiUnreachableErrorCode;
+  }
+  return kVpnPathIncompatibleErrorCode;
 }

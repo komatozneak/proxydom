@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:teremok_connect/features/home/application/vpn_status.dart';
 import 'package:teremok_connect/features/session/application/identity_reconnect.dart';
@@ -16,6 +19,14 @@ void main() {
 
     test('returns null for unrelated errors', () {
       expect(parseSocksProbeFailure('Xray start failed'), isNull);
+    });
+
+    test('parses failStart when the server includes a port', () {
+      final parsed = parseSocksProbeFailure(
+        'eu-hy2-1@217.60.3.9:443: SOCKS HTTPS probe failed',
+      );
+      expect(parsed?.nodeId, 'eu-hy2-1');
+      expect(parsed?.host, '217.60.3.9');
     });
   });
 
@@ -48,6 +59,14 @@ void main() {
       expect(err.code, kVpnPathIncompatibleErrorCode);
     });
 
+    test('maps ported SOCKS probe to server_probe_failed', () {
+      final err = vpnErrorFromNativeDetail(
+        'eu-hy2-1@217.60.3.9:443: SOCKS HTTPS probe failed',
+      );
+      expect(err.code, kVpnProbeFailedErrorCode);
+      expect(err.message, 'eu-hy2-1');
+    });
+
     test('falls back when detail empty', () {
       final err = vpnErrorFromNativeDetail(
         null,
@@ -55,6 +74,64 @@ void main() {
       );
       expect(err.code, isNull);
       expect(err.message, 'Failed to start VPN service');
+    });
+  });
+
+  group('auto mint empty classification', () {
+    test('DNS skips are api_unreachable', () {
+      expect(
+        autoMintEmptyFailCode(const [
+          AutoMintSkipKind.connection,
+          AutoMintSkipKind.connection,
+        ]),
+        kVpnApiUnreachableErrorCode,
+      );
+    });
+
+    test('a non-transport skip stays path_incompatible', () {
+      expect(
+        autoMintEmptyFailCode(const [
+          AutoMintSkipKind.connection,
+          AutoMintSkipKind.other,
+        ]),
+        kVpnPathIncompatibleErrorCode,
+      );
+      expect(
+        autoMintEmptyFailCode(const <AutoMintSkipKind>[]),
+        kVpnPathIncompatibleErrorCode,
+      );
+    });
+
+    test('connection Dio and SocketException are control-plane', () {
+      expect(
+        isControlPlaneTransportError(
+          const SocketException('Failed host lookup'),
+        ),
+        isTrue,
+      );
+      final opts = RequestOptions(path: '/vpn/config');
+      expect(
+        isControlPlaneTransportError(
+          DioException(
+            requestOptions: opts,
+            type: DioExceptionType.connectionError,
+            error: const SocketException(
+              'Failed host lookup: api.teremokconnect.online',
+            ),
+          ),
+        ),
+        isTrue,
+      );
+      expect(
+        isControlPlaneTransportError(
+          DioException(
+            requestOptions: opts,
+            type: DioExceptionType.badResponse,
+            response: Response(requestOptions: opts, statusCode: 402),
+          ),
+        ),
+        isFalse,
+      );
     });
   });
 

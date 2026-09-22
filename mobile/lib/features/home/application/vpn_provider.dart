@@ -1076,7 +1076,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
 
     _autoMints.clear();
     _autoActiveNodeId = null;
-    List<_AutoMint?> minted;
+    List<_MintAttempt> minted;
     try {
       minted = await Future.wait([
         for (final node in pool) _mintAutoNode(node, gen),
@@ -1092,9 +1092,15 @@ class VpnNotifier extends Notifier<VpnStatus> {
     if (gen != null && await _abortStaleConnect(gen)) return;
 
     final payloads = <String>[];
+    final skips = <AutoMintSkipKind>[];
     for (var i = 0; i < pool.length; i++) {
-      final mint = minted[i];
-      if (mint == null) continue;
+      final attempt = minted[i];
+      final mint = attempt.mint;
+      if (mint == null) {
+        final skip = attempt.skip;
+        if (skip != null) skips.add(skip);
+        continue;
+      }
       final node = pool[i];
       _autoMints[node.id] = mint;
       if (_autoMints.length == 1) {
@@ -1109,7 +1115,11 @@ class VpnNotifier extends Notifier<VpnStatus> {
       );
     }
     if (payloads.isEmpty) {
-      await _onAutoPathIncompatible(reason: 'mint_empty');
+      if (autoMintEmptyFailCode(skips) == kVpnApiUnreachableErrorCode) {
+        await _onApiUnreachable();
+      } else {
+        await _onAutoPathIncompatible(reason: 'mint_empty');
+      }
       return;
     }
     final started = await VpnController.instance.startAuto(payloads);
@@ -1128,8 +1138,10 @@ class VpnNotifier extends Notifier<VpnStatus> {
     );
   }
 
-  Future<_AutoMint?> _mintAutoNode(VpnNode node, int? gen) async {
-    if (gen != null && await _abortStaleConnect(gen)) return null;
+  Future<_MintAttempt> _mintAutoNode(VpnNode node, int? gen) async {
+    if (gen != null && await _abortStaleConnect(gen)) {
+      return const _MintAttempt.skipped();
+    }
     try {
       final cfg = await _autoMintRetryPolicy.execute(
         () => ref
@@ -1156,17 +1168,21 @@ class VpnNotifier extends Notifier<VpnStatus> {
           return e is! FormatException;
         },
       );
-      if (gen != null && await _abortStaleConnect(gen)) return null;
+      if (gen != null && await _abortStaleConnect(gen)) {
+        return const _MintAttempt.skipped();
+      }
       final label = _autoHintLabel(node);
       ProductLog.event('vpn.mint', {
         'id': node.id,
         'active_core': cfg.activeCore.name,
         'protocol': node.protocol,
       });
-      return _AutoMint(
-        config: cfg,
-        label: label,
-        protocol: node.protocol,
+      return _MintAttempt.ok(
+        _AutoMint(
+          config: cfg,
+          label: label,
+          protocol: node.protocol,
+        ),
       );
     } on DioException catch (e) {
       if (e.error == 'quota_exceeded' || _apiErrorCode(e) == 'quota_exceeded') {
@@ -1178,7 +1194,11 @@ class VpnNotifier extends Notifier<VpnStatus> {
         'code': e.error ?? _apiErrorCode(e) ?? e.response?.statusCode,
       });
       _vpnLog('[VPN] auto mint skip ${node.id}: $e', warn: true);
-      return null;
+      return _MintAttempt.skipped(
+        isControlPlaneTransportError(e)
+            ? AutoMintSkipKind.connection
+            : AutoMintSkipKind.other,
+      );
     } catch (e) {
       ProductLog.event('vpn.mint', {
         'id': node.id,
@@ -1186,8 +1206,29 @@ class VpnNotifier extends Notifier<VpnStatus> {
         'code': e.runtimeType.toString(),
       });
       _vpnLog('[VPN] auto mint skip ${node.id}: $e', warn: true);
-      return null;
+      return _MintAttempt.skipped(
+        isControlPlaneTransportError(e)
+            ? AutoMintSkipKind.connection
+            : AutoMintSkipKind.other,
+      );
     }
+  }
+
+  /// DNS/connect failed for every Auto candidate. Do not Wi-Fi-retry that
+  /// as a data-plane path miss — the process bind is still the broken path.
+  Future<void> _onApiUnreachable() async {
+    ProductLog.event('vpn.connect_fail', {
+      'code': kVpnApiUnreachableErrorCode,
+      'reason': 'mint_empty',
+      'pool_ids': _lastAutoPoolIds,
+      'attempt': _autoConnectAttempt,
+    });
+    _endSessionWalk();
+    _cancelConnectingWatchdog();
+    state = const VpnError(
+      message: kVpnApiUnreachableErrorCode,
+      code: kVpnApiUnreachableErrorCode,
+    );
   }
 
   Future<void> _onAutoPathIncompatible({
@@ -2101,6 +2142,15 @@ String? _apiErrorCode(DioException e) {
 }
 
 final class _AutoMintQuotaExceeded implements Exception {}
+
+final class _MintAttempt {
+  const _MintAttempt.ok(this.mint) : skip = null;
+
+  const _MintAttempt.skipped([this.skip]) : mint = null;
+
+  final _AutoMint? mint;
+  final AutoMintSkipKind? skip;
+}
 
 final class _AutoMint {
   const _AutoMint({
