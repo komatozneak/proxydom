@@ -13,7 +13,9 @@ import '../../../l10n/app_localizations.dart';
 import '../../account/application/account_profile_provider.dart';
 import '../../account/application/telegram_identity.dart';
 import '../../account/presentation/telegram_link_dialog.dart';
+import '../../beta/data/jwt_subject.dart';
 import '../../home/application/vpn_provider.dart';
+import '../../onboarding/data/onboarding_prefs.dart';
 import '../../session/application/identity_reconnect.dart';
 import '../../session/application/session_provider.dart';
 import '../../vpn/presentation/vpn_platform_copy.dart';
@@ -94,6 +96,19 @@ class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
     }
   }
 
+  Future<void> _enterRestoredAccount() async {
+    final auth = ref.read(authProvider).valueOrNull;
+    final token = auth is AuthStateAuthenticated ? auth.accessToken : null;
+    final userId = jwtSubject(token);
+    if (userId != null) {
+      await OnboardingPrefs.markCompleted(userId: userId);
+    }
+    if (!mounted) return;
+    unawaited(reconnectVpnAfterIdentityChange(ref));
+    AppRouter.postAuthResolved = true;
+    context.go('/home');
+  }
+
   Future<void> _finishPairSuccess(Map<String, dynamic> data) async {
     final ok = await ref.read(authProvider.notifier).recoverWithTelegram(
           token: data['token']?.toString() ?? '',
@@ -101,9 +116,7 @@ class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
         );
     if (!mounted) return;
     if (ok) {
-      unawaited(reconnectVpnAfterIdentityChange(ref));
-      AppRouter.postAuthResolved = true;
-      context.go('/gate');
+      await _enterRestoredAccount();
     } else {
       setState(() {
         _busy = false;
@@ -283,9 +296,7 @@ class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
                     );
             if (!mounted) return;
             if (ok) {
-              unawaited(reconnectVpnAfterIdentityChange(ref));
-              AppRouter.postAuthResolved = true;
-              context.go('/gate');
+              await _enterRestoredAccount();
             } else {
               setState(() {
                 _tgBusy = false;
@@ -303,9 +314,7 @@ class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
                     );
             if (!mounted) return;
             if (ok) {
-              unawaited(reconnectVpnAfterIdentityChange(ref));
-              AppRouter.postAuthResolved = true;
-              context.go('/gate');
+              await _enterRestoredAccount();
             } else {
               setState(() {
                 _tgBusy = false;
@@ -389,9 +398,7 @@ class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
         });
         return;
       }
-      unawaited(reconnectVpnAfterIdentityChange(ref));
-      AppRouter.postAuthResolved = true;
-      context.go('/gate');
+      await _enterRestoredAccount();
     } on NeedsDeviceSlotException catch (e) {
       if (!mounted) return;
       final chosen = await RestoreDeviceSlotDialog.show(
@@ -418,9 +425,7 @@ class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
         });
         return;
       }
-      unawaited(reconnectVpnAfterIdentityChange(ref));
-      AppRouter.postAuthResolved = true;
-      context.go('/gate');
+      await _enterRestoredAccount();
     }
   }
 
