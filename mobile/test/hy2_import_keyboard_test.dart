@@ -42,4 +42,33 @@ void main() {
     expect(find.text('Сохранить и подключить'), findsOneWidget);
     expect(find.text('Только сохранить'), findsOneWidget);
   });
+
+  testWidgets('a bad draft says the link was not read', (tester) async {
+    final router = GoRouter(
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (context, state) => const Hy2ImportScreen(),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp.router(
+          routerConfig: router,
+          locale: const Locale('ru'),
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.enterText(find.byType(TextField), 'not-a-link');
+    await tester.pump();
+
+    expect(find.text('Ссылка не разобрана'), findsOneWidget);
+    expect(find.text('Ошибка подключения'), findsNothing);
+  });
 }

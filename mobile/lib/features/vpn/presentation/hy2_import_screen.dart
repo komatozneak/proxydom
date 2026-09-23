@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
+import '../../../core/widgets/app_icon.dart';
+import '../../../core/widgets/teremok_snackbar.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../home/application/vpn_provider.dart';
 import '../data/hy2_import_store.dart';
@@ -21,6 +23,7 @@ class Hy2ImportScreen extends ConsumerStatefulWidget {
 
 class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
   final _controller = TextEditingController();
+  final _fieldFocus = FocusNode();
   List<ParsedShareLink> _preview = const [];
   String? _error;
   bool _busy = false;
@@ -40,6 +43,7 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
   @override
   void dispose() {
     _controller.dispose();
+    _fieldFocus.dispose();
     super.dispose();
   }
 
@@ -74,6 +78,7 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
     try {
       final links = await Hy2ImportStore.instance.saveInput(_controller.text);
       if (!mounted) return;
+      showTeremokSnackBar(context, AppL10n.of(context).freeServerAdded);
       if (connect && links.isNotEmpty) {
         await Hy2ImportStore.instance.select(0);
         if (!mounted) return;
@@ -130,6 +135,7 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
                     const SizedBox(height: 16),
                     TextField(
                       controller: _controller,
+                      focusNode: _fieldFocus,
                       minLines: keyboard ? 2 : 4,
                       maxLines: keyboard ? 3 : 6,
                       onChanged: _previewInput,
@@ -137,6 +143,15 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
                         hintText: l.freeAddHint,
                         filled: true,
                         fillColor: theme.colorScheme.surfaceContainerHighest,
+                        suffixIcon: _controller.text.isEmpty
+                            ? null
+                            : IconButton(
+                                onPressed: () {
+                                  _controller.clear();
+                                  _previewInput('');
+                                },
+                                icon: const AppIcon(AppIcons.x, size: 18),
+                              ),
                         border: OutlineInputBorder(
                           borderRadius:
                               BorderRadius.circular(AppBrand.radiusCard),
@@ -147,14 +162,14 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
                     ),
                     const SizedBox(height: 12),
                     FreeClientActionBar(
-                      onAdd: () => _controller.clear(),
+                      onAdd: () => _fieldFocus.requestFocus(),
                       onPaste: _pasteClipboard,
                       onScan: () => context.push('/scan'),
                     ),
                     if (_error != null) ...[
                       const SizedBox(height: 8),
                       Text(
-                        l.homeError,
+                        l.freeLinkInvalid,
                         style: TextStyle(color: theme.colorScheme.error),
                       ),
                     ],

@@ -1680,6 +1680,12 @@ class AppL10nRu extends AppL10n {
   String get freePreview => 'Найдено';
 
   @override
+  String get freeServerAdded => 'Сервер добавлен';
+
+  @override
+  String get freeLinkInvalid => 'Ссылка не разобрана';
+
+  @override
   String get freeOnboardTitle => 'Бесплатное приложение';
 
   @override

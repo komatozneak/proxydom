@@ -567,6 +567,8 @@
   "freeSaveConnect": "Сохранить и подключить",
   "freeSaveOnly": "Только сохранить",
   "freePreview": "Найдено",
+  "freeServerAdded": "Сервер добавлен",
+  "freeLinkInvalid": "Ссылка не разобрана",
   "freeOnboardTitle": "Бесплатное приложение",
   "freeOnboardBody": "Без рекламы. Внутри ничего не продаётся. Подключение — по ссылке, которую добавляете вы.",
   "freeOnboardAddTitle": "Добавьте ссылку, ключ или QR",

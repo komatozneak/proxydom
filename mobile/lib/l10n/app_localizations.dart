@@ -3133,6 +3133,18 @@ abstract class AppL10n {
   /// **'Found'**
   String get freePreview;
 
+  /// No description provided for @freeServerAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Server added'**
+  String get freeServerAdded;
+
+  /// No description provided for @freeLinkInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not read that link'**
+  String get freeLinkInvalid;
+
   /// No description provided for @freeOnboardTitle.
   ///
   /// In en, this message translates to:

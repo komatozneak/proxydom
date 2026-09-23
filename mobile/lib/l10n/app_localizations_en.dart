@@ -1675,6 +1675,12 @@ class AppL10nEn extends AppL10n {
   String get freePreview => 'Found';
 
   @override
+  String get freeServerAdded => 'Server added';
+
+  @override
+  String get freeLinkInvalid => 'Could not read that link';
+
+  @override
   String get freeOnboardTitle => 'A free app';
 
   @override

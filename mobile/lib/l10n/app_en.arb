@@ -778,6 +778,8 @@
   "freeSaveConnect": "Save and connect",
   "freeSaveOnly": "Save only",
   "freePreview": "Found",
+  "freeServerAdded": "Server added",
+  "freeLinkInvalid": "Could not read that link",
   "freeOnboardTitle": "A free app",
   "freeOnboardBody": "No ads. Nothing is sold inside the app. You connect with a link you add yourself.",
   "freeOnboardAddTitle": "Add a link, key, or QR",
