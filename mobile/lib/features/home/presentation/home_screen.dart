@@ -21,6 +21,7 @@ import '../../settings/application/subscription_status_provider.dart';
 import '../../settings/data/installed_apps_channel.dart';
 import '../../settings/data/split_tunnel_prefs.dart';
 import '../../settings/data/subscription_status.dart';
+import '../../vpn/data/hy2_import_store.dart';
 import '../../vpn/data/node_auto_selector.dart';
 import '../../vpn/data/node_display.dart';
 import '../../vpn/data/vpn_controller.dart';
@@ -87,6 +88,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Future<void> _refreshEntitlement() async {
+    if (freeKeyClient) return;
     await ref.read(sessionProvider.notifier).refresh();
     await ref.read(subscriptionStatusProvider.notifier).refresh();
   }
@@ -160,6 +162,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Future<void> _refreshServerCardBody() async {
+    if (freeKeyClient) {
+      final selected = await Hy2ImportStore.instance.selected();
+      if (!mounted) return;
+      final ru = Localizations.localeOf(context).languageCode == 'ru';
+      setState(() {
+        _selectionIsAuto = false;
+        _autoPoolFlags = const [];
+        _placeStickyKey = selected?.name ?? 'import:empty';
+        if (selected == null) {
+          _serverTitle = ru ? 'Нет ссылки' : 'No link';
+          _serverSubtitle = ru ? 'Вставьте ключ' : 'Paste a key';
+          _serverFlag = kFlagGlobe;
+        } else {
+          _serverTitle = selected.name;
+          _serverSubtitle = selected.profile.server;
+          _serverFlag = kFlagGlobe;
+        }
+      });
+      return;
+    }
     final l = AppL10n.of(context);
     final locale = Localizations.localeOf(context).languageCode;
     try {
@@ -578,8 +600,9 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
     };
     final showVpnSettingsCta =
         status is VpnError && status.code == kVpnConflictErrorCode;
-    final showDevicesCta =
-        status is VpnError && status.code == 'device_limit_reached';
+    final showDevicesCta = !hideInAppPlategaCheckout &&
+        status is VpnError &&
+        status.code == 'device_limit_reached';
     final showQuotaCta = status is VpnError && status.code == 'quota_exceeded';
     final liveQuota = ref.watch(subscriptionStatusProvider).asData?.value;
     if (liveQuota != null) {
@@ -693,7 +716,9 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
                 : () => context.push('/locked'),
             child: Text(
               hideInAppPlategaCheckout
-                  ? l.accountHubTitle
+                  ? (Localizations.localeOf(context).languageCode == 'ru'
+                      ? 'Вставить ссылку'
+                      : 'Paste link')
                   : l.homeQuotaUpgradeCta,
             ),
           ),

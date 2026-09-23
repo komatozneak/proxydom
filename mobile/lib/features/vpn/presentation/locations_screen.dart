@@ -18,6 +18,8 @@ import '../../home/application/vpn_provider.dart';
 import '../../home/application/vpn_status.dart';
 import '../../settings/application/subscription_status_provider.dart';
 import '../../settings/data/subscription_status.dart';
+import '../data/hy2_import_store.dart';
+import '../data/hy2_link_parser.dart';
 import '../data/node_auto_selector.dart';
 import '../data/node_display.dart';
 import '../data/vpn_controller.dart';
@@ -42,6 +44,7 @@ class LocationsScreen extends ConsumerStatefulWidget {
 
 class _LocationsScreenState extends ConsumerState<LocationsScreen> {
   List<VpnNode>? _nodes;
+  List<ParsedHy2Link> _imported = const [];
   String? _selectedId;
   Object? _error;
   bool _loading = true;
@@ -61,15 +64,17 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     final canPop = GoRouter.maybeOf(context)?.canPop() ?? false;
     final busy = ref.watch(busyOverlayProvider).isBusy;
     ref.watch(vpnProvider);
-    ref.listen<AsyncValue<SubscriptionStatus>>(subscriptionStatusProvider, (
-      previous,
-      next,
-    ) {
-      bool prem(SubscriptionStatus? s) => s != null && s.unlocksPremium;
-      if (prem(previous?.valueOrNull) != prem(next.valueOrNull)) {
-        unawaited(_load());
-      }
-    });
+    if (!freeKeyClient) {
+      ref.listen<AsyncValue<SubscriptionStatus>>(subscriptionStatusProvider, (
+        previous,
+        next,
+      ) {
+        bool prem(SubscriptionStatus? s) => s != null && s.unlocksPremium;
+        if (prem(previous?.valueOrNull) != prem(next.valueOrNull)) {
+          unawaited(_load());
+        }
+      });
+    }
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
@@ -103,6 +108,20 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
   }
 
   Future<void> _load() async {
+    if (freeKeyClient) {
+      final links = await Hy2ImportStore.instance.load();
+      final index = await Hy2ImportStore.instance.selectedIndex();
+      if (!mounted) return;
+      setState(() {
+        _imported = links;
+        _nodes = const [];
+        _selectedId = links.isEmpty ? null : '$index';
+        _loading = false;
+        _error = null;
+        _fromCache = false;
+      });
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
@@ -274,9 +293,49 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     return l.networkErrorFriendly;
   }
 
+  Widget _buildImported(ThemeData theme) {
+    final ru = Localizations.localeOf(context).languageCode == 'ru';
+    if (_imported.isEmpty) {
+      return Center(
+        child: FilledButton(
+          onPressed: () => context.push('/import'),
+          child: Text(ru ? 'Вставить ссылку' : 'Paste link'),
+        ),
+      );
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: _imported.length,
+      itemBuilder: (context, index) {
+        final link = _imported[index];
+        final selected = _selectedId == '$index';
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: ListTile(
+            selected: selected,
+            title: Text(link.name),
+            subtitle: Text(link.profile.server),
+            onTap: () async {
+              await Hy2ImportStore.instance.select(index);
+              if (!mounted) return;
+              setState(() => _selectedId = '$index');
+              final status = ref.read(vpnProvider);
+              if (status is VpnConnected || status is VpnConnecting) {
+                await ref.read(vpnProvider.notifier).connect(forceRestart: true);
+              }
+            },
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildBody(AppL10n l, ThemeData theme) {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
+    }
+    if (freeKeyClient) {
+      return _buildImported(theme);
     }
     if (_error != null) {
       return Center(

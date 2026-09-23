@@ -1470,6 +1470,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
       state = const VpnConnecting(progress: 0.5);
 
       if (hideInAppPlategaCheckout) {
+        // ADR 026: pasted profile only. Do not call GET /vpn/config.
         final imported = await Hy2ImportStore.instance.selected();
         if (await _abortStaleConnect(gen)) return;
         if (imported == null) {

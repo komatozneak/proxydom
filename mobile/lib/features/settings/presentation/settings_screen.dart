@@ -384,7 +384,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            _SectionLabel(l.settingsSectionAccount),
+            _SectionLabel(
+              hideInAppPlategaCheckout
+                  ? l.settingsSupport
+                  : l.settingsSectionAccount,
+            ),
             _SettingsCard(
               children: [
                 if (!hideInAppPlategaCheckout)

@@ -7,7 +7,7 @@ import '../../home/application/vpn_provider.dart';
 import '../data/hy2_import_store.dart';
 import '../data/hy2_link_parser.dart';
 
-/// iOS-only: paste a Hysteria2 URI or subscription URL, then connect.
+/// Paste a key or subscription URL, then connect. Android and iOS (ADR 026).
 class Hy2ImportScreen extends ConsumerStatefulWidget {
   const Hy2ImportScreen({super.key});
 
