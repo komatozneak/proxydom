@@ -929,7 +929,7 @@ class _FreeClientHome extends StatelessWidget {
               SizedBox(
                 height: 96,
                 width: double.infinity,
-                child: Center(child: _houseSlot(l)),
+                child: Center(child: _houseSlot()),
               ),
               const SizedBox(height: 8),
               SizedBox(
@@ -969,6 +969,15 @@ class _FreeClientHome extends StatelessWidget {
             child: Text(l.settingsKillSwitchOpenVpn),
           ),
         ],
+        if (status is VpnConnected && androidPerAppSplit) ...[
+          const SizedBox(height: 8),
+          _NoVpnHomeRow(
+            label: l.homeNoVpnRow,
+            enabled: noVpnEnabled,
+            total: noVpnTotal,
+            onTap: onOpenNoVpn,
+          ),
+        ],
         const SizedBox(height: 12),
         FreeClientActionBar(
           onPaste: () => context.push('/import?clipboard=1'),
@@ -978,19 +987,11 @@ class _FreeClientHome extends StatelessWidget {
     );
   }
 
-  Widget _houseSlot(AppL10n l) {
-    if (status is VpnConnected && androidPerAppSplit) {
-      return _NoVpnHomeRow(
-        label: l.homeNoVpnRow,
-        enabled: noVpnEnabled,
-        total: noVpnTotal,
-        onTap: onOpenNoVpn,
-      );
-    }
+  Widget _houseSlot() {
     final noProfile = serverTitle == '…' ||
         serverTitle == 'Нет ссылки' ||
         serverTitle == 'No link';
-    if (noProfile && status is! VpnConnecting) {
+    if (noProfile && status is! VpnConnecting && status is! VpnConnected) {
       return const FreeClientEmptyState(compact: true);
     }
     return const SizedBox.shrink();
