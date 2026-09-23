@@ -213,6 +213,7 @@ class _CenterNavMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return InkWell(
       onTap: onTap,
       customBorder: const CircleBorder(),
@@ -221,7 +222,18 @@ class _CenterNavMark extends StatelessWidget {
         selected: selected,
         label: semanticLabel,
         child: Center(
-          child: TeremokNavIcon(selected: selected, size: 52),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: selected
+                    ? AppBrand.paperMargin
+                    : theme.colorScheme.outline,
+                width: selected ? 1.6 : 1,
+              ),
+            ),
+            child: TeremokNavIcon(selected: selected, size: 52),
+          ),
         ),
       ),
     );
