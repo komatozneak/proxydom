@@ -96,7 +96,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(l.freeServers),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 16),
                   _ServerCountChip(count: _imported.length),
                 ],
               )
@@ -712,7 +712,7 @@ class _ServerCountChip extends StatelessWidget {
     final theme = Theme.of(context);
     final dark = theme.brightness == Brightness.dark;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
         color: dark ? AppBrand.surfaceVariantDark : AppBrand.surfaceElevatedLight,
         borderRadius: BorderRadius.circular(AppBrand.radiusPill),
@@ -720,7 +720,7 @@ class _ServerCountChip extends StatelessWidget {
       ),
       child: Text(
         '$count',
-        style: theme.textTheme.labelLarge?.copyWith(
+        style: theme.textTheme.titleMedium?.copyWith(
           fontWeight: FontWeight.w800,
           color: dark ? AppBrand.inkDark : AppBrand.inkLight,
         ),
