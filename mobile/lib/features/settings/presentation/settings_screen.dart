@@ -291,7 +291,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final theme = Theme.of(context);
     final showNotif = VpnNotificationPrefs.isSupported;
     final showAutoReconnect = !hideInAppPlategaCheckout;
-    final showNoVpn = !hideInAppPlategaCheckout;
+    final showNoVpn = androidPerAppSplit;
     final notifOn = _notifEnabled ?? true;
     final autoOn = _autoReconnect ?? false;
     final showConnectionSection = showAutoReconnect || showNotif || showNoVpn;

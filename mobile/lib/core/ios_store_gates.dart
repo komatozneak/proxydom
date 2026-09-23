@@ -16,6 +16,13 @@ bool get freeKeyClient {
 /// [debugDefaultTargetPlatformOverride].
 bool get hideInAppPlategaCheckout => freeKeyClient;
 
+/// Android VpnService can exclude apps. Independent of the cashier hide:
+/// the free client still needs «what works without VPN».
+bool get androidPerAppSplit {
+  if (kIsWeb) return false;
+  return defaultTargetPlatform == TargetPlatform.android;
+}
+
 /// Per-app split (VpnService.Builder) is Android-only; iOS consumer VPN has no
 /// equivalent without MDM (ADR 025). Sites use shared prefs → iOS
 /// `excludedRoutes` (destination IP), not hyDialer-protect.

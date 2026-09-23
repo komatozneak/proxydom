@@ -13,6 +13,7 @@ void main() {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
     expect(freeKeyClient, isTrue);
     expect(hideInAppPlategaCheckout, isTrue);
+    expect(androidPerAppSplit, isFalse);
     expect(iosAppsSplitUnsupported, isTrue);
     expect(referralLandingPath, '/home');
     expect(iosFreeClientRouteBlocked('/subscription'), isTrue);
@@ -24,6 +25,7 @@ void main() {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     expect(freeKeyClient, isTrue);
     expect(hideInAppPlategaCheckout, isTrue);
+    expect(androidPerAppSplit, isTrue);
     expect(iosAppsSplitUnsupported, isFalse);
     expect(referralLandingPath, '/home');
     expect(iosFreeClientRouteBlocked('/subscription'), isTrue);
