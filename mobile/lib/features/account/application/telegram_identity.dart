@@ -8,6 +8,7 @@ bool telegramIdentityAllowed(VpnStatus status) => status is VpnConnected;
 enum TelegramPollStatus {
   pending,
   needsDeviceSlot,
+  accountFull,
   linked,
   confirmed,
   failed,
@@ -33,6 +34,7 @@ class TelegramPollOutcome {
     final status = switch (data['status']) {
       'pending' => TelegramPollStatus.pending,
       'needs_device_slot' => TelegramPollStatus.needsDeviceSlot,
+      'account_full' => TelegramPollStatus.accountFull,
       'linked' => TelegramPollStatus.linked,
       'confirmed' => TelegramPollStatus.confirmed,
       'failed' => TelegramPollStatus.failed,

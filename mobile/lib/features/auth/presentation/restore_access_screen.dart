@@ -141,6 +141,14 @@ class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
       );
       final outcome = TelegramPollOutcome.fromJson(result);
       if (!mounted) return;
+      if (outcome.status == TelegramPollStatus.accountFull) {
+        setState(() {
+          _busy = false;
+          _pairStarted = false;
+          _error = AppL10n.of(context).restoreAccountFull;
+        });
+        return;
+      }
       if (outcome.status == TelegramPollStatus.needsDeviceSlot) {
         final devices = RestoreDeviceChoice.listFrom(result['devices']);
         final chosen = await RestoreDeviceSlotDialog.show(
@@ -253,6 +261,15 @@ class _RestoreAccessScreenState extends ConsumerState<RestoreAccessScreen> {
               : await AuthApi().pollTelegramRecover(token);
           _pollFailures = 0;
           final outcome = TelegramPollOutcome.fromJson(poll);
+          if (outcome.status == TelegramPollStatus.accountFull) {
+            timer.cancel();
+            if (!mounted) return;
+            setState(() {
+              _tgBusy = false;
+              _error = AppL10n.of(context).restoreAccountFull;
+            });
+            return;
+          }
           if (outcome.status == TelegramPollStatus.needsDeviceSlot) {
             timer.cancel();
             if (!mounted) return;

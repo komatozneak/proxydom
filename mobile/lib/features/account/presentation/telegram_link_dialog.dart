@@ -207,6 +207,14 @@ class _TelegramLinkDialogState extends ConsumerState<TelegramLinkDialog>
         final poll = await AuthApi().pollTelegramLink(_token!);
         _pollFailures = 0;
         final outcome = TelegramPollOutcome.fromJson(poll);
+        if (outcome.status == TelegramPollStatus.accountFull) {
+          _pollTimer?.cancel();
+          if (!mounted) return;
+          setState(() {
+            _error = AppL10n.of(context).restoreAccountFull;
+          });
+          return;
+        }
         if (outcome.status == TelegramPollStatus.needsDeviceSlot) {
           _pollTimer?.cancel();
           final devices = RestoreDeviceChoice.listFrom(poll['devices']);

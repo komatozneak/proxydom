@@ -1304,6 +1304,10 @@ class AppL10nEn extends AppL10n {
       'Choose which device to disconnect so this device can join.';
 
   @override
+  String get restoreAccountFull =>
+      'Device limit reached. Remove one in the device list, then sign in again. Devices already signed in stay online.';
+
+  @override
   String get restoreDeviceLimitOwner => 'Owner';
 
   @override

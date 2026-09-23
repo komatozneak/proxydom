@@ -1309,6 +1309,10 @@ class AppL10nRu extends AppL10n {
       'Выберите, какое устройство отключить, чтобы войти с этого устройства.';
 
   @override
+  String get restoreAccountFull =>
+      'Лимит устройств. Удалите лишнее в списке устройств, затем войдите снова. Уже подключённые остались в сети.';
+
+  @override
   String get restoreDeviceLimitOwner => 'Владелец';
 
   @override

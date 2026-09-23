@@ -2461,6 +2461,12 @@ abstract class AppL10n {
   /// **'Choose which device to disconnect so this device can join.'**
   String get restoreDeviceLimitBody;
 
+  /// No description provided for @restoreAccountFull.
+  ///
+  /// In en, this message translates to:
+  /// **'Device limit reached. Remove one in the device list, then sign in again. Devices already signed in stay online.'**
+  String get restoreAccountFull;
+
   /// No description provided for @restoreDeviceLimitOwner.
   ///
   /// In en, this message translates to:
