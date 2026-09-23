@@ -949,8 +949,6 @@ class _FreeClientHome extends StatelessWidget {
         ],
         const SizedBox(height: 12),
         FreeClientActionBar(
-          primaryAdd: empty,
-          onAdd: () => context.push('/import'),
           onPaste: () => context.push('/import?clipboard=1'),
           onScan: () => context.push('/scan'),
         ),

@@ -4,83 +4,49 @@ import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../l10n/app_localizations.dart';
 
-/// Same add / paste / scan row on Home, Servers, and Add.
+/// Paste and QR, the same size on Home, Servers, and Add.
 class FreeClientActionBar extends StatelessWidget {
   const FreeClientActionBar({
     super.key,
-    this.onAdd,
     required this.onPaste,
     required this.onScan,
-    this.primaryAdd = false,
-    this.showAdd = true,
   });
 
-  final VoidCallback? onAdd;
   final VoidCallback onPaste;
   final VoidCallback onScan;
-  final bool primaryAdd;
-
-  /// Home keeps Add. The add screen and Servers do not.
-  final bool showAdd;
 
   @override
   Widget build(BuildContext context) {
     final l = AppL10n.of(context);
-    final dark = Theme.of(context).brightness == Brightness.dark;
     final shape = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(AppBrand.radiusPill),
     );
     const pad = EdgeInsets.symmetric(horizontal: 12, vertical: 14);
-    final addBg = dark ? AppBrand.accentOnDark : AppBrand.primary;
-    final addFg = dark ? AppBrand.primary : AppBrand.accentOnDark;
-    final paste = Expanded(
-      child: _action(
-        onPressed: onPaste,
-        icon: AppIcons.clipboard,
-        label: l.freePaste,
-        background: AppBrand.secondary,
-        foreground: AppBrand.surfaceElevatedLight,
-        shape: shape,
-        pad: pad,
-      ),
-    );
-    final scan = Expanded(
-      child: _action(
-        onPressed: onScan,
-        icon: AppIcons.qrCode,
-        label: l.freeQr,
-        background: AppBrand.paperMargin,
-        foreground: AppBrand.inkLight,
-        shape: shape,
-        pad: pad,
-      ),
-    );
-    if (!showAdd) {
-      return Row(
-        children: [
-          paste,
-          const SizedBox(width: 8),
-          scan,
-        ],
-      );
-    }
     return Row(
       children: [
         Expanded(
           child: _action(
-            onPressed: onAdd!,
-            icon: AppIcons.plus,
-            label: primaryAdd ? l.freeAddServer : l.freeAdd,
-            background: addBg,
-            foreground: addFg,
+            onPressed: onPaste,
+            icon: AppIcons.clipboard,
+            label: l.freePaste,
+            background: AppBrand.secondary,
+            foreground: AppBrand.surfaceElevatedLight,
             shape: shape,
             pad: pad,
           ),
         ),
         const SizedBox(width: 8),
-        paste,
-        const SizedBox(width: 8),
-        scan,
+        Expanded(
+          child: _action(
+            onPressed: onScan,
+            icon: AppIcons.qrCode,
+            label: l.freeQr,
+            background: AppBrand.paperMargin,
+            foreground: AppBrand.inkLight,
+            shape: shape,
+            pad: pad,
+          ),
+        ),
       ],
     );
   }

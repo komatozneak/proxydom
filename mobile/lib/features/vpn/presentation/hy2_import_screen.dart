@@ -176,7 +176,6 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
                     ),
                     const SizedBox(height: 12),
                     FreeClientActionBar(
-                      showAdd: false,
                       onPaste: _pasteClipboard,
                       onScan: () => context.push('/scan'),
                     ),
