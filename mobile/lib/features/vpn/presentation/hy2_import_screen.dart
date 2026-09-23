@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/ios_store_gates.dart';
+import '../../../core/theme.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../home/application/vpn_provider.dart';
 import '../data/hy2_import_store.dart';
 import '../data/share_link_parser.dart';
+import 'free_client_chrome.dart';
 
-/// Paste a key or subscription URL, then connect. Android and iOS (ADR 026).
+/// Add a link or key, preview the profiles, then save or connect.
 class Hy2ImportScreen extends ConsumerStatefulWidget {
   const Hy2ImportScreen({super.key});
 
@@ -17,15 +21,20 @@ class Hy2ImportScreen extends ConsumerStatefulWidget {
 
 class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
   final _controller = TextEditingController();
-  List<ParsedShareLink> _links = const [];
-  int _selected = 0;
+  List<ParsedShareLink> _preview = const [];
   String? _error;
   bool _busy = false;
+  var _clipboardApplied = false;
 
   @override
-  void initState() {
-    super.initState();
-    _reload();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_clipboardApplied) return;
+    final paste =
+        GoRouterState.of(context).uri.queryParameters['clipboard'] == '1';
+    if (!paste) return;
+    _clipboardApplied = true;
+    _pasteClipboard();
   }
 
   @override
@@ -34,24 +43,30 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
     super.dispose();
   }
 
-  Future<void> _reload() async {
-    final links = await Hy2ImportStore.instance.load();
-    final selected = await Hy2ImportStore.instance.selectedIndex();
-    if (!mounted) return;
-    setState(() {
-      _links = links;
-      _selected = links.isEmpty ? 0 : selected.clamp(0, links.length - 1);
-    });
-  }
-
   Future<void> _pasteClipboard() async {
     final data = await Clipboard.getData(Clipboard.kTextPlain);
     final text = data?.text?.trim() ?? '';
-    if (text.isEmpty) return;
+    if (!mounted || text.isEmpty) return;
     _controller.text = text;
+    _previewInput(text);
   }
 
-  Future<void> _save() async {
+  void _previewInput(String raw) {
+    try {
+      final links = parseShareSubscription(raw.trim());
+      setState(() {
+        _preview = links;
+        _error = links.isEmpty ? 'empty' : null;
+      });
+    } on FormatException {
+      setState(() {
+        _preview = const [];
+        _error = 'bad';
+      });
+    }
+  }
+
+  Future<void> _save({required bool connect}) async {
     setState(() {
       _busy = true;
       _error = null;
@@ -59,92 +74,139 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
     try {
       final links = await Hy2ImportStore.instance.saveInput(_controller.text);
       if (!mounted) return;
-      setState(() {
-        _links = links;
-        _selected = 0;
-        _busy = false;
-      });
-    } on FormatException catch (err) {
+      if (connect && links.isNotEmpty) {
+        await Hy2ImportStore.instance.select(0);
+        if (!mounted) return;
+        await ref.read(vpnProvider.notifier).connect(forceRestart: true);
+        if (!mounted) return;
+        context.go('/home');
+        return;
+      }
+      if (!mounted) return;
+      context.go('/locations');
+    } on FormatException {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _error = err.message;
+        _error = 'bad';
       });
-    } catch (err) {
+    } catch (_) {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _error = err.toString();
+        _error = 'bad';
       });
     }
-  }
-
-  Future<void> _connect() async {
-    await Hy2ImportStore.instance.select(_selected);
-    if (!mounted) return;
-    await ref.read(vpnProvider.notifier).connect(forceRestart: true);
   }
 
   @override
   Widget build(BuildContext context) {
-    final ru = Localizations.localeOf(context).languageCode == 'ru';
+    final l = AppL10n.of(context);
     if (!hideInAppPlategaCheckout) {
       return const Scaffold(body: SizedBox.shrink());
     }
+    final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(ru ? 'Ссылка' : 'Link')),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          Text(
-            ru
-                ? 'Вставьте hysteria2://, vless://, vmess://, trojan://, ss:// или ссылку подписки.'
-                : 'Paste hysteria2, vless, vmess, trojan, ss, or a subscription URL.',
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _controller,
-            minLines: 3,
-            maxLines: 6,
-            decoration: InputDecoration(
-              hintText: ru ? 'Ссылка' : 'Link',
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
+      appBar: AppBar(title: Text(l.freeAddTitle)),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              TextButton(
-                onPressed: _busy ? null : _pasteClipboard,
-                child: Text(ru ? 'Из буфера' : 'Clipboard'),
+              Text(
+                l.freeAddHint,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
-              const Spacer(),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _controller,
+                minLines: 4,
+                maxLines: 6,
+                onChanged: _previewInput,
+                decoration: InputDecoration(
+                  hintText: l.freeAddHint,
+                  filled: true,
+                  fillColor: theme.colorScheme.surfaceContainerHighest,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppBrand.radiusCard),
+                    borderSide: BorderSide(color: theme.colorScheme.outline),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              FreeClientActionBar(
+                onAdd: () => _controller.clear(),
+                onPaste: _pasteClipboard,
+                onScan: () => context.push('/scan'),
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  l.homeError,
+                  style: TextStyle(color: theme.colorScheme.error),
+                ),
+              ],
+              const SizedBox(height: 16),
+              Text(
+                l.freePreview,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: _preview.isEmpty
+                    ? const Center(child: FreeClientEmptyState(compact: true))
+                    : ListView.separated(
+                        itemCount: _preview.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (context, i) {
+                          final link = _preview[i];
+                          return ImportedProfileCard(
+                            name: link.name,
+                            scheme: link.scheme,
+                            endpoint: link.endpoint,
+                            selected: i == 0,
+                          );
+                        },
+                      ),
+              ),
+              const SizedBox(height: 12),
               FilledButton(
-                onPressed: _busy ? null : _save,
-                child: Text(ru ? 'Сохранить' : 'Save'),
+                onPressed: _busy || _preview.isEmpty
+                    ? null
+                    : () => _save(connect: true),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: theme.colorScheme.onPrimary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppBrand.radiusPill),
+                  ),
+                ),
+                child: Text(l.freeSaveConnect),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton(
+                onPressed: _busy || _preview.isEmpty
+                    ? null
+                    : () => _save(connect: false),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  foregroundColor: theme.colorScheme.onSurface,
+                  side: BorderSide(color: theme.colorScheme.outline, width: 1.4),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppBrand.radiusPill),
+                  ),
+                ),
+                child: Text(l.freeSaveOnly),
               ),
             ],
           ),
-          if (_error != null) ...[
-            const SizedBox(height: 8),
-            Text(_error!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error)),
-          ],
-          const SizedBox(height: 16),
-          for (var i = 0; i < _links.length; i++)
-            ListTile(
-              selected: i == _selected,
-              title: Text(_links[i].name),
-              subtitle: Text('${_links[i].scheme} ${_links[i].endpoint}'),
-              onTap: () => setState(() => _selected = i),
-            ),
-          if (_links.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            FilledButton(
-              onPressed: _busy ? null : _connect,
-              child: Text(ru ? 'Подключить' : 'Connect'),
-            ),
-          ],
-        ],
+        ),
       ),
     );
   }
