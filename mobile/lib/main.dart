@@ -97,7 +97,7 @@ void main() async {
   // Do not await auth here: Play 0.1.7 sat on the launcher icon for the full
   // register timeout. GoRouter keeps /bootstrap while [authProvider] loads.
   await AppRouter.warmWelcomeFlag();
-  if (!hideInAppPlategaCheckout) {
+  if (!freeKeyClient) {
     await attachSeatJoinLinks(container);
     await attachReferralLinks(container);
     await attachPairLinks(container);

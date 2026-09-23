@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/config.dart';
 import '../../../core/diagnostics/app_log_buffer.dart';
+import '../../../core/ios_store_gates.dart';
 import '../../../core/router.dart';
 import '../../auth/application/auth_provider.dart';
 import '../../auth/application/auth_state.dart';
@@ -32,6 +33,10 @@ class ColdStartEntitlement {
   static Future<void> runOnce(WidgetRef ref, BuildContext context) async {
     if (_started) return;
     _started = true;
+    if (freeKeyClient) {
+      AppLogBuffer.instance.info('cold_start.entitlement skip free client');
+      return;
+    }
     AppLogBuffer.instance.info('cold_start.entitlement begin');
 
     final auth = ref.read(authProvider).valueOrNull;

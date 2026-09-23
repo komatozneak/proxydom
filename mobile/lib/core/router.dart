@@ -125,6 +125,19 @@ class AppRouter {
       final goingToImport = loc == '/import';
 
       // Still loading / no ProviderScope — keep the bootstrap spinner on screen.
+      // Free clients open Home without an account (ADR 026).
+      if (freeKeyClient) {
+        if (goingToBootstrap ||
+            goingToBootstrapFail ||
+            goingToWelcome ||
+            goingToGate ||
+            iosFreeClientRouteBlocked(loc)) {
+          return '/home';
+        }
+        if (inShell || goingToImport || goingToOnboarding) return null;
+        return '/home';
+      }
+
       if (auth == null) {
         if (goingToBootstrap) return null;
         return '/bootstrap';

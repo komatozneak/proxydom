@@ -56,7 +56,7 @@ class _SeatJoinHost extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.listen<String?>(seatJoinCodeProvider, (prev, next) {
-      if (hideInAppPlategaCheckout) return;
+      if (freeKeyClient) return;
       final code = next?.trim();
       if (code == null || code.isEmpty) return;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -76,7 +76,7 @@ class _ReferralLinkHost extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.listen<String?>(pendingReferralCodeProvider, (prev, next) {
-      if (hideInAppPlategaCheckout) return;
+      if (freeKeyClient) return;
       final code = next?.trim();
       if (code == null || code.isEmpty) return;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -96,7 +96,7 @@ class _PairLinkHost extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.listen<String?>(pendingPairTokenProvider, (prev, next) {
-      if (hideInAppPlategaCheckout) return;
+      if (freeKeyClient) return;
       final token = next?.trim();
       if (token == null || token.isEmpty) return;
       WidgetsBinding.instance.addPostFrameCallback((_) {

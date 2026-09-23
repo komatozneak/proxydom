@@ -9,6 +9,7 @@ void main() {
 
   test('hideInAppPlategaCheckout true on iOS', () {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    expect(freeKeyClient, isTrue);
     expect(hideInAppPlategaCheckout, isTrue);
     expect(iosAppsSplitUnsupported, isTrue);
     expect(referralLandingPath, '/home');
@@ -17,11 +18,15 @@ void main() {
     expect(iosFreeClientRouteBlocked('/import'), isFalse);
   });
 
-  test('hideInAppPlategaCheckout false on Android', () {
+  test('free key client blocks cashier routes on Android', () {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
-    expect(hideInAppPlategaCheckout, isFalse);
+    expect(freeKeyClient, isTrue);
+    expect(hideInAppPlategaCheckout, isTrue);
     expect(iosAppsSplitUnsupported, isFalse);
-    expect(referralLandingPath, '/settings/account/promo');
-    expect(iosFreeClientRouteBlocked('/subscription'), isFalse);
+    expect(referralLandingPath, '/home');
+    expect(iosFreeClientRouteBlocked('/subscription'), isTrue);
+    expect(iosFreeClientRouteBlocked('/premium'), isTrue);
+    expect(iosFreeClientRouteBlocked('/settings/account'), isTrue);
+    expect(iosFreeClientRouteBlocked('/import'), isFalse);
   });
 }

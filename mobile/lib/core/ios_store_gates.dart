@@ -1,14 +1,20 @@
 import 'package:flutter/foundation.dart';
 
-/// App Store iOS must not surface Platega hosted checkout (guideline 3.1.1).
-/// Android keeps ADR 017 Platega. See [docs/ops/ios-iap-parked.md].
+/// Store clients are local key importers (ADR 026). Web stays on the account
+/// shell. Uses [defaultTargetPlatform] so widget tests can override with
+/// [debugDefaultTargetPlatformOverride].
+bool get freeKeyClient {
+  if (kIsWeb) return false;
+  return defaultTargetPlatform == TargetPlatform.android ||
+      defaultTargetPlatform == TargetPlatform.iOS;
+}
+
+/// App Store and Play binaries must not surface Platega hosted checkout.
+/// See [docs/ops/ios-iap-parked.md] and ADR 026.
 ///
 /// Uses [defaultTargetPlatform] so widget tests can override with
 /// [debugDefaultTargetPlatformOverride].
-bool get hideInAppPlategaCheckout {
-  if (kIsWeb) return false;
-  return defaultTargetPlatform == TargetPlatform.iOS;
-}
+bool get hideInAppPlategaCheckout => freeKeyClient;
 
 /// Per-app split (VpnService.Builder) is Android-only; iOS consumer VPN has no
 /// equivalent without MDM (ADR 025). Sites use shared prefs → iOS
@@ -18,16 +24,15 @@ bool get iosAppsSplitUnsupported {
   return defaultTargetPlatform == TargetPlatform.iOS;
 }
 
-/// `teremokconnect://ref` landing. iOS paste client ignores the link.
+/// `teremokconnect://ref` landing. Free clients ignore the link.
 String get referralLandingPath {
-  if (hideInAppPlategaCheckout) return '/home';
+  if (freeKeyClient) return '/home';
   return '/settings/account/promo';
 }
 
-/// Routes that would show a paid catalog or an account join. iOS paste client
-/// never opens them.
+/// Routes that would show a paid catalog or an account join.
 bool iosFreeClientRouteBlocked(String location) {
-  if (!hideInAppPlategaCheckout) return false;
+  if (!freeKeyClient) return false;
   if (location == '/subscription' ||
       location == '/premium' ||
       location == '/locked' ||

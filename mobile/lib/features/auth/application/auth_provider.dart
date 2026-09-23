@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api_discovery.dart';
 import '../../../core/api_secret_storage.dart';
 import '../../../core/config.dart';
+import '../../../core/ios_store_gates.dart';
 import '../../../core/device_info_helper.dart';
 import '../../../core/device_platform.dart';
 import '../../../core/install_id_storage.dart';
@@ -49,7 +50,7 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
       debugPrint('auth.restore_failed: $e\n$st');
     }
 
-    if (AppConfig.authAnonymous) {
+    if (AppConfig.authAnonymous && !freeKeyClient) {
       return _registerDevice();
     }
 
@@ -119,7 +120,7 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
   /// instead of us orphaning it by minting a new identity.
   Future<void> unauthenticated({bool autoRegister = true}) async {
     await TokenStorage.instance.clear();
-    if (AppConfig.authAnonymous && autoRegister) {
+    if (AppConfig.authAnonymous && autoRegister && !freeKeyClient) {
       state = AsyncData(await _registerDevice());
       return;
     }
