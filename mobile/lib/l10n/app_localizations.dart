@@ -3036,6 +3036,186 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'The subscription is not active. After it is renewed you can restore this seat.'**
   String get restoreTelegramSubscriptionInactive;
+
+  /// No description provided for @freeAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get freeAdd;
+
+  /// No description provided for @freePaste.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste'**
+  String get freePaste;
+
+  /// No description provided for @freeQr.
+  ///
+  /// In en, this message translates to:
+  /// **'QR'**
+  String get freeQr;
+
+  /// No description provided for @freeAddServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Add server'**
+  String get freeAddServer;
+
+  /// No description provided for @freeEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No servers added'**
+  String get freeEmptyTitle;
+
+  /// No description provided for @freeEmptyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a link, a key, or a QR code.'**
+  String get freeEmptyBody;
+
+  /// No description provided for @freeStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get freeStatus;
+
+  /// No description provided for @freeProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile'**
+  String get freeProfile;
+
+  /// No description provided for @freeProtocol.
+  ///
+  /// In en, this message translates to:
+  /// **'Protocol'**
+  String get freeProtocol;
+
+  /// No description provided for @freeUptime.
+  ///
+  /// In en, this message translates to:
+  /// **'Uptime'**
+  String get freeUptime;
+
+  /// No description provided for @freeNoProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get freeNoProfile;
+
+  /// No description provided for @freeAddTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get freeAddTitle;
+
+  /// No description provided for @freeAddHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste a link or a key. The app does not sell access.'**
+  String get freeAddHint;
+
+  /// No description provided for @freeSaveConnect.
+  ///
+  /// In en, this message translates to:
+  /// **'Save and connect'**
+  String get freeSaveConnect;
+
+  /// No description provided for @freeSaveOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Save only'**
+  String get freeSaveOnly;
+
+  /// No description provided for @freePreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Found'**
+  String get freePreview;
+
+  /// No description provided for @freeOnboardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'A free app'**
+  String get freeOnboardTitle;
+
+  /// No description provided for @freeOnboardBody.
+  ///
+  /// In en, this message translates to:
+  /// **'No ads. Nothing is sold inside the app. You connect with a link you add yourself.'**
+  String get freeOnboardBody;
+
+  /// No description provided for @freeOnboardAddTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a link, key, or QR'**
+  String get freeOnboardAddTitle;
+
+  /// No description provided for @freeOnboardAddBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Servers from that link appear in the list. You choose which one to use.'**
+  String get freeOnboardAddBody;
+
+  /// No description provided for @freeOnboardConnectTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect with one tap'**
+  String get freeOnboardConnectTitle;
+
+  /// No description provided for @freeOnboardConnectBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap the house to connect or disconnect. The status stays on this screen.'**
+  String get freeOnboardConnectBody;
+
+  /// No description provided for @freeLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Later'**
+  String get freeLater;
+
+  /// No description provided for @freeBatteryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep the tunnel running'**
+  String get freeBatteryTitle;
+
+  /// No description provided for @freeBatteryBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Android may stop the tunnel to save battery. You can allow background activity.'**
+  String get freeBatteryBody;
+
+  /// No description provided for @freeBatteryAllow.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow'**
+  String get freeBatteryAllow;
+
+  /// No description provided for @freeBatteryDismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Don\'t ask again'**
+  String get freeBatteryDismiss;
+
+  /// No description provided for @freeServers.
+  ///
+  /// In en, this message translates to:
+  /// **'Servers'**
+  String get freeServers;
+
+  /// No description provided for @freeSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search servers'**
+  String get freeSearch;
+
+  /// No description provided for @freeDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get freeDelete;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

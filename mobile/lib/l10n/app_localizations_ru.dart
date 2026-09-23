@@ -1629,4 +1629,99 @@ class AppL10nRu extends AppL10n {
   @override
   String get restoreTelegramSubscriptionInactive =>
       'Подписка сейчас не активна. После продления место можно восстановить снова.';
+
+  @override
+  String get freeAdd => 'Добавить';
+
+  @override
+  String get freePaste => 'Вставить';
+
+  @override
+  String get freeQr => 'QR';
+
+  @override
+  String get freeAddServer => 'Добавить сервер';
+
+  @override
+  String get freeEmptyTitle => 'Нет добавленных серверов';
+
+  @override
+  String get freeEmptyBody => 'Добавьте ссылку, ключ или QR-код.';
+
+  @override
+  String get freeStatus => 'Статус';
+
+  @override
+  String get freeProfile => 'Профиль';
+
+  @override
+  String get freeProtocol => 'Протокол';
+
+  @override
+  String get freeUptime => 'Время';
+
+  @override
+  String get freeNoProfile => 'Нет';
+
+  @override
+  String get freeAddTitle => 'Добавить';
+
+  @override
+  String get freeAddHint =>
+      'Вставьте ссылку или ключ. В приложении ничего не продаётся.';
+
+  @override
+  String get freeSaveConnect => 'Сохранить и подключить';
+
+  @override
+  String get freeSaveOnly => 'Только сохранить';
+
+  @override
+  String get freePreview => 'Найдено';
+
+  @override
+  String get freeOnboardTitle => 'Бесплатное приложение';
+
+  @override
+  String get freeOnboardBody =>
+      'Без рекламы. Внутри ничего не продаётся. Подключение — по ссылке, которую добавляете вы.';
+
+  @override
+  String get freeOnboardAddTitle => 'Добавьте ссылку, ключ или QR';
+
+  @override
+  String get freeOnboardAddBody =>
+      'Серверы из этой ссылки появятся в списке. Какой использовать — выбираете вы.';
+
+  @override
+  String get freeOnboardConnectTitle => 'Подключайтесь одним нажатием';
+
+  @override
+  String get freeOnboardConnectBody =>
+      'Нажмите на домик, чтобы включить или выключить. Статус остаётся на этом экране.';
+
+  @override
+  String get freeLater => 'Позже';
+
+  @override
+  String get freeBatteryTitle => 'Не останавливать туннель';
+
+  @override
+  String get freeBatteryBody =>
+      'Android может остановить туннель, чтобы экономить батарею. Можно разрешить работу в фоне.';
+
+  @override
+  String get freeBatteryAllow => 'Разрешить';
+
+  @override
+  String get freeBatteryDismiss => 'Больше не спрашивать';
+
+  @override
+  String get freeServers => 'Сервера';
+
+  @override
+  String get freeSearch => 'Поиск серверов';
+
+  @override
+  String get freeDelete => 'Удалить';
 }

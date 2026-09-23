@@ -1624,4 +1624,99 @@ class AppL10nEn extends AppL10n {
   @override
   String get restoreTelegramSubscriptionInactive =>
       'The subscription is not active. After it is renewed you can restore this seat.';
+
+  @override
+  String get freeAdd => 'Add';
+
+  @override
+  String get freePaste => 'Paste';
+
+  @override
+  String get freeQr => 'QR';
+
+  @override
+  String get freeAddServer => 'Add server';
+
+  @override
+  String get freeEmptyTitle => 'No servers added';
+
+  @override
+  String get freeEmptyBody => 'Add a link, a key, or a QR code.';
+
+  @override
+  String get freeStatus => 'Status';
+
+  @override
+  String get freeProfile => 'Profile';
+
+  @override
+  String get freeProtocol => 'Protocol';
+
+  @override
+  String get freeUptime => 'Uptime';
+
+  @override
+  String get freeNoProfile => 'None';
+
+  @override
+  String get freeAddTitle => 'Add';
+
+  @override
+  String get freeAddHint =>
+      'Paste a link or a key. The app does not sell access.';
+
+  @override
+  String get freeSaveConnect => 'Save and connect';
+
+  @override
+  String get freeSaveOnly => 'Save only';
+
+  @override
+  String get freePreview => 'Found';
+
+  @override
+  String get freeOnboardTitle => 'A free app';
+
+  @override
+  String get freeOnboardBody =>
+      'No ads. Nothing is sold inside the app. You connect with a link you add yourself.';
+
+  @override
+  String get freeOnboardAddTitle => 'Add a link, key, or QR';
+
+  @override
+  String get freeOnboardAddBody =>
+      'Servers from that link appear in the list. You choose which one to use.';
+
+  @override
+  String get freeOnboardConnectTitle => 'Connect with one tap';
+
+  @override
+  String get freeOnboardConnectBody =>
+      'Tap the house to connect or disconnect. The status stays on this screen.';
+
+  @override
+  String get freeLater => 'Later';
+
+  @override
+  String get freeBatteryTitle => 'Keep the tunnel running';
+
+  @override
+  String get freeBatteryBody =>
+      'Android may stop the tunnel to save battery. You can allow background activity.';
+
+  @override
+  String get freeBatteryAllow => 'Allow';
+
+  @override
+  String get freeBatteryDismiss => 'Don\'t ask again';
+
+  @override
+  String get freeServers => 'Servers';
+
+  @override
+  String get freeSearch => 'Search servers';
+
+  @override
+  String get freeDelete => 'Remove';
 }
