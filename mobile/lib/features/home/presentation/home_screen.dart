@@ -12,6 +12,7 @@ import '../../../core/theme.dart';
 import '../../../core/utils/format_utils.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/connect_button.dart';
+import '../../../core/widgets/house_pulsar.dart';
 import '../../../core/widgets/signal_nest_hero.dart';
 import '../../../core/widgets/teremok_snackbar.dart';
 import '../../../l10n/app_localizations.dart';
@@ -900,15 +901,9 @@ class _FreeClientHome extends StatelessWidget {
                 height: nestSize,
                 child: Stack(
                   alignment: Alignment.center,
+                  clipBehavior: Clip.none,
                   children: [
-                    Container(
-                      width: nestSize,
-                      height: nestSize,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: AppBrand.livingHouse.withValues(alpha: 0.10),
-                      ),
-                    ),
+                    HousePulsar(diameter: nestSize),
                     SignalNestHero(
                       key: kHomeSignalNestKey,
                       state: treeState,
