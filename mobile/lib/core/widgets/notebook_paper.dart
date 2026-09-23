@@ -69,18 +69,17 @@ class _NotebookPaperPainter extends CustomPainter {
 
     final marginAlpha =
         emphasized ? (dark ? 0.58 : 0.72) : (dark ? 0.34 : 0.5);
+    // Sit on the first grid vertical and wider than its blur, so the gray
+    // stroke does not show to the right of the margin.
     final marginPaint = Paint()
       ..color = margin.withValues(alpha: marginAlpha)
-      ..strokeWidth = emphasized ? 2.6 : 2.2
+      ..strokeWidth = emphasized ? 8 : 7
       ..style = PaintingStyle.stroke
-      ..maskFilter = MaskFilter.blur(
-        BlurStyle.normal,
-        emphasized ? 0.8 : 1.5,
-      );
-    const marginX = 22.0;
+      ..strokeCap = StrokeCap.butt
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 0.45);
     canvas.drawLine(
-      const Offset(marginX, 0),
-      Offset(marginX, size.height),
+      const Offset(_cell, 0),
+      Offset(_cell, size.height),
       marginPaint,
     );
   }
