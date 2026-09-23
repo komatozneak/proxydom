@@ -394,7 +394,7 @@ void main() {
     expect(find.text('SUB_PAGE'), findsOneWidget);
   });
 
-  testWidgets('iOS quota bar tap without VPN asks to connect, not /subscription',
+  testWidgets('iOS quota bar tap opens paste link, not /subscription',
       (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
@@ -412,6 +412,10 @@ void main() {
         GoRoute(
           path: '/settings/account',
           builder: (_, __) => const Scaffold(body: Text('ACCOUNT_HUB')),
+        ),
+        GoRoute(
+          path: '/import',
+          builder: (_, __) => const Scaffold(body: Text('IMPORT_LINK')),
         ),
         GoRoute(
           path: '/locations',
@@ -456,15 +460,15 @@ void main() {
 
     expect(find.text('Подключить безлимит'), findsNothing);
     await tester.tap(find.byKey(kHomeQuotaBarKey));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-    expect(find.text('Сначала подключитесь.'), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(find.text('IMPORT_LINK'), findsOneWidget);
+    expect(find.text('Сначала подключитесь.'), findsNothing);
     expect(find.text('ACCOUNT_HUB'), findsNothing);
     expect(find.text('SUB_PAGE'), findsNothing);
     debugDefaultTargetPlatformOverride = null;
   });
 
-  testWidgets('iOS quota exceeded CTA asks to connect, not Оформить Premium',
+  testWidgets('iOS quota exceeded CTA opens paste link, not Оформить Premium',
       (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
@@ -482,6 +486,10 @@ void main() {
         GoRoute(
           path: '/settings/account',
           builder: (_, __) => const Scaffold(body: Text('ACCOUNT_HUB')),
+        ),
+        GoRoute(
+          path: '/import',
+          builder: (_, __) => const Scaffold(body: Text('IMPORT_LINK')),
         ),
         GoRoute(
           path: '/locations',
@@ -529,9 +537,9 @@ void main() {
     expect(find.text('Оформить Premium'), findsNothing);
     expect(find.textContaining('Оформите Premium'), findsNothing);
     await tester.tap(find.widgetWithText(FilledButton, 'Аккаунт'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-    expect(find.text('Сначала подключитесь.'), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(find.text('IMPORT_LINK'), findsOneWidget);
+    expect(find.text('Сначала подключитесь.'), findsNothing);
     expect(find.text('ACCOUNT_HUB'), findsNothing);
     expect(find.text('LOCKED'), findsNothing);
     debugDefaultTargetPlatformOverride = null;
