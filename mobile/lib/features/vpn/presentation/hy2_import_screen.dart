@@ -106,73 +106,80 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
       return const Scaffold(body: SizedBox.shrink());
     }
     final theme = Theme.of(context);
+    final keyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(title: Text(l.freeAddTitle)),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                l.freeAddHint,
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _controller,
-                minLines: 4,
-                maxLines: 6,
-                onChanged: _previewInput,
-                decoration: InputDecoration(
-                  hintText: l.freeAddHint,
-                  filled: true,
-                  fillColor: theme.colorScheme.surfaceContainerHighest,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppBrand.radiusCard),
-                    borderSide: BorderSide(color: theme.colorScheme.outline),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              FreeClientActionBar(
-                onAdd: () => _controller.clear(),
-                onPaste: _pasteClipboard,
-                onScan: () => context.push('/scan'),
-              ),
-              if (_error != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  l.homeError,
-                  style: TextStyle(color: theme.colorScheme.error),
-                ),
-              ],
-              const SizedBox(height: 16),
-              Text(
-                l.freePreview,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 8),
               Expanded(
-                child: _preview.isEmpty
-                    ? const Center(child: FreeClientEmptyState(compact: true))
-                    : ListView.separated(
-                        itemCount: _preview.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 8),
-                        itemBuilder: (context, i) {
-                          final link = _preview[i];
-                          return ImportedProfileCard(
-                            name: link.name,
-                            scheme: link.scheme,
-                            endpoint: link.endpoint,
-                            selected: i == 0,
-                          );
-                        },
+                child: ListView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  children: [
+                    Text(
+                      l.freeAddHint,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _controller,
+                      minLines: keyboard ? 2 : 4,
+                      maxLines: keyboard ? 3 : 6,
+                      onChanged: _previewInput,
+                      decoration: InputDecoration(
+                        hintText: l.freeAddHint,
+                        filled: true,
+                        fillColor: theme.colorScheme.surfaceContainerHighest,
+                        border: OutlineInputBorder(
+                          borderRadius:
+                              BorderRadius.circular(AppBrand.radiusCard),
+                          borderSide:
+                              BorderSide(color: theme.colorScheme.outline),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    FreeClientActionBar(
+                      onAdd: () => _controller.clear(),
+                      onPaste: _pasteClipboard,
+                      onScan: () => context.push('/scan'),
+                    ),
+                    if (_error != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        l.homeError,
+                        style: TextStyle(color: theme.colorScheme.error),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    Text(
+                      l.freePreview,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    if (_preview.isEmpty)
+                      const FreeClientEmptyState(compact: true)
+                    else
+                      for (var i = 0; i < _preview.length; i++) ...[
+                        if (i > 0) const SizedBox(height: 8),
+                        ImportedProfileCard(
+                          name: _preview[i].name,
+                          scheme: _preview[i].scheme,
+                          endpoint: _preview[i].endpoint,
+                          selected: i == 0,
+                        ),
+                      ],
+                  ],
+                ),
               ),
               const SizedBox(height: 12),
               FilledButton(
@@ -197,7 +204,10 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   foregroundColor: theme.colorScheme.onSurface,
-                  side: BorderSide(color: theme.colorScheme.outline, width: 1.4),
+                  side: BorderSide(
+                    color: theme.colorScheme.outline,
+                    width: 1.4,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(AppBrand.radiusPill),
                   ),
