@@ -22,59 +22,75 @@ class FreeClientActionBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppL10n.of(context);
-    final theme = Theme.of(context);
+    final dark = Theme.of(context).brightness == Brightness.dark;
     final shape = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(AppBrand.radiusPill),
     );
-    final pad = const EdgeInsets.symmetric(horizontal: 12, vertical: 14);
+    const pad = EdgeInsets.symmetric(horizontal: 12, vertical: 14);
+    final addBg = dark ? AppBrand.accentOnDark : AppBrand.primary;
+    final addFg = dark ? AppBrand.primary : AppBrand.accentOnDark;
     return Row(
       children: [
         Expanded(
-          child: primaryAdd
-              ? FilledButton.icon(
-                  onPressed: onAdd,
-                  icon: const AppIcon(AppIcons.plus, size: 18),
-                  label: Text(l.freeAddServer),
-                  style: FilledButton.styleFrom(
-                    padding: pad,
-                    shape: shape,
-                    backgroundColor: theme.colorScheme.primary,
-                    foregroundColor: theme.colorScheme.onPrimary,
-                  ),
-                )
-              : OutlinedButton.icon(
-                  onPressed: onAdd,
-                  icon: const AppIcon(AppIcons.plus, size: 18),
-                  label: Text(l.freeAdd),
-                  style: _outline(theme, shape, pad),
-                ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: onPaste,
-            icon: const AppIcon(AppIcons.clipboard, size: 18),
-            label: Text(l.freePaste),
-            style: _outline(theme, shape, pad),
+          child: _action(
+            onPressed: onAdd,
+            icon: AppIcons.plus,
+            label: primaryAdd ? l.freeAddServer : l.freeAdd,
+            background: addBg,
+            foreground: addFg,
+            shape: shape,
+            pad: pad,
           ),
         ),
         const SizedBox(width: 8),
-        OutlinedButton.icon(
+        Expanded(
+          child: _action(
+            onPressed: onPaste,
+            icon: AppIcons.clipboard,
+            label: l.freePaste,
+            background: AppBrand.secondary,
+            foreground: AppBrand.surfaceElevatedLight,
+            shape: shape,
+            pad: pad,
+          ),
+        ),
+        const SizedBox(width: 8),
+        _action(
           onPressed: onScan,
-          icon: const AppIcon(AppIcons.qrCode, size: 18),
-          label: Text(l.freeQr),
-          style: _outline(theme, shape, pad),
+          icon: AppIcons.qrCode,
+          label: l.freeQr,
+          background: AppBrand.paperMargin,
+          foreground: AppBrand.inkLight,
+          shape: shape,
+          pad: pad,
         ),
       ],
     );
   }
 
-  ButtonStyle _outline(ThemeData theme, OutlinedBorder shape, EdgeInsets pad) {
-    return OutlinedButton.styleFrom(
-      padding: pad,
-      shape: shape,
-      foregroundColor: theme.colorScheme.onSurface,
-      side: BorderSide(color: theme.colorScheme.outline, width: 1.4),
+  Widget _action({
+    required VoidCallback onPressed,
+    required IconData icon,
+    required String label,
+    required Color background,
+    required Color foreground,
+    required OutlinedBorder shape,
+    required EdgeInsets pad,
+  }) {
+    return FilledButton.icon(
+      onPressed: onPressed,
+      icon: AppIcon(icon, size: 18, color: foreground),
+      label: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      style: FilledButton.styleFrom(
+        padding: pad,
+        shape: shape,
+        backgroundColor: background,
+        foregroundColor: foreground,
+      ),
     );
   }
 }
