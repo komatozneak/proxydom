@@ -19,6 +19,7 @@ import '../../home/application/vpn_status.dart';
 import '../../settings/application/subscription_status_provider.dart';
 import '../../settings/data/subscription_status.dart';
 import '../data/hy2_import_store.dart';
+import 'free_client_chrome.dart';
 import '../data/share_link_parser.dart';
 import '../data/node_auto_selector.dart';
 import '../data/node_display.dart';
@@ -83,11 +84,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         title: Text(
-          freeKeyClient
-              ? (Localizations.localeOf(context).languageCode == 'ru'
-                  ? 'Сервера'
-                  : 'Servers')
-              : l.regionTitle,
+              freeKeyClient ? l.freeServers : l.regionTitle,
         ),
         leading: canPop
             ? IconButton(
@@ -299,8 +296,18 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     return l.networkErrorFriendly;
   }
 
+  Future<void> _removeImported(int index) async {
+    final selected = _selectedId == '$index';
+    final status = ref.read(vpnProvider);
+    if (selected && (status is VpnConnected || status is VpnConnecting)) {
+      await ref.read(vpnProvider.notifier).disconnect();
+    }
+    await Hy2ImportStore.instance.removeAt(index);
+    await _load();
+  }
+
   Widget _buildImported(ThemeData theme) {
-    final ru = Localizations.localeOf(context).languageCode == 'ru';
+    final l = AppL10n.of(context);
     final filtered = <int>[];
     final q = _query.trim().toLowerCase();
     for (var i = 0; i < _imported.length; i++) {
@@ -308,16 +315,18 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       final hay = '${link.name} ${link.endpoint} ${link.scheme}'.toLowerCase();
       if (q.isEmpty || hay.contains(q)) filtered.add(i);
     }
+    final connected = ref.watch(vpnProvider) is VpnConnected;
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-          child: Text(
-            ru
-                ? '${_imported.length} серверов${_sourceHost == null ? '' : ' · 1 провайдер'}'
-                : '${_imported.length} servers${_sourceHost == null ? '' : ' · 1 provider'}',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              '${_imported.length}',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
         ),
@@ -325,58 +334,36 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
           child: TextField(
             decoration: InputDecoration(
-              hintText: ru ? 'Поиск серверов' : 'Search servers',
+              hintText: l.freeSearch,
               prefixIcon: const AppIcon(AppIcons.search),
-              isDense: true,
+              filled: true,
+              fillColor: theme.colorScheme.surfaceContainerHighest,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppBrand.radiusCard),
+                borderSide: BorderSide(color: theme.colorScheme.outline),
+              ),
             ),
             onChanged: (value) => setState(() => _query = value),
           ),
         ),
         Expanded(
           child: filtered.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        AppIcons.folder,
-                        size: 42,
-                        color: theme.colorScheme.onSurfaceVariant
-                            .withValues(alpha: 0.45),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(ru ? 'Нет серверов' : 'No servers'),
-                      const SizedBox(height: 4),
-                      Text(
-                        ru
-                            ? 'Вставьте ссылку на провайдера или ключ сервера'
-                            : 'Paste a provider link or a server key',
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
+              ? const Center(child: FreeClientEmptyState())
+              : ListView.separated(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
                   itemCount: filtered.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
                   itemBuilder: (context, i) {
                     final index = filtered[i];
                     final link = _imported[index];
                     final selected = _selectedId == '$index';
-                    return ListTile(
+                    return ImportedProfileCard(
+                      name: link.name,
+                      scheme: link.scheme,
+                      endpoint: link.endpoint,
                       selected: selected,
-                      title: Text(link.name),
-                      subtitle: Text('${link.scheme} ${link.endpoint}'),
-                      trailing: IconButton(
-                        icon: const AppIcon(AppIcons.trash, size: 18),
-                        onPressed: () async {
-                          await Hy2ImportStore.instance.removeAt(index);
-                          await _load();
-                        },
-                      ),
+                      connected: selected && connected,
+                      onDelete: () => _removeImported(index),
                       onTap: () async {
                         await Hy2ImportStore.instance.select(index);
                         if (!mounted) return;
@@ -393,30 +380,12 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
                 ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-          child: Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => context.push('/import'),
-                  icon: const AppIcon(AppIcons.plus, size: 18),
-                  label: Text(ru ? 'Добавить' : 'Add'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => context.push('/import'),
-                  icon: const AppIcon(AppIcons.clipboard, size: 18),
-                  label: Text(ru ? 'Вставить' : 'Paste'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              OutlinedButton(
-                onPressed: () => context.push('/scan'),
-                child: const AppIcon(AppIcons.qrCode, size: 18),
-              ),
-            ],
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          child: FreeClientActionBar(
+            primaryAdd: _imported.isEmpty,
+            onAdd: () => context.push('/import'),
+            onPaste: () => context.push('/import?clipboard=1'),
+            onScan: () => context.push('/scan'),
           ),
         ),
       ],
