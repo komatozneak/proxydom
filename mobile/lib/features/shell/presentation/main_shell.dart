@@ -121,7 +121,8 @@ class _MainShellState extends ConsumerState<MainShell> {
                     decoration: BoxDecoration(
                       border: Border(
                         top: BorderSide(
-                          color: AppBrand.paperMargin.withValues(alpha: 0.35),
+                          color: AppBrand.paperMargin.withValues(alpha: 0.72),
+                          width: 2.5,
                         ),
                       ),
                     ),
