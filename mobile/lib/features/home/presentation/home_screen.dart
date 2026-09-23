@@ -27,6 +27,7 @@ import '../../vpn/data/node_display.dart';
 import '../../vpn/data/vpn_controller.dart';
 import '../../vpn/data/vpn_node.dart';
 import '../../vpn/domain/vpn_connect_error.dart';
+import '../../vpn/presentation/free_client_chrome.dart';
 import '../../vpn/presentation/vpn_disclosure_dialog.dart';
 import '../../vpn/presentation/vpn_platform_copy.dart';
 import '../data/battery_prompt_prefs.dart';
@@ -69,7 +70,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(_onHomeReady());
-      unawaited(_maybeAskBattery());
     });
   }
 
@@ -94,32 +94,43 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     if (defaultTargetPlatform != TargetPlatform.android) return;
     if (await BatteryPromptPrefs.isDismissed()) return;
     if (!mounted) return;
-    final ru = Localizations.localeOf(context).languageCode == 'ru';
-    final allow = await showDialog<bool>(
+    final l = AppL10n.of(context);
+    final allow = await showModalBottomSheet<bool>(
       context: context,
+      showDragHandle: true,
       builder: (ctx) {
-        return AlertDialog(
-          title: Text(ru ? 'Фоновая работа' : 'Background activity'),
-          content: Text(
-            ru
-                ? 'Без этого Android может остановить туннель, чтобы экономить батарею.'
-                : 'Without this, Android may stop the tunnel to save battery.',
+        final theme = Theme.of(ctx);
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                l.freeBatteryTitle,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(l.freeBatteryBody),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: Text(l.freeBatteryAllow),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(l.freeBatteryDismiss),
+              ),
+            ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(ru ? 'Больше не спрашивать' : 'Don\'t ask again'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text(ru ? 'Разрешить' : 'Allow'),
-            ),
-          ],
         );
       },
     );
+    if (!mounted || allow == null) return;
     await BatteryPromptPrefs.dismiss();
-    if (allow == true) {
+    if (allow) {
       await VpnController.instance.requestBatteryExemption();
     }
   }
@@ -431,6 +442,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final vpnStatus = ref.watch(vpnProvider);
 
     ref.listen(vpnProvider, (prev, next) {
+      if (prev is! VpnConnected && next is VpnConnected) {
+        unawaited(_maybeAskBattery());
+      }
       if (prev is VpnConnected &&
           next is VpnConnected &&
           prev.serverName == next.serverName &&
@@ -642,10 +656,10 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
 
     final nestSize = freeKeyClient
         ? math.min(
-            340.0,
+            320.0,
             math.min(
-              size.width * 0.86,
-              math.max(200.0, widget.maxHeight - 240),
+              size.width * 0.84,
+              math.max(200.0, widget.maxHeight - 340),
             ),
           )
         : math.min(
@@ -658,8 +672,6 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
         nestSize: nestSize,
         treeState: treeState,
         status: status,
-        statusLabel: statusLabel,
-        statusHint: statusHint,
         serverTitle: widget.serverTitle,
         onNestTap: widget.onNestTap,
         showVpnSettingsCta: showVpnSettingsCta,
@@ -804,8 +816,6 @@ class _FreeClientHome extends StatelessWidget {
     required this.nestSize,
     required this.treeState,
     required this.status,
-    required this.statusLabel,
-    required this.statusHint,
     required this.serverTitle,
     required this.onNestTap,
     required this.showVpnSettingsCta,
@@ -814,155 +824,110 @@ class _FreeClientHome extends StatelessWidget {
   final double nestSize;
   final TreeState treeState;
   final VpnStatus status;
-  final String statusLabel;
-  final String statusHint;
   final String serverTitle;
   final Future<void> Function() onNestTap;
   final bool showVpnSettingsCta;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final l = AppL10n.of(context);
-    final ru = Localizations.localeOf(context).languageCode == 'ru';
     final empty = serverTitle == '…' ||
         serverTitle == 'Нет ссылки' ||
         serverTitle == 'No link';
-    final caption = status is VpnDisconnected
-        ? (ru ? 'Нажмите для подключения' : 'Tap to connect')
-        : statusHint;
-    final headline = status is VpnConnected && !empty ? serverTitle : statusLabel;
+    final current = status;
+    final String protocol;
+    final String? uptime;
+    if (current is VpnConnected) {
+      protocol = current.protocol;
+      uptime = _formatUptime(current.connectedSince);
+    } else {
+      protocol = '—';
+      uptime = null;
+    }
+    final profile = empty ? l.freeNoProfile : serverTitle;
+    final statusText = status is VpnConnecting
+        ? l.homeConnecting
+        : status is VpnError
+            ? l.homeError
+            : status is VpnConnected
+                ? l.homeConnected
+                : l.homeDisconnected;
 
     return Column(
       children: [
-        const Spacer(),
-        Flexible(
-          child: FittedBox(
-            child: SignalNestHero(
-              key: kHomeSignalNestKey,
-              state: treeState,
-              onTap: () => onNestTap(),
-              size: nestSize,
-            ),
-          ),
-        ),
-        Text(
-          headline,
-          textAlign: TextAlign.center,
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          caption,
-          textAlign: TextAlign.center,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: status is VpnError
-                ? theme.colorScheme.error
-                : theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-        if (empty && status is VpnDisconnected) ...[
-          const SizedBox(height: 28),
-          Icon(
-            AppIcons.folder,
-            size: 42,
-            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.45),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            ru ? 'Нет серверов' : 'No servers',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            ru
-                ? 'Вставьте ссылку на провайдера или ключ сервера'
-                : 'Paste a provider link or a server key',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-        if (showVpnSettingsCta) ...[
-          const SizedBox(height: 12),
-          FilledButton.tonal(
-            onPressed: () async {
-              final opened = await VpnController.instance.openVpnSettings();
-              if (!context.mounted) return;
-              if (!opened) {
-                showTeremokSnackBar(
-                  context,
-                  settingsKillSwitchOpenFailedForPlatform(l),
-                );
-              }
-            },
-            child: Text(l.settingsKillSwitchOpenVpn),
-          ),
-        ],
-        const Spacer(),
-        Row(
-          children: [
-            Expanded(
-              child: _HomeAction(
-                icon: AppIcons.plus,
-                label: ru ? 'Добавить' : 'Add',
-                onTap: () => context.push('/import'),
+        Expanded(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: nestSize,
+                height: nestSize,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
+                      width: nestSize,
+                      height: nestSize,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppBrand.livingHouse.withValues(alpha: 0.10),
+                      ),
+                    ),
+                    SignalNestHero(
+                      key: kHomeSignalNestKey,
+                      state: treeState,
+                      onTap: () => onNestTap(),
+                      size: nestSize,
+                    ),
+                  ],
+                ),
               ),
-            ),
-            Expanded(
-              child: _HomeAction(
-                icon: AppIcons.clipboard,
-                label: ru ? 'Вставить' : 'Paste',
-                onTap: () => context.push('/import'),
+              ConnectionStatusPanel(
+                status: statusText,
+                profile: profile,
+                protocol: protocol,
+                uptime: uptime,
               ),
-            ),
-            _HomeAction(
-              icon: AppIcons.qrCode,
-              label: 'QR',
-              onTap: () => context.push('/scan'),
-            ),
-          ],
+              if (empty && status is VpnDisconnected) ...[
+                const SizedBox(height: 16),
+                const FreeClientEmptyState(compact: true),
+              ],
+              if (showVpnSettingsCta) ...[
+                const SizedBox(height: 12),
+                FilledButton.tonal(
+                  onPressed: () async {
+                    final opened =
+                        await VpnController.instance.openVpnSettings();
+                    if (!context.mounted) return;
+                    if (!opened) {
+                      showTeremokSnackBar(
+                        context,
+                        settingsKillSwitchOpenFailedForPlatform(l),
+                      );
+                    }
+                  },
+                  child: Text(l.settingsKillSwitchOpenVpn),
+                ),
+              ],
+            ],
+          ),
+        ),
+        FreeClientActionBar(
+          primaryAdd: empty,
+          onAdd: () => context.push('/import'),
+          onPaste: () => context.push('/import?clipboard=1'),
+          onScan: () => context.push('/scan'),
         ),
       ],
     );
   }
-}
 
-class _HomeAction extends StatelessWidget {
-  const _HomeAction({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: OutlinedButton.icon(
-        onPressed: onTap,
-        icon: AppIcon(icon, size: 18),
-        label: Text(label),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: theme.colorScheme.onSurface,
-          side: BorderSide(color: theme.colorScheme.outline),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppBrand.radiusNavPill),
-          ),
-        ),
-      ),
-    );
+  String _formatUptime(DateTime since) {
+    final d = DateTime.now().difference(since);
+    final h = d.inHours.toString().padLeft(2, '0');
+    final m = (d.inMinutes % 60).toString().padLeft(2, '0');
+    final s = (d.inSeconds % 60).toString().padLeft(2, '0');
+    return '$h:$m:$s';
   }
 }
 

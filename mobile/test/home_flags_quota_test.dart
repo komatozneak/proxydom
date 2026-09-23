@@ -297,8 +297,8 @@ void main() {
 
     expect(find.byKey(kHomeSignalNestKey), findsOneWidget);
     expect(find.byKey(kHomeQuotaBarKey), findsNothing);
-    expect(find.text('Нажмите для подключения'), findsOneWidget);
-    expect(find.text('Нет серверов'), findsOneWidget);
+    expect(find.text('Не подключено'), findsOneWidget);
+    expect(find.text('Нет добавленных серверов'), findsOneWidget);
     expect(find.text('Безлимит с Premium'), findsNothing);
     expect(find.text('Что работает без VPN?'), findsNothing);
     debugDefaultTargetPlatformOverride = null;
@@ -808,6 +808,8 @@ void main() {
   });
 
   testWidgets('connecting hint uses canonical location title', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
     final container = ProviderContainer(
       overrides: [
         vpnNodesRepositoryProvider.overrideWithValue(
@@ -835,5 +837,6 @@ void main() {
 
     expect(find.text('Подбираем сервер… Латвия'), findsOneWidget);
     expect(find.textContaining('Европа'), findsNothing);
+    debugDefaultTargetPlatformOverride = null;
   });
 }
