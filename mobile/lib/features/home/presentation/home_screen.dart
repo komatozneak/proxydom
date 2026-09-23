@@ -905,30 +905,35 @@ class _FreeClientHome extends StatelessWidget {
           uptime: uptime,
           accent: accent,
         ),
-        if (empty && status is! VpnConnected && status is! VpnConnecting) ...[
-          const SizedBox(height: 12),
-          const FreeClientEmptyState(compact: true),
-        ],
         Expanded(
-          child: Center(
-            child: SizedBox(
-              width: nestSize,
-              height: nestSize,
-              child: Stack(
-                alignment: Alignment.center,
-                clipBehavior: Clip.none,
-                children: [
-                  if (status is VpnConnecting || status is VpnConnected)
-                    HousePulsar(diameter: nestSize),
-                  SignalNestHero(
-                    key: kHomeSignalNestKey,
-                    state: treeState,
-                    onTap: () => onNestTap(),
-                    size: nestSize,
-                  ),
-                ],
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (empty &&
+                  status is! VpnConnected &&
+                  status is! VpnConnecting) ...[
+                const FreeClientEmptyState(compact: true),
+                const SizedBox(height: 8),
+              ],
+              SizedBox(
+                width: nestSize,
+                height: nestSize,
+                child: Stack(
+                  alignment: Alignment.center,
+                  clipBehavior: Clip.none,
+                  children: [
+                    if (status is VpnConnecting || status is VpnConnected)
+                      HousePulsar(diameter: nestSize),
+                    SignalNestHero(
+                      key: kHomeSignalNestKey,
+                      state: treeState,
+                      onTap: () => onNestTap(),
+                      size: nestSize,
+                    ),
+                  ],
+                ),
               ),
-            ),
+            ],
           ),
         ),
         if (showVpnSettingsCta) ...[
