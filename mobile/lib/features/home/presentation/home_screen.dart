@@ -713,6 +713,9 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
         importedScheme: widget.importedScheme,
         onNestTap: widget.onNestTap,
         showVpnSettingsCta: showVpnSettingsCta,
+        noVpnEnabled: widget.noVpnEnabled,
+        noVpnTotal: widget.noVpnTotal,
+        onOpenNoVpn: widget.onOpenNoVpn,
       );
     }
 
@@ -858,6 +861,9 @@ class _FreeClientHome extends StatelessWidget {
     this.importedScheme,
     required this.onNestTap,
     required this.showVpnSettingsCta,
+    required this.noVpnEnabled,
+    required this.noVpnTotal,
+    required this.onOpenNoVpn,
   });
 
   final double nestSize;
@@ -867,6 +873,9 @@ class _FreeClientHome extends StatelessWidget {
   final String? importedScheme;
   final Future<void> Function() onNestTap;
   final bool showVpnSettingsCta;
+  final int noVpnEnabled;
+  final int noVpnTotal;
+  final VoidCallback onOpenNoVpn;
 
   @override
   Widget build(BuildContext context) {
@@ -917,12 +926,12 @@ class _FreeClientHome extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              if (empty &&
-                  status is! VpnConnected &&
-                  status is! VpnConnecting) ...[
-                const FreeClientEmptyState(compact: true),
-                const SizedBox(height: 8),
-              ],
+              SizedBox(
+                height: 96,
+                width: double.infinity,
+                child: Center(child: _houseSlot(l)),
+              ),
+              const SizedBox(height: 8),
               SizedBox(
                 width: nestSize,
                 height: nestSize,
@@ -967,6 +976,24 @@ class _FreeClientHome extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  Widget _houseSlot(AppL10n l) {
+    if (status is VpnConnected && androidPerAppSplit) {
+      return _NoVpnHomeRow(
+        label: l.homeNoVpnRow,
+        enabled: noVpnEnabled,
+        total: noVpnTotal,
+        onTap: onOpenNoVpn,
+      );
+    }
+    final noProfile = serverTitle == '…' ||
+        serverTitle == 'Нет ссылки' ||
+        serverTitle == 'No link';
+    if (noProfile && status is! VpnConnecting) {
+      return const FreeClientEmptyState(compact: true);
+    }
+    return const SizedBox.shrink();
   }
 
   String _formatUptime(DateTime since) {
