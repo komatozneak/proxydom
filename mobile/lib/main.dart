@@ -12,6 +12,7 @@ import 'core/config.dart';
 import 'core/diagnostics/app_log_buffer.dart';
 import 'core/diagnostics/diagnostics_service.dart';
 import 'core/internet_permission.dart';
+import 'core/ios_store_gates.dart';
 import 'core/jwt_interceptor.dart';
 import 'core/pair_links.dart';
 import 'core/referral_links.dart';
@@ -96,9 +97,11 @@ void main() async {
   // Do not await auth here: Play 0.1.7 sat on the launcher icon for the full
   // register timeout. GoRouter keeps /bootstrap while [authProvider] loads.
   await AppRouter.warmWelcomeFlag();
-  await attachSeatJoinLinks(container);
-  await attachReferralLinks(container);
-  await attachPairLinks(container);
+  if (!hideInAppPlategaCheckout) {
+    await attachSeatJoinLinks(container);
+    await attachReferralLinks(container);
+    await attachPairLinks(container);
+  }
   container.read(authProvider);
 
   // Связываем GoRouter с authProvider: при смене состояния авторизации

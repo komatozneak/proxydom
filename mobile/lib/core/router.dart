@@ -28,6 +28,7 @@ import '../features/settings/presentation/settings_screen.dart';
 import '../features/shell/presentation/main_shell.dart';
 import '../features/vpn/presentation/hy2_import_screen.dart';
 import 'config.dart';
+import 'ios_store_gates.dart';
 
 /// Роутер приложения.
 ///
@@ -168,6 +169,9 @@ class AppRouter {
       // Authed: leave welcome / bootstrap-fail for Home (soft entitlement later).
       if (goingToWelcome || goingToBootstrapFail) {
         return enterShellForAuthedColdStart();
+      }
+      if (iosFreeClientRouteBlocked(loc)) {
+        return '/home';
       }
       if (goingToGate ||
           goingToPromo ||

@@ -387,35 +387,39 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             _SectionLabel(l.settingsSectionAccount),
             _SettingsCard(
               children: [
-                _SettingsRow(
-                  leading: _AccessStatusGlyph(status: subAsync),
-                  title: _accessTitle(l, subAsync),
-                  subtitle: _accessSubtitle(l, subAsync),
-                  onTap: () => context.push('/settings/account'),
-                  trailing: subAsync.when(
-                    data: (_) => const AppIcon(AppIcons.chevronRight, size: 18),
-                    loading: () => const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                    error: (_, __) => TextButton(
-                      onPressed: () => ref
-                          .read(subscriptionStatusProvider.notifier)
-                          .refresh(),
-                      child: Text(l.homeRetry),
-                    ),
-                  ),
-                ),
-                if (AppConfig.authAnonymous) ...[
-                  const _CardDivider(),
+                if (!hideInAppPlategaCheckout)
                   _SettingsRow(
-                    icon: AppIcons.devices,
-                    title: l.settingsDevices,
-                    subtitle: l.settingsDevicesHint,
-                    onTap: () => context.push('/settings/devices'),
+                    leading: _AccessStatusGlyph(status: subAsync),
+                    title: _accessTitle(l, subAsync),
+                    subtitle: _accessSubtitle(l, subAsync),
+                    onTap: () => context.push('/settings/account'),
+                    trailing: subAsync.when(
+                      data: (_) =>
+                          const AppIcon(AppIcons.chevronRight, size: 18),
+                      loading: () => const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      error: (_, __) => TextButton(
+                        onPressed: () => ref
+                            .read(subscriptionStatusProvider.notifier)
+                            .refresh(),
+                        child: Text(l.homeRetry),
+                      ),
+                    ),
                   ),
-                  const _CardDivider(),
+                if (AppConfig.authAnonymous) ...[
+                  if (!hideInAppPlategaCheckout) ...[
+                    const _CardDivider(),
+                    _SettingsRow(
+                      icon: AppIcons.devices,
+                      title: l.settingsDevices,
+                      subtitle: l.settingsDevicesHint,
+                      onTap: () => context.push('/settings/devices'),
+                    ),
+                  ],
+                  if (!hideInAppPlategaCheckout) const _CardDivider(),
                   _SettingsRow(
                     icon: AppIcons.siteTelegram,
                     title: l.settingsSupport,
