@@ -26,7 +26,7 @@ import '../features/settings/presentation/devices_screen.dart';
 import '../features/settings/presentation/no_vpn_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/shell/presentation/main_shell.dart';
-import '../features/vpn/presentation/locations_screen.dart';
+import '../features/vpn/presentation/hy2_import_screen.dart';
 import 'config.dart';
 
 /// Роутер приложения.
@@ -120,6 +120,7 @@ class AppRouter {
           loc.startsWith('/settings/');
       // /subscription + /premium parked outside shell — still require auth gate.
       final goingToBillingTabs = loc == '/subscription' || loc == '/premium';
+      final goingToImport = loc == '/import';
 
       // Still loading / no ProviderScope — keep the bootstrap spinner on screen.
       if (auth == null) {
@@ -177,11 +178,14 @@ class AppRouter {
       }
       // Onboarding + shell after cold-start flag or explicit gate resolution.
       // Do NOT allow /onboarding without postAuthResolved — that skipped promo.
-      if ((goingToOnboarding || inShell || goingToBillingTabs) &&
+      if ((goingToOnboarding ||
+              inShell ||
+              goingToBillingTabs ||
+              goingToImport) &&
           !postAuthResolved) {
         return '/gate';
       }
-      if (goingToOnboarding || inShell || goingToBillingTabs) {
+      if (goingToOnboarding || inShell || goingToBillingTabs || goingToImport) {
         return null;
       }
       return enterShellForAuthedColdStart();
@@ -228,6 +232,11 @@ class AppRouter {
         path: '/premium',
         parentNavigatorKey: rootNavigatorKey,
         builder: (c, s) => const PremiumTabScreen(),
+      ),
+      GoRoute(
+        path: '/import',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (c, s) => const Hy2ImportScreen(),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {

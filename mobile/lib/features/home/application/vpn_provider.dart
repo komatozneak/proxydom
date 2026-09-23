@@ -10,11 +10,13 @@ import '../../../core/app_locale.dart';
 import '../../../core/diagnostics/app_log_buffer.dart';
 import '../../../core/diagnostics/egress_verify.dart';
 import '../../../core/diagnostics/product_log.dart';
+import '../../../core/ios_store_gates.dart';
 import '../../../core/jwt_interceptor.dart';
 import '../../../core/retry_policy.dart';
 import '../../auth/application/auth_provider.dart';
 import '../../auth/application/auth_state.dart';
 import '../../beta/application/beta_usage_tracker.dart';
+import '../../vpn/data/hy2_import_store.dart';
 import '../../vpn/data/node_auto_selector.dart';
 import '../../vpn/data/node_display.dart';
 import '../../vpn/data/vpn_config.dart';
@@ -1466,6 +1468,29 @@ class VpnNotifier extends Notifier<VpnStatus> {
       await VpnController.instance.requestNotificationPermission();
       if (await _abortStaleConnect(gen)) return;
       state = const VpnConnecting(progress: 0.5);
+
+      if (hideInAppPlategaCheckout) {
+        final imported = await Hy2ImportStore.instance.selected();
+        if (await _abortStaleConnect(gen)) return;
+        if (imported == null) {
+          state = const VpnError(
+            message: 'hy2_import_required',
+            code: 'hy2_import_required',
+          );
+          return;
+        }
+        final started = await VpnController.instance.startHysteria(
+          imported.profile,
+          displayLabel: imported.name,
+        );
+        if (await _abortStaleConnect(gen)) return;
+        if (!started) {
+          state = await _errorForStartFailure();
+          return;
+        }
+        state = const VpnConnecting(progress: 0.8);
+        return;
+      }
 
       if (useAuto) {
         await _runAutoProveLoop(gen: gen);

@@ -615,12 +615,9 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
               ),
             ),
             exhaustedLabel: l.homeTrafficExhausted,
-            teaser: hideInAppPlategaCheckout
-                ? null
-                : l.homeQuotaUnlimitedTeaser,
-            ctaLabel: hideInAppPlategaCheckout
-                ? null
-                : l.homeQuotaUnlimitedCta,
+            teaser:
+                hideInAppPlategaCheckout ? null : l.homeQuotaUnlimitedTeaser,
+            ctaLabel: hideInAppPlategaCheckout ? null : l.homeQuotaUnlimitedCta,
             onTap: widget.onOpenSubscription,
           ),
           const SizedBox(height: 8),
@@ -703,6 +700,17 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
           ),
         ],
         const SizedBox(height: 16),
+        if (hideInAppPlategaCheckout) ...[
+          FilledButton.tonal(
+            onPressed: () => context.push('/import'),
+            child: Text(
+              Localizations.localeOf(context).languageCode == 'ru'
+                  ? 'Вставить ссылку'
+                  : 'Paste link',
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
         if (!hideInAppPlategaCheckout) ...[
           _NoVpnHomeRow(
             label: l.homeNoVpnRow,
