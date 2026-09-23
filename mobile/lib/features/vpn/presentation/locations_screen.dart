@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -323,7 +322,9 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
           child: Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              '${_imported.length}',
+              _sourceHost == null
+                  ? '${_imported.length}'
+                  : '${_imported.length} · $_sourceHost',
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w800,
               ),

@@ -22,6 +22,7 @@ import '../../settings/data/installed_apps_channel.dart';
 import '../../settings/data/split_tunnel_prefs.dart';
 import '../../settings/data/subscription_status.dart';
 import '../../vpn/data/hy2_import_store.dart';
+import '../../vpn/data/vpn_service_config.dart';
 import '../../vpn/data/node_auto_selector.dart';
 import '../../vpn/data/node_display.dart';
 import '../../vpn/data/vpn_controller.dart';
@@ -53,6 +54,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     with WidgetsBindingObserver {
   String _serverTitle = '…';
   String _serverSubtitle = '';
+  String? _importedScheme;
   String _serverFlag = kFlagGlobe;
   bool _selectionIsAuto = true;
   List<String> _autoPoolFlags = const [kFlagGlobe];
@@ -212,10 +214,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         if (selected == null) {
           _serverTitle = ru ? 'Нет ссылки' : 'No link';
           _serverSubtitle = ru ? 'Вставьте ключ' : 'Paste a key';
+          _importedScheme = null;
           _serverFlag = kFlagGlobe;
         } else {
           _serverTitle = selected.name;
           _serverSubtitle = selected.endpoint;
+          _importedScheme = selected.scheme;
           _serverFlag = kFlagGlobe;
         }
       });
@@ -472,6 +476,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                         ? l.regionAutoSubtitle
                         : l.homeStatServer)
                     : _serverSubtitle,
+                importedScheme: _importedScheme,
                 serverFlag: _serverFlag,
                 selectionIsAuto: _selectionIsAuto,
                 autoPoolFlags: _autoPoolFlags,
@@ -500,6 +505,7 @@ class _DashboardBody extends ConsumerStatefulWidget {
     required this.maxHeight,
     required this.serverTitle,
     required this.serverSubtitle,
+    this.importedScheme,
     required this.serverFlag,
     required this.selectionIsAuto,
     required this.autoPoolFlags,
@@ -516,6 +522,7 @@ class _DashboardBody extends ConsumerStatefulWidget {
   final double maxHeight;
   final String serverTitle;
   final String serverSubtitle;
+  final String? importedScheme;
   final String serverFlag;
   final bool selectionIsAuto;
   final List<String> autoPoolFlags;
@@ -673,6 +680,7 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
         treeState: treeState,
         status: status,
         serverTitle: widget.serverTitle,
+        importedScheme: widget.importedScheme,
         onNestTap: widget.onNestTap,
         showVpnSettingsCta: showVpnSettingsCta,
       );
@@ -817,6 +825,7 @@ class _FreeClientHome extends StatelessWidget {
     required this.treeState,
     required this.status,
     required this.serverTitle,
+    this.importedScheme,
     required this.onNestTap,
     required this.showVpnSettingsCta,
   });
@@ -825,6 +834,7 @@ class _FreeClientHome extends StatelessWidget {
   final TreeState treeState;
   final VpnStatus status;
   final String serverTitle;
+  final String? importedScheme;
   final Future<void> Function() onNestTap;
   final bool showVpnSettingsCta;
 
@@ -841,7 +851,10 @@ class _FreeClientHome extends StatelessWidget {
       protocol = current.protocol;
       uptime = _formatUptime(current.connectedSince);
     } else {
-      protocol = '—';
+      final scheme = importedScheme;
+      protocol = scheme == null || scheme.isEmpty
+          ? '—'
+          : friendlyProtocolLabel(scheme);
       uptime = null;
     }
     final profile = empty ? l.freeNoProfile : serverTitle;

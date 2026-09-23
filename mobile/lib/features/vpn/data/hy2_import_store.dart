@@ -83,10 +83,15 @@ class Hy2ImportStore {
     } else if (selected >= lines.length) {
       selected = lines.length - 1;
     }
+    final source = await sourceHost();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
       _prefsKey,
-      jsonEncode({'lines': lines, 'selected': selected}),
+      jsonEncode({
+        'lines': lines,
+        'selected': selected,
+        if (source != null && source.isNotEmpty) 'source': source,
+      }),
     );
   }
 
