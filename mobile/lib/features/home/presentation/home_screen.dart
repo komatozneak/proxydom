@@ -685,9 +685,9 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
 
     final nestSize = freeKeyClient
         ? math.min(
-            320.0,
+            340.0,
             math.min(
-              size.width * 0.84,
+              size.width * 0.88,
               math.max(200.0, widget.maxHeight - 340),
             ),
           )

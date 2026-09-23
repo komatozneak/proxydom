@@ -146,7 +146,7 @@ class _SignalNestHeroState extends State<SignalNestHero>
 
   @override
   Widget build(BuildContext context) {
-    final glyph = widget.size * 0.85;
+    final glyph = widget.size * 0.90;
     final showNet = widget.state == TreeState.connecting ||
         widget.state == TreeState.connected;
     final isError = widget.state == TreeState.error;
