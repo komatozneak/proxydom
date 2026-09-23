@@ -1842,6 +1842,26 @@ object VpnChannelRegistry {
                             result.error("VPN_SETTINGS_FAILED", e.message, null)
                         }
                     }
+                    "requestBatteryExemption" -> {
+                        try {
+                            val activity = activityProvider()
+                            val intent = Intent(
+                                Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                            ).apply {
+                                data = android.net.Uri.parse(
+                                    "package:${appContext.packageName}",
+                                )
+                            }
+                            if (activity == null) {
+                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            (activity ?: appContext).startActivity(intent)
+                            result.success(true)
+                        } catch (e: Exception) {
+                            Log.w(TeremokVpnService.TAG, "battery exemption failed", e)
+                            result.success(false)
+                        }
+                    }
                     "getSingBoxStderrTail" -> {
                         val maxLines = call.argument<Int>("maxLines") ?: 400
                         result.success(

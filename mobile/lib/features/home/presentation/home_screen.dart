@@ -29,6 +29,7 @@ import '../../vpn/data/vpn_node.dart';
 import '../../vpn/domain/vpn_connect_error.dart';
 import '../../vpn/presentation/vpn_disclosure_dialog.dart';
 import '../../vpn/presentation/vpn_platform_copy.dart';
+import '../data/battery_prompt_prefs.dart';
 import '../application/vpn_provider.dart';
 import '../application/vpn_status.dart';
 import 'widgets/free_quota_bar.dart';
@@ -68,6 +69,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(_onHomeReady());
+      unawaited(_maybeAskBattery());
     });
   }
 
@@ -84,6 +86,41 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       unawaited(_refreshNoVpnCounter());
       unawaited(_refreshServerCard());
       unawaited(_refreshEntitlement());
+    }
+  }
+
+  Future<void> _maybeAskBattery() async {
+    if (!freeKeyClient) return;
+    if (defaultTargetPlatform != TargetPlatform.android) return;
+    if (await BatteryPromptPrefs.isDismissed()) return;
+    if (!mounted) return;
+    final ru = Localizations.localeOf(context).languageCode == 'ru';
+    final allow = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: Text(ru ? 'Фоновая работа' : 'Background activity'),
+          content: Text(
+            ru
+                ? 'Без этого Android может остановить туннель, чтобы экономить батарею.'
+                : 'Without this, Android may stop the tunnel to save battery.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(ru ? 'Больше не спрашивать' : 'Don\'t ask again'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(ru ? 'Разрешить' : 'Allow'),
+            ),
+          ],
+        );
+      },
+    );
+    await BatteryPromptPrefs.dismiss();
+    if (allow == true) {
+      await VpnController.instance.requestBatteryExemption();
     }
   }
 

@@ -398,6 +398,19 @@ class VpnController {
     }
   }
 
+  /// Opens the system battery exemption screen. Does not promise the grant.
+  Future<bool> requestBatteryExemption() async {
+    try {
+      final result =
+          await _methodChannel.invokeMethod<bool>('requestBatteryExemption');
+      return result ?? false;
+    } on PlatformException {
+      return false;
+    } on MissingPluginException {
+      return false;
+    }
+  }
+
   /// Detect a blocking foreign VPN: Always-on / lockdown / live TUN (Android).
   Future<VpnConflictInfo> queryVpnConflict() async {
     try {
