@@ -235,6 +235,8 @@ void main() {
 
   testWidgets('Free quota meter sits above Nest with unlimited curtain',
       (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
     final container = ProviderContainer(
       overrides: [
         vpnNodesRepositoryProvider.overrideWithValue(
@@ -264,6 +266,7 @@ void main() {
     final quotaY = tester.getTopLeft(find.byKey(kHomeQuotaBarKey)).dy;
     final nestY = tester.getTopLeft(find.byKey(kHomeSignalNestKey)).dy;
     expect(quotaY, lessThan(nestY));
+    debugDefaultTargetPlatformOverride = null;
   });
 
   testWidgets('iOS Free quota meter has no Premium curtain or NoVPN row',
@@ -292,15 +295,19 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
-    expect(find.byKey(kHomeQuotaBarKey), findsOneWidget);
+    expect(find.byKey(kHomeSignalNestKey), findsOneWidget);
+    expect(find.byKey(kHomeQuotaBarKey), findsNothing);
+    expect(find.text('Нажмите для подключения'), findsOneWidget);
+    expect(find.text('Нет серверов'), findsOneWidget);
     expect(find.text('Безлимит с Premium'), findsNothing);
-    expect(find.text('Подключить безлимит'), findsNothing);
     expect(find.text('Что работает без VPN?'), findsNothing);
     debugDefaultTargetPlatformOverride = null;
   });
 
   testWidgets('quota bar stays mounted and does not jump during refresh',
       (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
     final notifier = _HoldRefreshSubNotifier(_freeQuota);
     final container = ProviderContainer(
       overrides: [
@@ -335,9 +342,12 @@ void main() {
     await tester.pump();
     expect(find.byKey(kHomeQuotaBarKey), findsOneWidget);
     expect(tester.getTopLeft(find.byKey(kHomeQuotaBarKey)).dy, yBefore);
+    debugDefaultTargetPlatformOverride = null;
   });
 
   testWidgets('quota curtain tap opens paste link', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
     final router = GoRouter(
       routes: [
         GoRoute(
@@ -397,6 +407,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('IMPORT_LINK'), findsOneWidget);
     expect(find.text('SUB_PAGE'), findsNothing);
+    debugDefaultTargetPlatformOverride = null;
   });
 
   testWidgets('iOS quota bar tap opens paste link, not /subscription',
@@ -464,7 +475,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
 
     expect(find.text('Подключить безлимит'), findsNothing);
-    await tester.tap(find.byKey(kHomeQuotaBarKey));
+    await tester.tap(find.text('Вставить'));
     await tester.pumpAndSettle();
     expect(find.text('IMPORT_LINK'), findsOneWidget);
     expect(find.text('Сначала подключитесь.'), findsNothing);
@@ -541,7 +552,7 @@ void main() {
 
     expect(find.text('Оформить Premium'), findsNothing);
     expect(find.textContaining('Оформите Premium'), findsNothing);
-    await tester.tap(find.text('Вставить ссылку').first);
+    await tester.tap(find.text('Вставить'));
     await tester.pumpAndSettle();
     expect(find.text('IMPORT_LINK'), findsOneWidget);
     expect(find.text('Сначала подключитесь.'), findsNothing);
@@ -551,6 +562,8 @@ void main() {
   });
 
   testWidgets('two fast taps open one paste screen', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
     final rootKey = GlobalKey<NavigatorState>(debugLabel: 'root');
     final router = GoRouter(
       navigatorKey: rootKey,
@@ -644,6 +657,7 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('IMPORT_LINK', skipOffstage: false), findsOneWidget);
     expect(find.byType(HomeScreen, skipOffstage: false), findsOneWidget);
+    debugDefaultTargetPlatformOverride = null;
   });
 
   testWidgets('Auto connecting cycles Free pool flags LV then US',

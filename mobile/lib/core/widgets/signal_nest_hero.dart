@@ -146,7 +146,7 @@ class _SignalNestHeroState extends State<SignalNestHero>
 
   @override
   Widget build(BuildContext context) {
-    final glyph = widget.size * 0.90;
+    final glyph = widget.size * 0.78;
     final showNet = widget.state == TreeState.connecting ||
         widget.state == TreeState.connected;
     final isError = widget.state == TreeState.error;
@@ -263,7 +263,7 @@ class _RefSymNetPainter extends CustomPainter {
     if (emerge < 0.01) return;
 
     final hub = Offset(size.width * 0.5, size.height * 0.52);
-    final orbitR = size.width * 0.40;
+    final orbitR = size.width * 0.47;
     final ellipseY = 0.90;
 
     // Rigid-body spin — seamless, keeps equal spacing.

@@ -76,6 +76,9 @@ abstract final class AppIcons {
   static const IconData treeFill = PhosphorIconsFill.tree;
   static const IconData house = PhosphorIconsRegular.house;
   static const IconData houseFill = PhosphorIconsFill.house;
+  static const IconData folder = PhosphorIconsRegular.folder;
+  static const IconData clipboard = PhosphorIconsRegular.clipboardText;
+  static const IconData qrCode = PhosphorIconsRegular.qrCode;
   static const IconData check = PhosphorIconsRegular.check;
   static const IconData checkCircle = PhosphorIconsRegular.checkCircle;
   static const IconData circle = PhosphorIconsRegular.circle;

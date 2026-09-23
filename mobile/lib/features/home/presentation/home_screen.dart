@@ -603,10 +603,31 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
     final russian = Localizations.localeOf(context).languageCode == 'ru';
     const gib = 1024.0 * 1024.0 * 1024.0;
 
-    final nestSize = math.min(
-      320.0,
-      math.min(size.width * 0.78, widget.maxHeight * 0.46),
-    );
+    final nestSize = freeKeyClient
+        ? math.min(
+            340.0,
+            math.min(
+              size.width * 0.86,
+              math.max(200.0, widget.maxHeight - 240),
+            ),
+          )
+        : math.min(
+            320.0,
+            math.min(size.width * 0.78, widget.maxHeight * 0.46),
+          );
+
+    if (freeKeyClient) {
+      return _FreeClientHome(
+        nestSize: nestSize,
+        treeState: treeState,
+        status: status,
+        statusLabel: statusLabel,
+        statusHint: statusHint,
+        serverTitle: widget.serverTitle,
+        onNestTap: widget.onNestTap,
+        showVpnSettingsCta: showVpnSettingsCta,
+      );
+    }
 
     return Column(
       children: [
@@ -737,6 +758,173 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
           onTap: widget.onOpenLocations,
         ),
       ],
+    );
+  }
+}
+
+class _FreeClientHome extends StatelessWidget {
+  const _FreeClientHome({
+    required this.nestSize,
+    required this.treeState,
+    required this.status,
+    required this.statusLabel,
+    required this.statusHint,
+    required this.serverTitle,
+    required this.onNestTap,
+    required this.showVpnSettingsCta,
+  });
+
+  final double nestSize;
+  final TreeState treeState;
+  final VpnStatus status;
+  final String statusLabel;
+  final String statusHint;
+  final String serverTitle;
+  final Future<void> Function() onNestTap;
+  final bool showVpnSettingsCta;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final l = AppL10n.of(context);
+    final ru = Localizations.localeOf(context).languageCode == 'ru';
+    final empty = serverTitle == '…' ||
+        serverTitle == 'Нет ссылки' ||
+        serverTitle == 'No link';
+    final caption = status is VpnDisconnected
+        ? (ru ? 'Нажмите для подключения' : 'Tap to connect')
+        : statusHint;
+    final headline = status is VpnConnected && !empty ? serverTitle : statusLabel;
+
+    return Column(
+      children: [
+        const Spacer(),
+        Flexible(
+          child: FittedBox(
+            child: SignalNestHero(
+              key: kHomeSignalNestKey,
+              state: treeState,
+              onTap: () => onNestTap(),
+              size: nestSize,
+            ),
+          ),
+        ),
+        Text(
+          headline,
+          textAlign: TextAlign.center,
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          caption,
+          textAlign: TextAlign.center,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: status is VpnError
+                ? theme.colorScheme.error
+                : theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        if (empty && status is VpnDisconnected) ...[
+          const SizedBox(height: 28),
+          Icon(
+            AppIcons.folder,
+            size: 42,
+            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.45),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            ru ? 'Нет серверов' : 'No servers',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            ru
+                ? 'Вставьте ссылку на провайдера или ключ сервера'
+                : 'Paste a provider link or a server key',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+        if (showVpnSettingsCta) ...[
+          const SizedBox(height: 12),
+          FilledButton.tonal(
+            onPressed: () async {
+              final opened = await VpnController.instance.openVpnSettings();
+              if (!context.mounted) return;
+              if (!opened) {
+                showTeremokSnackBar(
+                  context,
+                  settingsKillSwitchOpenFailedForPlatform(l),
+                );
+              }
+            },
+            child: Text(l.settingsKillSwitchOpenVpn),
+          ),
+        ],
+        const Spacer(),
+        Row(
+          children: [
+            Expanded(
+              child: _HomeAction(
+                icon: AppIcons.plus,
+                label: ru ? 'Добавить' : 'Add',
+                onTap: () => context.push('/import'),
+              ),
+            ),
+            Expanded(
+              child: _HomeAction(
+                icon: AppIcons.clipboard,
+                label: ru ? 'Вставить' : 'Paste',
+                onTap: () => context.push('/import'),
+              ),
+            ),
+            _HomeAction(
+              icon: AppIcons.qrCode,
+              label: 'QR',
+              onTap: () => context.push('/import'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _HomeAction extends StatelessWidget {
+  const _HomeAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: OutlinedButton.icon(
+        onPressed: onTap,
+        icon: AppIcon(icon, size: 18),
+        label: Text(label),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: theme.colorScheme.onSurface,
+          side: BorderSide(color: theme.colorScheme.outline),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppBrand.radiusNavPill),
+          ),
+        ),
+      ),
     );
   }
 }

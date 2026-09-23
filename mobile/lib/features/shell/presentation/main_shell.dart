@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/busy/busy_overlay.dart';
 import '../../../core/busy/busy_overlay_host.dart';
+import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/teremok_nav_icon.dart';
@@ -84,7 +85,12 @@ class _MainShellState extends ConsumerState<MainShell> {
                     Expanded(
                       child: _SideNavGlyph(
                         icon: AppIcons.mapPin,
-                        label: l.navLocations,
+                        label: freeKeyClient
+                            ? (Localizations.localeOf(context).languageCode ==
+                                    'ru'
+                                ? 'Сервера'
+                                : 'Servers')
+                            : l.navLocations,
                         selected: selected == MainShell.locationsIndex,
                         onTap: () => _onTap(MainShell.locationsIndex),
                       ),
