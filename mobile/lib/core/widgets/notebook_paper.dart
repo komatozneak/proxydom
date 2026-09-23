@@ -68,16 +68,16 @@ class _NotebookPaperPainter extends CustomPainter {
     }
 
     final marginAlpha =
-        emphasized ? (dark ? 0.42 : 0.55) : (dark ? 0.18 : 0.26);
+        emphasized ? (dark ? 0.58 : 0.72) : (dark ? 0.34 : 0.5);
     final marginPaint = Paint()
       ..color = margin.withValues(alpha: marginAlpha)
-      ..strokeWidth = emphasized ? 2.2 : 1.6
+      ..strokeWidth = emphasized ? 2.6 : 2.2
       ..style = PaintingStyle.stroke
       ..maskFilter = MaskFilter.blur(
         BlurStyle.normal,
-        emphasized ? 1.1 : 2.6,
+        emphasized ? 0.8 : 1.5,
       );
-    const marginX = 18.0;
+    const marginX = 22.0;
     canvas.drawLine(
       const Offset(marginX, 0),
       Offset(marginX, size.height),
