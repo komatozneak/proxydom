@@ -37,18 +37,18 @@ Widget _settingsApp() {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('iOS auto-reconnect is always on without a pref', () async {
+  test('iOS free client leaves reconnect to the packet tunnel', () async {
     SharedPreferences.setMockInitialValues({});
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
-    expect(await AutoReconnectPrefs.isEnabled(), isTrue);
+    expect(await AutoReconnectPrefs.isEnabled(), isFalse);
   });
 
-  test('iOS auto-reconnect ignores a stored off pref', () async {
-    SharedPreferences.setMockInitialValues({'auto_reconnect_enabled': false});
+  test('iOS free client ignores a stored on pref', () async {
+    SharedPreferences.setMockInitialValues({'auto_reconnect_enabled': true});
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
-    expect(await AutoReconnectPrefs.isEnabled(), isTrue);
+    expect(await AutoReconnectPrefs.isEnabled(), isFalse);
   });
 
   test('Android free client leaves reconnect to the native engine', () async {
