@@ -112,7 +112,11 @@ class _MainShellState extends ConsumerState<MainShell> {
         Scaffold(
           backgroundColor: freeKeyClient ? paper : theme.colorScheme.surface,
           body: freeKeyClient
-              ? NotebookPaper(child: widget.navigationShell)
+              ? _PaperStatusScrim(
+                  paper: paper,
+                  dark: theme.brightness == Brightness.dark,
+                  child: NotebookPaper(child: widget.navigationShell),
+                )
               : widget.navigationShell,
           bottomNavigationBar: freeKeyClient
               ? NotebookPaper(
@@ -139,6 +143,48 @@ class _MainShellState extends ConsumerState<MainShell> {
         ),
         const BusyOverlayHost(),
       ],
+    );
+  }
+}
+
+/// Darker band behind the system status icons so they do not melt into the sheet.
+class _PaperStatusScrim extends StatelessWidget {
+  const _PaperStatusScrim({
+    required this.paper,
+    required this.dark,
+    required this.child,
+  });
+
+  final Color paper;
+  final bool dark;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final top = MediaQuery.paddingOf(context).top;
+    final scrim = Color.alphaBlend(
+      Colors.black.withValues(alpha: dark ? 0.45 : 0.14),
+      paper,
+    );
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: dark ? Brightness.light : Brightness.dark,
+        statusBarBrightness: dark ? Brightness.dark : Brightness.light,
+      ),
+      child: Stack(
+        children: [
+          child,
+          if (top > 0)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: top,
+              child: ColoredBox(color: scrim),
+            ),
+        ],
+      ),
     );
   }
 }
