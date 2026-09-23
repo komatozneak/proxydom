@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -12,6 +13,15 @@ const _prefsKey = 'hy2_import_v1';
 class Hy2ImportStore {
   Hy2ImportStore._();
   static final Hy2ImportStore instance = Hy2ImportStore._();
+
+  final _changes = StreamController<void>.broadcast(sync: true);
+
+  /// Fires after a profile list write. Screens reload from this, not from init.
+  Stream<void> get changes => _changes.stream;
+
+  void _changed() {
+    if (!_changes.isClosed) _changes.add(null);
+  }
 
   Future<List<ParsedShareLink>> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -70,6 +80,7 @@ class Hy2ImportStore {
         : Map<String, Object?>.from(jsonDecode(raw) as Map);
     decoded['selected'] = index;
     await prefs.setString(_prefsKey, jsonEncode(decoded));
+    _changed();
   }
 
   /// Accept one URI, a subscription body, or an http(s) URL that returns one.
@@ -93,6 +104,7 @@ class Hy2ImportStore {
         if (source != null && source.isNotEmpty) 'source': source,
       }),
     );
+    _changed();
   }
 
   Future<List<ParsedShareLink>> saveInput(String raw) async {
@@ -118,6 +130,7 @@ class Hy2ImportStore {
         if (source != null && source.isNotEmpty) 'source': source,
       }),
     );
+    _changed();
     return links;
   }
 

@@ -22,6 +22,7 @@ import '../../settings/application/subscription_status_provider.dart';
 import '../../settings/data/installed_apps_channel.dart';
 import '../../settings/data/split_tunnel_prefs.dart';
 import '../../settings/data/subscription_status.dart';
+import '../../vpn/application/imported_profiles_provider.dart';
 import '../../vpn/data/hy2_import_store.dart';
 import '../../vpn/data/vpn_service_config.dart';
 import '../../vpn/data/node_auto_selector.dart';
@@ -449,6 +450,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final l = AppL10n.of(context);
     final theme = Theme.of(context);
     final vpnStatus = ref.watch(vpnProvider);
+
+    if (freeKeyClient) {
+      ref.listen(importedProfilesProvider, (previous, next) {
+        if (next.valueOrNull == null) return;
+        unawaited(_refreshServerCard());
+      });
+    }
 
     ref.listen(vpnProvider, (prev, next) {
       if (prev is! VpnConnected && next is VpnConnected) {

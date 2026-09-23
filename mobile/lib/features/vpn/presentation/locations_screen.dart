@@ -17,6 +17,7 @@ import '../../home/application/vpn_provider.dart';
 import '../../home/application/vpn_status.dart';
 import '../../settings/application/subscription_status_provider.dart';
 import '../../settings/data/subscription_status.dart';
+import '../application/imported_profiles_provider.dart';
 import '../data/hy2_import_store.dart';
 import 'free_client_chrome.dart';
 import '../data/share_link_parser.dart';
@@ -66,7 +67,13 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     final canPop = GoRouter.maybeOf(context)?.canPop() ?? false;
     final busy = ref.watch(busyOverlayProvider).isBusy;
     ref.watch(vpnProvider);
-    if (!freeKeyClient) {
+    if (freeKeyClient) {
+      ref.listen(importedProfilesProvider, (previous, next) {
+        final links = next.valueOrNull;
+        if (links == null) return;
+        unawaited(_applyImported(links));
+      });
+    } else {
       ref.listen<AsyncValue<SubscriptionStatus>>(subscriptionStatusProvider, (
         previous,
         next,
@@ -121,19 +128,22 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
         raw.contains('software caused connection abort');
   }
 
+  Future<void> _applyImported(List<ParsedShareLink> links) async {
+    final index = await Hy2ImportStore.instance.selectedIndex();
+    if (!mounted) return;
+    setState(() {
+      _imported = links;
+      _nodes = const [];
+      _selectedId = links.isEmpty ? null : '$index';
+      _loading = false;
+      _error = null;
+      _fromCache = false;
+    });
+  }
+
   Future<void> _load() async {
     if (freeKeyClient) {
-      final links = await Hy2ImportStore.instance.load();
-      final index = await Hy2ImportStore.instance.selectedIndex();
-      if (!mounted) return;
-      setState(() {
-        _imported = links;
-        _nodes = const [];
-        _selectedId = links.isEmpty ? null : '$index';
-        _loading = false;
-        _error = null;
-        _fromCache = false;
-      });
+      await _applyImported(await Hy2ImportStore.instance.load());
       return;
     }
     setState(() {
