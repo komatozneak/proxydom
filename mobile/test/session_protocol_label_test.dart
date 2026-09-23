@@ -5,6 +5,17 @@ import 'package:teremok_connect/features/vpn/data/vpn_node.dart';
 import 'package:teremok_connect/features/vpn/data/vpn_service_config.dart';
 
 void main() {
+  test('imported share schemes keep their own label', () {
+    expect(
+      sessionProtocolLabel(config: null, selectedNodeProtocol: 'vless'),
+      'VLESS',
+    );
+    expect(
+      sessionProtocolLabel(config: null, selectedNodeProtocol: 'hysteria2'),
+      'HYSTERIA2',
+    );
+  });
+
   test('Hy2 session is HYSTERIA2 not VLESS', () {
     expect(
       sessionProtocolLabel(
