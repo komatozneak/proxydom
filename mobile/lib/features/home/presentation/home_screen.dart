@@ -887,7 +887,7 @@ class _FreeClientHome extends StatelessWidget {
             _HomeAction(
               icon: AppIcons.qrCode,
               label: 'QR',
-              onTap: () => context.push('/import'),
+              onTap: () => context.push('/scan'),
             ),
           ],
         ),

@@ -44,6 +44,7 @@ class LocationsScreen extends ConsumerStatefulWidget {
 
 class _LocationsScreenState extends ConsumerState<LocationsScreen> {
   String _query = '';
+  String? _sourceHost;
 
   List<VpnNode>? _nodes;
   List<ParsedShareLink> _imported = const [];
@@ -119,9 +120,11 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     if (freeKeyClient) {
       final links = await Hy2ImportStore.instance.load();
       final index = await Hy2ImportStore.instance.selectedIndex();
+      final source = await Hy2ImportStore.instance.sourceHost();
       if (!mounted) return;
       setState(() {
         _imported = links;
+        _sourceHost = source;
         _nodes = const [];
         _selectedId = links.isEmpty ? null : '$index';
         _loading = false;
@@ -311,8 +314,8 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
           child: Text(
             ru
-                ? '${_imported.length} серверов'
-                : '${_imported.length} servers',
+                ? '${_imported.length} серверов${_sourceHost == null ? '' : ' · 1 провайдер'}'
+                : '${_imported.length} servers${_sourceHost == null ? '' : ' · 1 provider'}',
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -410,7 +413,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
               ),
               const SizedBox(width: 8),
               OutlinedButton(
-                onPressed: () => context.push('/import'),
+                onPressed: () => context.push('/scan'),
                 child: const AppIcon(AppIcons.qrCode, size: 18),
               ),
             ],

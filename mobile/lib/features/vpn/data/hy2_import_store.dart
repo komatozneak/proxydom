@@ -43,6 +43,17 @@ class Hy2ImportStore {
     return index is int ? index : 0;
   }
 
+  Future<String?> sourceHost() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_prefsKey);
+    if (raw == null || raw.isEmpty) return null;
+    final decoded = jsonDecode(raw);
+    if (decoded is! Map) return null;
+    final source = decoded['source'];
+    if (source is! String || source.trim().isEmpty) return null;
+    return source.trim();
+  }
+
   Future<ParsedShareLink?> selected() async {
     final links = await load();
     if (links.isEmpty) return null;
@@ -90,10 +101,17 @@ class Hy2ImportStore {
       throw const FormatException('no links');
     }
     final lines = links.map((link) => link.raw).toList();
+    final source = looksLikeSubscriptionUrl(text)
+        ? Uri.tryParse(text)?.host
+        : null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
       _prefsKey,
-      jsonEncode({'lines': lines, 'selected': 0}),
+      jsonEncode({
+        'lines': lines,
+        'selected': 0,
+        if (source != null && source.isNotEmpty) 'source': source,
+      }),
     );
     return links;
   }

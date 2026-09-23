@@ -17,6 +17,7 @@ import '../features/settings/presentation/no_vpn_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/shell/presentation/main_shell.dart';
 import '../features/vpn/presentation/hy2_import_screen.dart';
+import '../features/vpn/presentation/share_qr_scan_screen.dart';
 import '../features/vpn/presentation/locations_screen.dart';
 import 'config.dart';
 import 'ios_store_gates.dart';
@@ -94,6 +95,7 @@ class AppRouter {
       // /subscription + /premium parked outside shell — still require auth gate.
       final goingToBillingTabs = loc == '/subscription' || loc == '/premium';
       final goingToImport = loc == '/import';
+      final goingToScan = loc == '/scan';
 
       // Still loading / no ProviderScope — keep the bootstrap spinner on screen.
       // Free clients open Home without an account (ADR 026).
@@ -109,7 +111,9 @@ class AppRouter {
             iosFreeClientRouteBlocked(loc)) {
           return '/home';
         }
-        if (inShell || goingToImport || goingToOnboarding) return null;
+        if (inShell || goingToImport || goingToOnboarding || goingToScan) {
+          return null;
+        }
         return '/home';
       }
 
@@ -202,6 +206,11 @@ class AppRouter {
         path: '/import',
         parentNavigatorKey: rootNavigatorKey,
         builder: (c, s) => const Hy2ImportScreen(),
+      ),
+      GoRoute(
+        path: '/scan',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (c, s) => const ShareQrScanScreen(),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
