@@ -918,7 +918,8 @@ class _FreeClientHome extends StatelessWidget {
                 alignment: Alignment.center,
                 clipBehavior: Clip.none,
                 children: [
-                  HousePulsar(diameter: nestSize),
+                  if (status is VpnConnecting || status is VpnConnected)
+                    HousePulsar(diameter: nestSize),
                   SignalNestHero(
                     key: kHomeSignalNestKey,
                     state: treeState,

@@ -25,6 +25,9 @@ class AppBrand {
   /// Living House mustard — Nest glyph only.
   static const Color livingHouse = Color(0xFFC78F29);
 
+  /// Honey flame behind the house. Brighter than [livingHouse] so the roof edge stays visible.
+  static const Color flame = Color(0xFFFF8F00);
+
   /// Accent on dark surfaces — near-white.
   static const Color accentOnDark = Color(0xFFF5F5F5);
 

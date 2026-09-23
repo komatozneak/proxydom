@@ -4,11 +4,11 @@ import 'package:flutter/material.dart';
 
 import '../theme.dart';
 
-/// Three house-colored discs, larger toward the outside, breathing in place.
+/// Honey flame from the middle of the house, only while the tunnel is coming up.
 class HousePulsar extends StatefulWidget {
   const HousePulsar({super.key, required this.diameter});
 
-  /// Diameter of the innermost disc, matching the house box.
+  /// Diameter of the house box. The glow starts inside it.
   final double diameter;
 
   @override
@@ -39,7 +39,7 @@ class _HousePulsarState extends State<HousePulsar>
     return AnimatedBuilder(
       animation: _tick,
       builder: (context, _) {
-        final canvas = widget.diameter * 1.46;
+        final canvas = widget.diameter * 1.42;
         return OverflowBox(
           alignment: Alignment.center,
           minWidth: canvas,
@@ -51,7 +51,7 @@ class _HousePulsarState extends State<HousePulsar>
             painter: _PulsarPainter(
               t: _tick.value,
               diameter: widget.diameter,
-              color: AppBrand.livingHouse,
+              color: AppBrand.flame,
             ),
           ),
         );
@@ -71,23 +71,41 @@ class _PulsarPainter extends CustomPainter {
   final double diameter;
   final Color color;
 
-  /// Outer first so the denser inner disc sits on top.
+  /// Outer first. Scales are fractions of the house radius, starting inside it.
   static const List<(double scale, double alpha, double phase)> _rings = [
-    (1.32, 0.07, 0),
-    (1.14, 0.13, 2.1),
-    (1.0, 0.22, 4.2),
+    (1.28, 0.03, 0),
+    (1.0, 0.05, 1.05),
+    (0.78, 0.08, 2.1),
+    (0.58, 0.11, 3.15),
+    (0.38, 0.15, 4.2),
+    (0.18, 0.20, 5.25),
   ];
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final base = diameter / 2;
+    final reach = base * 1.28;
     final turn = t * math.pi * 2;
+    final breathe = 1 + 0.035 * math.sin(turn);
+    canvas.drawCircle(
+      center,
+      reach * breathe,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            color.withValues(alpha: 0.26),
+            color.withValues(alpha: 0.10),
+            color.withValues(alpha: 0),
+          ],
+          stops: const [0.0, 0.42, 1.0],
+        ).createShader(Rect.fromCircle(center: center, radius: reach)),
+    );
     for (final ring in _rings) {
-      final breathe = 1 + 0.045 * math.sin(turn + ring.$3);
+      final pulse = 1 + 0.04 * math.sin(turn + ring.$3);
       canvas.drawCircle(
         center,
-        base * ring.$1 * breathe,
+        base * ring.$1 * pulse,
         Paint()..color = color.withValues(alpha: ring.$2),
       );
     }
