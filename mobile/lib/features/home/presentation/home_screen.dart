@@ -1113,7 +1113,9 @@ class _NoVpnHomeRow extends StatelessWidget {
                   Text(
                     '$enabled / $total',
                     style: theme.textTheme.labelLarge?.copyWith(
-                      color: AppBrand.primary,
+                      color: theme.brightness == Brightness.dark
+                          ? AppBrand.inkDark
+                          : AppBrand.inkLight,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
