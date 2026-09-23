@@ -890,61 +890,63 @@ class _FreeClientHome extends StatelessWidget {
                     ? l.homeConnected
                     : l.homeDisconnected;
 
+    final accent = status is VpnConnected
+        ? AppBrand.success
+        : status is VpnConnecting
+            ? AppBrand.warning
+            : AppBrand.destructive;
+
     return Column(
       children: [
         Expanded(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              SizedBox(
-                width: nestSize,
-                height: nestSize,
-                child: Stack(
-                  alignment: Alignment.center,
-                  clipBehavior: Clip.none,
-                  children: [
-                    HousePulsar(diameter: nestSize),
-                    SignalNestHero(
-                      key: kHomeSignalNestKey,
-                      state: treeState,
-                      onTap: () => onNestTap(),
-                      size: nestSize,
-                    ),
-                  ],
-                ),
+          child: Center(
+            child: SizedBox(
+              width: nestSize,
+              height: nestSize,
+              child: Stack(
+                alignment: Alignment.center,
+                clipBehavior: Clip.none,
+                children: [
+                  HousePulsar(diameter: nestSize),
+                  SignalNestHero(
+                    key: kHomeSignalNestKey,
+                    state: treeState,
+                    onTap: () => onNestTap(),
+                    size: nestSize,
+                  ),
+                ],
               ),
-              ConnectionStatusPanel(
-                status: statusText,
-                profile: profile,
-                protocol: protocol,
-                uptime: uptime,
-              ),
-              if (empty &&
-                  status is! VpnConnected &&
-                  status is! VpnConnecting) ...[
-                const SizedBox(height: 16),
-                const FreeClientEmptyState(compact: true),
-              ],
-              if (showVpnSettingsCta) ...[
-                const SizedBox(height: 12),
-                FilledButton.tonal(
-                  onPressed: () async {
-                    final opened =
-                        await VpnController.instance.openVpnSettings();
-                    if (!context.mounted) return;
-                    if (!opened) {
-                      showTeremokSnackBar(
-                        context,
-                        settingsKillSwitchOpenFailedForPlatform(l),
-                      );
-                    }
-                  },
-                  child: Text(l.settingsKillSwitchOpenVpn),
-                ),
-              ],
-            ],
+            ),
           ),
         ),
+        if (empty && status is! VpnConnected && status is! VpnConnecting) ...[
+          const FreeClientEmptyState(compact: true),
+          const SizedBox(height: 12),
+        ],
+        ConnectionStatusPanel(
+          status: statusText,
+          profile: profile,
+          protocol: protocol,
+          uptime: uptime,
+          accent: accent,
+        ),
+        if (showVpnSettingsCta) ...[
+          const SizedBox(height: 12),
+          FilledButton.tonal(
+            onPressed: () async {
+              final opened = await VpnController.instance.openVpnSettings();
+              if (!context.mounted) return;
+              if (!opened) {
+                showTeremokSnackBar(
+                  context,
+                  settingsKillSwitchOpenFailedForPlatform(l),
+                );
+              }
+            },
+            child: Text(l.settingsKillSwitchOpenVpn),
+          ),
+        ],
+        const SizedBox(height: 12),
         FreeClientActionBar(
           primaryAdd: empty,
           onAdd: () => context.push('/import'),

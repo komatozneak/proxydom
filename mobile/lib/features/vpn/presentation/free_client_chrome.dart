@@ -124,12 +124,14 @@ class ConnectionStatusPanel extends StatelessWidget {
     required this.status,
     required this.profile,
     required this.protocol,
+    required this.accent,
     this.uptime,
   });
 
   final String status;
   final String profile;
   final String protocol;
+  final Color accent;
   final String? uptime;
 
   @override
@@ -146,10 +148,11 @@ class ConnectionStatusPanel extends StatelessWidget {
       ),
       child: Column(
         children: [
-          _row(theme, l.freeStatus, status, emphasize: true),
+          _row(theme, l.freeStatus, status, emphasize: true, valueColor: accent),
           _row(theme, l.freeProfile, profile),
           _row(theme, l.freeProtocol, protocol),
-          if (uptime != null) _row(theme, l.freeUptime, uptime!),
+          if (uptime != null)
+            _row(theme, l.freeUptime, uptime!, valueColor: accent),
         ],
       ),
     );
@@ -160,6 +163,7 @@ class ConnectionStatusPanel extends StatelessWidget {
     String label,
     String value, {
     bool emphasize = false,
+    Color? valueColor,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -181,6 +185,7 @@ class ConnectionStatusPanel extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: emphasize ? FontWeight.w800 : FontWeight.w700,
+                color: valueColor,
               ),
             ),
           ),
