@@ -51,9 +51,16 @@ void main() {
     expect(await AutoReconnectPrefs.isEnabled(), isTrue);
   });
 
-  test('Android auto-reconnect stays default on', () async {
+  test('Android free client leaves reconnect to the native engine', () async {
     SharedPreferences.setMockInitialValues({});
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    expect(await AutoReconnectPrefs.isEnabled(), isFalse);
+  });
+
+  test('non-store platform keeps auto-reconnect default on', () async {
+    SharedPreferences.setMockInitialValues({});
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
     expect(await AutoReconnectPrefs.isEnabled(), isTrue);
     await AutoReconnectPrefs.setEnabled(false);
@@ -73,7 +80,8 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
-  testWidgets('Android Settings keeps the auto-reconnect switch', (tester) async {
+  testWidgets('Android Settings hides the account auto-reconnect switch',
+      (tester) async {
     SharedPreferences.setMockInitialValues({});
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
@@ -81,8 +89,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
 
-    expect(find.text('Авто-переподключение'), findsOneWidget);
-    expect(find.byType(Switch), findsWidgets);
+    expect(find.text('Авто-переподключение'), findsNothing);
     debugDefaultTargetPlatformOverride = null;
   });
 }
