@@ -384,7 +384,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
                 ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
           child: FreeClientActionBar(
             onPaste: () => context.push('/import?clipboard=1'),
             onScan: () => context.push('/scan'),

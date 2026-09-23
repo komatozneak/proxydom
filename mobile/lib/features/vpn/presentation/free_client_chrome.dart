@@ -22,6 +22,7 @@ class FreeClientActionBar extends StatelessWidget {
       borderRadius: BorderRadius.circular(AppBrand.radiusPill),
     );
     const pad = EdgeInsets.symmetric(horizontal: 12, vertical: 14);
+    const barHeight = 52.0;
     return Row(
       children: [
         Expanded(
@@ -33,6 +34,7 @@ class FreeClientActionBar extends StatelessWidget {
             foreground: AppBrand.surfaceElevatedLight,
             shape: shape,
             pad: pad,
+            height: barHeight,
           ),
         ),
         const SizedBox(width: 8),
@@ -45,6 +47,7 @@ class FreeClientActionBar extends StatelessWidget {
             foreground: AppBrand.inkLight,
             shape: shape,
             pad: pad,
+            height: barHeight,
           ),
         ),
       ],
@@ -59,20 +62,28 @@ class FreeClientActionBar extends StatelessWidget {
     required Color foreground,
     required OutlinedBorder shape,
     required EdgeInsets pad,
+    required double height,
   }) {
-    return FilledButton.icon(
-      onPressed: onPressed,
-      icon: AppIcon(icon, size: 18, color: foreground),
-      label: Text(
-        label,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      style: FilledButton.styleFrom(
-        padding: pad,
-        shape: shape,
-        backgroundColor: background,
-        foregroundColor: foreground,
+    return SizedBox(
+      height: height,
+      width: double.infinity,
+      child: FilledButton.icon(
+        onPressed: onPressed,
+        icon: AppIcon(icon, size: 18, color: foreground),
+        label: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        style: FilledButton.styleFrom(
+          padding: pad,
+          minimumSize: Size(double.infinity, height),
+          fixedSize: Size.fromHeight(height),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          shape: shape,
+          backgroundColor: background,
+          foregroundColor: foreground,
+        ),
       ),
     );
   }
