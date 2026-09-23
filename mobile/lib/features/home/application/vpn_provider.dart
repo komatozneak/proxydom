@@ -17,6 +17,7 @@ import '../../auth/application/auth_provider.dart';
 import '../../auth/application/auth_state.dart';
 import '../../beta/application/beta_usage_tracker.dart';
 import '../../vpn/data/hy2_import_store.dart';
+import '../../vpn/data/xray_share_config.dart';
 import '../../vpn/data/node_auto_selector.dart';
 import '../../vpn/data/node_display.dart';
 import '../../vpn/data/vpn_config.dart';
@@ -1481,17 +1482,32 @@ class VpnNotifier extends Notifier<VpnStatus> {
           return;
         }
         final profile = imported.hy2?.profile;
-        if (profile == null) {
+        final bool started;
+        if (profile != null) {
+          started = await VpnController.instance.startHysteria(
+            profile,
+            displayLabel: imported.name,
+          );
+        } else if (defaultTargetPlatform == TargetPlatform.android) {
+          final xrayJson = buildXraySocksConfig(imported);
+          if (xrayJson == null) {
+            state = const VpnError(
+              message: 'share_unsupported',
+              code: 'share_unsupported',
+            );
+            return;
+          }
+          started = await VpnController.instance.startXray(
+            xrayJson,
+            displayLabel: imported.name,
+          );
+        } else {
           state = const VpnError(
-            message: 'share_engine_pending',
-            code: 'share_engine_pending',
+            message: 'share_ios_hy2_only',
+            code: 'share_ios_hy2_only',
           );
           return;
         }
-        final started = await VpnController.instance.startHysteria(
-          profile,
-          displayLabel: imported.name,
-        );
         if (await _abortStaleConnect(gen)) return;
         if (!started) {
           state = await _errorForStartFailure();
