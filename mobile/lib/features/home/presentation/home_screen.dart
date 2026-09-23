@@ -898,6 +898,17 @@ class _FreeClientHome extends StatelessWidget {
 
     return Column(
       children: [
+        ConnectionStatusPanel(
+          status: statusText,
+          profile: profile,
+          protocol: protocol,
+          uptime: uptime,
+          accent: accent,
+        ),
+        if (empty && status is! VpnConnected && status is! VpnConnecting) ...[
+          const SizedBox(height: 12),
+          const FreeClientEmptyState(compact: true),
+        ],
         Expanded(
           child: Center(
             child: SizedBox(
@@ -918,17 +929,6 @@ class _FreeClientHome extends StatelessWidget {
               ),
             ),
           ),
-        ),
-        if (empty && status is! VpnConnected && status is! VpnConnecting) ...[
-          const FreeClientEmptyState(compact: true),
-          const SizedBox(height: 12),
-        ],
-        ConnectionStatusPanel(
-          status: statusText,
-          profile: profile,
-          protocol: protocol,
-          uptime: uptime,
-          accent: accent,
         ),
         if (showVpnSettingsCta) ...[
           const SizedBox(height: 12),
