@@ -266,12 +266,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
   }
 
   Future<void> _onLockedPremiumTap() async {
-    // iOS: Account / Telegram bind — not /promo. Android keeps Platega.
-    if (hideInAppPlategaCheckout) {
-      await context.push('/import');
-      return;
-    }
-    context.push('/subscription');
+    await context.push('/import');
   }
 
   /// Free/online egress + always keep Premium/locked rows in the pool (gray).

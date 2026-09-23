@@ -95,18 +95,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   Future<void> _openSubscription() async {
     if (_openingSubscription || !mounted) return;
-    if (hideInAppPlategaCheckout) {
-      await context.push('/import');
-      return;
-    }
-    // Imperative /subscription can leave matchedLocation on /home; rely on
-    // route currency so a second tap does not push a duplicate page key.
-    final route = ModalRoute.of(context);
-    if (route != null && !route.isCurrent) return;
-    if (GoRouterState.of(context).uri.path == '/subscription') return;
     _openingSubscription = true;
     try {
-      await context.push('/subscription');
+      await context.push('/import');
     } finally {
       if (mounted) _openingSubscription = false;
     }
@@ -591,9 +582,7 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
       VpnError(:final code) when code == 'device_limit_reached' =>
         l.settingsDevicesHint,
       VpnError(:final code) when code == 'quota_exceeded' =>
-        hideInAppPlategaCheckout
-            ? l.iosBillingUnavailableBody
-            : l.homeQuotaExceededHint,
+        l.iosBillingUnavailableBody,
       VpnError(:final code) when code == kVpnPathIncompatibleErrorCode =>
         l.homePathIncompatibleHint,
       VpnError() => l.homeErrorFriendly,
@@ -637,9 +626,8 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
               ),
             ),
             exhaustedLabel: l.homeTrafficExhausted,
-            teaser:
-                hideInAppPlategaCheckout ? null : l.homeQuotaUnlimitedTeaser,
-            ctaLabel: hideInAppPlategaCheckout ? null : l.homeQuotaUnlimitedCta,
+            teaser: null,
+            ctaLabel: null,
             onTap: widget.onOpenSubscription,
           ),
           const SizedBox(height: 8),
@@ -711,15 +699,11 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
         if (showQuotaCta) ...[
           const SizedBox(height: 12),
           FilledButton.tonal(
-            onPressed: hideInAppPlategaCheckout
-                ? () => context.push('/import')
-                : () => context.push('/locked'),
+            onPressed: () => context.push('/import'),
             child: Text(
-              hideInAppPlategaCheckout
-                  ? (Localizations.localeOf(context).languageCode == 'ru'
-                      ? 'Вставить ссылку'
-                      : 'Paste link')
-                  : l.homeQuotaUpgradeCta,
+              Localizations.localeOf(context).languageCode == 'ru'
+                  ? 'Вставить ссылку'
+                  : 'Paste link',
             ),
           ),
         ],

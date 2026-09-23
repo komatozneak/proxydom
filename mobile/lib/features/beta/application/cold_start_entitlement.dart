@@ -57,16 +57,10 @@ class ColdStartEntitlement {
       if (!context.mounted) return;
       switch (dest) {
         case PostAuthDestination.home:
-          // Already on Home (or shell). Keep postAuthResolved.
-          return;
         case PostAuthDestination.onboarding:
-          await AppRouter.goAfterEntitlement(context, '/onboarding');
         case PostAuthDestination.promo:
-          AppRouter.postAuthResolved = false;
-          context.go('/promo');
         case PostAuthDestination.locked:
-          AppRouter.postAuthResolved = false;
-          context.go('/locked');
+          return;
       }
     } on DioException catch (e) {
       AppLogBuffer.instance.warn(

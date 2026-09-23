@@ -135,13 +135,8 @@ class _PostAuthGateScreenState extends ConsumerState<PostAuthGateScreen> {
           AppLogBuffer.instance.info('gate.dest=${dest.name}');
           switch (dest) {
             case PostAuthDestination.promo:
-              AppRouter.postAuthResolved = false;
-              context.go('/promo');
             case PostAuthDestination.locked:
-              AppRouter.postAuthResolved = false;
-              context.go('/locked');
             case PostAuthDestination.onboarding:
-              await AppRouter.goAfterEntitlement(context, '/onboarding');
             case PostAuthDestination.home:
               await AppRouter.goAfterEntitlement(context, '/home');
           }
