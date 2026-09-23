@@ -544,6 +544,22 @@ class _DashboardBody extends ConsumerStatefulWidget {
 
 class _DashboardBodyState extends ConsumerState<_DashboardBody> {
   String? _warmingHost;
+  Timer? _uptimeTick;
+
+  @override
+  void initState() {
+    super.initState();
+    _uptimeTick = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted || widget.status is! VpnConnected) return;
+      setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _uptimeTick?.cancel();
+    super.dispose();
+  }
 
   /// Last Free meter so a background refresh does not unmount the bar.
   SubscriptionStatus? _stickyMeteredQuota;
