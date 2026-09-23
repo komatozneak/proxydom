@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/ios_store_gates.dart';
 import '../../home/application/vpn_provider.dart';
 import '../data/hy2_import_store.dart';
-import '../data/hy2_link_parser.dart';
+import '../data/share_link_parser.dart';
 
 /// Paste a key or subscription URL, then connect. Android and iOS (ADR 026).
 class Hy2ImportScreen extends ConsumerStatefulWidget {
@@ -17,7 +17,7 @@ class Hy2ImportScreen extends ConsumerStatefulWidget {
 
 class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
   final _controller = TextEditingController();
-  List<ParsedHy2Link> _links = const [];
+  List<ParsedShareLink> _links = const [];
   int _selected = 0;
   String? _error;
   bool _busy = false;
@@ -98,8 +98,8 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
         children: [
           Text(
             ru
-                ? 'Вставьте hysteria2:// или ссылку подписки. Приложение не продаёт доступ.'
-                : 'Paste a hysteria2:// link or a subscription URL. This app does not sell access.',
+                ? 'Вставьте hysteria2://, vless://, vmess://, trojan://, ss:// или ссылку подписки.'
+                : 'Paste hysteria2, vless, vmess, trojan, ss, or a subscription URL.',
           ),
           const SizedBox(height: 16),
           TextField(
@@ -134,7 +134,7 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
             ListTile(
               selected: i == _selected,
               title: Text(_links[i].name),
-              subtitle: Text(_links[i].profile.server),
+              subtitle: Text('${_links[i].scheme} ${_links[i].endpoint}'),
               onTap: () => setState(() => _selected = i),
             ),
           if (_links.isNotEmpty) ...[

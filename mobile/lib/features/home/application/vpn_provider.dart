@@ -1480,8 +1480,16 @@ class VpnNotifier extends Notifier<VpnStatus> {
           );
           return;
         }
+        final profile = imported.hy2?.profile;
+        if (profile == null) {
+          state = const VpnError(
+            message: 'share_engine_pending',
+            code: 'share_engine_pending',
+          );
+          return;
+        }
         final started = await VpnController.instance.startHysteria(
-          imported.profile,
+          profile,
           displayLabel: imported.name,
         );
         if (await _abortStaleConnect(gen)) return;

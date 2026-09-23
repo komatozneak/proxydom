@@ -19,7 +19,7 @@ import '../../home/application/vpn_status.dart';
 import '../../settings/application/subscription_status_provider.dart';
 import '../../settings/data/subscription_status.dart';
 import '../data/hy2_import_store.dart';
-import '../data/hy2_link_parser.dart';
+import '../data/share_link_parser.dart';
 import '../data/node_auto_selector.dart';
 import '../data/node_display.dart';
 import '../data/vpn_controller.dart';
@@ -44,7 +44,7 @@ class LocationsScreen extends ConsumerStatefulWidget {
 
 class _LocationsScreenState extends ConsumerState<LocationsScreen> {
   List<VpnNode>? _nodes;
-  List<ParsedHy2Link> _imported = const [];
+  List<ParsedShareLink> _imported = const [];
   String? _selectedId;
   Object? _error;
   bool _loading = true;
@@ -309,7 +309,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
           child: ListTile(
             selected: selected,
             title: Text(link.name),
-            subtitle: Text(link.profile.server),
+            subtitle: Text('${link.scheme} ${link.endpoint}'),
             onTap: () async {
               await Hy2ImportStore.instance.select(index);
               if (!mounted) return;

@@ -167,7 +167,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           _serverFlag = kFlagGlobe;
         } else {
           _serverTitle = selected.name;
-          _serverSubtitle = selected.profile.server;
+          _serverSubtitle = selected.endpoint;
           _serverFlag = kFlagGlobe;
         }
       });
