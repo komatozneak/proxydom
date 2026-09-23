@@ -1438,6 +1438,14 @@ class VpnNotifier extends Notifier<VpnStatus> {
     bool reuseConfig = false,
     required int gen,
   }) async {
+    if (hideInAppPlategaCheckout) {
+      final imported = await Hy2ImportStore.instance.selected();
+      if (await _abortStaleConnect(gen)) return;
+      if (imported == null) {
+        state = const VpnDisconnected();
+        return;
+      }
+    }
     // Conflict before Connecting — foreign VPN must not paint a spinner.
     final existing = await VpnController.instance.getStatus();
     if (await _abortStaleConnect(gen)) return;

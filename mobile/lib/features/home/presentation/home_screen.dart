@@ -428,6 +428,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     }
 
     if (status is VpnDisconnected || status is VpnError) {
+      if (freeKeyClient && _importedScheme == null) {
+        context.push('/import');
+        return;
+      }
       final allowed = await VpnDisclosureDialog.ensureAccepted(context);
       if (!allowed || !mounted) return;
       await notifier.connect();
@@ -860,11 +864,13 @@ class _FreeClientHome extends StatelessWidget {
     final profile = empty ? l.freeNoProfile : serverTitle;
     final statusText = status is VpnConnecting
         ? l.homeConnecting
-        : status is VpnError
-            ? l.homeError
-            : status is VpnConnected
-                ? l.homeConnected
-                : l.homeDisconnected;
+        : empty
+            ? l.homeDisconnected
+            : status is VpnError
+                ? l.homeError
+                : status is VpnConnected
+                    ? l.homeConnected
+                    : l.homeDisconnected;
 
     return Column(
       children: [
@@ -901,7 +907,7 @@ class _FreeClientHome extends StatelessWidget {
                 protocol: protocol,
                 uptime: uptime,
               ),
-              if (empty && status is VpnDisconnected) ...[
+              if (empty && status is! VpnConnected && status is! VpnConnecting) ...[
                 const SizedBox(height: 16),
                 const FreeClientEmptyState(compact: true),
               ],
