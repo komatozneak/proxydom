@@ -44,7 +44,6 @@ class LocationsScreen extends ConsumerStatefulWidget {
 
 class _LocationsScreenState extends ConsumerState<LocationsScreen> {
   String _query = '';
-  String? _sourceHost;
 
   List<VpnNode>? _nodes;
   List<ParsedShareLink> _imported = const [];
@@ -85,9 +84,16 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       appBar: AppBar(
         backgroundColor: freeKeyClient ? Colors.transparent : null,
         surfaceTintColor: freeKeyClient ? Colors.transparent : null,
-        title: Text(
-          freeKeyClient ? l.freeServers : l.regionTitle,
-        ),
+        title: freeKeyClient
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(l.freeServers),
+                  const SizedBox(width: 8),
+                  _ServerCountChip(count: _imported.length),
+                ],
+              )
+            : Text(l.regionTitle),
         leading: canPop
             ? IconButton(
                 icon: const AppIcon(AppIcons.back),
@@ -119,11 +125,9 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     if (freeKeyClient) {
       final links = await Hy2ImportStore.instance.load();
       final index = await Hy2ImportStore.instance.selectedIndex();
-      final source = await Hy2ImportStore.instance.sourceHost();
       if (!mounted) return;
       setState(() {
         _imported = links;
-        _sourceHost = source;
         _nodes = const [];
         _selectedId = links.isEmpty ? null : '$index';
         _loading = false;
@@ -320,20 +324,6 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     final connected = ref.watch(vpnProvider) is VpnConnected;
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              _sourceHost == null
-                  ? '${_imported.length}'
-                  : '${_imported.length} · $_sourceHost',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-        ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
           child: TextField(
@@ -699,6 +689,33 @@ class _SignalBars extends StatelessWidget {
           ),
         );
       }),
+    );
+  }
+}
+
+class _ServerCountChip extends StatelessWidget {
+  const _ServerCountChip({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: dark ? AppBrand.surfaceVariantDark : AppBrand.surfaceElevatedLight,
+        borderRadius: BorderRadius.circular(AppBrand.radiusPill),
+        border: Border.all(color: theme.colorScheme.outline),
+      ),
+      child: Text(
+        '$count',
+        style: theme.textTheme.labelLarge?.copyWith(
+          fontWeight: FontWeight.w800,
+          color: dark ? AppBrand.inkDark : AppBrand.inkLight,
+        ),
+      ),
     );
   }
 }

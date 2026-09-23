@@ -114,7 +114,21 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
     final keyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
     return Scaffold(
       resizeToAvoidBottomInset: true,
-      appBar: AppBar(title: Text(l.freeAddTitle)),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        leading: IconButton(
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/home');
+            }
+          },
+          icon: const _AddBackMark(),
+        ),
+        title: Text(l.freeAddTitle),
+      ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
@@ -232,6 +246,31 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _AddBackMark extends StatelessWidget {
+  const _AddBackMark();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    return Container(
+      width: 36,
+      height: 36,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: dark ? AppBrand.surfaceVariantDark : AppBrand.surfaceElevatedLight,
+        shape: BoxShape.circle,
+        border: Border.all(color: theme.colorScheme.outline),
+      ),
+      child: AppIcon(
+        AppIcons.back,
+        size: 18,
+        color: dark ? AppBrand.inkDark : AppBrand.inkLight,
       ),
     );
   }
