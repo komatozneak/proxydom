@@ -8,6 +8,13 @@ void main() {
     expect(AppBrand.paperLight.r, greaterThan(AppBrand.paperLight.b));
     expect(AppBrand.paperDark.r, greaterThan(AppBrand.paperDark.b));
     expect(AppBrand.paperGrid.r, greaterThan(AppBrand.paperGrid.b));
+    final lightSheet = AppBrand.paperLight.r +
+        AppBrand.paperLight.g +
+        AppBrand.paperLight.b;
+    final lightGrid = AppBrand.paperGridLight.r +
+        AppBrand.paperGridLight.g +
+        AppBrand.paperGridLight.b;
+    expect(lightGrid, lessThan(lightSheet));
     expect(AppBrand.paperMargin.r, greaterThan(AppBrand.paperMargin.g));
     expect(AppBrand.paperMargin.r, greaterThan(AppBrand.paperMargin.b));
   });

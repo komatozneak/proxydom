@@ -21,7 +21,7 @@ class NotebookPaper extends StatelessWidget {
     return CustomPaint(
       painter: _NotebookPaperPainter(
         paper: dark ? AppBrand.paperDark : AppBrand.paperLight,
-        grid: AppBrand.paperGrid,
+        grid: dark ? AppBrand.paperGrid : AppBrand.paperGridLight,
         margin: AppBrand.paperMargin,
         emphasized: emphasized,
         dark: dark,

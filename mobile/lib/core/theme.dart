@@ -52,14 +52,17 @@ class AppBrand {
 
   static const Color surfaceDark = Color(0xFF121212);
 
-  /// Free-client sheet: reference taupe, lifted toward cream so type holds.
-  static const Color paperLight = Color(0xFFD9CFC6);
+  /// Free-client sheet: cream, lighter than the house so the roof stays separate.
+  static const Color paperLight = Color(0xFFF6F1EA);
 
   /// Same hue as [paperLight], deepened so it stays oak rather than navy.
   static const Color paperDark = Color(0xFF221C1A);
 
-  /// Ivory grid ink. Drawn at low alpha so it does not cut type.
+  /// Ivory grid ink for the dark sheet. Drawn at low alpha so it does not cut type.
   static const Color paperGrid = Color(0xFFF4EDE3);
+
+  /// Pencil grid on the light sheet. Darker than [paperLight].
+  static const Color paperGridLight = Color(0xFFB7A898);
 
   /// Margin rule: living-house mustard mixed toward [destructive].
   static const Color paperMargin = Color(0xFFD4682E);
