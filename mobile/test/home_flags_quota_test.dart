@@ -257,8 +257,8 @@ void main() {
 
     expect(find.byKey(kHomeQuotaBarKey), findsOneWidget);
     expect(find.byType(FreeQuotaBar), findsOneWidget);
-    expect(find.text('Безлимит с Premium'), findsOneWidget);
-    expect(find.text('Подключить безлимит'), findsOneWidget);
+    expect(find.text('Безлимит с Premium'), findsNothing);
+    expect(find.text('Подключить безлимит'), findsNothing);
     expect(find.byType(SignalNestHero), findsOneWidget);
 
     final quotaY = tester.getTopLeft(find.byKey(kHomeQuotaBarKey)).dy;
@@ -337,12 +337,16 @@ void main() {
     expect(tester.getTopLeft(find.byKey(kHomeQuotaBarKey)).dy, yBefore);
   });
 
-  testWidgets('quota curtain tap opens /subscription', (tester) async {
+  testWidgets('quota curtain tap opens paste link', (tester) async {
     final router = GoRouter(
       routes: [
         GoRoute(
           path: '/',
           builder: (_, __) => const HomeScreen(),
+        ),
+        GoRoute(
+          path: '/import',
+          builder: (_, __) => const Scaffold(body: Text('IMPORT_LINK')),
         ),
         GoRoute(
           path: '/subscription',
@@ -391,7 +395,8 @@ void main() {
 
     await tester.tap(find.byKey(kHomeQuotaBarKey));
     await tester.pumpAndSettle();
-    expect(find.text('SUB_PAGE'), findsOneWidget);
+    expect(find.text('IMPORT_LINK'), findsOneWidget);
+    expect(find.text('SUB_PAGE'), findsNothing);
   });
 
   testWidgets('iOS quota bar tap opens paste link, not /subscription',
@@ -536,7 +541,7 @@ void main() {
 
     expect(find.text('Оформить Premium'), findsNothing);
     expect(find.textContaining('Оформите Premium'), findsNothing);
-    await tester.tap(find.widgetWithText(FilledButton, 'Аккаунт'));
+    await tester.tap(find.text('Вставить ссылку').first);
     await tester.pumpAndSettle();
     expect(find.text('IMPORT_LINK'), findsOneWidget);
     expect(find.text('Сначала подключитесь.'), findsNothing);
@@ -545,17 +550,16 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
-  testWidgets('two fast taps from StatefulShellRoute open one /subscription',
-      (tester) async {
+  testWidgets('two fast taps open one paste screen', (tester) async {
     final rootKey = GlobalKey<NavigatorState>(debugLabel: 'root');
     final router = GoRouter(
       navigatorKey: rootKey,
       initialLocation: '/home',
       routes: [
         GoRoute(
-          path: '/subscription',
+          path: '/import',
           parentNavigatorKey: rootKey,
-          builder: (_, __) => const Scaffold(body: Text('SUB_PAGE')),
+          builder: (_, __) => const Scaffold(body: Text('IMPORT_LINK')),
         ),
         StatefulShellRoute.indexedStack(
           builder: (context, state, navigationShell) {
@@ -638,12 +642,14 @@ void main() {
 
     // Duplicate push would assert on page keys (!keyReservation.contains).
     expect(tester.takeException(), isNull);
-    expect(find.text('SUB_PAGE', skipOffstage: false), findsOneWidget);
+    expect(find.text('IMPORT_LINK', skipOffstage: false), findsOneWidget);
     expect(find.byType(HomeScreen, skipOffstage: false), findsOneWidget);
   });
 
   testWidgets('Auto connecting cycles Free pool flags LV then US',
       (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
     final container = ProviderContainer(
       overrides: [
         vpnNodesRepositoryProvider.overrideWithValue(
@@ -695,10 +701,13 @@ void main() {
         .flag;
     expect(second, kFlagUsa);
     expect(find.text('Автоматически'), findsOneWidget);
+    debugDefaultTargetPlatformOverride = null;
   });
 
   testWidgets('Home ServerCard strips · Premium like Locations titles',
       (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
     const yt = VpnNode(
       id: 'al-youtube',
       label: 'YouTube · Premium',
@@ -742,10 +751,13 @@ void main() {
 
     expect(find.text('YouTube'), findsWidgets);
     expect(find.textContaining('· Premium'), findsNothing);
+    debugDefaultTargetPlatformOverride = null;
   });
 
   testWidgets('Auto connected winner shows Locations title, not Европа · Авто',
       (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
     final container = ProviderContainer(
       overrides: [
         vpnNodesRepositoryProvider.overrideWithValue(
@@ -778,6 +790,7 @@ void main() {
     expect(find.text('Низкий пинг'), findsOneWidget);
     expect(find.text('Европа'), findsNothing);
     expect(find.textContaining('Авто'), findsNothing);
+    debugDefaultTargetPlatformOverride = null;
   });
 
   testWidgets('connecting hint uses canonical location title', (tester) async {

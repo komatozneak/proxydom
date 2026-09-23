@@ -10,7 +10,7 @@ import 'package:teremok_connect/l10n/app_localizations.dart';
 const _screenSources = [
   'lib/features/home/presentation/home_screen.dart',
   'lib/features/settings/presentation/settings_screen.dart',
-  'lib/features/beta/presentation/locked_access_screen.dart',
+  'lib/features/vpn/presentation/hy2_import_screen.dart',
 ];
 
 Widget _wrap(Widget child, {ThemeData? theme}) {
