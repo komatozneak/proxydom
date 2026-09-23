@@ -301,7 +301,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         Localizations.localeOf(context);
     final localeLabel = _localeLabel(l, locale);
     return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
+      backgroundColor:
+          freeKeyClient ? Colors.transparent : theme.colorScheme.surface,
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
@@ -683,4 +684,3 @@ class _SettingsRow extends StatelessWidget {
     );
   }
 }
-

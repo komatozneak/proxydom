@@ -463,7 +463,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     });
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
+      backgroundColor:
+          freeKeyClient ? Colors.transparent : theme.colorScheme.surface,
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -923,7 +924,9 @@ class _FreeClientHome extends StatelessWidget {
                 protocol: protocol,
                 uptime: uptime,
               ),
-              if (empty && status is! VpnConnected && status is! VpnConnecting) ...[
+              if (empty &&
+                  status is! VpnConnected &&
+                  status is! VpnConnecting) ...[
                 const SizedBox(height: 16),
                 const FreeClientEmptyState(compact: true),
               ],

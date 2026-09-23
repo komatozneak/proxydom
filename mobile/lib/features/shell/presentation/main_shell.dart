@@ -9,6 +9,7 @@ import '../../../core/busy/busy_overlay_host.dart';
 import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
+import '../../../core/widgets/notebook_paper.dart';
 import '../../../core/widgets/teremok_nav_icon.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../beta/application/cold_start_entitlement.dart';
@@ -66,55 +67,74 @@ class _MainShellState extends ConsumerState<MainShell> {
     final selected = widget.navigationShell.currentIndex;
     final elevated = theme.colorScheme.surfaceContainerHighest;
     final line = theme.colorScheme.outline;
-
+    final paper = theme.brightness == Brightness.dark
+        ? AppBrand.paperDark
+        : AppBrand.paperLight;
+    final bar = SafeArea(
+      top: false,
+      child: SizedBox(
+        height: 76,
+        child: Row(
+          children: [
+            Expanded(
+              child: _SideNavGlyph(
+                icon: AppIcons.mapPin,
+                label: freeKeyClient
+                    ? (Localizations.localeOf(context).languageCode == 'ru'
+                        ? 'Сервера'
+                        : 'Servers')
+                    : l.navLocations,
+                selected: selected == MainShell.locationsIndex,
+                onTap: () => _onTap(MainShell.locationsIndex),
+              ),
+            ),
+            Expanded(
+              child: _CenterNavMark(
+                selected: selected == MainShell.homeIndex,
+                semanticLabel: l.navVpn,
+                onTap: () => _onTap(MainShell.homeIndex),
+              ),
+            ),
+            Expanded(
+              child: _SideNavGlyph(
+                icon: AppIcons.settings,
+                label: l.navSettings,
+                selected: selected == MainShell.settingsIndex,
+                onTap: () => _onTap(MainShell.settingsIndex),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
     return Stack(
       children: [
         Scaffold(
-          body: widget.navigationShell,
-          bottomNavigationBar: DecoratedBox(
-            decoration: BoxDecoration(
-              color: elevated,
-              border: Border(top: BorderSide(color: line)),
-            ),
-            child: SafeArea(
-              top: false,
-              child: SizedBox(
-                height: 76,
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: _SideNavGlyph(
-                        icon: AppIcons.mapPin,
-                        label: freeKeyClient
-                            ? (Localizations.localeOf(context).languageCode ==
-                                    'ru'
-                                ? 'Сервера'
-                                : 'Servers')
-                            : l.navLocations,
-                        selected: selected == MainShell.locationsIndex,
-                        onTap: () => _onTap(MainShell.locationsIndex),
+          backgroundColor: freeKeyClient ? paper : theme.colorScheme.surface,
+          body: freeKeyClient
+              ? NotebookPaper(child: widget.navigationShell)
+              : widget.navigationShell,
+          bottomNavigationBar: freeKeyClient
+              ? NotebookPaper(
+                  emphasized: true,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      border: Border(
+                        top: BorderSide(
+                          color: AppBrand.paperMargin.withValues(alpha: 0.35),
+                        ),
                       ),
                     ),
-                    Expanded(
-                      child: _CenterNavMark(
-                        selected: selected == MainShell.homeIndex,
-                        semanticLabel: l.navVpn,
-                        onTap: () => _onTap(MainShell.homeIndex),
-                      ),
-                    ),
-                    Expanded(
-                      child: _SideNavGlyph(
-                        icon: AppIcons.settings,
-                        label: l.navSettings,
-                        selected: selected == MainShell.settingsIndex,
-                        onTap: () => _onTap(MainShell.settingsIndex),
-                      ),
-                    ),
-                  ],
+                    child: bar,
+                  ),
+                )
+              : DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: elevated,
+                    border: Border(top: BorderSide(color: line)),
+                  ),
+                  child: bar,
                 ),
-              ),
-            ),
-          ),
         ),
         const BusyOverlayHost(),
       ],

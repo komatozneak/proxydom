@@ -49,6 +49,18 @@ class AppBrand {
 
   static const Color surfaceDark = Color(0xFF121212);
 
+  /// Free-client sheet: reference taupe, lifted toward cream so type holds.
+  static const Color paperLight = Color(0xFFD9CFC6);
+
+  /// Same hue as [paperLight], deepened so it stays oak rather than navy.
+  static const Color paperDark = Color(0xFF221C1A);
+
+  /// Ivory grid ink. Drawn at low alpha so it does not cut type.
+  static const Color paperGrid = Color(0xFFF4EDE3);
+
+  /// Margin rule: living-house mustard mixed toward [destructive].
+  static const Color paperMargin = Color(0xFFD4682E);
+
   /// Dark elevated cards — enough lift off [surfaceDark] so numbers read.
   static const Color surfaceVariantDark = Color(0xFF2C2C32);
 

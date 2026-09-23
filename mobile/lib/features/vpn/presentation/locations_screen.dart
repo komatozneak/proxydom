@@ -80,10 +80,13 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     }
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
+      backgroundColor:
+          freeKeyClient ? Colors.transparent : theme.colorScheme.surface,
       appBar: AppBar(
+        backgroundColor: freeKeyClient ? Colors.transparent : null,
+        surfaceTintColor: freeKeyClient ? Colors.transparent : null,
         title: Text(
-              freeKeyClient ? l.freeServers : l.regionTitle,
+          freeKeyClient ? l.freeServers : l.regionTitle,
         ),
         leading: canPop
             ? IconButton(
