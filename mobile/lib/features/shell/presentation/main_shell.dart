@@ -158,9 +158,9 @@ class _SideNavGlyph extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final color = selected
-        ? theme.colorScheme.onSurface
-        : theme.colorScheme.onSurfaceVariant;
+    final dark = theme.brightness == Brightness.dark;
+    final ink = dark ? AppBrand.inkDark : AppBrand.inkLight;
+    final chip = dark ? AppBrand.surfaceVariantDark : AppBrand.surfaceElevatedLight;
 
     return InkWell(
       onTap: onTap,
@@ -172,10 +172,16 @@ class _SideNavGlyph extends StatelessWidget {
             duration: const Duration(milliseconds: 180),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: selected ? AppBrand.inkWithOpacity(0.08) : null,
+              color: chip,
               borderRadius: BorderRadius.circular(AppBrand.radiusNavPill),
+              border: Border.all(
+                color: selected
+                    ? AppBrand.paperMargin
+                    : theme.colorScheme.outline,
+                width: selected ? 1.6 : 1,
+              ),
             ),
-            child: AppIcon(icon, size: 18, color: color),
+            child: AppIcon(icon, size: 18, color: ink),
           ),
           const SizedBox(height: 2),
           Text(
@@ -183,9 +189,9 @@ class _SideNavGlyph extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: theme.textTheme.labelSmall?.copyWith(
-              color: color,
+              color: ink,
               fontSize: 10,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
