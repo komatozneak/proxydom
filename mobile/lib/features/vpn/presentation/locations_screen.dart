@@ -43,6 +43,8 @@ class LocationsScreen extends ConsumerStatefulWidget {
 }
 
 class _LocationsScreenState extends ConsumerState<LocationsScreen> {
+  String _query = '';
+
   List<VpnNode>? _nodes;
   List<ParsedShareLink> _imported = const [];
   String? _selectedId;
@@ -79,7 +81,13 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: Text(l.regionTitle),
+        title: Text(
+          freeKeyClient
+              ? (Localizations.localeOf(context).languageCode == 'ru'
+                  ? 'Сервера'
+                  : 'Servers')
+              : l.regionTitle,
+        ),
         leading: canPop
             ? IconButton(
                 icon: const AppIcon(AppIcons.back),
@@ -290,38 +298,125 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
 
   Widget _buildImported(ThemeData theme) {
     final ru = Localizations.localeOf(context).languageCode == 'ru';
-    if (_imported.isEmpty) {
-      return Center(
-        child: FilledButton(
-          onPressed: () => context.push('/import'),
-          child: Text(ru ? 'Вставить ссылку' : 'Paste link'),
-        ),
-      );
+    final filtered = <int>[];
+    final q = _query.trim().toLowerCase();
+    for (var i = 0; i < _imported.length; i++) {
+      final link = _imported[i];
+      final hay = '${link.name} ${link.endpoint} ${link.scheme}'.toLowerCase();
+      if (q.isEmpty || hay.contains(q)) filtered.add(i);
     }
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _imported.length,
-      itemBuilder: (context, index) {
-        final link = _imported[index];
-        final selected = _selectedId == '$index';
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: ListTile(
-            selected: selected,
-            title: Text(link.name),
-            subtitle: Text('${link.scheme} ${link.endpoint}'),
-            onTap: () async {
-              await Hy2ImportStore.instance.select(index);
-              if (!mounted) return;
-              setState(() => _selectedId = '$index');
-              final status = ref.read(vpnProvider);
-              if (status is VpnConnected || status is VpnConnecting) {
-                await ref.read(vpnProvider.notifier).connect(forceRestart: true);
-              }
-            },
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: Text(
+            ru
+                ? '${_imported.length} серверов'
+                : '${_imported.length} servers',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
-        );
-      },
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          child: TextField(
+            decoration: InputDecoration(
+              hintText: ru ? 'Поиск серверов' : 'Search servers',
+              prefixIcon: const AppIcon(AppIcons.search),
+              isDense: true,
+            ),
+            onChanged: (value) => setState(() => _query = value),
+          ),
+        ),
+        Expanded(
+          child: filtered.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        AppIcons.folder,
+                        size: 42,
+                        color: theme.colorScheme.onSurfaceVariant
+                            .withValues(alpha: 0.45),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(ru ? 'Нет серверов' : 'No servers'),
+                      const SizedBox(height: 4),
+                      Text(
+                        ru
+                            ? 'Вставьте ссылку на провайдера или ключ сервера'
+                            : 'Paste a provider link or a server key',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  itemCount: filtered.length,
+                  itemBuilder: (context, i) {
+                    final index = filtered[i];
+                    final link = _imported[index];
+                    final selected = _selectedId == '$index';
+                    return ListTile(
+                      selected: selected,
+                      title: Text(link.name),
+                      subtitle: Text('${link.scheme} ${link.endpoint}'),
+                      trailing: IconButton(
+                        icon: const AppIcon(AppIcons.trash, size: 18),
+                        onPressed: () async {
+                          await Hy2ImportStore.instance.removeAt(index);
+                          await _load();
+                        },
+                      ),
+                      onTap: () async {
+                        await Hy2ImportStore.instance.select(index);
+                        if (!mounted) return;
+                        setState(() => _selectedId = '$index');
+                        final status = ref.read(vpnProvider);
+                        if (status is VpnConnected || status is VpnConnecting) {
+                          await ref
+                              .read(vpnProvider.notifier)
+                              .connect(forceRestart: true);
+                        }
+                      },
+                    );
+                  },
+                ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => context.push('/import'),
+                  icon: const AppIcon(AppIcons.plus, size: 18),
+                  label: Text(ru ? 'Добавить' : 'Add'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => context.push('/import'),
+                  icon: const AppIcon(AppIcons.clipboard, size: 18),
+                  label: Text(ru ? 'Вставить' : 'Paste'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton(
+                onPressed: () => context.push('/import'),
+                child: const AppIcon(AppIcons.qrCode, size: 18),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

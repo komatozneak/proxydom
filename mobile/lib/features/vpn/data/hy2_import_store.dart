@@ -62,6 +62,23 @@ class Hy2ImportStore {
   }
 
   /// Accept one URI, a subscription body, or an http(s) URL that returns one.
+  Future<void> removeAt(int index) async {
+    final links = await load();
+    if (index < 0 || index >= links.length) return;
+    final lines = links.map((link) => link.raw).toList()..removeAt(index);
+    var selected = await selectedIndex();
+    if (lines.isEmpty) {
+      selected = 0;
+    } else if (selected >= lines.length) {
+      selected = lines.length - 1;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _prefsKey,
+      jsonEncode({'lines': lines, 'selected': selected}),
+    );
+  }
+
   Future<List<ParsedShareLink>> saveInput(String raw) async {
     final text = raw.trim();
     if (text.isEmpty) {
