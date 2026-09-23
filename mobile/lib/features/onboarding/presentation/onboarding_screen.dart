@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/ios_store_gates.dart';
 import '../../../core/router.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
@@ -55,7 +56,36 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     super.dispose();
   }
 
-  List<_OnboardingCard> _cards(AppL10n l) => [
+  List<_OnboardingCard> _cards(AppL10n l) {
+    if (freeKeyClient) {
+      final ru = Localizations.localeOf(context).languageCode == 'ru';
+      return [
+        _OnboardingCard(
+          icon: AppIcons.shield,
+          title: ru ? 'Теремок — бесплатный клиент' : 'Teremok is a free client',
+          body: ru
+              ? 'Приложение бесплатное и без рекламы. Доступ не продаётся внутри. Подключение — по вашей ссылке.'
+              : 'The app is free and has no ads. Access is not sold inside. You connect with your own link.',
+        ),
+        _OnboardingCard(
+          icon: AppIcons.servers,
+          title: ru
+              ? 'Серверы — от вашего провайдера'
+              : 'Servers come from your provider',
+          body: ru
+              ? 'Своих серверов в приложении нет. Ссылку на подписку даёт провайдер, в том числе бот Теремка.'
+              : 'This app does not ship its own server list. A provider, including the Teremok bot, gives you a subscription link.',
+        ),
+        _OnboardingCard(
+          icon: AppIcons.clipboard,
+          title: ru ? 'Добавьте подписку' : 'Add a subscription',
+          body: ru
+              ? 'Вставьте ссылку или отсканируйте QR — серверы появятся в списке.'
+              : 'Paste a link or scan a QR code and the servers show up in the list.',
+        ),
+      ];
+    }
+    return [
         _OnboardingCard(
           icon: AppIcons.power,
           title: l.onboardingConnectTitle,
@@ -67,8 +97,15 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           body: l.onboardingRegionBody,
         ),
       ];
+  }
 
-  Future<void> _finish() async {
+  Future<void> _finish({bool openImport = false}) async {
+    if (freeKeyClient) {
+      await OnboardingPrefs.markWelcomeSeen();
+      AppRouter.welcomeSeenCache = true;
+      if (mounted) context.go(openImport ? '/import' : '/home');
+      return;
+    }
     final auth = ref.read(authProvider).valueOrNull;
     final userId = auth is AuthStateAuthenticated
         ? (jwtSubject(auth.accessToken) ?? 'unknown')
@@ -172,16 +209,35 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             ),
             const SizedBox(height: 20),
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-              child: FilledButton(
-                onPressed: () => _next(cards.length),
-                child: Text(
-                  _index >= cards.length - 1
-                      ? l.onboardingDone
-                      : l.onboardingNext,
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => freeKeyClient && _index >= cards.length - 1
+                      ? _finish(openImport: true)
+                      : _next(cards.length),
+                  child: Text(
+                    freeKeyClient && _index >= cards.length - 1
+                        ? (Localizations.localeOf(context).languageCode == 'ru'
+                            ? 'Добавить подписку'
+                            : 'Add subscription')
+                        : (_index >= cards.length - 1
+                            ? l.onboardingDone
+                            : l.onboardingNext),
+                  ),
                 ),
               ),
             ),
+            if (freeKeyClient && _index >= cards.length - 1)
+              TextButton(
+                onPressed: _finish,
+                child: Text(
+                  Localizations.localeOf(context).languageCode == 'ru'
+                      ? 'Позже'
+                      : 'Later',
+                ),
+              ),
+            const SizedBox(height: 12),
           ],
         ),
       ),

@@ -98,6 +98,10 @@ class AppRouter {
       // Still loading / no ProviderScope — keep the bootstrap spinner on screen.
       // Free clients open Home without an account (ADR 026).
       if (freeKeyClient) {
+        final introDone = welcomeSeenCache == true;
+        if (!introDone && !goingToOnboarding) {
+          return '/onboarding';
+        }
         if (goingToBootstrap ||
             goingToBootstrapFail ||
             goingToWelcome ||
