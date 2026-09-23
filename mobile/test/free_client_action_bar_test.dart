@@ -32,4 +32,29 @@ void main() {
       AppBrand.paperMargin,
     ]);
   });
+
+  testWidgets('add screen keeps equal paste and qr buttons', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        locale: const Locale('ru'),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        home: Scaffold(
+          body: FreeClientActionBar(
+            showAdd: false,
+            onPaste: () {},
+            onScan: () {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Добавить'), findsNothing);
+    final buttons = tester.widgetList<FilledButton>(find.byType(FilledButton));
+    final colors = buttons
+        .map((button) => button.style?.backgroundColor?.resolve({}))
+        .toList();
+    expect(colors, [AppBrand.secondary, AppBrand.paperMargin]);
+  });
 }

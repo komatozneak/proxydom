@@ -162,7 +162,7 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
                     ),
                     const SizedBox(height: 12),
                     FreeClientActionBar(
-                      onAdd: () => _fieldFocus.requestFocus(),
+                      showAdd: false,
                       onPaste: _pasteClipboard,
                       onScan: () => context.push('/scan'),
                     ),
