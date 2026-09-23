@@ -29,11 +29,11 @@ Future<void> openIosAdvancedFeaturesPath(
 ) =>
     openIosTelegramBotStartPath(context, ref);
 
+/// Free App Store client must not open the bot cashier.
 Future<void> openIosTelegramBotTariffsPath(
   BuildContext context,
   WidgetRef ref,
-) =>
-    openIosTelegramBotStartPath(context, ref, startPayload: 'tariffs');
+) async {}
 
 Future<void> openIosTelegramBotStartPath(
   BuildContext context,

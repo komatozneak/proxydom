@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../../../core/ios_store_gates.dart';
 import '../../../core/utils/format_utils.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../account/application/ios_account_nav.dart';
 import '../../beta/presentation/promo_redeem_form.dart';
 import '../../home/application/vpn_provider.dart';
 import '../../home/presentation/widgets/free_quota_bar.dart';
@@ -60,18 +59,16 @@ class SubscriptionTabScreen extends ConsumerWidget {
                               formatGib(
                                 (status.quotaBytesRemaining ?? 0) /
                                     (1024 * 1024 * 1024),
-                                russian:
-                                    Localizations.localeOf(context)
-                                            .languageCode ==
-                                        'ru',
+                                russian: Localizations.localeOf(context)
+                                        .languageCode ==
+                                    'ru',
                               ),
                               formatGib(
                                 (status.quotaBytesLimit ?? 0) /
                                     (1024 * 1024 * 1024),
-                                russian:
-                                    Localizations.localeOf(context)
-                                            .languageCode ==
-                                        'ru',
+                                russian: Localizations.localeOf(context)
+                                        .languageCode ==
+                                    'ru',
                               ),
                             ),
                             exhaustedLabel: l.homeTrafficExhausted,
@@ -98,8 +95,7 @@ class SubscriptionTabScreen extends ConsumerWidget {
                     FilledButton.tonal(
                       key: kSubscriptionAdvancedKey,
                       style: buttonStyle,
-                      onPressed: () =>
-                          openIosAdvancedFeaturesPath(context, ref),
+                      onPressed: () => context.push('/import'),
                       child: Text(l.iosAdvancedFeaturesCta),
                     ),
                   ] else
@@ -115,68 +111,69 @@ class SubscriptionTabScreen extends ConsumerWidget {
           ),
           if (!hideInAppPlategaCheckout)
             SliverFillRemaining(
-            hasScrollBody: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 32, 20, 24),
-              child: Align(
-                alignment: Alignment.bottomCenter,
-                child: KeyedSubtree(
-                  key: kSubscriptionPromoKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Divider(
-                              color: theme.colorScheme.outline
-                                  .withValues(alpha: 0.55),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 14),
-                            child: Text(
-                              l.lockedOrPromo,
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                color: theme.colorScheme.onSurface
-                                    .withValues(alpha: 0.72),
-                                fontWeight: FontWeight.w600,
+              hasScrollBody: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 32, 20, 24),
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: KeyedSubtree(
+                    key: kSubscriptionPromoKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Divider(
+                                color: theme.colorScheme.outline
+                                    .withValues(alpha: 0.55),
                               ),
                             ),
-                          ),
-                          Expanded(
-                            child: Divider(
-                              color: theme.colorScheme.outline
-                                  .withValues(alpha: 0.55),
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 14),
+                              child: Text(
+                                l.lockedOrPromo,
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  color: theme.colorScheme.onSurface
+                                      .withValues(alpha: 0.72),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      PromoRedeemForm(
-                        useTonalButton: true,
-                        buttonStyle: buttonStyle,
-                        textFieldContentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 18,
+                            Expanded(
+                              child: Divider(
+                                color: theme.colorScheme.outline
+                                    .withValues(alpha: 0.55),
+                              ),
+                            ),
+                          ],
                         ),
-                        onSuccess: () async {
-                          await ref
-                              .read(vpnNodesRepositoryProvider)
-                              .refreshAfterEntitlementChange();
-                          await ref
-                              .read(subscriptionStatusProvider.notifier)
-                              .refresh();
-                          if (context.mounted) context.go('/locations');
-                        },
-                      ),
-                    ],
+                        const SizedBox(height: 20),
+                        PromoRedeemForm(
+                          useTonalButton: true,
+                          buttonStyle: buttonStyle,
+                          textFieldContentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 18,
+                          ),
+                          onSuccess: () async {
+                            await ref
+                                .read(vpnNodesRepositoryProvider)
+                                .refreshAfterEntitlementChange();
+                            await ref
+                                .read(subscriptionStatusProvider.notifier)
+                                .refresh();
+                            if (context.mounted) context.go('/locations');
+                          },
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );

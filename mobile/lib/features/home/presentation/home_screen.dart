@@ -8,14 +8,13 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/busy/busy_overlay.dart';
 import '../../../core/ios_store_gates.dart';
-import '../../../core/utils/format_utils.dart';
 import '../../../core/theme.dart';
+import '../../../core/utils/format_utils.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/connect_button.dart';
 import '../../../core/widgets/signal_nest_hero.dart';
 import '../../../core/widgets/teremok_snackbar.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../account/application/ios_account_nav.dart';
 import '../../session/application/session_provider.dart';
 import '../../session/data/account_session_snapshot.dart';
 import '../../settings/application/subscription_status_provider.dart';
@@ -95,7 +94,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Future<void> _openSubscription() async {
     if (_openingSubscription || !mounted) return;
     if (hideInAppPlategaCheckout) {
-      await openIosPremiumAccountPath(context, ref);
+      await context.push('/import');
       return;
     }
     // Imperative /subscription can leave matchedLocation on /home; rely on
@@ -690,7 +689,7 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
           const SizedBox(height: 12),
           FilledButton.tonal(
             onPressed: hideInAppPlategaCheckout
-                ? () => openIosPremiumAccountPath(context, ref)
+                ? () => context.push('/import')
                 : () => context.push('/locked'),
             child: Text(
               hideInAppPlategaCheckout

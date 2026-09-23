@@ -11,7 +11,6 @@ import '../../../core/support_contact.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../account/application/ios_account_nav.dart';
 import '../../billing/data/billing_api.dart';
 import '../../home/application/vpn_provider.dart';
 import '../../settings/application/devices_list_provider.dart';
@@ -85,9 +84,7 @@ class _LockedAccessScreenState extends ConsumerState<LockedAccessScreen> {
   String _selectedPlan = '1m';
 
   Future<void> _goAfterUnlock() async {
-    await ref
-        .read(vpnNodesRepositoryProvider)
-        .refreshAfterEntitlementChange();
+    await ref.read(vpnNodesRepositoryProvider).refreshAfterEntitlementChange();
     await ref.read(subscriptionStatusProvider.notifier).refresh();
     if (!mounted) return;
     AppRouter.postAuthResolved = true;
@@ -96,7 +93,8 @@ class _LockedAccessScreenState extends ConsumerState<LockedAccessScreen> {
 
   Future<void> _pay(String plan) async {
     if (hideInAppPlategaCheckout) {
-      await openIosPremiumAccountPath(context, ref);
+      if (!mounted) return;
+      await context.push('/import');
       return;
     }
     setState(() {
@@ -191,7 +189,8 @@ class _LockedAccessScreenState extends ConsumerState<LockedAccessScreen> {
             return SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
               child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight - 32),
+                constraints:
+                    BoxConstraints(minHeight: constraints.maxHeight - 32),
                 child: Column(
                   children: [
                     Material(
@@ -238,16 +237,11 @@ class _LockedAccessScreenState extends ConsumerState<LockedAccessScreen> {
                             else if (hideInAppPlategaCheckout) ...[
                               FilledButton.tonal(
                                 style: buttonStyle,
-                                onPressed: busy
-                                    ? null
-                                    : () => openIosPremiumAccountPath(
-                                          context,
-                                          ref,
-                                        ),
+                                onPressed:
+                                    busy ? null : () => context.push('/import'),
                                 child: Text(l.accountHubTitle),
                               ),
-                            ]
-                            else ...[
+                            ] else ...[
                               for (final plan in plans) ...[
                                 _PlanTile(
                                   plan: plan,
@@ -321,8 +315,7 @@ class _LockedAccessScreenState extends ConsumerState<LockedAccessScreen> {
                               TextButton(
                                 onPressed: busy
                                     ? null
-                                    : () =>
-                                        _open(AppConfig.accountDeletionUrl),
+                                    : () => _open(AppConfig.accountDeletionUrl),
                                 child: Text(l.settingsDeleteAccount),
                               ),
                             ],
@@ -355,8 +348,7 @@ class _LockedAccessScreenState extends ConsumerState<LockedAccessScreen> {
                                 children: [
                                   Text(
                                     l.settingsSupport,
-                                    style:
-                                        theme.textTheme.titleSmall?.copyWith(
+                                    style: theme.textTheme.titleSmall?.copyWith(
                                       fontWeight: FontWeight.w600,
                                       color: theme.colorScheme.onSurface
                                           .withValues(alpha: busy ? 0.38 : 1),

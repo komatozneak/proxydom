@@ -17,7 +17,6 @@ import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/teremok_snackbar.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../account/application/ios_account_nav.dart';
 import '../../auth/application/auth_provider.dart';
 import '../../auth/application/auth_state.dart';
 import '../../auth/application/logout_handler.dart';
@@ -424,10 +423,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ? l.settingsSupportHintIos
                         : l.settingsSupportHint,
                     onTap: () {
-                      if (hideInAppPlategaCheckout) {
-                        unawaited(openIosTelegramBotTariffsPath(context, ref));
-                        return;
-                      }
                       SupportContact.open(screen: 'Настройки');
                     },
                   ),

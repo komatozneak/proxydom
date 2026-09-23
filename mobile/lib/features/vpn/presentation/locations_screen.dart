@@ -9,7 +9,6 @@ import 'package:go_router/go_router.dart';
 import '../../../core/busy/busy_overlay.dart';
 import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
-import '../../account/application/ios_account_nav.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/location_flag_icon.dart';
 import '../../../core/widgets/teremok_snackbar.dart';
@@ -250,7 +249,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
   Future<void> _onLockedPremiumTap() async {
     // iOS: Account / Telegram bind — not /promo. Android keeps Platega.
     if (hideInAppPlategaCheckout) {
-      await openIosPremiumAccountPath(context, ref);
+      await context.push('/import');
       return;
     }
     context.push('/subscription');
