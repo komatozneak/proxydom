@@ -209,6 +209,7 @@ void main() {
           builder: (_, __) => const Text('ACCOUNT_HUB'),
         ),
         GoRoute(path: '/promo', builder: (_, __) => const Text('PROMO_DEAD')),
+        GoRoute(path: '/import', builder: (_, __) => const Text('IMPORT_LINK')),
       ],
     );
 
@@ -242,7 +243,8 @@ void main() {
     expect(find.text('Аккаунт'), findsWidgets);
     await tester.tap(find.widgetWithText(FilledButton, 'Аккаунт'));
     await tester.pumpAndSettle();
-    expect(find.text('Сначала подключитесь.'), findsOneWidget);
+    expect(find.text('IMPORT_LINK'), findsOneWidget);
+    expect(find.text('Сначала подключитесь.'), findsNothing);
     expect(find.text('ACCOUNT_HUB'), findsNothing);
     expect(find.text('PROMO_DEAD'), findsNothing);
     debugDefaultTargetPlatformOverride = null;
@@ -270,6 +272,7 @@ void main() {
           builder: (_, __) => const Text('ACCOUNT_HUB'),
         ),
         GoRoute(path: '/promo', builder: (_, __) => const Text('PROMO_DEAD')),
+        GoRoute(path: '/import', builder: (_, __) => const Text('IMPORT_LINK')),
       ],
     );
 
@@ -290,7 +293,8 @@ void main() {
     expect(find.text('Код доступа'), findsNothing);
     await tester.tap(find.widgetWithText(FilledButton, 'Аккаунт'));
     await tester.pumpAndSettle();
-    expect(find.text('Сначала подключитесь.'), findsOneWidget);
+    expect(find.text('IMPORT_LINK'), findsOneWidget);
+    expect(find.text('Сначала подключитесь.'), findsNothing);
     expect(find.text('ACCOUNT_HUB'), findsNothing);
     expect(find.text('PROMO_DEAD'), findsNothing);
     debugDefaultTargetPlatformOverride = null;
@@ -368,10 +372,11 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
-  test('iOS referral deep link lands on Account, not promo', () {
+  test('iOS referral deep link does not open promo or account', () {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
-    expect(referralLandingPath, '/settings/account');
+    expect(referralLandingPath, '/home');
     expect(referralLandingPath, isNot(contains('promo')));
+    expect(iosFreeClientRouteBlocked('/settings/account'), isTrue);
   });
 }

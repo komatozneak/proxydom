@@ -27,6 +27,7 @@ import '../features/settings/presentation/no_vpn_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/shell/presentation/main_shell.dart';
 import '../features/vpn/presentation/hy2_import_screen.dart';
+import '../features/vpn/presentation/locations_screen.dart';
 import 'config.dart';
 import 'ios_store_gates.dart';
 

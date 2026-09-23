@@ -12,10 +12,7 @@ import '../presentation/telegram_link_dialog.dart';
 import 'account_profile_provider.dart';
 import 'telegram_identity.dart';
 
-/// iOS Path A: VPN + Telegram cashier (`start=tariffs`), never in-app pay.
-///
-/// No tunnel → snackbar. Already bound → open tariffs. Unbound → bind
-/// dialog (backend sends tariffs after a fresh link).
+/// Kept for older call sites. The free client does not open a cashier.
 Future<void> openIosPremiumAccountPath(
   BuildContext context,
   WidgetRef ref,

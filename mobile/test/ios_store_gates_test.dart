@@ -11,7 +11,10 @@ void main() {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
     expect(hideInAppPlategaCheckout, isTrue);
     expect(iosAppsSplitUnsupported, isTrue);
-    expect(referralLandingPath, '/settings/account');
+    expect(referralLandingPath, '/home');
+    expect(iosFreeClientRouteBlocked('/subscription'), isTrue);
+    expect(iosFreeClientRouteBlocked('/settings/devices'), isTrue);
+    expect(iosFreeClientRouteBlocked('/import'), isFalse);
   });
 
   test('hideInAppPlategaCheckout false on Android', () {
@@ -19,5 +22,6 @@ void main() {
     expect(hideInAppPlategaCheckout, isFalse);
     expect(iosAppsSplitUnsupported, isFalse);
     expect(referralLandingPath, '/settings/account/promo');
+    expect(iosFreeClientRouteBlocked('/subscription'), isFalse);
   });
 }
