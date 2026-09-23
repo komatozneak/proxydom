@@ -140,8 +140,14 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
     final osnovnyeLabel = lang == 'en' ? 'Main' : 'Основные';
     final appsSection = lang == 'en' ? 'Apps' : 'Приложения';
 
+    final sheet = theme.brightness == Brightness.dark
+        ? AppBrand.surfaceDark
+        : AppBrand.surfaceElevatedLight;
     return Scaffold(
+      backgroundColor: sheet,
       appBar: AppBar(
+        backgroundColor: sheet,
+        surfaceTintColor: sheet,
         title: Text(l.settingsNoVpn),
         leading: IconButton(
           icon: const AppIcon(AppIcons.back),

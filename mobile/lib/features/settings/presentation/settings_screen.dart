@@ -300,9 +300,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final locale = ref.watch(localeProvider).valueOrNull ??
         Localizations.localeOf(context);
     final localeLabel = _localeLabel(l, locale);
+    final paper = theme.brightness == Brightness.dark
+        ? AppBrand.paperDark
+        : AppBrand.paperLight;
     return Scaffold(
-      backgroundColor:
-          freeKeyClient ? Colors.transparent : theme.colorScheme.surface,
+      backgroundColor: freeKeyClient ? paper : theme.colorScheme.surface,
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
