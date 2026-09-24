@@ -17,6 +17,7 @@ import '../../auth/application/auth_provider.dart';
 import '../../auth/application/auth_state.dart';
 import '../../beta/application/beta_usage_tracker.dart';
 import '../../vpn/data/hy2_import_store.dart';
+import '../../vpn/data/subscription_label.dart';
 import '../../vpn/data/xray_share_config.dart';
 import '../../vpn/data/node_auto_selector.dart';
 import '../../vpn/data/node_display.dart';
@@ -655,7 +656,9 @@ class VpnNotifier extends Notifier<VpnStatus> {
     _autoActiveNodeId = null;
     _catalogHost = null;
     final imported = await Hy2ImportStore.instance.selected();
-    _displayLabel = imported?.name;
+    _displayLabel = imported == null
+        ? null
+        : labelForShareLink(imported).title;
     _selectedNodeProtocol = imported?.scheme;
     _profileHost = imported == null
         ? null
@@ -1566,16 +1569,23 @@ class VpnNotifier extends Notifier<VpnStatus> {
         _config = null;
         _autoActiveNodeId = null;
         _catalogHost = null;
-        _displayLabel = imported.name;
+        final shown = labelForShareLink(imported);
+        _displayLabel = shown.title;
         _selectedNodeProtocol = imported.scheme;
         _profileHost = profileHostForLog(imported.endpoint);
         await VpnSessionMeta.clear();
         final profile = imported.hy2?.profile;
         final bool started;
         if (profile != null) {
+          ProductLog.event('vpn.connect_attempt', {
+            'profile': shown.title,
+            'scheme': imported.scheme,
+            'host': _profileHost,
+            'sni': profile.sni,
+          });
           started = await VpnController.instance.startHysteria(
             profile,
-            displayLabel: imported.name,
+            displayLabel: shown.title,
           );
         } else if (defaultTargetPlatform == TargetPlatform.android) {
           final xrayJson = buildXraySocksConfig(imported);
@@ -1588,7 +1598,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
           }
           started = await VpnController.instance.startXray(
             xrayJson,
-            displayLabel: imported.name,
+            displayLabel: shown.title,
           );
         } else {
           state = const VpnError(
