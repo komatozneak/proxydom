@@ -1623,13 +1623,11 @@ class VpnNotifier extends Notifier<VpnStatus> {
             'host': _profileHost,
             'sni': profile.sni,
           });
-          started = await VpnController.instance.startHysteria(
+          final raw = await VpnController.instance.startHysteria(
             profile,
             displayLabel: shown.title,
           );
-          if (!started || _dialGen != dial) {
-            started = false;
-          }
+          started = raw && _dialGen == dial;
         } else if (defaultTargetPlatform == TargetPlatform.android) {
           final xrayJson = buildXraySocksConfig(imported);
           if (xrayJson == null) {
