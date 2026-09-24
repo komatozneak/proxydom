@@ -14,6 +14,7 @@ import '../features/onboarding/data/onboarding_prefs.dart';
 import '../features/onboarding/presentation/onboarding_screen.dart';
 import '../features/onboarding/presentation/welcome_screen.dart';
 import '../features/settings/presentation/no_vpn_screen.dart';
+import '../features/settings/presentation/tunnel_log_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/shell/presentation/main_shell.dart';
 import '../features/vpn/presentation/hy2_import_screen.dart';
@@ -240,6 +241,10 @@ class AppRouter {
                 path: '/settings',
                 builder: (c, s) => const SettingsScreen(),
                 routes: [
+                  GoRoute(
+                    path: 'logs',
+                    builder: (context, state) => const TunnelLogScreen(),
+                  ),
                   GoRoute(
                     path: 'no-vpn',
                     builder: (c, s) => const NoVpnScreen(),

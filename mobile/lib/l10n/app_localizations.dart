@@ -1477,6 +1477,102 @@ abstract class AppL10n {
   /// **'Send diagnostic report'**
   String get settingsSendReport;
 
+  /// No description provided for @tunnelLogsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tunnel logs'**
+  String get tunnelLogsTitle;
+
+  /// No description provided for @tunnelLogsLevelOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get tunnelLogsLevelOff;
+
+  /// No description provided for @tunnelLogsLevelError.
+  ///
+  /// In en, this message translates to:
+  /// **'Errors'**
+  String get tunnelLogsLevelError;
+
+  /// No description provided for @tunnelLogsLevelWarn.
+  ///
+  /// In en, this message translates to:
+  /// **'Warnings'**
+  String get tunnelLogsLevelWarn;
+
+  /// No description provided for @tunnelLogsLevelInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Info'**
+  String get tunnelLogsLevelInfo;
+
+  /// No description provided for @tunnelLogsLevelDebug.
+  ///
+  /// In en, this message translates to:
+  /// **'Debug'**
+  String get tunnelLogsLevelDebug;
+
+  /// No description provided for @tunnelLogsSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Text, IP, or domain'**
+  String get tunnelLogsSearch;
+
+  /// No description provided for @tunnelLogsAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get tunnelLogsAll;
+
+  /// No description provided for @tunnelLogsSession.
+  ///
+  /// In en, this message translates to:
+  /// **'Session'**
+  String get tunnelLogsSession;
+
+  /// No description provided for @tunnelLogsNetwork.
+  ///
+  /// In en, this message translates to:
+  /// **'Network'**
+  String get tunnelLogsNetwork;
+
+  /// No description provided for @tunnelLogsRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get tunnelLogsRefresh;
+
+  /// No description provided for @tunnelLogsCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get tunnelLogsCopy;
+
+  /// No description provided for @tunnelLogsExport.
+  ///
+  /// In en, this message translates to:
+  /// **'Export all'**
+  String get tunnelLogsExport;
+
+  /// No description provided for @tunnelLogsDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get tunnelLogsDelete;
+
+  /// No description provided for @tunnelLogsCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Log copied'**
+  String get tunnelLogsCopied;
+
+  /// No description provided for @tunnelLogsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No entries'**
+  String get tunnelLogsEmpty;
+
   /// No description provided for @settingsSendReportHint.
   ///
   /// In en, this message translates to:

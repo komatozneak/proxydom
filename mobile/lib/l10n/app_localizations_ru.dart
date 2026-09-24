@@ -761,6 +761,54 @@ class AppL10nRu extends AppL10n {
   String get settingsSendReport => 'Отправить отчёт';
 
   @override
+  String get tunnelLogsTitle => 'Логи туннеля';
+
+  @override
+  String get tunnelLogsLevelOff => 'Выключены';
+
+  @override
+  String get tunnelLogsLevelError => 'Ошибки';
+
+  @override
+  String get tunnelLogsLevelWarn => 'Предупреждения';
+
+  @override
+  String get tunnelLogsLevelInfo => 'Информация';
+
+  @override
+  String get tunnelLogsLevelDebug => 'Отладка';
+
+  @override
+  String get tunnelLogsSearch => 'Текст, IP или домен';
+
+  @override
+  String get tunnelLogsAll => 'Все';
+
+  @override
+  String get tunnelLogsSession => 'Сессия';
+
+  @override
+  String get tunnelLogsNetwork => 'Сеть';
+
+  @override
+  String get tunnelLogsRefresh => 'Обновить';
+
+  @override
+  String get tunnelLogsCopy => 'Копировать';
+
+  @override
+  String get tunnelLogsExport => 'Экспорт всех';
+
+  @override
+  String get tunnelLogsDelete => 'Удалить';
+
+  @override
+  String get tunnelLogsCopied => 'Лог скопирован';
+
+  @override
+  String get tunnelLogsEmpty => 'Записей нет';
+
+  @override
   String get settingsSendReportHint =>
       'Копирует диагностику. Вставьте её в поддержку сами.';
 

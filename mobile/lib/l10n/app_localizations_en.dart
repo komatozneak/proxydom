@@ -761,6 +761,54 @@ class AppL10nEn extends AppL10n {
   String get settingsSendReport => 'Send diagnostic report';
 
   @override
+  String get tunnelLogsTitle => 'Tunnel logs';
+
+  @override
+  String get tunnelLogsLevelOff => 'Off';
+
+  @override
+  String get tunnelLogsLevelError => 'Errors';
+
+  @override
+  String get tunnelLogsLevelWarn => 'Warnings';
+
+  @override
+  String get tunnelLogsLevelInfo => 'Info';
+
+  @override
+  String get tunnelLogsLevelDebug => 'Debug';
+
+  @override
+  String get tunnelLogsSearch => 'Text, IP, or domain';
+
+  @override
+  String get tunnelLogsAll => 'All';
+
+  @override
+  String get tunnelLogsSession => 'Session';
+
+  @override
+  String get tunnelLogsNetwork => 'Network';
+
+  @override
+  String get tunnelLogsRefresh => 'Refresh';
+
+  @override
+  String get tunnelLogsCopy => 'Copy';
+
+  @override
+  String get tunnelLogsExport => 'Export all';
+
+  @override
+  String get tunnelLogsDelete => 'Delete';
+
+  @override
+  String get tunnelLogsCopied => 'Log copied';
+
+  @override
+  String get tunnelLogsEmpty => 'No entries';
+
+  @override
   String get settingsSendReportHint =>
       'Copies diagnostics. Paste them into support yourself.';
 

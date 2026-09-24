@@ -4,6 +4,8 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import 'tunnel_log_level.dart';
+
 /// In-memory ring buffer for lightweight diagnostic logs (no PII).
 ///
 /// Optional persist (~256 KB) so «Отправить отчёт» survives process kill.
@@ -16,6 +18,7 @@ class AppLogBuffer {
   static const maxPersistBytes = 256 * 1024;
 
   final ListQueue<String> _lines = ListQueue<String>();
+  TunnelLogLevel minLevel = TunnelLogLevel.info;
   File? _persistFile;
   Future<void>? _flushInFlight;
 
@@ -42,7 +45,12 @@ class AppLogBuffer {
 
   void warn(String message) => _append('warn', message);
 
+  void error(String message) => _append('error', message);
+
+  void debug(String message) => _append('debug', message);
+
   void _append(String level, String message) {
+    if (!minLevel.allows(level)) return;
     final line =
         '${DateTime.now().toUtc().toIso8601String()} [$level] $message';
     _lines.addLast(line);
@@ -93,6 +101,11 @@ class AppLogBuffer {
 
   void clear() {
     _lines.clear();
+    final file = _persistFile;
+    if (file == null) return;
+    _flushInFlight = (_flushInFlight ?? Future<void>.value()).then((_) async {
+      await file.writeAsString('', flush: true);
+    });
   }
 
   /// Tests: drop persist target so later cases stay isolated.
@@ -101,5 +114,6 @@ class AppLogBuffer {
     _lines.clear();
     _persistFile = null;
     _flushInFlight = null;
+    minLevel = TunnelLogLevel.info;
   }
 }

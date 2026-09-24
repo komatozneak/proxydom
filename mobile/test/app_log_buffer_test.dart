@@ -3,9 +3,25 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:teremok_connect/core/diagnostics/app_log_buffer.dart';
 import 'package:teremok_connect/core/diagnostics/product_log.dart';
+import 'package:teremok_connect/core/diagnostics/tunnel_log_level.dart';
 
 void main() {
   tearDown(AppLogBuffer.instance.resetForTest);
+
+  test('AppLogBuffer drops lines above the selected level', () {
+    final buf = AppLogBuffer.instance;
+    buf.clear();
+    buf.minLevel = TunnelLogLevel.off;
+    buf.info('hidden');
+    expect(buf.recentLines(), isEmpty);
+    buf.minLevel = TunnelLogLevel.error;
+    buf.info('still hidden');
+    buf.error('kept');
+    final text = buf.formatRecentLog();
+    expect(text, contains('[error] kept'));
+    expect(text, isNot(contains('still hidden')));
+    expect(text, isNot(contains('hidden')));
+  });
 
   test('AppLogBuffer keeps last N lines', () {
     final buf = AppLogBuffer.instance;

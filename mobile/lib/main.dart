@@ -11,6 +11,7 @@ import 'core/api_discovery.dart';
 import 'core/config.dart';
 import 'core/diagnostics/app_log_buffer.dart';
 import 'core/diagnostics/diagnostics_service.dart';
+import 'core/diagnostics/tunnel_log_prefs.dart';
 import 'core/internet_permission.dart';
 import 'core/ios_store_gates.dart';
 import 'core/jwt_interceptor.dart';
@@ -28,14 +29,17 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final boot = Stopwatch()..start();
 
-  // Persist first so boot phases land in «Отправить отчёт» even if discovery hangs.
+  // Level before the first line, then the file, so «Выключены» drops boot too.
+  try {
+    await TunnelLogPrefs.read();
+  } catch (_) {}
   try {
     final dir = await getApplicationSupportDirectory();
     await AppLogBuffer.instance.attachPersistFile(
       io.File('${dir.path}/product.log'),
     );
   } catch (_) {
-    // Persist is best-effort; in-memory ring still feeds reports.
+    // Persist is best-effort; in-memory ring still feeds the log screen.
   }
   AppLogBuffer.instance.info('app.boot t0 ms=${boot.elapsedMilliseconds}');
 

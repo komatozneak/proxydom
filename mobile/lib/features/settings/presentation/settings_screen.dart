@@ -1,22 +1,19 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../../core/config.dart';
-import '../../../core/diagnostics/diagnostics_service.dart';
+import '../../../core/diagnostics/tunnel_log_level.dart';
+import '../../../core/diagnostics/tunnel_log_prefs.dart';
 import '../../../core/ios_store_gates.dart';
 import '../../../core/support_contact.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/teremok_snackbar.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../auth/application/auth_provider.dart';
-import '../../auth/application/auth_state.dart';
 import '../../auth/application/logout_handler.dart';
-import '../../home/application/vpn_provider.dart';
 import '../application/locale_provider.dart';
 import '../application/theme_mode_provider.dart';
 import '../data/auto_reconnect_prefs.dart';
@@ -37,8 +34,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _qsAdding = false;
   bool? _autoReconnect;
   bool _autoReconnectLoading = false;
-  bool _reportSending = false;
   String _versionLabel = '';
+  TunnelLogLevel _logLevel = TunnelLogLevel.info;
 
   @override
   void initState() {
@@ -49,6 +46,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _bootstrap() async {
     final futures = <Future<void>>[
       _loadVersion(),
+      _loadLogLevel(),
     ];
     if (!hideInAppPlategaCheckout) {
       futures.add(_loadAutoReconnect());
@@ -155,34 +153,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     // Phone path: GoRouter redirects to /login via refreshListenable.
   }
 
-  Future<void> _onSendReportPressed() async {
-    final l = AppL10n.of(context);
-    setState(() => _reportSending = true);
-    try {
-      final auth = ref.read(authProvider).valueOrNull;
-      final vpn = ref.read(vpnProvider);
-      final notifier = ref.read(vpnProvider.notifier);
-      final service = DiagnosticsService();
-      final report = await service.buildReport(
-        authState: auth ?? const AuthStateUnauthenticated(),
-        vpnUi: vpn,
-        cachedConfig: notifier.config,
-        autoWinnerId: notifier.autoWinnerId,
-        autoWinnerLabel: notifier.displayLabel,
-        lastProve: notifier.lastProveSummary,
-        catalogHost: notifier.catalogHost,
-      );
-      final saved = await DiagnosticsService.persistLocal(report);
-      await Clipboard.setData(ClipboardData(text: saved.body));
-      if (!mounted) return;
-      showTeremokSnackBar(context, l.settingsReportCopied);
-    } catch (_) {
-      if (!mounted) return;
-      showTeremokSnackBar(context, l.settingsReportFailed);
-    } finally {
-      if (mounted) setState(() => _reportSending = false);
-    }
+  Future<void> _loadLogLevel() async {
+    final level = await TunnelLogPrefs.read();
+    if (!mounted) return;
+    setState(() => _logLevel = level);
   }
+
+  String _logLevelLabel(AppL10n l, TunnelLogLevel level) => switch (level) {
+        TunnelLogLevel.off => l.tunnelLogsLevelOff,
+        TunnelLogLevel.error => l.tunnelLogsLevelError,
+        TunnelLogLevel.warn => l.tunnelLogsLevelWarn,
+        TunnelLogLevel.info => l.tunnelLogsLevelInfo,
+        TunnelLogLevel.debug => l.tunnelLogsLevelDebug,
+      };
 
   String _themeModeLabel(AppL10n l, ThemeMode mode) => switch (mode) {
         ThemeMode.light => l.settingsThemeLight,
@@ -349,24 +332,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 SupportContact.open(screen: 'Настройки');
               },
             ),
-          _SettingsRow(
-            icon: AppIcons.bug,
-            title: l.settingsSendReport,
-            subtitle: l.settingsSendReportHint,
-            onTap: _reportSending ? null : _onSendReportPressed,
-            trailing: _reportSending
-                ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : null,
-          ),
         ],
       ),
       (
         title: l.settingsSectionConnection,
         rows: [
+          _SettingsRow(
+            icon: AppIcons.bug,
+            title: l.tunnelLogsTitle,
+            subtitle: _logLevelLabel(l, _logLevel),
+            onTap: () async {
+              await context.push('/settings/logs');
+              if (mounted) await _loadLogLevel();
+            },
+          ),
           if (showAutoReconnect)
             _SettingsRow(
               icon: AppIcons.refresh,
