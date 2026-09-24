@@ -19,3 +19,10 @@ String vpnUiPhase(VpnStatus state) => switch (state) {
       VpnConnected() => 'connected',
       VpnError() => 'error',
     };
+
+/// Host from `host:port`. The share URI itself is never logged.
+String? profileHostForLog(String endpoint) {
+  final host = Uri.tryParse('x://$endpoint')?.host;
+  if (host == null || host.isEmpty) return null;
+  return host;
+}

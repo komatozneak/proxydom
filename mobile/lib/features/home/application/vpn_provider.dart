@@ -95,6 +95,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
 
   /// Label from catalog after Auto/manual pick (overrides generic host fallback).
   String? _displayLabel;
+  String? _profileHost;
 
   /// Protocol of the catalog node chosen at fetchConfig / selectNode time
   /// (`kVpnNodeProtocolTrusttunnel` → start TrustTunnel core, ADR 006).
@@ -523,6 +524,8 @@ class VpnNotifier extends Notifier<VpnStatus> {
         'winner_id': _autoActiveNodeId,
         'core': config?.activeCore.name,
         'label': serverName,
+        'scheme': _selectedNodeProtocol ?? protocol,
+        'host': _profileHost,
         'protocol': protocol,
       });
       unawaited(
@@ -557,6 +560,8 @@ class VpnNotifier extends Notifier<VpnStatus> {
       'winner_id': _autoActiveNodeId,
       'core': config?.activeCore.name,
       'label': serverName,
+      'scheme': _selectedNodeProtocol ?? protocol,
+      'host': _profileHost,
       'protocol': protocol,
     });
     unawaited(_persistConnectedUi(serverName: serverName, protocol: protocol));
@@ -638,6 +643,9 @@ class VpnNotifier extends Notifier<VpnStatus> {
     final imported = await Hy2ImportStore.instance.selected();
     _displayLabel = imported?.name;
     _selectedNodeProtocol = imported?.scheme;
+    _profileHost = imported == null
+        ? null
+        : profileHostForLog(imported.endpoint);
   }
 
   Future<void> _persistConnectedUi({
@@ -698,7 +706,8 @@ class VpnNotifier extends Notifier<VpnStatus> {
         ProductLog.event('vpn.egress_probe', {
           'external_ip': ip,
           'profile': _displayLabel,
-          'protocol': _selectedNodeProtocol,
+          'scheme': _selectedNodeProtocol,
+          'host': _profileHost,
           'phase': _lastSessionPhase.name,
         });
         return;
@@ -936,6 +945,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
     }
     _config = null;
     _displayLabel = null;
+    _profileHost = null;
     _selectedNodeProtocol = null;
     _autoMints.clear();
     _autoActiveNodeId = null;
@@ -960,9 +970,10 @@ class VpnNotifier extends Notifier<VpnStatus> {
     if (useAuto) {
       await nodesRepo.setSelectedNodeId(kRegionAutoId);
     }
-    _displayLabel = null;
-    _selectedNodeProtocol = null;
-    List<VpnNode>? catalog;
+      _displayLabel = null;
+      _profileHost = null;
+      _selectedNodeProtocol = null;
+      List<VpnNode>? catalog;
     String? apiNodeId;
     try {
       if (useAuto) {
@@ -1541,6 +1552,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
         _catalogHost = null;
         _displayLabel = imported.name;
         _selectedNodeProtocol = imported.scheme;
+        _profileHost = profileHostForLog(imported.endpoint);
         await VpnSessionMeta.clear();
         final profile = imported.hy2?.profile;
         final bool started;
@@ -1835,7 +1847,12 @@ class VpnNotifier extends Notifier<VpnStatus> {
     final current = state;
     if (current is! VpnConnected) return;
     final seconds = DateTime.now().difference(current.connectedSince).inSeconds;
-    ProductLog.event('vpn.session_end', {'duration_s': seconds});
+    ProductLog.event('vpn.session_end', {
+      'duration_s': seconds,
+      'profile': current.serverName,
+      'scheme': current.protocol,
+      'host': _profileHost,
+    });
     try {
       ref.read(betaUsageTrackerProvider).recordSessionSeconds(seconds);
     } on StateError {
@@ -2103,9 +2120,6 @@ class VpnNotifier extends Notifier<VpnStatus> {
       VpnConnected() => 'connected',
       VpnError() => 'error',
     };
-    _vpnLog(
-      '[VPN] ui_transition from=$from to=$to src=$src phase=${_lastSessionPhase.name}',
-    );
     ProductLog.event('vpn.ui_transition', {
       'from': from,
       'to': to,

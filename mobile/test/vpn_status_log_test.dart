@@ -16,4 +16,9 @@ void main() {
     expect(vpnUiPhase(const VpnDisconnected()), 'disconnected');
     expect(vpnUiPhase(const VpnConnecting(progress: 0.5)), 'connecting');
   });
+
+  test('profile host is logged without the share secret', () {
+    expect(profileHostForLog('85.155.228.235:443'), '85.155.228.235');
+    expect(profileHostForLog('node.example:443'), 'node.example');
+  });
 }
