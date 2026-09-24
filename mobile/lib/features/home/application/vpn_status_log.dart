@@ -26,3 +26,12 @@ String? profileHostForLog(String endpoint) {
   if (host == null || host.isEmpty) return null;
   return host;
 }
+
+/// Free-client tunnel already up for this profile. A later snapshot must not
+/// open a second session or close the clock.
+bool keepLiveFreeSession({
+  required bool freeClient,
+  required bool sessionOpen,
+  required bool sameProfile,
+}) =>
+    freeClient && sessionOpen && sameProfile;

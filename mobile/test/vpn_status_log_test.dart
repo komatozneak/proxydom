@@ -17,6 +17,33 @@ void main() {
     expect(vpnUiPhase(const VpnConnecting(progress: 0.5)), 'connecting');
   });
 
+  test('a live free session is not opened again', () {
+    expect(
+      keepLiveFreeSession(
+        freeClient: true,
+        sessionOpen: true,
+        sameProfile: true,
+      ),
+      isTrue,
+    );
+    expect(
+      keepLiveFreeSession(
+        freeClient: true,
+        sessionOpen: true,
+        sameProfile: false,
+      ),
+      isFalse,
+    );
+    expect(
+      keepLiveFreeSession(
+        freeClient: false,
+        sessionOpen: true,
+        sameProfile: true,
+      ),
+      isFalse,
+    );
+  });
+
   test('profile host is logged without the share secret', () {
     expect(profileHostForLog('85.155.228.235:443'), '85.155.228.235');
     expect(profileHostForLog('node.example:443'), 'node.example');

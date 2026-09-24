@@ -96,6 +96,8 @@ class VpnNotifier extends Notifier<VpnStatus> {
   /// Label from catalog after Auto/manual pick (overrides generic host fallback).
   String? _displayLabel;
   String? _profileHost;
+  bool _freeSessionOpen = false;
+  String? _freeSessionKey;
 
   /// Protocol of the catalog node chosen at fetchConfig / selectNode time
   /// (`kVpnNodeProtocolTrusttunnel` → start TrustTunnel core, ADR 006).
@@ -506,6 +508,17 @@ class VpnNotifier extends Notifier<VpnStatus> {
       config: config,
       selectedNodeProtocol: _selectedNodeProtocol,
     );
+    final sessionKey =
+        '${_selectedNodeProtocol ?? protocol}|$_profileHost|$serverName';
+    if (keepLiveFreeSession(
+      freeClient: freeKeyClient,
+      sessionOpen: _freeSessionOpen,
+      sameProfile: _freeSessionKey == sessionKey,
+    )) {
+      _endSessionWalk();
+      _cancelConnectingWatchdog();
+      return;
+    }
     if (state is VpnConnected && !freshSession) {
       final cur = state as VpnConnected;
       if (cur.serverName == serverName && cur.protocol == protocol) {
@@ -528,6 +541,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
         'host': _profileHost,
         'protocol': protocol,
       });
+      _rememberFreeSession(sessionKey);
       unawaited(
           _persistConnectedUi(serverName: serverName, protocol: protocol));
       unawaited(_persistAutoLastWinner());
@@ -564,6 +578,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
       'host': _profileHost,
       'protocol': protocol,
     });
+    _rememberFreeSession(sessionKey);
     unawaited(_persistConnectedUi(serverName: serverName, protocol: protocol));
     unawaited(_persistAutoLastWinner());
     final probeToken = ++_egressProbeToken;
@@ -946,6 +961,8 @@ class VpnNotifier extends Notifier<VpnStatus> {
     _config = null;
     _displayLabel = null;
     _profileHost = null;
+    _freeSessionOpen = false;
+    _freeSessionKey = null;
     _selectedNodeProtocol = null;
     _autoMints.clear();
     _autoActiveNodeId = null;
@@ -1843,7 +1860,15 @@ class VpnNotifier extends Notifier<VpnStatus> {
     }
   }
 
+  void _rememberFreeSession(String sessionKey) {
+    if (!freeKeyClient) return;
+    _freeSessionOpen = true;
+    _freeSessionKey = sessionKey;
+  }
+
   void _recordSessionEnd() {
+    _freeSessionOpen = false;
+    _freeSessionKey = null;
     final current = state;
     if (current is! VpnConnected) return;
     final seconds = DateTime.now().difference(current.connectedSince).inSeconds;
@@ -1944,11 +1969,13 @@ class VpnNotifier extends Notifier<VpnStatus> {
       _applyAutoMint(winnerId);
     }
     if (snap.isProving) {
-      final proveId = snap.candidateId ?? '';
-      if (proveId.isNotEmpty && proveId != _lastLoggedProveId) {
-        _lastLoggedProveId = proveId;
-        _lastProveSummary = 'id=$proveId proving';
-        ProductLog.event('vpn.prove', {'id': proveId, 'ok': 'pending'});
+      if (!freeKeyClient) {
+        final proveId = snap.candidateId ?? '';
+        if (proveId.isNotEmpty && proveId != _lastLoggedProveId) {
+          _lastLoggedProveId = proveId;
+          _lastProveSummary = 'id=$proveId proving';
+          ProductLog.event('vpn.prove', {'id': proveId, 'ok': 'pending'});
+        }
       }
     }
     if (snap.isConnected) {
@@ -1956,13 +1983,14 @@ class VpnNotifier extends Notifier<VpnStatus> {
       _lastProveSummary = 'id=$proveId ok reason=${snap.reason.name}';
       _cancelConnectingWatchdog();
       final alreadyOn = state is VpnConnected;
-      if (!alreadyOn) {
+      if (!freeKeyClient && !alreadyOn) {
         ProductLog.event('vpn.prove', {
           'id': proveId,
           'ok': true,
           'reason': snap.reason.name,
         });
       }
+      if (_freeSessionOpen) return;
       unawaited(
         _enterConnected(freshSession: !alreadyOn && state is VpnConnecting),
       );
