@@ -149,6 +149,11 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
 
   Future<void> _load() async {
     if (freeKeyClient) {
+      try {
+        await Hy2ImportStore.instance.refreshSavedUrl();
+      } on FormatException {
+        // Keep the last good list when the network fails.
+      }
       await _applyImported(await Hy2ImportStore.instance.load());
       return;
     }

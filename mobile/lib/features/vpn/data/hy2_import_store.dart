@@ -54,6 +54,38 @@ class Hy2ImportStore {
     return index is int ? index : 0;
   }
 
+  Future<String?> sourceUrl() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_prefsKey);
+    if (raw == null || raw.isEmpty) return null;
+    final decoded = jsonDecode(raw);
+    if (decoded is! Map) return null;
+    final url = decoded['url'];
+    if (url is! String || url.trim().isEmpty) return null;
+    return url.trim();
+  }
+
+  /// Re-fetch the saved https subscription. A dead slot (404) drops the profile.
+  Future<void> refreshSavedUrl() async {
+    final url = await sourceUrl();
+    if (url == null) return;
+    try {
+      await saveInput(url);
+    } on FormatException catch (e) {
+      if (e.message.contains('404')) {
+        await clear();
+        return;
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> clear() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_prefsKey);
+    _changed();
+  }
+
   Future<String?> profileTitle() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_prefsKey);
@@ -108,6 +140,7 @@ class Hy2ImportStore {
     }
     final source = await sourceHost();
     final title = await profileTitle();
+    final url = await sourceUrl();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
       _prefsKey,
@@ -115,6 +148,7 @@ class Hy2ImportStore {
         'lines': lines,
         'selected': selected,
         if (source != null && source.isNotEmpty) 'source': source,
+        if (url != null) 'url': url,
         if (title != null && lines.isNotEmpty) 'title': title,
       }),
     );
@@ -146,6 +180,7 @@ class Hy2ImportStore {
         'lines': lines,
         'selected': 0,
         if (source != null && source.isNotEmpty) 'source': source,
+        if (looksLikeSubscriptionUrl(text)) 'url': text,
         if (title != null && title.isNotEmpty) 'title': title,
       }),
     );
