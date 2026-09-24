@@ -3208,7 +3208,7 @@ abstract class AppL10n {
   /// No description provided for @freeAddHint.
   ///
   /// In en, this message translates to:
-  /// **'Paste a link or a key. The app does not sell access.'**
+  /// **'Paste a link or a key.'**
   String get freeAddHint;
 
   /// No description provided for @freeSaveConnect.
@@ -3244,25 +3244,25 @@ abstract class AppL10n {
   /// No description provided for @freeOnboardTitle.
   ///
   /// In en, this message translates to:
-  /// **'A free app'**
+  /// **'Server list'**
   String get freeOnboardTitle;
 
   /// No description provided for @freeOnboardBody.
   ///
   /// In en, this message translates to:
-  /// **'No ads. Nothing is sold inside the app. You connect with a link you add yourself.'**
+  /// **'A subscription link or a key becomes a profile. Its servers stay in one list.'**
   String get freeOnboardBody;
 
   /// No description provided for @freeOnboardAddTitle.
   ///
   /// In en, this message translates to:
-  /// **'Add a link, key, or QR'**
+  /// **'Pick a server'**
   String get freeOnboardAddTitle;
 
   /// No description provided for @freeOnboardAddBody.
   ///
   /// In en, this message translates to:
-  /// **'Servers from that link appear in the list. You choose which one to use.'**
+  /// **'Each server has a name and a short line. You choose which one to use.'**
   String get freeOnboardAddBody;
 
   /// No description provided for @freeOnboardConnectTitle.

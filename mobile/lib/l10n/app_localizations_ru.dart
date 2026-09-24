@@ -1715,8 +1715,7 @@ class AppL10nRu extends AppL10n {
   String get freeAddTitle => 'Добавить';
 
   @override
-  String get freeAddHint =>
-      'Вставьте ссылку или ключ. В приложении ничего не продаётся.';
+  String get freeAddHint => 'Вставьте ссылку или ключ.';
 
   @override
   String get freeSaveConnect => 'Сохранить и подключить';
@@ -1734,18 +1733,18 @@ class AppL10nRu extends AppL10n {
   String get freeLinkInvalid => 'Ссылка не разобрана';
 
   @override
-  String get freeOnboardTitle => 'Бесплатное приложение';
+  String get freeOnboardTitle => 'Список серверов';
 
   @override
   String get freeOnboardBody =>
-      'Без рекламы. Внутри ничего не продаётся. Подключение — по ссылке, которую добавляете вы.';
+      'Ссылка подписки или ключ становятся профилем. Серверы из неё собираются в один список.';
 
   @override
-  String get freeOnboardAddTitle => 'Добавьте ссылку, ключ или QR';
+  String get freeOnboardAddTitle => 'Выберите сервер';
 
   @override
   String get freeOnboardAddBody =>
-      'Серверы из этой ссылки появятся в списке. Какой использовать — выбираете вы.';
+      'У каждого сервера своё имя и подпись. Какой использовать — выбираете вы.';
 
   @override
   String get freeOnboardConnectTitle => 'Подключайтесь одним нажатием';

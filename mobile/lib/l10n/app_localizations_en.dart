@@ -1710,8 +1710,7 @@ class AppL10nEn extends AppL10n {
   String get freeAddTitle => 'Add';
 
   @override
-  String get freeAddHint =>
-      'Paste a link or a key. The app does not sell access.';
+  String get freeAddHint => 'Paste a link or a key.';
 
   @override
   String get freeSaveConnect => 'Save and connect';
@@ -1729,18 +1728,18 @@ class AppL10nEn extends AppL10n {
   String get freeLinkInvalid => 'Could not read that link';
 
   @override
-  String get freeOnboardTitle => 'A free app';
+  String get freeOnboardTitle => 'Server list';
 
   @override
   String get freeOnboardBody =>
-      'No ads. Nothing is sold inside the app. You connect with a link you add yourself.';
+      'A subscription link or a key becomes a profile. Its servers stay in one list.';
 
   @override
-  String get freeOnboardAddTitle => 'Add a link, key, or QR';
+  String get freeOnboardAddTitle => 'Pick a server';
 
   @override
   String get freeOnboardAddBody =>
-      'Servers from that link appear in the list. You choose which one to use.';
+      'Each server has a name and a short line. You choose which one to use.';
 
   @override
   String get freeOnboardConnectTitle => 'Connect with one tap';
