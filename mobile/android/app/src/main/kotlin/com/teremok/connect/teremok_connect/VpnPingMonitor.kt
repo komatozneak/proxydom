@@ -185,6 +185,35 @@ class VpnPingMonitor(
             )
         }
 
+        /**
+         * Public IPv4 as seen through the Hy2 SOCKS client.
+         * The app itself is excluded from the TUN, so a normal HTTP client
+         * would report the carrier address.
+         */
+        fun socksExitIp(
+            socksHost: String = GvisorTun2Socks.SOCKS_HOST,
+            socksPort: Int = GvisorTun2Socks.SOCKS_PORT,
+            timeoutMs: Int = PROBE_TIMEOUT_MS,
+        ): String? = runCatching {
+            Socket().use { socket ->
+                socket.soTimeout = timeoutMs
+                socket.connect(InetSocketAddress(socksHost, socksPort), timeoutMs)
+                val out = DataOutputStream(socket.getOutputStream())
+                val inp = DataInputStream(socket.getInputStream())
+                socks5Greeting(out, inp)
+                socks5ConnectDomain(out, inp, "ipv4.icanhazip.com", 80)
+                val request =
+                    "GET / HTTP/1.0\r\nHost: ipv4.icanhazip.com\r\nConnection: close\r\n\r\n"
+                out.write(request.toByteArray(StandardCharsets.US_ASCII))
+                out.flush()
+                val text = inp.readBytes().toString(StandardCharsets.US_ASCII)
+                val body = text.substringAfter("\r\n\r\n", "")
+                body.lineSequence()
+                    .map { it.trim() }
+                    .firstOrNull { it.isNotEmpty() && it.none { ch -> ch.isWhitespace() } }
+            }
+        }.getOrNull()
+
         fun socksHttpOk(
             socksHost: String = GvisorTun2Socks.SOCKS_HOST,
             socksPort: Int = GvisorTun2Socks.SOCKS_PORT,

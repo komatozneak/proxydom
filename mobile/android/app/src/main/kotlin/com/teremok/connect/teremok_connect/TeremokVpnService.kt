@@ -427,6 +427,9 @@ class TeremokVpnService : VpnService() {
     private val tunInterface = AtomicReference<ParcelFileDescriptor?>(null)
     @Volatile
     private var isRunning = false
+
+    @Volatile
+    var provenEgressIp: String? = null
     /** True only while [startVpn] is establishing TUN/core (not onCreate hint). */
     @Volatile
     private var establishInProgress = false
@@ -479,8 +482,8 @@ class TeremokVpnService : VpnService() {
             emit: (SessionSnapshot) -> Unit,
         ): Boolean {
             if (!alive()) return false
-            startVpn(username, protocol, params)
-            return isRunning
+            startVpn(username, protocol, params, alive)
+            return isRunning && alive()
         }
 
         override fun teardownGeneration(generation: Long) {
@@ -987,13 +990,17 @@ class TeremokVpnService : VpnService() {
         username: String,
         protocol: String,
         params: Map<String, Any?>,
+        alive: () -> Boolean = { true },
     ) {
-        if (isRunning) {
-            Log.w(TAG, "startVpn: already running — teardown+reapply new params")
+        if (!alive()) return
+        if (isRunning || HysteriaBridge.instance.running()) {
+            Log.w(TAG, "startVpn: previous hysteria still up — stop before establish")
             teardownCores()
         }
+        if (!alive()) return
         if (establishInProgress) {
-            Log.w(TAG, "startVpn: establish already in progress, skip")
+            Log.w(TAG, "startVpn: establish already in progress")
+            failStart("establish already in progress")
             return
         }
         establishInProgress = true
@@ -1018,7 +1025,7 @@ class TeremokVpnService : VpnService() {
             }
 
             if (isHysteriaCore(params)) {
-                startHysteriaOnWorker(username, protocol, params)
+                startHysteriaOnWorker(username, protocol, params, alive)
                 return
             }
             if (isXrayShareCore(params)) {
@@ -1129,6 +1136,7 @@ class TeremokVpnService : VpnService() {
         username: String,
         protocol: String,
         params: Map<String, Any?>,
+        alive: () -> Boolean = { true },
     ) {
         val server = (params["hysteriaServer"] as? String)?.trim().orEmpty()
         val auth = (params["hysteriaAuth"] as? String)?.trim().orEmpty()
@@ -1146,6 +1154,7 @@ class TeremokVpnService : VpnService() {
         val sessionName = (params["sessionName"] as? String)
             ?.takeIf { it.isNotBlank() }
             ?: "Теремок VPN"
+        val carrierIp = readCarrierIpv4()
         // Hy2 QUIC overhead on LTE: 1500 inner packets fragment and stall
         // the first request of each page. Video then recovers via TCP MSS.
         val mtu = 1280
@@ -1200,8 +1209,19 @@ class TeremokVpnService : VpnService() {
         }
         VpnUnderlyingNetworkPolicy.applyTo(this)
 
+        if (!alive()) {
+            teardownCores()
+            return
+        }
         val hy = HysteriaBridge.instance
         hy.bind(this)
+        if (hy.running()) {
+            hy.stop()
+        }
+        if (!alive()) {
+            teardownCores()
+            return
+        }
         if (!hy.start(
                 server = server,
                 auth = auth,
@@ -1239,10 +1259,24 @@ class TeremokVpnService : VpnService() {
             label = "hysteria",
             configJson = hysteriaTun2SocksConfig(mtu),
         )
+        if (!alive()) {
+            teardownCores()
+            return
+        }
         if (!probeSocksHttps(probeCandidate)) {
             failStart("$nodeId@$server: SOCKS HTTPS probe failed")
             return
         }
+        if (!alive()) {
+            teardownCores()
+            return
+        }
+        val exitIp = VpnPingMonitor.socksExitIp()
+        if (exitIp.isNullOrBlank() || exitIp == carrierIp) {
+            failStart("egress unchanged exit=$exitIp carrier=$carrierIp")
+            return
+        }
+        provenEgressIp = exitIp
 
         isRunning = true
         establishInProgress = false
@@ -1262,6 +1296,14 @@ class TeremokVpnService : VpnService() {
      * SOCKS CONNECT to 1.1.1.1:443 through local Xray SOCKS — must pass before
      * `connected`. Runs off the main thread (no TLS, no generate_204).
      */
+    private fun readCarrierIpv4(): String? = runCatching {
+        val url = java.net.URL("http://ipv4.icanhazip.com")
+        val conn = url.openConnection() as java.net.HttpURLConnection
+        conn.connectTimeout = 4000
+        conn.readTimeout = 4000
+        conn.inputStream.bufferedReader().use { it.readLine()?.trim() }
+    }.getOrNull()
+
     private fun probeSocksHttps(selected: SocksProbeCandidate): Boolean {
         val okFlag = AtomicBoolean(false)
         val done = CountDownLatch(1)
@@ -1390,6 +1432,7 @@ class TeremokVpnService : VpnService() {
             releaseVpnLocks()
             stopTrafficMonitor()
             HysteriaBridge.instance.stop()
+            provenEgressIp = null
             closeTunOnce("teardownCores")
             Log.i(TAG, "teardownCores: cores stopped, TUN closed if any")
         } catch (e: Exception) {
@@ -1768,6 +1811,9 @@ object VpnChannelRegistry {
                     "getLastError" -> {
                         result.success(VpnStatusBroadcaster.lastError())
                     }
+                    "getProvenEgress" -> {
+                        result.success(serviceProvider()?.provenEgressIp)
+                    }
                     "isLockdownEnabled" -> {
                         // Preference/system lockdown — not tunnel-up. See
                         // [TeremokVpnService.queryAlwaysOnVpnSnapshot].
@@ -2027,7 +2073,6 @@ object VpnStatusBroadcaster {
     @Volatile
     private var lastStatus: String = "idle"
 
-    @Volatile
     private var lastErrorMessage: String? = null
 
     @Volatile

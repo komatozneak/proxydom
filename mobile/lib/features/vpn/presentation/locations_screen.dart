@@ -333,6 +333,20 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     await _load();
   }
 
+  Future<void> _deleteProfile() async {
+    final status = ref.read(vpnProvider);
+    if (status is VpnConnected || status is VpnConnecting) {
+      await ref.read(vpnProvider.notifier).disconnect();
+    }
+    await Hy2ImportStore.instance.clear();
+    if (!mounted) return;
+    setState(() {
+      _imported = const [];
+      _profileTitle = null;
+      _selectedId = null;
+    });
+  }
+
   Future<void> _openPoolSheet() async {
     final theme = Theme.of(context);
     final premium = <int>[];
@@ -425,7 +439,16 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                  trailing: const AppIcon(AppIcons.chevronRight),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        onPressed: _deleteProfile,
+                        icon: const AppIcon(AppIcons.trash, size: 20),
+                      ),
+                      const AppIcon(AppIcons.chevronRight),
+                    ],
+                  ),
                   onTap: _openPoolSheet,
                 ),
               ],

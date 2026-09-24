@@ -240,6 +240,13 @@ class VpnNotifier extends Notifier<VpnStatus> {
   /// and syncFromNative auto-reconnect until the next user [connect].
   bool _suppressAutoReconnect = false;
 
+  /// True while a server switch is waiting for the previous tunnel to go idle.
+  bool _switchStop = false;
+  int _dialGen = 0;
+  int _liveDialGen = 0;
+  int _nativeGenFloor = 0;
+  int _lastNativeGen = 0;
+
   /// One PathIncompatible Auto retry on Wi-Fi (issue #147).
   bool _wifiAutoRetryUsed = false;
   bool _wifiRetryPending = false;
@@ -453,7 +460,8 @@ class VpnNotifier extends Notifier<VpnStatus> {
     // Auto SOCKS prove: session snapshot is SoT. Binding+TUN in the shade
     // must still paint Nest Connected (ConnectedHealthy can lag / miss).
     if (_sessionProving) return;
-    if (_suppressAutoReconnect) return;
+    if (_suppressAutoReconnect || _switchStop) return;
+    if (hideInAppPlategaCheckout && _liveDialGen != _dialGen) return;
     final effectiveGen = gen ?? _activeConnectGen ?? _connectGeneration;
     if (_enterConnectedGenInFlight == effectiveGen) {
       return;
@@ -718,7 +726,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
     try {
       if (freeKeyClient) {
         _catalogHost = null;
-        final ip = await fetchExternalIp();
+        final ip = await VpnController.instance.provenEgressIp();
         if (mine != _egressProbeToken || state is! VpnConnected) return;
         ProductLog.event('vpn.egress_probe', {
           'external_ip': ip,
@@ -1521,7 +1529,37 @@ class VpnNotifier extends Notifier<VpnStatus> {
     if (state is VpnError || state is VpnDisconnected) {
       state = const VpnConnecting(progress: 0.0);
     }
-    if (forceRestart && existing == VpnNativeStatus.connected) {
+    if (hideInAppPlategaCheckout && forceRestart) {
+      final dial = ++_dialGen;
+      state = const VpnConnecting(progress: 0.2);
+      final busy = existing == VpnNativeStatus.connected ||
+          existing == VpnNativeStatus.connecting ||
+          existing == VpnNativeStatus.preparing ||
+          existing == VpnNativeStatus.disconnecting;
+      if (busy) {
+        _switchStop = true;
+        var idle = false;
+        try {
+          try {
+            await VpnController.instance.wipeSession(reason: 'switch_server');
+          } catch (_) {}
+          idle = await waitUntilNativeIdle(
+            timeout: const Duration(seconds: 8),
+          );
+        } finally {
+          _switchStop = false;
+        }
+        if (await _abortStaleConnect(gen)) return;
+        if (_dialGen != dial) return;
+        if (!idle) {
+          state = const VpnError(
+            message: 'switch_not_idle',
+            code: 'switch_not_idle',
+          );
+          return;
+        }
+      }
+    } else if (forceRestart && existing == VpnNativeStatus.connected) {
       try {
         await VpnController.instance.stop(reason: 'force_restart');
       } catch (_) {}
@@ -1577,16 +1615,19 @@ class VpnNotifier extends Notifier<VpnStatus> {
         final profile = imported.hy2?.profile;
         final bool started;
         if (profile != null) {
+          final dial = _dialGen == 0 ? ++_dialGen : _dialGen;
+          _nativeGenFloor = _lastNativeGen;
           ProductLog.event('vpn.connect_attempt', {
             'profile': shown.title,
             'scheme': imported.scheme,
             'host': _profileHost,
             'sni': profile.sni,
           });
-          started = await VpnController.instance.startHysteria(
+          final raw = await VpnController.instance.startHysteria(
             profile,
             displayLabel: shown.title,
           );
+          started = raw && _dialGen == dial;
         } else if (defaultTargetPlatform == TargetPlatform.android) {
           final xrayJson = buildXraySocksConfig(imported);
           if (xrayJson == null) {
@@ -1965,7 +2006,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
       lastPhase: _lastSessionPhase,
       walkActive: _sessionWalkActive,
       sessionOwnsUi: _sessionOwnsUi,
-      userStopping: _suppressAutoReconnect,
+      userStopping: _suppressAutoReconnect || _switchStop,
     )) {
       _vpnLog(
         'vpn.native ignore regressive ${snap.phase.name} '
@@ -1973,6 +2014,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
       );
       return;
     }
+    _lastNativeGen = snap.generation;
     _lastSessionPhase = snap.phase;
     _sessionOwnsUi = snap.ownsConnectUi;
     final wasProving = _sessionProving;
@@ -1997,6 +2039,13 @@ class VpnNotifier extends Notifier<VpnStatus> {
       }
     }
     if (snap.isConnected) {
+      if (hideInAppPlategaCheckout &&
+          (snap.generation <= _nativeGenFloor || _switchStop)) {
+        return;
+      }
+      if (hideInAppPlategaCheckout) {
+        _liveDialGen = _dialGen;
+      }
       final proveId = snap.candidateId ?? _autoActiveNodeId ?? '';
       _lastProveSummary = 'id=$proveId ok reason=${snap.reason.name}';
       _cancelConnectingWatchdog();
@@ -2138,6 +2187,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
             ProductLog.event('vpn.connect_fail', {
               'code': err.code,
               'message': err.message,
+              'host': _profileHost,
             });
             state = err;
           }),
