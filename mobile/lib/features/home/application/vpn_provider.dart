@@ -242,10 +242,8 @@ class VpnNotifier extends Notifier<VpnStatus> {
 
   /// True while a server switch is waiting for the previous tunnel to go idle.
   bool _switchStop = false;
-
-  /// Bumps on every dial. Connected from an older dial must not paint Home.
-  int _dialToken = 0;
-  int _liveDialToken = 0;
+  int _dialGen = 0;
+  int _liveDialGen = 0;
 
   /// One PathIncompatible Auto retry on Wi-Fi (issue #147).
   bool _wifiAutoRetryUsed = false;
@@ -461,7 +459,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
     // must still paint Nest Connected (ConnectedHealthy can lag / miss).
     if (_sessionProving) return;
     if (_suppressAutoReconnect || _switchStop) return;
-    if (hideInAppPlategaCheckout && _liveDialToken != _dialToken) return;
+    if (hideInAppPlategaCheckout && _liveDialGen != _dialGen) return;
     final effectiveGen = gen ?? _activeConnectGen ?? _connectGeneration;
     if (_enterConnectedGenInFlight == effectiveGen) {
       return;
@@ -1530,8 +1528,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
       state = const VpnConnecting(progress: 0.0);
     }
     if (hideInAppPlategaCheckout && forceRestart) {
-      _dialToken++;
-      _liveDialToken = 0;
+      final dial = ++_dialGen;
       state = const VpnConnecting(progress: 0.2);
       final busy = existing == VpnNativeStatus.connected ||
           existing == VpnNativeStatus.connecting ||
@@ -1542,7 +1539,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
         var idle = false;
         try {
           try {
-            await VpnController.instance.stop(reason: 'switch_server');
+            await VpnController.instance.wipeSession(reason: 'switch_server');
           } catch (_) {}
           idle = await waitUntilNativeIdle(
             timeout: const Duration(seconds: 8),
@@ -1551,6 +1548,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
           _switchStop = false;
         }
         if (await _abortStaleConnect(gen)) return;
+        if (_dialGen != dial) return;
         if (!idle) {
           state = const VpnError(
             message: 'switch_not_idle',
@@ -1615,8 +1613,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
         final profile = imported.hy2?.profile;
         final bool started;
         if (profile != null) {
-          final token = ++_dialToken;
-          _liveDialToken = 0;
+          final dial = _dialGen == 0 ? ++_dialGen : _dialGen;
           ProductLog.event('vpn.connect_attempt', {
             'profile': shown.title,
             'scheme': imported.scheme,
@@ -1627,8 +1624,8 @@ class VpnNotifier extends Notifier<VpnStatus> {
             profile,
             displayLabel: shown.title,
           );
-          if (started && token == _dialToken) {
-            _liveDialToken = token;
+          if (started && _dialGen == dial) {
+            _liveDialGen = dial;
           }
         } else if (defaultTargetPlatform == TargetPlatform.android) {
           final xrayJson = buildXraySocksConfig(imported);
