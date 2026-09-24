@@ -1151,6 +1151,7 @@ class TeremokVpnService : VpnService() {
         val sessionName = (params["sessionName"] as? String)
             ?.takeIf { it.isNotBlank() }
             ?: "Теремок VPN"
+        val carrierIp = readCarrierIpv4()
         // Hy2 QUIC overhead on LTE: 1500 inner packets fragment and stall
         // the first request of each page. Video then recovers via TCP MSS.
         val mtu = 1280
@@ -1267,6 +1268,12 @@ class TeremokVpnService : VpnService() {
             teardownCores()
             return
         }
+        val exitIp = VpnPingMonitor.socksExitIp()
+        if (exitIp.isNullOrBlank() || exitIp == carrierIp) {
+            failStart("egress unchanged exit=$exitIp carrier=$carrierIp")
+            return
+        }
+        provenEgressIp = exitIp
 
         isRunning = true
         establishInProgress = false
@@ -1286,6 +1293,14 @@ class TeremokVpnService : VpnService() {
      * SOCKS CONNECT to 1.1.1.1:443 through local Xray SOCKS — must pass before
      * `connected`. Runs off the main thread (no TLS, no generate_204).
      */
+    private fun readCarrierIpv4(): String? = runCatching {
+        val url = java.net.URL("http://ipv4.icanhazip.com")
+        val conn = url.openConnection() as java.net.HttpURLConnection
+        conn.connectTimeout = 4000
+        conn.readTimeout = 4000
+        conn.inputStream.bufferedReader().use { it.readLine()?.trim() }
+    }.getOrNull()
+
     private fun probeSocksHttps(selected: SocksProbeCandidate): Boolean {
         val okFlag = AtomicBoolean(false)
         val done = CountDownLatch(1)
@@ -1414,6 +1429,7 @@ class TeremokVpnService : VpnService() {
             releaseVpnLocks()
             stopTrafficMonitor()
             HysteriaBridge.instance.stop()
+            provenEgressIp = null
             closeTunOnce("teardownCores")
             Log.i(TAG, "teardownCores: cores stopped, TUN closed if any")
         } catch (e: Exception) {
@@ -1792,6 +1808,9 @@ object VpnChannelRegistry {
                     "getLastError" -> {
                         result.success(VpnStatusBroadcaster.lastError())
                     }
+                    "getProvenEgress" -> {
+                        result.success(serviceProvider()?.provenEgressIp)
+                    }
                     "isLockdownEnabled" -> {
                         // Preference/system lockdown — not tunnel-up. See
                         // [TeremokVpnService.queryAlwaysOnVpnSnapshot].
@@ -2052,6 +2071,9 @@ object VpnStatusBroadcaster {
     private var lastStatus: String = "idle"
 
     @Volatile
+    @Volatile
+    var provenEgressIp: String? = null
+
     private var lastErrorMessage: String? = null
 
     @Volatile

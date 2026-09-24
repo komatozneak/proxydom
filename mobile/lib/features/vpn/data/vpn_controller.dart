@@ -231,6 +231,16 @@ class VpnController {
     }
   }
 
+  Future<String?> provenEgressIp() async {
+    try {
+      return await _methodChannel.invokeMethod<String>('getProvenEgress');
+    } on PlatformException {
+      return null;
+    } on MissingPluginException {
+      return null;
+    }
+  }
+
   Future<bool> stop({String reason = 'user_tap'}) async {
     try {
       final result = await _methodChannel.invokeMethod<bool>(

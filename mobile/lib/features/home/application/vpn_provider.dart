@@ -726,7 +726,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
     try {
       if (freeKeyClient) {
         _catalogHost = null;
-        final ip = await fetchExternalIp();
+        final ip = await VpnController.instance.provenEgressIp();
         if (mine != _egressProbeToken || state is! VpnConnected) return;
         ProductLog.event('vpn.egress_probe', {
           'external_ip': ip,
