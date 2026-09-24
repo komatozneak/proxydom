@@ -321,6 +321,16 @@ void main() {
         isFalse,
       );
       expect(
+        shouldIgnoreRegressiveIdleSnapshot(
+          incoming: VpnSessionPhase.idle,
+          lastPhase: VpnSessionPhase.stopping,
+          walkActive: true,
+          sessionOwnsUi: true,
+          userStopping: true,
+        ),
+        isFalse,
+      );
+      expect(
         nativeIdleMustNotDemote(
           walkActive: false,
           sessionOwnsUi: false,

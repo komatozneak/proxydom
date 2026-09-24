@@ -1996,7 +1996,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
       lastPhase: _lastSessionPhase,
       walkActive: _sessionWalkActive,
       sessionOwnsUi: _sessionOwnsUi,
-      userStopping: _suppressAutoReconnect,
+      userStopping: _suppressAutoReconnect || _switchStop,
     )) {
       _vpnLog(
         'vpn.native ignore regressive ${snap.phase.name} '
@@ -2169,6 +2169,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
             ProductLog.event('vpn.connect_fail', {
               'code': err.code,
               'message': err.message,
+              'host': _profileHost,
             });
             state = err;
           }),
