@@ -9,19 +9,14 @@ import 'package:go_router/go_router.dart';
 import '../../../core/busy/busy_overlay.dart';
 import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
-import '../../../core/utils/format_utils.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/connect_button.dart';
 import '../../../core/widgets/house_pulsar.dart';
 import '../../../core/widgets/signal_nest_hero.dart';
 import '../../../core/widgets/teremok_snackbar.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../session/application/session_provider.dart';
-import '../../session/data/account_session_snapshot.dart';
-import '../../settings/application/subscription_status_provider.dart';
 import '../../settings/data/installed_apps_channel.dart';
 import '../../settings/data/split_tunnel_prefs.dart';
-import '../../settings/data/subscription_status.dart';
 import '../../vpn/application/imported_profiles_provider.dart';
 import '../../vpn/data/hy2_import_store.dart';
 import '../../vpn/data/vpn_service_config.dart';
@@ -36,9 +31,6 @@ import '../../vpn/presentation/vpn_platform_copy.dart';
 import '../data/battery_prompt_prefs.dart';
 import '../application/vpn_provider.dart';
 import '../application/vpn_status.dart';
-import 'widgets/free_quota_bar.dart';
-import 'widgets/radial_gradient_ground.dart';
-import 'widgets/server_card.dart';
 
 /// Test keys: quota meter sits above Living House.
 const kHomeQuotaBarKey = ValueKey<String>('home_quota_bar');
@@ -139,11 +131,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     }
   }
 
-  Future<void> _refreshEntitlement() async {
-    if (freeKeyClient) return;
-    await ref.read(sessionProvider.notifier).refresh();
-    await ref.read(subscriptionStatusProvider.notifier).refresh();
-  }
+  Future<void> _refreshEntitlement() async {}
 
   Future<void> _openSubscription() async {
     if (_openingSubscription || !mounted) return;
@@ -248,9 +236,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       } catch (_) {
         catalog = await nodesRepo.loadCachedNodes() ?? const [];
       }
-      final premium =
-          ref.read(subscriptionStatusProvider).asData?.value.unlocksPremium ??
-              false;
+      const premium = false;
       final poolFlags = uniqueAutoPoolFlags(
         autoPoolFor(catalog, isPremium: premium),
       );
@@ -572,7 +558,6 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
   }
 
   /// Last Free meter so a background refresh does not unmount the bar.
-  SubscriptionStatus? _stickyMeteredQuota;
 
   TreeState get _treeState => switch (widget.status) {
         VpnConnecting() => TreeState.connecting,
@@ -591,18 +576,6 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
     if (mounted) await widget.onPlaceRefresh();
   }
 
-  String get _displayFlag {
-    if (widget.selectionIsAuto) {
-      final flag = widget.serverFlag.trim();
-      if (flag.isEmpty || flag == kFlagGlobe || flag == '🌍') {
-        return widget.autoPoolFlags.isNotEmpty
-            ? widget.autoPoolFlags.first
-            : kFlagGlobe;
-      }
-    }
-    return widget.serverFlag;
-  }
-
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -619,77 +592,18 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
       // Session end → traffic just got scraped server-side; refresh the meter.
       if (oldWidget.status is VpnConnected &&
           widget.status is VpnDisconnected) {
-        unawaited(ref.read(subscriptionStatusProvider.notifier).refresh());
+        // Local profiles have no server-side traffic meter.
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final l = AppL10n.of(context);
     final size = MediaQuery.sizeOf(context);
     final status = widget.status;
     final treeState = _treeState;
-
-    final statusLabel = switch (status) {
-      VpnDisconnected() => l.homeDisconnected,
-      VpnConnecting() => l.homeConnecting,
-      VpnConnected() => l.homeConnected,
-      VpnError(:final code) when code == kVpnProbeFailedErrorCode =>
-        l.homeVpnProbeFailedTitle,
-      VpnError(:final code) when code == 'tt_provision_failed' =>
-        l.homeTtProvisionFailedTitle,
-      VpnError(:final code) when code == kVpnConflictErrorCode =>
-        l.homeVpnConflictTitle,
-      VpnError(:final code) when code == 'device_limit_reached' =>
-        l.settingsSeatDeviceLimit,
-      VpnError(:final code) when code == 'quota_exceeded' =>
-        l.homeQuotaExceededTitle,
-      VpnError() => l.homeError,
-    };
-    final statusHint = switch (status) {
-      VpnDisconnected() => l.homeTapHint,
-      VpnConnecting(:final hint) =>
-        (hint != null && hint.isNotEmpty) ? hint : l.homeConnectingHint,
-      VpnConnected() => l.homeConnectedHint,
-      VpnError(:final code, :final message)
-          when code == kVpnProbeFailedErrorCode =>
-        l.homeVpnProbeFailedHint(
-          message.isNotEmpty ? message : l.homeRegion,
-        ),
-      VpnError(:final code) when code == 'tt_provision_failed' =>
-        l.homeTtProvisionFailedHint,
-      VpnError(:final code, :final message)
-          when code == kVpnConflictErrorCode =>
-        (message.isNotEmpty && message != 'vpn_conflict')
-            ? homeVpnConflictHintNamedForPlatform(l, message)
-            : homeVpnConflictHintForPlatform(l),
-      VpnError(:final code) when code == 'permission_denied' =>
-        homeVpnPermissionHintForPlatform(l),
-      VpnError(:final code) when code == 'device_limit_reached' =>
-        l.settingsDevicesHint,
-      VpnError(:final code) when code == 'quota_exceeded' =>
-        l.iosBillingUnavailableBody,
-      VpnError(:final code) when code == kVpnPathIncompatibleErrorCode =>
-        l.homePathIncompatibleHint,
-      VpnError() => l.homeErrorFriendly,
-    };
     final showVpnSettingsCta =
         status is VpnError && status.code == kVpnConflictErrorCode;
-    final showDevicesCta = !hideInAppPlategaCheckout &&
-        status is VpnError &&
-        status.code == 'device_limit_reached';
-    final showQuotaCta = status is VpnError && status.code == 'quota_exceeded';
-    final liveQuota = ref.watch(subscriptionStatusProvider).asData?.value;
-    if (liveQuota != null) {
-      _stickyMeteredQuota = liveQuota.showsMeteredQuotaBar ? liveQuota : null;
-    }
-    final quota = liveQuota != null && liveQuota.showsMeteredQuotaBar
-        ? liveQuota
-        : _stickyMeteredQuota;
-    final russian = Localizations.localeOf(context).languageCode == 'ru';
-    const gib = 1024.0 * 1024.0 * 1024.0;
 
     final nestSize = freeKeyClient
         ? math.min(
@@ -704,150 +618,17 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
             math.min(size.width * 0.78, widget.maxHeight * 0.46),
           );
 
-    if (freeKeyClient) {
-      return _FreeClientHome(
-        nestSize: nestSize,
-        treeState: treeState,
-        status: status,
-        serverTitle: widget.serverTitle,
-        importedScheme: widget.importedScheme,
-        onNestTap: widget.onNestTap,
-        showVpnSettingsCta: showVpnSettingsCta,
-        noVpnEnabled: widget.noVpnEnabled,
-        noVpnTotal: widget.noVpnTotal,
-        onOpenNoVpn: widget.onOpenNoVpn,
-      );
-    }
-
-    return Column(
-      children: [
-        if (quota != null && quota.showsMeteredQuotaBar) ...[
-          FreeQuotaBar(
-            key: kHomeQuotaBarKey,
-            remainingFraction: quota.quotaRemainingFraction,
-            title: l.homeTrafficRemainder,
-            amountLabel: l.homeTrafficAmount(
-              formatGib(
-                (quota.quotaBytesRemaining ?? 0) / gib,
-                russian: russian,
-              ),
-              formatGib(
-                (quota.quotaBytesLimit ?? 0) / gib,
-                russian: russian,
-              ),
-            ),
-            exhaustedLabel: l.homeTrafficExhausted,
-            teaser: null,
-            ctaLabel: null,
-            onTap: widget.onOpenSubscription,
-          ),
-          const SizedBox(height: 8),
-        ],
-        if (_showTelegramRestoreBanner(
-          quota: liveQuota,
-          session: ref.watch(sessionProvider).valueOrNull,
-        )) ...[
-          _TelegramRestoreBanner(
-            vpnConnected: status is VpnConnected,
-            onTap: () {
-              if (status is VpnConnected) {
-                context.push('/restore');
-              }
-            },
-          ),
-          const SizedBox(height: 8),
-        ],
-        Expanded(
-          child: Center(
-            child: RadialGradientGround(
-              state: treeState,
-              child: SignalNestHero(
-                key: kHomeSignalNestKey,
-                state: treeState,
-                onTap: () => widget.onNestTap(),
-                size: nestSize,
-              ),
-            ),
-          ),
-        ),
-        TreeStatusLabel(
-          state: treeState,
-          label: statusLabel,
-        ),
-        const SizedBox(height: 6),
-        Text(
-          statusHint,
-          textAlign: TextAlign.center,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: status is VpnError
-                ? theme.colorScheme.error
-                : theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-        if (showVpnSettingsCta) ...[
-          const SizedBox(height: 12),
-          FilledButton.tonal(
-            onPressed: () async {
-              final opened = await VpnController.instance.openVpnSettings();
-              if (!context.mounted) return;
-              if (!opened) {
-                showTeremokSnackBar(
-                  context,
-                  settingsKillSwitchOpenFailedForPlatform(l),
-                );
-              }
-            },
-            child: Text(l.settingsKillSwitchOpenVpn),
-          ),
-        ],
-        if (showDevicesCta) ...[
-          const SizedBox(height: 12),
-          FilledButton.tonal(
-            onPressed: () => context.push('/settings/devices'),
-            child: Text(l.devicesLimitOpenManage),
-          ),
-        ],
-        if (showQuotaCta) ...[
-          const SizedBox(height: 12),
-          FilledButton.tonal(
-            onPressed: () => context.push('/import'),
-            child: Text(
-              Localizations.localeOf(context).languageCode == 'ru'
-                  ? 'Вставить ссылку'
-                  : 'Paste link',
-            ),
-          ),
-        ],
-        const SizedBox(height: 16),
-        if (hideInAppPlategaCheckout) ...[
-          FilledButton.tonal(
-            onPressed: () => context.push('/import'),
-            child: Text(
-              Localizations.localeOf(context).languageCode == 'ru'
-                  ? 'Вставить ссылку'
-                  : 'Paste link',
-            ),
-          ),
-          const SizedBox(height: 12),
-        ],
-        if (!hideInAppPlategaCheckout) ...[
-          _NoVpnHomeRow(
-            label: l.homeNoVpnRow,
-            enabled: widget.noVpnEnabled,
-            total: widget.noVpnTotal,
-            onTap: widget.onOpenNoVpn,
-          ),
-          const SizedBox(height: 8),
-        ],
-        ServerCard(
-          title: widget.serverTitle,
-          subtitle: widget.serverSubtitle,
-          flagEmoji: _displayFlag,
-          selectionIsAuto: widget.selectionIsAuto,
-          autoPoolFlags: widget.autoPoolFlags,
-          onTap: widget.onOpenLocations,
-        ),
-      ],
+    return _FreeClientHome(
+      nestSize: nestSize,
+      treeState: treeState,
+      status: status,
+      serverTitle: widget.serverTitle,
+      importedScheme: widget.importedScheme,
+      onNestTap: widget.onNestTap,
+      showVpnSettingsCta: showVpnSettingsCta,
+      noVpnEnabled: widget.noVpnEnabled,
+      noVpnTotal: widget.noVpnTotal,
+      onOpenNoVpn: widget.onOpenNoVpn,
     );
   }
 }
@@ -880,6 +661,7 @@ class _FreeClientHome extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppL10n.of(context);
+    final theme = Theme.of(context);
     final empty = serverTitle == '…' ||
         serverTitle == 'Нет ссылки' ||
         serverTitle == 'No link';
@@ -897,15 +679,36 @@ class _FreeClientHome extends StatelessWidget {
       uptime = null;
     }
     final profile = empty ? l.freeNoProfile : serverTitle;
-    final statusText = status is VpnConnecting
-        ? l.homeConnecting
-        : empty
-            ? l.homeDisconnected
-            : status is VpnError
-                ? l.homeError
-                : status is VpnConnected
-                    ? l.homeConnected
-                    : l.homeDisconnected;
+    final statusText = switch (status) {
+      VpnConnecting() => l.homeConnecting,
+      VpnConnected() => l.homeConnected,
+      VpnError(:final code) when code == kVpnConflictErrorCode =>
+        l.homeVpnConflictTitle,
+      VpnError(:final code) when code == kVpnProbeFailedErrorCode =>
+        l.homeVpnProbeFailedTitle,
+      VpnError() => l.homeError,
+      VpnDisconnected() => l.homeDisconnected,
+    };
+    final errorHint = switch (status) {
+      VpnError(:final code, :final message)
+          when code == kVpnConflictErrorCode =>
+        (message.isNotEmpty && message != 'vpn_conflict')
+            ? homeVpnConflictHintNamedForPlatform(l, message)
+            : homeVpnConflictHintForPlatform(l),
+      VpnError(:final code, :final message)
+          when code == kVpnProbeFailedErrorCode =>
+        l.homeVpnProbeFailedHint(
+          message.isNotEmpty ? message : l.homeRegion,
+        ),
+      VpnError(:final code) when code == 'permission_denied' =>
+        homeVpnPermissionHintForPlatform(l),
+      VpnError(:final code) when code == kVpnPathIncompatibleErrorCode =>
+        l.homePathIncompatibleHint,
+      VpnError(:final code) when code == 'share_ios_hy2_only' =>
+        l.freeIosHy2Only,
+      VpnError() => l.homeErrorFriendly,
+      _ => null,
+    };
 
     final accent = status is VpnConnected
         ? AppBrand.success
@@ -922,6 +725,16 @@ class _FreeClientHome extends StatelessWidget {
           uptime: uptime,
           accent: accent,
         ),
+        if (errorHint != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            errorHint,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.error,
+            ),
+          ),
+        ],
         Expanded(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -993,7 +806,10 @@ class _FreeClientHome extends StatelessWidget {
     final noProfile = serverTitle == '…' ||
         serverTitle == 'Нет ссылки' ||
         serverTitle == 'No link';
-    return noProfile && status is! VpnConnecting && status is! VpnConnected;
+    return noProfile &&
+        status is! VpnConnecting &&
+        status is! VpnConnected &&
+        status is! VpnError;
   }
 
   String _formatUptime(DateTime since) {
@@ -1002,64 +818,6 @@ class _FreeClientHome extends StatelessWidget {
     final m = (d.inMinutes % 60).toString().padLeft(2, '0');
     final s = (d.inSeconds % 60).toString().padLeft(2, '0');
     return '$h:$m:$s';
-  }
-}
-
-bool _showTelegramRestoreBanner({
-  required SubscriptionStatus? quota,
-  required AccountSessionSnapshot? session,
-}) {
-  // Bound contact is not "restore". Username-only missed contact_linked.
-  if (session == null) return false;
-  if (session.contactLinked || session.telegramUsername != null) return false;
-  if (quota != null && quota.unlocksPremium) return false;
-  if (session.hasAccess) return false;
-  return true;
-}
-
-class _TelegramRestoreBanner extends StatelessWidget {
-  const _TelegramRestoreBanner({
-    required this.vpnConnected,
-    required this.onTap,
-  });
-
-  final bool vpnConnected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final l = AppL10n.of(context);
-    final theme = Theme.of(context);
-    return Material(
-      color: theme.colorScheme.surfaceContainerHighest,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppBrand.radiusCard),
-        side: BorderSide(color: theme.colorScheme.outline),
-      ),
-      child: InkWell(
-        onTap: vpnConnected ? onTap : null,
-        borderRadius: BorderRadius.circular(AppBrand.radiusCard),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            children: [
-              const AppIcon(AppIcons.siteTelegram, size: 22),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  vpnConnected
-                      ? l.homeTelegramRestoreCta
-                      : l.homeTelegramRestoreConnectFirst,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }
 

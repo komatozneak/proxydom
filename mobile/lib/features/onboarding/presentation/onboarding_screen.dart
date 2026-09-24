@@ -8,10 +8,6 @@ import '../../../core/router.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../auth/application/auth_provider.dart';
-import '../../auth/application/auth_state.dart';
-import '../../beta/application/beta_usage_tracker.dart';
-import '../../beta/data/jwt_subject.dart';
 import '../data/onboarding_prefs.dart';
 
 /// Connect-card copy: iOS must not mention Android VPN permission.
@@ -95,16 +91,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       await OnboardingPrefs.markWelcomeSeen();
       AppRouter.welcomeSeenCache = true;
       if (mounted) context.go(openImport ? '/import' : '/home');
-      return;
     }
-    final auth = ref.read(authProvider).valueOrNull;
-    final userId = auth is AuthStateAuthenticated
-        ? (jwtSubject(auth.accessToken) ?? 'unknown')
-        : 'unknown';
-    await OnboardingPrefs.markCompleted(userId: userId);
-    ref.read(betaUsageTrackerProvider).recordOnboardingCompleted();
-    AppRouter.postAuthResolved = true;
-    if (mounted) context.go('/home');
   }
 
   void _next(int total) {

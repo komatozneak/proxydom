@@ -12,7 +12,6 @@ import '../config.dart';
 import '../ios_store_gates.dart';
 import 'app_log_buffer.dart';
 import 'egress_verify.dart';
-import '../../features/auth/application/auth_state.dart';
 import '../../features/home/application/vpn_status.dart';
 import '../../features/vpn/data/vpn_config.dart';
 import '../../features/vpn/data/vpn_controller.dart';
@@ -49,7 +48,6 @@ class DiagnosticsService {
   }
 
   Future<String> buildReport({
-    required AuthState authState,
     required VpnStatus vpnUi,
     VpnConfig? cachedConfig,
     String? autoWinnerId,
@@ -85,10 +83,6 @@ class DiagnosticsService {
 
     final egress = await _probeEgress(expectedHost);
 
-    final authLine = authState is AuthStateAuthenticated
-        ? 'authenticated (tokens present, phone redacted)'
-        : 'not_authenticated';
-
     final vpnUiLine = _vpnUiLabel(vpnUi);
     final lastVpnError = vpnUi is VpnError ? vpnUi.message : '(none)';
 
@@ -99,7 +93,6 @@ class DiagnosticsService {
       ..writeln('api_base: ${AppConfig.baseUrl}')
       ..writeln('app_env: ${const String.fromEnvironment('APP_ENV', defaultValue: 'prod')}')
       ..writeln('platform: ${_platformLabel()}')
-      ..writeln('auth: $authLine')
       ..writeln('vpn_ui: $vpnUiLine')
       ..writeln('vpn_native: ${nativeStatus.name}')
       ..writeln('vpn_native_last_error: ${nativeError ?? '(none)'}')

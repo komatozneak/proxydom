@@ -22,6 +22,17 @@ void main() {
     expect(json.contains('11111111-1111-1111-1111-111111111111'), isTrue);
   });
 
+  test('allowInsecure=1 is copied into tls settings', () {
+    const raw =
+        'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:8444'
+        '?security=tls&sni=stand.example&type=ws&path=%2Fws&allowInsecure=1#ws';
+    final json = buildXraySocksConfig(parseShareLink(raw));
+    final decoded = jsonDecode(json!) as Map<String, dynamic>;
+    final outbound = (decoded['outbounds'] as List).first as Map;
+    final tls = (outbound['streamSettings'] as Map)['tlsSettings'] as Map;
+    expect(tls['allowInsecure'], isTrue);
+  });
+
   test('hysteria2 is not an xray document', () {
     const raw = 'hysteria2://user:pass@203.0.113.12:443/?sni=c.example#Charlie';
     expect(buildXraySocksConfig(parseShareLink(raw)), isNull);

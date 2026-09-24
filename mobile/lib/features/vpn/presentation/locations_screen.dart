@@ -15,8 +15,6 @@ import '../../../l10n/app_localizations.dart';
 import 'vpn_platform_copy.dart';
 import '../../home/application/vpn_provider.dart';
 import '../../home/application/vpn_status.dart';
-import '../../settings/application/subscription_status_provider.dart';
-import '../../settings/data/subscription_status.dart';
 import '../application/imported_profiles_provider.dart';
 import '../data/hy2_import_store.dart';
 import '../data/subscription_label.dart';
@@ -75,16 +73,6 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
         final links = next.valueOrNull;
         if (links == null) return;
         unawaited(_applyImported(links));
-      });
-    } else {
-      ref.listen<AsyncValue<SubscriptionStatus>>(subscriptionStatusProvider, (
-        previous,
-        next,
-      ) {
-        bool prem(SubscriptionStatus? s) => s != null && s.unlocksPremium;
-        if (prem(previous?.valueOrNull) != prem(next.valueOrNull)) {
-          unawaited(_load());
-        }
       });
     }
 
@@ -369,7 +357,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             children: [
               if (premium.isNotEmpty) ...[
-                Text(l.freePoolPremium, style: theme.textTheme.titleSmall),
+                Text(l.freePoolMarked, style: theme.textTheme.titleSmall),
                 const SizedBox(height: 8),
                 for (final index in premium) _poolRow(index),
                 const SizedBox(height: 16),
@@ -563,8 +551,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       return Center(child: Text(l.regionEmpty));
     }
 
-    final sub = ref.watch(subscriptionStatusProvider).valueOrNull;
-    final userPremium = sub != null && sub.unlocksPremium;
+    const userPremium = false;
 
     // Free online/default + Premium/locked always visible (gray for Free).
     final pool = nodes.where(_inProductPool).toList();

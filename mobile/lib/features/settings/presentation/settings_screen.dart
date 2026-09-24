@@ -13,7 +13,6 @@ import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/teremok_snackbar.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../auth/application/logout_handler.dart';
 import '../application/locale_provider.dart';
 import '../application/theme_mode_provider.dart';
 import '../data/auto_reconnect_prefs.dart';
@@ -28,7 +27,6 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  bool _logoutInProgress = false;
   bool? _notifEnabled;
   bool _notifLoading = false;
   bool _qsAdding = false;
@@ -113,44 +111,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await AutoReconnectPrefs.setEnabled(value);
     if (!mounted) return;
     setState(() => _autoReconnectLoading = false);
-  }
-
-  Future<void> _onLogoutPressed() async {
-    final l = AppL10n.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l.logoutConfirmTitle),
-        content: Text(l.logoutConfirmMessage),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(l.cancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: TextButton.styleFrom(foregroundColor: AppBrand.destructive),
-            child: Text(l.logoutTooltip),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true || !mounted) return;
-
-    setState(() => _logoutInProgress = true);
-    final result = await ref.read(logoutHandlerProvider).logout();
-    if (!mounted) return;
-    setState(() => _logoutInProgress = false);
-
-    if (result is LogoutPartialFailure) {
-      showTeremokSnackBar(context, '${l.logoutWarning}: ${result.message}');
-    }
-    // Anonymous: re-check entitlement → locked if unpaid.
-    if (AppConfig.authAnonymous) {
-      context.go('/gate');
-    }
-    // Phone path: GoRouter redirects to /login via refreshListenable.
   }
 
   Future<void> _loadLogLevel() async {
@@ -292,16 +252,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
-              ),
-            if (!AppConfig.authAnonymous)
-              _SettingsCard(
-                children: [
-                  _LogoutRow(
-                    label: l.logoutTooltip,
-                    inProgress: _logoutInProgress,
-                    onTap: _logoutInProgress ? null : _onLogoutPressed,
-                  ),
-                ],
               ),
           ],
         ),
@@ -484,61 +434,6 @@ class _CardDivider extends StatelessWidget {
       indent: 56,
       color:
           Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.5),
-    );
-  }
-}
-
-/// Telegram-style destructive logout row at the bottom of Settings.
-class _LogoutRow extends StatelessWidget {
-  const _LogoutRow({
-    required this.label,
-    required this.inProgress,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool inProgress;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    const red = AppBrand.destructive;
-
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 36,
-              height: 36,
-              child: inProgress
-                  ? const Padding(
-                      padding: EdgeInsets.all(8),
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: red,
-                      ),
-                    )
-                  : const Center(
-                      child: AppIcon(AppIcons.logout, size: 22, color: red),
-                    ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                label,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  color: red,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

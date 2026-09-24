@@ -808,7 +808,8 @@
   "freeBatteryAllow": "Allow",
   "freeBatteryDismiss": "Don't ask again",
   "freeServers": "Servers",
-  "freePoolPremium": "Premium",
+  "freePoolMarked": "Marked",
+  "freeIosHy2Only": "iPhone starts Hysteria2 only",
   "freePoolGeneral": "General",
   "freeSearch": "Search servers",
   "freeDelete": "Remove"

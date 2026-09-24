@@ -12,8 +12,6 @@ import 'package:teremok_connect/core/retry_policy.dart';
 import 'package:teremok_connect/core/theme.dart';
 import 'package:teremok_connect/core/extensions.dart';
 import 'package:teremok_connect/core/token_storage.dart';
-import 'package:teremok_connect/features/auth/application/auth_state.dart';
-import 'package:teremok_connect/features/auth/application/logout_handler.dart';
 import 'package:teremok_connect/features/home/application/vpn_provider.dart';
 import 'package:teremok_connect/features/home/presentation/home_screen.dart';
 import 'package:teremok_connect/features/home/presentation/widgets/server_card.dart';
@@ -138,9 +136,9 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
 
     expect(find.text('Не подключено'), findsOneWidget);
-    expect(find.byType(ServerCard), findsOneWidget);
-    expect(find.text('Что работает без VPN?'), findsOneWidget);
-    expect(find.text('1 / 1'), findsOneWidget);
+    expect(find.byType(ServerCard), findsNothing);
+    expect(find.text('Что работает без VPN?'), findsNothing);
+    expect(find.text('1 / 1'), findsNothing);
     expect(
       await SplitTunnelPrefs.loadDisallowedPackages(),
       contains('ru.oneme.app'),
@@ -206,16 +204,6 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 1));
-  });
-
-  test('AuthState sealed: defaults to Unauthenticated when no tokens',
-      () async {
-    // Используем чистый sub-тест: build() подхватит реальный TokenStorage,
-    // который в тестах не имеет плагина → провайдер упадёт в AsyncError.
-    // Поэтому проверяем сам факт, что Unauthenticated() — singleton-конструктор.
-    const a = AuthStateUnauthenticated();
-    const b = AuthStateUnauthenticated();
-    expect(identical(a, b), isTrue);
   });
 
   test('VpnConfig.fromJson парсит mock-ответ от backend', () {
@@ -672,18 +660,4 @@ void main() {
     });
   });
 
-  // LogoutHandler unit-тесты сложно написать корректно из-за того что
-  // VpnNotifier.registerOnDispose → _cleanupOnLogout → ref.read(...) на
-  // disposed container. В production это не проблема (container живёт
-  // весь lifecycle), но в unit-тестах даёт async BadState при dispose.
-  // Integration-тест на Шаге 19 покроет это end-to-end.
-  group('LogoutHandler', () {
-    test('smoke: LogoutResult sealed types exist', () {
-      const success = LogoutSuccess();
-      const failure = LogoutPartialFailure('test');
-      expect(success, isA<LogoutResult>());
-      expect(failure, isA<LogoutResult>());
-      expect(failure.message, 'test');
-    });
-  });
 }

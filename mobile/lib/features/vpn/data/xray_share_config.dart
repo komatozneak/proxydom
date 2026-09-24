@@ -170,9 +170,11 @@ Map<String, Object?> _stream(
     'security': security.isEmpty ? 'none' : security,
   };
   if (security == 'tls') {
+    final allowInsecure = q['allowInsecure'] == '1' || q['insecure'] == '1';
     stream['tlsSettings'] = {
       'serverName': sni,
       if ((q['fp'] ?? '').isNotEmpty) 'fingerprint': q['fp'],
+      if (allowInsecure) 'allowInsecure': true,
     };
   } else if (security == 'reality') {
     stream['realitySettings'] = {

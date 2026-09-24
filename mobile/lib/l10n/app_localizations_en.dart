@@ -1768,7 +1768,10 @@ class AppL10nEn extends AppL10n {
   String get freeServers => 'Servers';
 
   @override
-  String get freePoolPremium => 'Premium';
+  String get freePoolMarked => 'Marked';
+
+  @override
+  String get freeIosHy2Only => 'iPhone starts Hysteria2 only';
 
   @override
   String get freePoolGeneral => 'General';

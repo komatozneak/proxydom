@@ -13,16 +13,7 @@ import 'core/diagnostics/app_log_buffer.dart';
 import 'core/diagnostics/diagnostics_service.dart';
 import 'core/diagnostics/tunnel_log_prefs.dart';
 import 'core/internet_permission.dart';
-import 'core/ios_store_gates.dart';
-import 'core/jwt_interceptor.dart';
-import 'core/pair_links.dart';
-import 'core/referral_links.dart';
 import 'core/router.dart';
-import 'core/seat_join_links.dart';
-import 'features/auth/application/auth_provider.dart';
-import 'features/auth/application/auth_state.dart';
-import 'features/auth/application/logout_handler.dart';
-import 'features/beta/application/beta_usage_tracker.dart';
 
 void main() async {
   // Required before flutter_secure_storage / path_provider on cold start.
@@ -63,15 +54,7 @@ void main() async {
   }
 
   final container = ProviderContainer();
-  installFlutterErrorHandler(
-    onCrashObserved: () {
-      try {
-        container.read(betaUsageTrackerProvider).recordCrash();
-      } catch (_) {
-        // Ignore — container may not be ready.
-      }
-    },
-  );
+  installFlutterErrorHandler();
   AppLogBuffer.instance.debug(
     'app.boot started baseUrl=${AppConfig.baseUrl} ms=${boot.elapsedMilliseconds}',
   );
@@ -84,37 +67,7 @@ void main() async {
     );
   }
 
-  // 401 + failed refresh → full logout (tokens already cleared by interceptor).
-  SessionExpiredGate.onExpired = () async {
-    if (LogoutHandler.inProgress) return;
-    AppLogBuffer.instance.warn('[auth] session expired — forcing logout');
-    await container.read(logoutHandlerProvider).logout();
-  };
-  // Owner revoked this install on another device → same wipe, no silent
-  // re-register (the account may still be recoverable via code/Telegram).
-  SessionExpiredGate.onDeviceRevoked = () async {
-    if (LogoutHandler.inProgress) return;
-    AppLogBuffer.instance.warn('[auth] device revoked — forcing logout');
-    await container.read(logoutHandlerProvider).logout();
-  };
-
-  // Do not await auth here: Play 0.1.7 sat on the launcher icon for the full
-  // register timeout. GoRouter keeps /bootstrap while [authProvider] loads.
   await AppRouter.warmWelcomeFlag();
-  if (!freeKeyClient) {
-    await attachSeatJoinLinks(container);
-    await attachReferralLinks(container);
-    await attachPairLinks(container);
-  }
-  container.read(authProvider);
-
-  // Связываем GoRouter с authProvider: при смене состояния авторизации
-  // вызываем refreshNotifier.notifyAuthChanged(), чтобы GoRouter пересчитал redirect.
-  container.listen<AsyncValue<AuthState>>(
-    authProvider,
-    (_, __) => AppRouter.refreshNotifier.notifyAuthChanged(),
-    fireImmediately: true,
-  );
 
   AppLogBuffer.instance.debug(
     'app.boot runApp ms=${boot.elapsedMilliseconds}',

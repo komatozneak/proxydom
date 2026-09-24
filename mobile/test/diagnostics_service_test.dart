@@ -6,7 +6,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:teremok_connect/core/diagnostics/diagnostics_service.dart';
 import 'package:teremok_connect/core/diagnostics/egress_verify.dart';
-import 'package:teremok_connect/features/auth/application/auth_state.dart';
 import 'package:teremok_connect/features/home/application/vpn_status.dart';
 import 'package:teremok_connect/features/vpn/data/vpn_controller.dart';
 
@@ -179,7 +178,6 @@ void main() {
       });
 
       final report = await DiagnosticsService().buildReport(
-        authState: const AuthStateUnauthenticated(),
         vpnUi: const VpnDisconnected(),
       );
       expect(report, contains('ios_native_tail:'));
@@ -223,7 +221,6 @@ void main() {
       });
 
       final report = await DiagnosticsService().buildReport(
-        authState: const AuthStateUnauthenticated(),
         vpnUi: const VpnDisconnected(),
       );
       expect(report, contains('ios_tunnel_health:'));

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/theme.dart';
@@ -253,8 +254,12 @@ class ImportedProfileCard extends StatelessWidget {
           ),
         ),
         subtitle: Text(
-          endpoint,
-          maxLines: 1,
+          (!kIsWeb &&
+                  defaultTargetPlatform == TargetPlatform.iOS &&
+                  scheme != 'hysteria2')
+              ? l.freeIosHy2Only
+              : endpoint,
+          maxLines: 2,
           overflow: TextOverflow.ellipsis,
         ),
         leading: Container(

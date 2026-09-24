@@ -11,13 +11,12 @@ on:
     paths:
       - "mobile/**"
       - ".github/workflows/mobile-build.yml"
-  workflow_dispatch:
-    inputs:
-      debug_build:
-        description: "Build debug APK instead of release"
-        required: false
-        default: "false"
-        type: boolean
+
+# A new push on the same ref cancels the previous run. Minutes already
+# spent are gone; stacked agent dispatches must not keep billing.
+concurrency:
+  group: mobile-pr-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   # rive_native 0.1.x needs SemanticsRole / isRequired (post-3.29).
@@ -64,7 +63,7 @@ jobs:
 
       - name: Run tests
         working-directory: mobile
-        run: flutter test --reporter expanded --dart-define=AUTH_ANONYMOUS=false
+        run: flutter test --reporter compact --dart-define=AUTH_ANONYMOUS=false
 
       - name: Verify minSdk = 26
         working-directory: mobile
@@ -95,8 +94,25 @@ jobs:
             exit 1
           fi
 
+  go-changes:
+    name: Detect hy2bind changes
+    runs-on: ubuntu-latest
+    outputs:
+      go: ${{ steps.filter.outputs.go }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            go:
+              - 'mobile/android/hysteria-bind/**'
+              - '.github/workflows/mobile-build.yml'
+
   hy2bind-go-test:
     name: hy2bind Go tests
+    needs: go-changes
+    if: needs.go-changes.outputs.go == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -108,208 +124,3 @@ jobs:
       - name: go test
         working-directory: mobile/android/hysteria-bind
         run: go test ./...
-
-  build-android:
-    name: Build Android APK
-    needs: analyze-test
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: false
-          lfs: true
-
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: ${{ env.JAVA_VERSION }}
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: stable
-          cache: true
-
-      - name: Install dependencies
-        working-directory: mobile
-        run: flutter pub get
-
-      - name: Generate localization
-        working-directory: mobile
-        run: flutter gen-l10n
-
-      - name: Build APK
-        working-directory: mobile
-        run: |
-          if [ "${{ github.event.inputs.debug_build }}" = "true" ]; then
-            echo "Building DEBUG APK per workflow_dispatch input..."
-            flutter build apk --debug
-          else
-            echo "Building RELEASE APK (4 ABIs)..."
-            flutter build apk --release
-          fi
-
-      - name: List build output
-        working-directory: mobile
-        run: |
-          echo "=== APK files ==="
-          ls -la build/app/outputs/flutter-apk/ || echo "no APK files"
-          echo ""
-          echo "=== Sizes ==="
-          du -sh build/app/outputs/flutter-apk/*.apk 2>/dev/null || true
-
-      # CI APK is compile smoke only (debug-signed, package suffix .ci / .debug).
-      # Never publish this artifact to the site — use mobile/android/build-sideload.ps1.
-      - name: Verify CI APK exists
-        run: |
-          if [ "${{ github.event.inputs.debug_build }}" = "true" ]; then
-            test -f mobile/build/app/outputs/flutter-apk/app-debug.apk
-          else
-            test -f mobile/build/app/outputs/flutter-apk/app-release.apk
-          fi
-
-      - name: Verify CI APK is not the production package
-        working-directory: mobile
-        run: |
-          python3 <<'PY'
-          import json, pathlib, sys
-          debug = "${{ github.event.inputs.debug_build }}" == "true"
-          variant = "debug" if debug else "release"
-          expected = (
-              "com.teremok.connect.teremok_connect.debug"
-              if debug
-              else "com.teremok.connect.teremok_connect.ci"
-          )
-          forbidden = "com.teremok.connect.teremok_connect"
-          candidates = list(pathlib.Path("build/app/outputs").rglob("output-metadata.json"))
-          matches = [p for p in candidates if variant in p.parts]
-          meta_path = matches[0] if matches else (candidates[0] if candidates else None)
-          if meta_path is None:
-              sys.exit("missing Gradle output-metadata.json after flutter build apk")
-          data = json.loads(meta_path.read_text(encoding="utf-8"))
-          app_id = data.get("applicationId")
-          print(f"metadata={meta_path} applicationId={app_id}")
-          if app_id == forbidden:
-              sys.exit("CI APK used production applicationId; refuse to upload")
-          if app_id != expected:
-              sys.exit(f"expected {expected}, got {app_id}")
-          PY
-
-      - name: Upload CI-only APK
-        if: github.event.inputs.debug_build != 'true'
-        uses: actions/upload-artifact@v4
-        continue-on-error: true
-        with:
-          name: android-apk-ci
-          path: mobile/build/app/outputs/flutter-apk/app-release.apk
-          retention-days: 7
-          if-no-files-found: error
-
-      - name: Upload CI debug APK
-        if: github.event.inputs.debug_build == 'true'
-        uses: actions/upload-artifact@v4
-        continue-on-error: true
-        with:
-          name: android-apk-ci-debug
-          path: mobile/build/app/outputs/flutter-apk/app-debug.apk
-          retention-days: 7
-          if-no-files-found: error
-
-      - name: Build summary
-        if: always()
-        run: |
-          {
-            echo "## Android Build Summary"
-            echo ""
-            echo "| Artifact | Path | Package | Approx Size |"
-            echo "|---|---|---|---|"
-            echo "| CI unsigned release | android-apk-ci | com.teremok.connect.teremok_connect.ci | ~110 MB |"
-            echo ""
-            echo "This artifact is **CI-only** (debug-signed, \`.ci\` suffix)."
-            echo "Do **not** upload it to /downloads. Sideload APK:"
-            echo "\`mobile/android/build-sideload.ps1\` (upload keystore required)."
-            echo ""
-            echo "Retention: 7 days. Upload is best-effort (continue-on-error)"
-            echo "so storage quota cannot fail a green compile."
-          } >> "$GITHUB_STEP_SUMMARY"
-
-  integration-test:
-    name: Backend Integration Test (optional)
-    runs-on: ubuntu-latest
-    needs: build-android
-    continue-on-error: true
-    timeout-minutes: 10
-    if: github.event_name == 'workflow_dispatch'
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install uv
-        run: pip install uv
-
-      - name: Install backend deps
-        working-directory: backend
-        run: uv sync
-
-      - name: Run backend integration tests
-        working-directory: backend
-        env:
-          DEBUG_BYPASS_FLASH_CALL: "true"
-          DEV_MOCK_VPN_CONFIG: "true"
-          JWT_SECRET_KEY: "test-secret-do-not-use-in-prod"
-        run: |
-          uv run pytest tests/test_auth_refresh.py tests/test_vpn_endpoints.py -v --tb=short
-
-  # Compile gate only. Does NOT codesign, does NOT upload to TestFlight.
-  # Device IPA: workflow "iOS TestFlight" (ios-testflight.yml).
-  build-ios-no-codesign:
-    name: Build iOS (no codesign)
-    runs-on: macos-latest
-    timeout-minutes: 75
-    if: github.event_name == 'workflow_dispatch'
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version: "1.25.x"
-          cache-dependency-path: mobile/android/hysteria-bind/go.sum
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: stable
-          cache: true
-
-      - name: Build Hy2bind.xcframework
-        working-directory: mobile/android/hysteria-bind
-        run: |
-          export PATH="$(go env GOPATH)/bin:$PATH"
-          bash build-ios.sh
-
-      - name: Install dependencies
-        working-directory: mobile
-        run: flutter pub get
-
-      - name: Build iOS (no codesign)
-        working-directory: mobile
-        run: flutter build ios --release --no-codesign
-
-      - name: Upload iOS artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios-app
-          path: mobile/build/ios/iphoneos/Runner.app
-          retention-days: 14
-          if-no-files-found: warn

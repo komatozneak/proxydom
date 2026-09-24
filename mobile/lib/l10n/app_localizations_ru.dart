@@ -1773,7 +1773,10 @@ class AppL10nRu extends AppL10n {
   String get freeServers => 'Сервера';
 
   @override
-  String get freePoolPremium => 'Премиум';
+  String get freePoolMarked => 'Особые';
+
+  @override
+  String get freeIosHy2Only => 'На iPhone запускается только Hysteria2';
 
   @override
   String get freePoolGeneral => 'Общего назначения';

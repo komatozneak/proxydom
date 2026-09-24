@@ -3,28 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:teremok_connect/features/settings/application/subscription_status_provider.dart';
 import 'package:teremok_connect/features/settings/data/auto_reconnect_prefs.dart';
-import 'package:teremok_connect/features/settings/data/subscription_status.dart';
 import 'package:teremok_connect/features/settings/presentation/settings_screen.dart';
 import 'package:teremok_connect/l10n/app_localizations.dart';
 
-class _FixedSubNotifier extends SubscriptionStatusNotifier {
-  _FixedSubNotifier(this._status);
-
-  final SubscriptionStatus _status;
-
-  @override
-  Future<SubscriptionStatus> build() async => _status;
-}
-
 Widget _settingsApp() {
   return ProviderScope(
-    overrides: [
-      subscriptionStatusProvider.overrideWith(
-        () => _FixedSubNotifier(SubscriptionStatus.empty),
-      ),
-    ],
     child: const MaterialApp(
       locale: Locale('ru'),
       localizationsDelegates: AppL10n.localizationsDelegates,

@@ -3313,11 +3313,17 @@ abstract class AppL10n {
   /// **'Servers'**
   String get freeServers;
 
-  /// No description provided for @freePoolPremium.
+  /// No description provided for @freePoolMarked.
   ///
   /// In en, this message translates to:
-  /// **'Premium'**
-  String get freePoolPremium;
+  /// **'Marked'**
+  String get freePoolMarked;
+
+  /// No description provided for @freeIosHy2Only.
+  ///
+  /// In en, this message translates to:
+  /// **'iPhone starts Hysteria2 only'**
+  String get freeIosHy2Only;
 
   /// No description provided for @freePoolGeneral.
   ///

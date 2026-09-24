@@ -13,7 +13,6 @@ import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/notebook_paper.dart';
 import '../../../core/widgets/teremok_nav_icon.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../beta/application/cold_start_entitlement.dart';
 import '../../home/application/vpn_provider.dart';
 
 /// Bumped when user opens the Locations tab — triggers a reload.
@@ -38,15 +37,6 @@ class MainShell extends ConsumerStatefulWidget {
 }
 
 class _MainShellState extends ConsumerState<MainShell> {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      unawaited(ColdStartEntitlement.runOnce(ref, context));
-    });
-  }
-
   void _onTap(int index) {
     if (ref.read(busyOverlayProvider).isBusy) return;
     if (index == MainShell.locationsIndex) {

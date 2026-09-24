@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:teremok_connect/features/home/application/vpn_status.dart';
-import 'package:teremok_connect/features/session/application/identity_reconnect.dart';
 import 'package:teremok_connect/features/vpn/data/vpn_session_snapshot.dart';
 import 'package:teremok_connect/features/vpn/domain/vpn_connect_error.dart';
 
@@ -495,12 +494,6 @@ void main() {
         ),
         isFalse,
       );
-    });
-  });
-
-  group('shouldAutoConnectAfterIdentityChange', () {
-    test('restore/link never auto-starts a connect walk', () {
-      expect(shouldAutoConnectAfterIdentityChange(), isFalse);
     });
   });
 
