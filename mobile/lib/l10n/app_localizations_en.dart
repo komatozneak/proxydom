@@ -1768,6 +1768,12 @@ class AppL10nEn extends AppL10n {
   String get freeServers => 'Servers';
 
   @override
+  String get freePoolPremium => 'Premium';
+
+  @override
+  String get freePoolGeneral => 'General';
+
+  @override
   String get freeSearch => 'Search servers';
 
   @override

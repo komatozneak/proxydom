@@ -808,6 +808,8 @@
   "freeBatteryAllow": "Allow",
   "freeBatteryDismiss": "Don't ask again",
   "freeServers": "Servers",
+  "freePoolPremium": "Premium",
+  "freePoolGeneral": "General",
   "freeSearch": "Search servers",
   "freeDelete": "Remove"
 }

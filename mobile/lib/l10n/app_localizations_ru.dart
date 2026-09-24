@@ -1773,6 +1773,12 @@ class AppL10nRu extends AppL10n {
   String get freeServers => 'Сервера';
 
   @override
+  String get freePoolPremium => 'Премиум';
+
+  @override
+  String get freePoolGeneral => 'Общего назначения';
+
+  @override
   String get freeSearch => 'Поиск серверов';
 
   @override

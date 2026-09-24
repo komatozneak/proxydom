@@ -19,7 +19,9 @@ import '../../settings/application/subscription_status_provider.dart';
 import '../../settings/data/subscription_status.dart';
 import '../application/imported_profiles_provider.dart';
 import '../data/hy2_import_store.dart';
+import '../data/subscription_label.dart';
 import 'free_client_chrome.dart';
+import 'pool_server_mark.dart';
 import '../data/share_link_parser.dart';
 import '../data/node_auto_selector.dart';
 import '../data/node_display.dart';
@@ -48,6 +50,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
 
   List<VpnNode>? _nodes;
   List<ParsedShareLink> _imported = const [];
+  String? _profileTitle;
   String? _selectedId;
   Object? _error;
   bool _loading = true;
@@ -131,9 +134,11 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
 
   Future<void> _applyImported(List<ParsedShareLink> links) async {
     final index = await Hy2ImportStore.instance.selectedIndex();
+    final title = await Hy2ImportStore.instance.profileTitle();
     if (!mounted) return;
     setState(() {
       _imported = links;
+      _profileTitle = title;
       _nodes = const [];
       _selectedId = links.isEmpty ? null : '$index';
       _loading = false;
@@ -323,6 +328,67 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     await _load();
   }
 
+  Future<void> _openPoolSheet() async {
+    final theme = Theme.of(context);
+    final premium = <int>[];
+    final general = <int>[];
+    for (var i = 0; i < _imported.length; i++) {
+      final label = labelForShareLink(_imported[i]);
+      if (isPremiumPoolServer(label.title)) {
+        premium.add(i);
+      } else {
+        general.add(i);
+      }
+    }
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        final l = AppL10n.of(sheetContext);
+        return SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            children: [
+              if (premium.isNotEmpty) ...[
+                Text(l.freePoolPremium, style: theme.textTheme.titleSmall),
+                const SizedBox(height: 8),
+                for (final index in premium) _poolRow(index),
+                const SizedBox(height: 16),
+              ],
+              if (general.isNotEmpty) ...[
+                Text(l.freePoolGeneral, style: theme.textTheme.titleSmall),
+                const SizedBox(height: 8),
+                for (final index in general) _poolRow(index),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _poolRow(int index) {
+    final link = _imported[index];
+    final label = labelForShareLink(link);
+    final selected = _selectedId == '$index';
+    return ListTile(
+      leading: PoolServerMark(label: label),
+      title: Text(label.title),
+      subtitle: Text(label.subtitle.isEmpty ? link.endpoint : label.subtitle),
+      selected: selected,
+      onTap: () async {
+        Navigator.of(context).pop();
+        await Hy2ImportStore.instance.select(index);
+        if (!mounted) return;
+        setState(() => _selectedId = '$index');
+        final status = ref.read(vpnProvider);
+        if (status is VpnConnected || status is VpnConnecting) {
+          await ref.read(vpnProvider.notifier).connect(forceRestart: true);
+        }
+      },
+    );
+  }
+
   Widget _buildImported(ThemeData theme) {
     final l = AppL10n.of(context);
     final filtered = <int>[];
@@ -333,6 +399,43 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       if (q.isEmpty || hay.contains(q)) filtered.add(i);
     }
     final connected = ref.watch(vpnProvider) is VpnConnected;
+    final grouped = _imported.length > 1 ||
+        (_profileTitle != null && _profileTitle!.isNotEmpty);
+    if (grouped) {
+      return Column(
+        children: [
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(44, 8, 16, 0),
+              children: [
+                ListTile(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppBrand.radiusCard),
+                    side: BorderSide(color: theme.colorScheme.outline),
+                  ),
+                  tileColor: theme.colorScheme.surfaceContainerHighest,
+                  title: Text(
+                    _profileTitle ?? l.freeServers,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  trailing: const AppIcon(AppIcons.chevronRight),
+                  onTap: _openPoolSheet,
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
+            child: FreeClientActionBar(
+              onPaste: () => context.push('/import?clipboard=1'),
+              onScan: () => context.push('/scan'),
+            ),
+          ),
+        ],
+      );
+    }
     return Column(
       children: [
         Padding(

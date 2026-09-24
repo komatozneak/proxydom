@@ -86,3 +86,12 @@ PoolTile _tileForTitle(String title) {
   }
   return PoolTile.flag;
 }
+
+bool isPremiumPoolServer(String title) {
+  final lower = title.toLowerCase();
+  return lower.contains('youtube') ||
+      lower.contains('игров') ||
+      lower.contains('gaming') ||
+      lower.contains('индия') ||
+      lower.contains('india');
+}

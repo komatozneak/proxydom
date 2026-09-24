@@ -597,6 +597,8 @@
   "freeBatteryAllow": "Разрешить",
   "freeBatteryDismiss": "Больше не спрашивать",
   "freeServers": "Сервера",
+  "freePoolPremium": "Премиум",
+  "freePoolGeneral": "Общего назначения",
   "freeSearch": "Поиск серверов",
   "freeDelete": "Удалить"
 }

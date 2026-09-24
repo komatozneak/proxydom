@@ -3313,6 +3313,18 @@ abstract class AppL10n {
   /// **'Servers'**
   String get freeServers;
 
+  /// No description provided for @freePoolPremium.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium'**
+  String get freePoolPremium;
+
+  /// No description provided for @freePoolGeneral.
+  ///
+  /// In en, this message translates to:
+  /// **'General'**
+  String get freePoolGeneral;
+
   /// No description provided for @freeSearch.
   ///
   /// In en, this message translates to:
