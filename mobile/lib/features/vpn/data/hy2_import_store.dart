@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'hy2_link_parser.dart';
 import 'share_link_parser.dart';
+import 'subscription_label.dart';
 
 const _prefsKey = 'hy2_import_v1';
 
@@ -53,6 +54,17 @@ class Hy2ImportStore {
     return index is int ? index : 0;
   }
 
+  Future<String?> profileTitle() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_prefsKey);
+    if (raw == null || raw.isEmpty) return null;
+    final decoded = jsonDecode(raw);
+    if (decoded is! Map) return null;
+    final title = decoded['title'];
+    if (title is! String || title.trim().isEmpty) return null;
+    return title.trim();
+  }
+
   Future<String?> sourceHost() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_prefsKey);
@@ -95,6 +107,7 @@ class Hy2ImportStore {
       selected = lines.length - 1;
     }
     final source = await sourceHost();
+    final title = await profileTitle();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
       _prefsKey,
@@ -102,6 +115,7 @@ class Hy2ImportStore {
         'lines': lines,
         'selected': selected,
         if (source != null && source.isNotEmpty) 'source': source,
+        if (title != null && lines.isNotEmpty) 'title': title,
       }),
     );
     _changed();
@@ -112,7 +126,10 @@ class Hy2ImportStore {
     if (text.isEmpty) {
       throw const FormatException('empty');
     }
-    final body = looksLikeSubscriptionUrl(text) ? await _fetch(text) : text;
+    final fetched = looksLikeSubscriptionUrl(text)
+        ? await _fetch(text)
+        : (body: text, profileTitle: null);
+    final body = fetched.body;
     final links = parseShareSubscription(body);
     if (links.isEmpty) {
       throw const FormatException('no links');
@@ -121,6 +138,7 @@ class Hy2ImportStore {
     final source = looksLikeSubscriptionUrl(text)
         ? Uri.tryParse(text)?.host
         : null;
+    final title = fetched.profileTitle ?? titleFromSubscriptionBody(body);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
       _prefsKey,
@@ -128,13 +146,14 @@ class Hy2ImportStore {
         'lines': lines,
         'selected': 0,
         if (source != null && source.isNotEmpty) 'source': source,
+        if (title != null && title.isNotEmpty) 'title': title,
       }),
     );
     _changed();
     return links;
   }
 
-  Future<String> _fetch(String url) async {
+  Future<({String body, String? profileTitle})> _fetch(String url) async {
     final client = HttpClient();
     try {
       final request = await client
@@ -146,7 +165,8 @@ class Hy2ImportStore {
       if (response.statusCode != 200) {
         throw FormatException('http ${response.statusCode}');
       }
-      return body;
+      final header = response.headers.value('profile-title');
+      return (body: body, profileTitle: decodeProfileTitle(header));
     } finally {
       client.close(force: true);
     }
