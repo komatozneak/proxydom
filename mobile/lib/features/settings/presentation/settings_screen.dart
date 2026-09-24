@@ -5,12 +5,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
-
 import '../../../core/config.dart';
 import '../../../core/diagnostics/diagnostics_service.dart';
 import '../../../core/ios_store_gates.dart';
-import '../../../core/install_id_storage.dart';
 import '../../../core/support_contact.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
@@ -35,7 +32,6 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _logoutInProgress = false;
-  String? _installId;
   bool? _notifEnabled;
   bool _notifLoading = false;
   bool _qsAdding = false;
@@ -53,7 +49,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _bootstrap() async {
     final futures = <Future<void>>[
       _loadVersion(),
-      _loadInstallId(),
     ];
     if (!hideInAppPlategaCheckout) {
       futures.add(_loadAutoReconnect());
@@ -62,24 +57,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       futures.add(_loadNotif());
     }
     await Future.wait(futures);
-  }
-
-  Future<void> _loadInstallId() async {
-    try {
-      final id = await InstallIdStorage.instance.getOrCreate();
-      if (!mounted) return;
-      setState(() => _installId = id);
-    } catch (_) {
-      // ignore
-    }
-  }
-
-  Future<void> _copyInstallId() async {
-    final id = _installId;
-    if (id == null || id.isEmpty) return;
-    await Clipboard.setData(ClipboardData(text: id));
-    if (!mounted) return;
-    showTeremokSnackBar(context, AppL10n.of(context).settingsDeviceIdCopied);
   }
 
   Future<void> _loadVersion() async {
@@ -432,58 +409,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
-            Wrap(
-              alignment: WrapAlignment.center,
-              spacing: 4,
-              runSpacing: 0,
-              children: [
-                TextButton(
-                  onPressed: () => launchUrl(
-                    Uri.parse(AppConfig.privacyPolicyUrl),
-                    mode: LaunchMode.externalApplication,
-                  ),
-                  child: Text(l.settingsPrivacyPlaceholder),
-                ),
-                TextButton(
-                  onPressed: () => launchUrl(
-                    Uri.parse(AppConfig.termsOfServiceUrl),
-                    mode: LaunchMode.externalApplication,
-                  ),
-                  child: Text(l.settingsTerms),
-                ),
-                TextButton(
-                  onPressed: () => launchUrl(
-                    Uri.parse(AppConfig.supportPageUrl),
-                    mode: LaunchMode.externalApplication,
-                  ),
-                  child: Text(l.settingsSupport),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            if (AppConfig.authAnonymous)
-              _SettingsCard(
-                children: [
-                  _SettingsRow(
-                    icon: AppIcons.devices,
-                    title: l.settingsDeviceId,
-                    subtitle: _installId ?? l.settingsDeviceIdHint,
-                    onTap: _installId == null ? null : _copyInstallId,
-                    trailing: _installId == null
-                        ? const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Icon(
-                            Icons.copy_outlined,
-                            size: 20,
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                  ),
-                ],
-              )
-            else
+            if (!AppConfig.authAnonymous)
               _SettingsCard(
                 children: [
                   _LogoutRow(
