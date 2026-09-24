@@ -1,33 +1,22 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
-
 import '../../../core/config.dart';
-import '../../../core/diagnostics/diagnostics_service.dart';
+import '../../../core/diagnostics/tunnel_log_level.dart';
+import '../../../core/diagnostics/tunnel_log_prefs.dart';
 import '../../../core/ios_store_gates.dart';
-import '../../../core/install_id_storage.dart';
 import '../../../core/support_contact.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/teremok_snackbar.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../account/application/ios_account_nav.dart';
-import '../../auth/application/auth_provider.dart';
-import '../../auth/application/auth_state.dart';
 import '../../auth/application/logout_handler.dart';
-import '../../home/application/vpn_provider.dart';
 import '../application/locale_provider.dart';
-import '../application/subscription_status_provider.dart';
 import '../application/theme_mode_provider.dart';
-import '../data/access_status_copy.dart';
 import '../data/auto_reconnect_prefs.dart';
-import '../data/subscription_status.dart';
 import '../data/vpn_notification_prefs.dart';
 import '../data/qs_tile_prefs.dart';
 
@@ -40,14 +29,13 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _logoutInProgress = false;
-  String? _installId;
   bool? _notifEnabled;
   bool _notifLoading = false;
   bool _qsAdding = false;
   bool? _autoReconnect;
   bool _autoReconnectLoading = false;
-  bool _reportSending = false;
   String _versionLabel = '';
+  TunnelLogLevel _logLevel = TunnelLogLevel.info;
 
   @override
   void initState() {
@@ -58,7 +46,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _bootstrap() async {
     final futures = <Future<void>>[
       _loadVersion(),
-      _loadInstallId(),
+      _loadLogLevel(),
     ];
     if (!hideInAppPlategaCheckout) {
       futures.add(_loadAutoReconnect());
@@ -67,24 +55,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       futures.add(_loadNotif());
     }
     await Future.wait(futures);
-  }
-
-  Future<void> _loadInstallId() async {
-    try {
-      final id = await InstallIdStorage.instance.getOrCreate();
-      if (!mounted) return;
-      setState(() => _installId = id);
-    } catch (_) {
-      // ignore
-    }
-  }
-
-  Future<void> _copyInstallId() async {
-    final id = _installId;
-    if (id == null || id.isEmpty) return;
-    await Clipboard.setData(ClipboardData(text: id));
-    if (!mounted) return;
-    showTeremokSnackBar(context, AppL10n.of(context).settingsDeviceIdCopied);
   }
 
   Future<void> _loadVersion() async {
@@ -145,71 +115,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     setState(() => _autoReconnectLoading = false);
   }
 
-  String _formatAccessDate(DateTime dt) {
-    final locale = Localizations.localeOf(context).toString();
-    return DateFormat('d MMMM y', locale).format(dt);
-  }
-
-  String _accessTitle(AppL10n l, AsyncValue<SubscriptionStatus> async) {
-    return async.when(
-      data: (s) {
-        switch (accessCopyKind(s)) {
-          case AccessCopyKind.paidOrTrial:
-            return l.settingsSubscriptionActive;
-          case AccessCopyKind.cancelled:
-            return l.settingsSubscriptionActiveUntil(
-              _formatAccessDate(s.expiresAt!),
-            );
-          case AccessCopyKind.closedBeta:
-            return l.settingsAccessBetaTitle;
-          case AccessCopyKind.free:
-            return l.settingsAccessFreeTitle;
-          case AccessCopyKind.none:
-            return l.settingsAccessNoneTitle;
-          case AccessCopyKind.generic:
-            return l.settingsSubscription;
-        }
-      },
-      loading: () => l.settingsSubscription,
-      error: (_, __) => l.settingsSubscription,
-    );
-  }
-
-  String _accessSubtitle(AppL10n l, AsyncValue<SubscriptionStatus> async) {
-    return async.when(
-      data: (s) {
-        switch (accessCopyKind(s)) {
-          case AccessCopyKind.paidOrTrial:
-            if (s.expiresAt != null) {
-              return l
-                  .settingsAccessActiveUntil(_formatAccessDate(s.expiresAt!));
-            }
-            return l.settingsAccessBetaSubtitle;
-          case AccessCopyKind.cancelled:
-            return l.settingsAccessCancelledSubtitle;
-          case AccessCopyKind.closedBeta:
-            if (s.expiresAt != null) {
-              return l
-                  .settingsAccessActiveUntil(_formatAccessDate(s.expiresAt!));
-            }
-            return l.settingsAccessBetaSubtitle;
-          case AccessCopyKind.free:
-            return l.settingsAccessFreeSubtitle;
-          case AccessCopyKind.none:
-            return l.settingsAccessNoneSubtitle;
-          case AccessCopyKind.generic:
-            if (s.status == 'expired' && s.expiresAt != null) {
-              return l
-                  .settingsAccessActiveUntil(_formatAccessDate(s.expiresAt!));
-            }
-            return l.settingsAccessNoneSubtitle;
-        }
-      },
-      loading: () => '?',
-      error: (_, __) => l.settingsSubscriptionLoadError,
-    );
-  }
-
   Future<void> _onLogoutPressed() async {
     final l = AppL10n.of(context);
     final confirmed = await showDialog<bool>(
@@ -248,34 +153,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     // Phone path: GoRouter redirects to /login via refreshListenable.
   }
 
-  Future<void> _onSendReportPressed() async {
-    final l = AppL10n.of(context);
-    setState(() => _reportSending = true);
-    try {
-      final auth = ref.read(authProvider).valueOrNull;
-      final vpn = ref.read(vpnProvider);
-      final notifier = ref.read(vpnProvider.notifier);
-      final service = DiagnosticsService();
-      final report = await service.buildReport(
-        authState: auth ?? const AuthStateUnauthenticated(),
-        vpnUi: vpn,
-        cachedConfig: notifier.config,
-        autoWinnerId: notifier.autoWinnerId,
-        autoWinnerLabel: notifier.displayLabel,
-        lastProve: notifier.lastProveSummary,
-        catalogHost: notifier.catalogHost,
-      );
-      final saved = await DiagnosticsService.persistLocal(report);
-      await Clipboard.setData(ClipboardData(text: saved.body));
-      if (!mounted) return;
-      showTeremokSnackBar(context, l.settingsReportCopied);
-    } catch (_) {
-      if (!mounted) return;
-      showTeremokSnackBar(context, l.settingsReportFailed);
-    } finally {
-      if (mounted) setState(() => _reportSending = false);
-    }
+  Future<void> _loadLogLevel() async {
+    final level = await TunnelLogPrefs.read();
+    if (!mounted) return;
+    setState(() => _logLevel = level);
   }
+
+  String _logLevelLabel(AppL10n l, TunnelLogLevel level) => switch (level) {
+        TunnelLogLevel.off => l.tunnelLogsLevelOff,
+        TunnelLogLevel.error => l.tunnelLogsLevelError,
+        TunnelLogLevel.warn => l.tunnelLogsLevelWarn,
+        TunnelLogLevel.info => l.tunnelLogsLevelInfo,
+        TunnelLogLevel.debug => l.tunnelLogsLevelDebug,
+      };
 
   String _themeModeLabel(AppL10n l, ThemeMode mode) => switch (mode) {
         ThemeMode.light => l.settingsThemeLight,
@@ -361,18 +251,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final theme = Theme.of(context);
     final showNotif = VpnNotificationPrefs.isSupported;
     final showAutoReconnect = !hideInAppPlategaCheckout;
-    final showNoVpn = !hideInAppPlategaCheckout;
+    final showNoVpn = androidPerAppSplit;
     final notifOn = _notifEnabled ?? true;
     final autoOn = _autoReconnect ?? false;
-    final showConnectionSection = showAutoReconnect || showNotif || showNoVpn;
-    final subAsync = ref.watch(subscriptionStatusProvider);
     final themeMode =
         ref.watch(themeModeProvider).valueOrNull ?? ThemeMode.system;
     final locale = ref.watch(localeProvider).valueOrNull ??
         Localizations.localeOf(context);
     final localeLabel = _localeLabel(l, locale);
     return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
+      backgroundColor:
+          freeKeyClient ? Colors.transparent : theme.colorScheme.surface,
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
@@ -385,148 +274,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            _SectionLabel(l.settingsSectionAccount),
-            _SettingsCard(
-              children: [
-                _SettingsRow(
-                  leading: _AccessStatusGlyph(status: subAsync),
-                  title: _accessTitle(l, subAsync),
-                  subtitle: _accessSubtitle(l, subAsync),
-                  onTap: () => context.push('/settings/account'),
-                  trailing: subAsync.when(
-                    data: (_) => const AppIcon(AppIcons.chevronRight, size: 18),
-                    loading: () => const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                    error: (_, __) => TextButton(
-                      onPressed: () => ref
-                          .read(subscriptionStatusProvider.notifier)
-                          .refresh(),
-                      child: Text(l.homeRetry),
-                    ),
-                  ),
-                ),
-                if (AppConfig.authAnonymous) ...[
-                  const _CardDivider(),
-                  _SettingsRow(
-                    icon: AppIcons.devices,
-                    title: l.settingsDevices,
-                    subtitle: l.settingsDevicesHint,
-                    onTap: () => context.push('/settings/devices'),
-                  ),
-                  const _CardDivider(),
-                  _SettingsRow(
-                    icon: AppIcons.siteTelegram,
-                    title: l.settingsSupport,
-                    subtitle: hideInAppPlategaCheckout
-                        ? l.settingsSupportHintIos
-                        : l.settingsSupportHint,
-                    onTap: () {
-                      if (hideInAppPlategaCheckout) {
-                        unawaited(openIosTelegramBotTariffsPath(context, ref));
-                        return;
-                      }
-                      SupportContact.open(screen: 'Настройки');
-                    },
-                  ),
-                ],
-                const _CardDivider(),
-                _SettingsRow(
-                  icon: AppIcons.bug,
-                  title: l.settingsSendReport,
-                  subtitle: l.settingsSendReportHint,
-                  onTap: _reportSending ? null : _onSendReportPressed,
-                  trailing: _reportSending
-                      ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : null,
-                ),
-              ],
-            ),
-            if (showConnectionSection) ...[
-              const SizedBox(height: 20),
-              _SectionLabel(l.settingsSectionConnection),
-              _SettingsCard(
-                children: [
-                  if (showAutoReconnect)
-                    _SettingsRow(
-                      icon: AppIcons.refresh,
-                      title: l.settingsAutoReconnect,
-                      subtitle: l.settingsAutoReconnectHint,
-                      trailing: Switch(
-                        value: autoOn,
-                        onChanged:
-                            _autoReconnectLoading || _autoReconnect == null
-                                ? null
-                                : _onAutoReconnectChanged,
-                      ),
-                    ),
-                  if (showNotif) ...[
-                    if (showAutoReconnect) const _CardDivider(),
-                    _SettingsRow(
-                      icon: AppIcons.notifications,
-                      title: l.settingsVpnNotificationTitle,
-                      subtitle: l.settingsVpnNotificationHint,
-                      trailing: Switch(
-                        value: notifOn,
-                        onChanged: _notifLoading || _notifEnabled == null
-                            ? null
-                            : _onNotifChanged,
-                      ),
-                    ),
-                    if (QsTilePrefs.isSupported) ...[
-                      const _CardDivider(),
-                      _SettingsRow(
-                        icon: AppIcons.house,
-                        title: l.settingsQsTileTitle,
-                        subtitle: l.settingsQsTileHint,
-                        onTap: _qsAdding ? null : _onAddQsTile,
-                        trailing: _qsAdding
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : null,
-                      ),
-                    ],
-                  ],
-                  if (showNoVpn) ...[
-                    if (showAutoReconnect || showNotif) const _CardDivider(),
-                    _SettingsRow(
-                      icon: AppIcons.sliders,
-                      title: l.settingsNoVpn,
-                      subtitle: l.settingsNoVpnHint,
-                      onTap: () => context.go('/settings/no-vpn'),
-                    ),
-                  ],
-                ],
-              ),
-            ],
-            const SizedBox(height: 20),
-            _SectionLabel(l.settingsSectionApp),
-            _SettingsCard(
-              children: [
-                _SettingsRow(
-                  icon: AppIcons.globe,
-                  title: l.settingsLanguage,
-                  subtitle: localeLabel,
-                  onTap: _pickLocale,
-                ),
-                const _CardDivider(),
-                _SettingsRow(
-                  icon: AppIcons.palette,
-                  title: l.settingsAppearance,
-                  subtitle: _themeModeLabel(l, themeMode),
-                  onTap: _pickThemeMode,
-                ),
-              ],
+            ..._settingsSections(
+              l: l,
+              showAutoReconnect: showAutoReconnect,
+              showNotif: showNotif,
+              showNoVpn: showNoVpn,
+              autoOn: autoOn,
+              notifOn: notifOn,
+              localeLabel: localeLabel,
+              themeMode: themeMode,
             ),
             const SizedBox(height: 28),
             if (_versionLabel.isNotEmpty)
@@ -537,66 +293,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
-            Wrap(
-              alignment: WrapAlignment.center,
-              spacing: 4,
-              runSpacing: 0,
-              children: [
-                TextButton(
-                  onPressed: () => launchUrl(
-                    Uri.parse(AppConfig.privacyPolicyUrl),
-                    mode: LaunchMode.externalApplication,
-                  ),
-                  child: Text(l.settingsPrivacyPlaceholder),
-                ),
-                TextButton(
-                  onPressed: () => launchUrl(
-                    Uri.parse(AppConfig.termsOfServiceUrl),
-                    mode: LaunchMode.externalApplication,
-                  ),
-                  child: Text(l.settingsTerms),
-                ),
-                if (!hideInAppPlategaCheckout)
-                  TextButton(
-                    onPressed: () => launchUrl(
-                      Uri.parse(AppConfig.pricingUrl),
-                      mode: LaunchMode.externalApplication,
-                    ),
-                    child: Text(l.settingsPricing),
-                  ),
-                TextButton(
-                  onPressed: () => launchUrl(
-                    Uri.parse(AppConfig.supportPageUrl),
-                    mode: LaunchMode.externalApplication,
-                  ),
-                  child: Text(l.settingsSupport),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            if (AppConfig.authAnonymous)
-              _SettingsCard(
-                children: [
-                  _SettingsRow(
-                    icon: AppIcons.devices,
-                    title: l.settingsDeviceId,
-                    subtitle: _installId ?? l.settingsDeviceIdHint,
-                    onTap: _installId == null ? null : _copyInstallId,
-                    trailing: _installId == null
-                        ? const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Icon(
-                            Icons.copy_outlined,
-                            size: 20,
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                  ),
-                ],
-              )
-            else
+            if (!AppConfig.authAnonymous)
               _SettingsCard(
                 children: [
                   _LogoutRow(
@@ -610,6 +307,127 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
       ),
     );
+  }
+
+  List<Widget> _settingsSections({
+    required AppL10n l,
+    required bool showAutoReconnect,
+    required bool showNotif,
+    required bool showNoVpn,
+    required bool autoOn,
+    required bool notifOn,
+    required String localeLabel,
+    required ThemeMode themeMode,
+  }) {
+    final sections = <({String title, List<Widget> rows})>[
+      (
+        title: l.settingsSupport,
+        rows: [
+          if (AppConfig.authAnonymous)
+            _SettingsRow(
+              icon: AppIcons.siteTelegram,
+              title: l.settingsSupport,
+              subtitle: l.settingsSupportHintIos,
+              onTap: () {
+                SupportContact.open(screen: 'Настройки');
+              },
+            ),
+        ],
+      ),
+      (
+        title: l.settingsSectionConnection,
+        rows: [
+          _SettingsRow(
+            icon: AppIcons.bug,
+            title: l.tunnelLogsTitle,
+            subtitle: _logLevelLabel(l, _logLevel),
+            onTap: () async {
+              await context.push('/settings/logs');
+              if (mounted) await _loadLogLevel();
+            },
+          ),
+          if (showAutoReconnect)
+            _SettingsRow(
+              icon: AppIcons.refresh,
+              title: l.settingsAutoReconnect,
+              subtitle: l.settingsAutoReconnectHint,
+              trailing: Switch(
+                value: autoOn,
+                onChanged: _autoReconnectLoading || _autoReconnect == null
+                    ? null
+                    : _onAutoReconnectChanged,
+              ),
+            ),
+          if (showNotif)
+            _SettingsRow(
+              icon: AppIcons.notifications,
+              title: l.settingsVpnNotificationTitle,
+              subtitle: l.settingsVpnNotificationHint,
+              trailing: Switch(
+                value: notifOn,
+                onChanged: _notifLoading || _notifEnabled == null
+                    ? null
+                    : _onNotifChanged,
+              ),
+            ),
+          if (showNotif && QsTilePrefs.isSupported)
+            _SettingsRow(
+              icon: AppIcons.house,
+              title: l.settingsQsTileTitle,
+              subtitle: l.settingsQsTileHint,
+              onTap: _qsAdding ? null : _onAddQsTile,
+              trailing: _qsAdding
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : null,
+            ),
+          if (showNoVpn)
+            _SettingsRow(
+              icon: AppIcons.sliders,
+              title: l.settingsNoVpn,
+              subtitle: l.settingsNoVpnHint,
+              onTap: () => context.go('/settings/no-vpn'),
+            ),
+        ],
+      ),
+      (
+        title: l.settingsSectionApp,
+        rows: [
+          _SettingsRow(
+            icon: AppIcons.globe,
+            title: l.settingsLanguage,
+            subtitle: localeLabel,
+            onTap: _pickLocale,
+          ),
+          _SettingsRow(
+            icon: AppIcons.palette,
+            title: l.settingsAppearance,
+            subtitle: _themeModeLabel(l, themeMode),
+            onTap: _pickThemeMode,
+          ),
+        ],
+      ),
+    ];
+    final out = <Widget>[];
+    for (final section in sections) {
+      if (section.rows.isEmpty) continue;
+      if (out.isNotEmpty) out.add(const SizedBox(height: 20));
+      out.add(_SectionLabel(section.title));
+      out.add(_SettingsCard(children: _divided(section.rows)));
+    }
+    return out;
+  }
+
+  List<Widget> _divided(List<Widget> rows) {
+    final out = <Widget>[];
+    for (var i = 0; i < rows.length; i++) {
+      if (i > 0) out.add(const _CardDivider());
+      out.add(rows[i]);
+    }
+    return out;
   }
 }
 
@@ -791,106 +609,6 @@ class _SettingsRow extends StatelessWidget {
               const SizedBox(width: 8),
               const AppIcon(AppIcons.chevronRight, size: 18),
             ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Monochrome Living House + check (access) / X (no access).
-class _AccessStatusGlyph extends StatelessWidget {
-  const _AccessStatusGlyph({required this.status});
-
-  final AsyncValue<SubscriptionStatus> status;
-
-  static bool _hasAccess(SubscriptionStatus s) {
-    // Free cold auth: empty subscription is still Free-tier access (quota VPN).
-    if (s.isEmpty) return true;
-    if (s.hasActivePaid || s.isTrial || s.isAlpha) return true;
-    if (s.status == 'cancelled' &&
-        s.expiresAt != null &&
-        s.expiresAt!.isAfter(DateTime.now())) {
-      return true;
-    }
-    return false;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final base = theme.colorScheme.onSurface;
-
-    final bool? ok;
-    final bool pending;
-    if (status.isLoading) {
-      ok = null;
-      pending = true;
-    } else if (status.hasError) {
-      ok = false;
-      pending = false;
-    } else {
-      ok = _hasAccess(status.requireValue);
-      pending = false;
-    }
-
-    final badgeColor = switch (ok) {
-      true => AppBrand.success,
-      false => theme.colorScheme.error,
-      null => theme.colorScheme.onSurfaceVariant,
-    };
-
-    return Container(
-      width: 36,
-      height: 36,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: AppBrand.oakWithOpacity(0.08),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: SizedBox(
-        width: 26,
-        height: 26,
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Positioned.fill(
-              child: Padding(
-                padding: const EdgeInsets.all(2),
-                child: ColorFiltered(
-                  colorFilter: ColorFilter.mode(base, BlendMode.srcIn),
-                  child: Image.asset(
-                    'assets/icon/mono_teremok.png',
-                    fit: BoxFit.contain,
-                    filterQuality: FilterQuality.high,
-                    errorBuilder: (_, __, ___) =>
-                        const AppIcon(AppIcons.houseFill, size: 20),
-                  ),
-                ),
-              ),
-            ),
-            if (!pending && ok != null)
-              Positioned(
-                right: -2,
-                bottom: -2,
-                child: Container(
-                  width: 14,
-                  height: 14,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: theme.colorScheme.surface,
-                      width: 1.5,
-                    ),
-                  ),
-                  child: AppIcon(
-                    ok ? AppIcons.checkCircleFill : AppIcons.xCircleFill,
-                    size: 14,
-                    color: badgeColor,
-                  ),
-                ),
-              ),
           ],
         ),
       ),

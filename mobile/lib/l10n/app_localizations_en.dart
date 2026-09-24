@@ -761,6 +761,54 @@ class AppL10nEn extends AppL10n {
   String get settingsSendReport => 'Send diagnostic report';
 
   @override
+  String get tunnelLogsTitle => 'Tunnel logs';
+
+  @override
+  String get tunnelLogsLevelOff => 'Off';
+
+  @override
+  String get tunnelLogsLevelError => 'Errors';
+
+  @override
+  String get tunnelLogsLevelWarn => 'Warnings';
+
+  @override
+  String get tunnelLogsLevelInfo => 'Info';
+
+  @override
+  String get tunnelLogsLevelDebug => 'Debug';
+
+  @override
+  String get tunnelLogsSearch => 'Text, IP, or domain';
+
+  @override
+  String get tunnelLogsAll => 'All';
+
+  @override
+  String get tunnelLogsSession => 'Session';
+
+  @override
+  String get tunnelLogsNetwork => 'Network';
+
+  @override
+  String get tunnelLogsRefresh => 'Refresh';
+
+  @override
+  String get tunnelLogsCopy => 'Copy';
+
+  @override
+  String get tunnelLogsExport => 'Export all';
+
+  @override
+  String get tunnelLogsDelete => 'Delete';
+
+  @override
+  String get tunnelLogsCopied => 'Log copied';
+
+  @override
+  String get tunnelLogsEmpty => 'No entries';
+
+  @override
   String get settingsSendReportHint =>
       'Copies diagnostics. Paste them into support yourself.';
 
@@ -1624,4 +1672,110 @@ class AppL10nEn extends AppL10n {
   @override
   String get restoreTelegramSubscriptionInactive =>
       'The subscription is not active. After it is renewed you can restore this seat.';
+
+  @override
+  String get freeAdd => 'Add';
+
+  @override
+  String get freePaste => 'Paste';
+
+  @override
+  String get freeQr => 'QR';
+
+  @override
+  String get freeAddServer => 'Add server';
+
+  @override
+  String get freeEmptyTitle => 'No servers added';
+
+  @override
+  String get freeEmptyBody => 'Add a link, a key, or a QR code.';
+
+  @override
+  String get freeStatus => 'Status';
+
+  @override
+  String get freeProfile => 'Profile';
+
+  @override
+  String get freeProtocol => 'Protocol';
+
+  @override
+  String get freeUptime => 'Uptime';
+
+  @override
+  String get freeNoProfile => 'None';
+
+  @override
+  String get freeAddTitle => 'Add';
+
+  @override
+  String get freeAddHint => 'Paste a link or a key.';
+
+  @override
+  String get freeSaveConnect => 'Save and connect';
+
+  @override
+  String get freeSaveOnly => 'Save only';
+
+  @override
+  String get freePreview => 'Found';
+
+  @override
+  String get freeServerAdded => 'Server added';
+
+  @override
+  String get freeLinkInvalid => 'Could not read that link';
+
+  @override
+  String get freeOnboardTitle => 'Server list';
+
+  @override
+  String get freeOnboardBody =>
+      'A subscription link or a key becomes a profile. Its servers stay in one list.';
+
+  @override
+  String get freeOnboardAddTitle => 'Pick a server';
+
+  @override
+  String get freeOnboardAddBody =>
+      'Each server has a name and a short line. You choose which one to use.';
+
+  @override
+  String get freeOnboardConnectTitle => 'Connect with one tap';
+
+  @override
+  String get freeOnboardConnectBody =>
+      'Tap the house to connect or disconnect. The status stays on this screen.';
+
+  @override
+  String get freeLater => 'Later';
+
+  @override
+  String get freeBatteryTitle => 'Keep the tunnel running';
+
+  @override
+  String get freeBatteryBody =>
+      'Android may stop the tunnel to save battery. You can allow background activity.';
+
+  @override
+  String get freeBatteryAllow => 'Allow';
+
+  @override
+  String get freeBatteryDismiss => 'Don\'t ask again';
+
+  @override
+  String get freeServers => 'Servers';
+
+  @override
+  String get freePoolPremium => 'Premium';
+
+  @override
+  String get freePoolGeneral => 'General';
+
+  @override
+  String get freeSearch => 'Search servers';
+
+  @override
+  String get freeDelete => 'Remove';
 }

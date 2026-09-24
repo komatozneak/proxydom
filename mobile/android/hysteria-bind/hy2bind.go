@@ -202,6 +202,7 @@ func StopTun() {
 // Stop closes TUN, SOCKS, and the Hy2 client.
 func Stop() {
 	StopTun()
+	stopShare()
 	mu.Lock()
 	ln := socksLn
 	c := hyClient

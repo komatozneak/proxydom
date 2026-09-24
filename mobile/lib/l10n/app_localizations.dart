@@ -1477,6 +1477,102 @@ abstract class AppL10n {
   /// **'Send diagnostic report'**
   String get settingsSendReport;
 
+  /// No description provided for @tunnelLogsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tunnel logs'**
+  String get tunnelLogsTitle;
+
+  /// No description provided for @tunnelLogsLevelOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get tunnelLogsLevelOff;
+
+  /// No description provided for @tunnelLogsLevelError.
+  ///
+  /// In en, this message translates to:
+  /// **'Errors'**
+  String get tunnelLogsLevelError;
+
+  /// No description provided for @tunnelLogsLevelWarn.
+  ///
+  /// In en, this message translates to:
+  /// **'Warnings'**
+  String get tunnelLogsLevelWarn;
+
+  /// No description provided for @tunnelLogsLevelInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Info'**
+  String get tunnelLogsLevelInfo;
+
+  /// No description provided for @tunnelLogsLevelDebug.
+  ///
+  /// In en, this message translates to:
+  /// **'Debug'**
+  String get tunnelLogsLevelDebug;
+
+  /// No description provided for @tunnelLogsSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Text, IP, or domain'**
+  String get tunnelLogsSearch;
+
+  /// No description provided for @tunnelLogsAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get tunnelLogsAll;
+
+  /// No description provided for @tunnelLogsSession.
+  ///
+  /// In en, this message translates to:
+  /// **'Session'**
+  String get tunnelLogsSession;
+
+  /// No description provided for @tunnelLogsNetwork.
+  ///
+  /// In en, this message translates to:
+  /// **'Network'**
+  String get tunnelLogsNetwork;
+
+  /// No description provided for @tunnelLogsRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get tunnelLogsRefresh;
+
+  /// No description provided for @tunnelLogsCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get tunnelLogsCopy;
+
+  /// No description provided for @tunnelLogsExport.
+  ///
+  /// In en, this message translates to:
+  /// **'Export all'**
+  String get tunnelLogsExport;
+
+  /// No description provided for @tunnelLogsDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get tunnelLogsDelete;
+
+  /// No description provided for @tunnelLogsCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Log copied'**
+  String get tunnelLogsCopied;
+
+  /// No description provided for @tunnelLogsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No entries'**
+  String get tunnelLogsEmpty;
+
   /// No description provided for @settingsSendReportHint.
   ///
   /// In en, this message translates to:
@@ -3036,6 +3132,210 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'The subscription is not active. After it is renewed you can restore this seat.'**
   String get restoreTelegramSubscriptionInactive;
+
+  /// No description provided for @freeAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get freeAdd;
+
+  /// No description provided for @freePaste.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste'**
+  String get freePaste;
+
+  /// No description provided for @freeQr.
+  ///
+  /// In en, this message translates to:
+  /// **'QR'**
+  String get freeQr;
+
+  /// No description provided for @freeAddServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Add server'**
+  String get freeAddServer;
+
+  /// No description provided for @freeEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No servers added'**
+  String get freeEmptyTitle;
+
+  /// No description provided for @freeEmptyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a link, a key, or a QR code.'**
+  String get freeEmptyBody;
+
+  /// No description provided for @freeStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get freeStatus;
+
+  /// No description provided for @freeProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile'**
+  String get freeProfile;
+
+  /// No description provided for @freeProtocol.
+  ///
+  /// In en, this message translates to:
+  /// **'Protocol'**
+  String get freeProtocol;
+
+  /// No description provided for @freeUptime.
+  ///
+  /// In en, this message translates to:
+  /// **'Uptime'**
+  String get freeUptime;
+
+  /// No description provided for @freeNoProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get freeNoProfile;
+
+  /// No description provided for @freeAddTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get freeAddTitle;
+
+  /// No description provided for @freeAddHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste a link or a key.'**
+  String get freeAddHint;
+
+  /// No description provided for @freeSaveConnect.
+  ///
+  /// In en, this message translates to:
+  /// **'Save and connect'**
+  String get freeSaveConnect;
+
+  /// No description provided for @freeSaveOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Save only'**
+  String get freeSaveOnly;
+
+  /// No description provided for @freePreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Found'**
+  String get freePreview;
+
+  /// No description provided for @freeServerAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Server added'**
+  String get freeServerAdded;
+
+  /// No description provided for @freeLinkInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not read that link'**
+  String get freeLinkInvalid;
+
+  /// No description provided for @freeOnboardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Server list'**
+  String get freeOnboardTitle;
+
+  /// No description provided for @freeOnboardBody.
+  ///
+  /// In en, this message translates to:
+  /// **'A subscription link or a key becomes a profile. Its servers stay in one list.'**
+  String get freeOnboardBody;
+
+  /// No description provided for @freeOnboardAddTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a server'**
+  String get freeOnboardAddTitle;
+
+  /// No description provided for @freeOnboardAddBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Each server has a name and a short line. You choose which one to use.'**
+  String get freeOnboardAddBody;
+
+  /// No description provided for @freeOnboardConnectTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect with one tap'**
+  String get freeOnboardConnectTitle;
+
+  /// No description provided for @freeOnboardConnectBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap the house to connect or disconnect. The status stays on this screen.'**
+  String get freeOnboardConnectBody;
+
+  /// No description provided for @freeLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Later'**
+  String get freeLater;
+
+  /// No description provided for @freeBatteryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep the tunnel running'**
+  String get freeBatteryTitle;
+
+  /// No description provided for @freeBatteryBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Android may stop the tunnel to save battery. You can allow background activity.'**
+  String get freeBatteryBody;
+
+  /// No description provided for @freeBatteryAllow.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow'**
+  String get freeBatteryAllow;
+
+  /// No description provided for @freeBatteryDismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Don\'t ask again'**
+  String get freeBatteryDismiss;
+
+  /// No description provided for @freeServers.
+  ///
+  /// In en, this message translates to:
+  /// **'Servers'**
+  String get freeServers;
+
+  /// No description provided for @freePoolPremium.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium'**
+  String get freePoolPremium;
+
+  /// No description provided for @freePoolGeneral.
+  ///
+  /// In en, this message translates to:
+  /// **'General'**
+  String get freePoolGeneral;
+
+  /// No description provided for @freeSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search servers'**
+  String get freeSearch;
+
+  /// No description provided for @freeDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get freeDelete;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

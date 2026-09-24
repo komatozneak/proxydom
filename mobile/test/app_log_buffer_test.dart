@@ -3,9 +3,41 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:teremok_connect/core/diagnostics/app_log_buffer.dart';
 import 'package:teremok_connect/core/diagnostics/product_log.dart';
+import 'package:teremok_connect/core/diagnostics/tunnel_log_level.dart';
 
 void main() {
   tearDown(AppLogBuffer.instance.resetForTest);
+
+  test('AppLogBuffer drops lines above the selected level', () {
+    final buf = AppLogBuffer.instance;
+    buf.clear();
+    buf.minLevel = TunnelLogLevel.off;
+    buf.info('hidden');
+    expect(buf.recentLines(), isEmpty);
+    buf.minLevel = TunnelLogLevel.error;
+    buf.info('still hidden');
+    buf.error('kept');
+    final text = buf.formatRecentLog();
+    expect(text, contains('[error] kept'));
+    expect(text, isNot(contains('still hidden')));
+    expect(text, isNot(contains('hidden')));
+  });
+
+  test('info level hides boot noise and keeps session lines', () {
+    final buf = AppLogBuffer.instance;
+    buf.clear();
+    buf.minLevel = TunnelLogLevel.info;
+    buf.debug('app.boot t0');
+    buf.debug('api.discovery cached_origin=https://api.example');
+    buf.info('vpn.native status=idle');
+    buf.info('vpn.connect_fail code=egressTimeout');
+    buf.info('vpn.native status=connected');
+    final text = buf.formatRecentLog();
+    expect(text, isNot(contains('app.boot')));
+    expect(text, isNot(contains('api.discovery')));
+    expect(text, contains('vpn.connect_fail code=egressTimeout'));
+    expect(text, contains('vpn.native status=connected'));
+  });
 
   test('AppLogBuffer keeps last N lines', () {
     final buf = AppLogBuffer.instance;

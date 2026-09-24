@@ -138,6 +138,48 @@ class HysteriaBridge private constructor() {
         }
     }
 
+    fun startShare(configJson: String): Boolean {
+        val svc = vpnService
+        if (svc == null) {
+            lastErrorMessage = "VpnService not bound for protect()"
+            return false
+        }
+        if (!loadLibrary()) return false
+        return try {
+            lastErrorMessage = null
+            Hy2bind.setProtector(Hy2VpnProtector(svc))
+            val err: String? = Hy2bind.startShare(configJson)
+            if (!err.isNullOrBlank()) {
+                lastErrorMessage = err
+                Log.e(TAG, "startShare failed")
+                return false
+            }
+            isRunning.set(true)
+            Log.i(TAG, "startShare: local SOCKS ready")
+            true
+        } catch (t: Throwable) {
+            lastErrorMessage = t.message ?: t.toString()
+            Log.e(TAG, "startShare: failed", t)
+            false
+        }
+    }
+
+    fun startShareTun(tunFd: Int, mtu: Int): Boolean {
+        return try {
+            val err: String? = Hy2bind.startShareTun(tunFd.toLong(), mtu.toLong())
+            if (!err.isNullOrBlank()) {
+                lastErrorMessage = err
+                Log.e(TAG, "startShareTun: $err")
+                return false
+            }
+            true
+        } catch (t: Throwable) {
+            lastErrorMessage = t.message ?: t.toString()
+            Log.e(TAG, "startShareTun: failed", t)
+            false
+        }
+    }
+
     fun stop() {
         if (!isRunning.getAndSet(false)) return
         try {

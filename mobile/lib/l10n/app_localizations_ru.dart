@@ -761,6 +761,54 @@ class AppL10nRu extends AppL10n {
   String get settingsSendReport => 'Отправить отчёт';
 
   @override
+  String get tunnelLogsTitle => 'Логи туннеля';
+
+  @override
+  String get tunnelLogsLevelOff => 'Выключены';
+
+  @override
+  String get tunnelLogsLevelError => 'Ошибки';
+
+  @override
+  String get tunnelLogsLevelWarn => 'Предупреждения';
+
+  @override
+  String get tunnelLogsLevelInfo => 'Информация';
+
+  @override
+  String get tunnelLogsLevelDebug => 'Отладка';
+
+  @override
+  String get tunnelLogsSearch => 'Текст, IP или домен';
+
+  @override
+  String get tunnelLogsAll => 'Все';
+
+  @override
+  String get tunnelLogsSession => 'Сессия';
+
+  @override
+  String get tunnelLogsNetwork => 'Сеть';
+
+  @override
+  String get tunnelLogsRefresh => 'Обновить';
+
+  @override
+  String get tunnelLogsCopy => 'Копировать';
+
+  @override
+  String get tunnelLogsExport => 'Экспорт всех';
+
+  @override
+  String get tunnelLogsDelete => 'Удалить';
+
+  @override
+  String get tunnelLogsCopied => 'Лог скопирован';
+
+  @override
+  String get tunnelLogsEmpty => 'Записей нет';
+
+  @override
   String get settingsSendReportHint =>
       'Копирует диагностику. Вставьте её в поддержку сами.';
 
@@ -1629,4 +1677,110 @@ class AppL10nRu extends AppL10n {
   @override
   String get restoreTelegramSubscriptionInactive =>
       'Подписка сейчас не активна. После продления место можно восстановить снова.';
+
+  @override
+  String get freeAdd => 'Добавить';
+
+  @override
+  String get freePaste => 'Вставить';
+
+  @override
+  String get freeQr => 'QR';
+
+  @override
+  String get freeAddServer => 'Добавить сервер';
+
+  @override
+  String get freeEmptyTitle => 'Нет добавленных серверов';
+
+  @override
+  String get freeEmptyBody => 'Добавьте ссылку, ключ или QR-код.';
+
+  @override
+  String get freeStatus => 'Статус';
+
+  @override
+  String get freeProfile => 'Профиль';
+
+  @override
+  String get freeProtocol => 'Протокол';
+
+  @override
+  String get freeUptime => 'Время';
+
+  @override
+  String get freeNoProfile => 'Нет';
+
+  @override
+  String get freeAddTitle => 'Добавить';
+
+  @override
+  String get freeAddHint => 'Вставьте ссылку или ключ.';
+
+  @override
+  String get freeSaveConnect => 'Сохранить и подключить';
+
+  @override
+  String get freeSaveOnly => 'Только сохранить';
+
+  @override
+  String get freePreview => 'Найдено';
+
+  @override
+  String get freeServerAdded => 'Сервер добавлен';
+
+  @override
+  String get freeLinkInvalid => 'Ссылка не разобрана';
+
+  @override
+  String get freeOnboardTitle => 'Список серверов';
+
+  @override
+  String get freeOnboardBody =>
+      'Ссылка подписки или ключ становятся профилем. Серверы из неё собираются в один список.';
+
+  @override
+  String get freeOnboardAddTitle => 'Выберите сервер';
+
+  @override
+  String get freeOnboardAddBody =>
+      'У каждого сервера своё имя и подпись. Какой использовать — выбираете вы.';
+
+  @override
+  String get freeOnboardConnectTitle => 'Подключайтесь одним нажатием';
+
+  @override
+  String get freeOnboardConnectBody =>
+      'Нажмите на домик, чтобы включить или выключить. Статус остаётся на этом экране.';
+
+  @override
+  String get freeLater => 'Позже';
+
+  @override
+  String get freeBatteryTitle => 'Не останавливать туннель';
+
+  @override
+  String get freeBatteryBody =>
+      'Android может остановить туннель, чтобы экономить батарею. Можно разрешить работу в фоне.';
+
+  @override
+  String get freeBatteryAllow => 'Разрешить';
+
+  @override
+  String get freeBatteryDismiss => 'Больше не спрашивать';
+
+  @override
+  String get freeServers => 'Сервера';
+
+  @override
+  String get freePoolPremium => 'Премиум';
+
+  @override
+  String get freePoolGeneral => 'Общего назначения';
+
+  @override
+  String get freeSearch => 'Поиск серверов';
+
+  @override
+  String get freeDelete => 'Удалить';
 }

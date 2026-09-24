@@ -1021,7 +1021,11 @@ class TeremokVpnService : VpnService() {
                 startHysteriaOnWorker(username, protocol, params)
                 return
             }
-            failStart("unsupported vpnCore (Hy2-only)")
+            if (isXrayShareCore(params)) {
+                startShareOnWorker(username, params)
+                return
+            }
+            failStart("unsupported vpnCore")
         } catch (e: Exception) {
             Log.e(TAG, "startVpn: failed", e)
             failStart(e.message ?: e.toString())
@@ -1036,7 +1040,89 @@ class TeremokVpnService : VpnService() {
             return !((params["hysteriaServer"] as? String).isNullOrBlank()) &&
                 !((params["hysteriaAuth"] as? String).isNullOrBlank())
         }
+        if (isXrayShareCore(params)) {
+            return !((params["xrayConfig"] as? String).isNullOrBlank())
+        }
         return false
+    }
+
+    private fun startShareOnWorker(
+        username: String,
+        params: Map<String, Any?>,
+    ) {
+        val configJson = (params["xrayConfig"] as? String)?.trim().orEmpty()
+        if (configJson.isEmpty()) {
+            failStart("xray config missing")
+            return
+        }
+        val sessionName = (params["sessionName"] as? String)
+            ?.takeIf { it.isNotBlank() }
+            ?: "Теремок VPN"
+        val mtu = 1280
+        val address = (params["address"] as? String) ?: "10.255.255.1"
+        val addressPrefix = (params["addressPrefix"] as? Number)?.toInt() ?: 30
+        @Suppress("UNCHECKED_CAST")
+        val routes = (params["routes"] as? List<String>) ?: listOf("0.0.0.0/0")
+        DefaultNetworkMonitor.prewarm(this)
+        if (!DefaultNetworkMonitor.awaitUnderlyingNetwork(this, 5000)) {
+            failStart("underlying network not ready")
+            return
+        }
+        val builder = Builder()
+            .setSession(sessionName)
+            .setMtu(mtu)
+            .addAddress(address, addressPrefix)
+        for (route in routes) {
+            val parts = route.split("/")
+            if (parts.size == 2 && !parts[0].contains(":")) {
+                runCatching { builder.addRoute(parts[0], parts[1].toInt()) }
+            }
+        }
+        builder.addDnsServer("1.1.1.1")
+        builder.addDnsServer("8.8.8.8")
+        applyDisallowedApplications(builder, params)
+        currentStatus = "connecting"
+        VpnStatusBroadcaster.emit(currentStatus)
+        tunInterface.set(builder.establish())
+        val activeTun = tunInterface.get()
+        if (activeTun == null) {
+            failStart("VPN permission denied or establish() returned null")
+            return
+        }
+        VpnUnderlyingNetworkPolicy.applyTo(this)
+        val hy = HysteriaBridge.instance
+        hy.bind(this)
+        if (!hy.startShare(configJson)) {
+            failStart(hy.lastErrorMessage ?: "Xray start failed")
+            return
+        }
+        val tunFd = try {
+            ParcelFileDescriptor.dup(activeTun.fileDescriptor).detachFd()
+        } catch (t: Throwable) {
+            failStart("Xray tun fd dup failed")
+            return
+        }
+        if (!hy.startShareTun(tunFd = tunFd, mtu = mtu)) {
+            failStart(hy.lastErrorMessage ?: "Xray tun pump failed")
+            return
+        }
+        val probe = VpnPingMonitor.socksConnectProbe(socksPort = 10809)
+        if (probe !is VpnPingMonitor.SocksHttpsResult.Ok) {
+            failStart("Xray SOCKS probe failed")
+            return
+        }
+        isRunning = true
+        establishInProgress = false
+        coreRecovering = false
+        deadRecoverAttempts = 0
+        cancelDeadRecoverRetry()
+        currentStatus = "connected"
+        VpnStatusBroadcaster.emit(currentStatus)
+        showConnectedNotification()
+        acquireVpnLocks()
+        startPathHealthWatch()
+        startTrafficMonitor()
+        Log.i(TAG, "startVpn: Xray share established user=$username")
     }
 
     private fun startHysteriaOnWorker(
@@ -1754,6 +1840,26 @@ object VpnChannelRegistry {
                         } catch (e: Exception) {
                             Log.w(TeremokVpnService.TAG, "openVpnSettings failed", e)
                             result.error("VPN_SETTINGS_FAILED", e.message, null)
+                        }
+                    }
+                    "requestBatteryExemption" -> {
+                        try {
+                            val activity = activityProvider()
+                            val intent = Intent(
+                                Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                            ).apply {
+                                data = android.net.Uri.parse(
+                                    "package:${appContext.packageName}",
+                                )
+                            }
+                            if (activity == null) {
+                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            (activity ?: appContext).startActivity(intent)
+                            result.success(true)
+                        } catch (e: Exception) {
+                            Log.w(TeremokVpnService.TAG, "battery exemption failed", e)
+                            result.success(false)
                         }
                     }
                     "getSingBoxStderrTail" -> {

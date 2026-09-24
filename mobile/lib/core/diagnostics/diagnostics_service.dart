@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../api_client.dart';
 import '../config.dart';
+import '../ios_store_gates.dart';
 import 'app_log_buffer.dart';
 import 'egress_verify.dart';
 import '../../features/auth/application/auth_state.dart';
@@ -78,8 +79,9 @@ class DiagnosticsService {
 
     final sessionMeta = await VpnSessionMeta.load();
     final config = cachedConfig ?? VpnConfigCache.instance.current;
-    final expectedHost =
-        sessionMeta.expectedEgressHost ?? config?.expectedEgressHost;
+    final expectedHost = freeKeyClient
+        ? null
+        : sessionMeta.expectedEgressHost ?? config?.expectedEgressHost;
 
     final egress = await _probeEgress(expectedHost);
 
@@ -102,20 +104,27 @@ class DiagnosticsService {
       ..writeln('vpn_native: ${nativeStatus.name}')
       ..writeln('vpn_native_last_error: ${nativeError ?? '(none)'}')
       ..writeln('vpn_lockdown: $lockdown')
-      ..writeln('external_ip: ${egress.externalIpLabel}')
-      ..writeln('catalog_host: ${formatCatalogHost(catalogHost)}')
-      ..writeln('expected_egress_host: ${expectedHost ?? '(unknown)'}')
-      ..writeln('egress_ok: ${egress.egressOkLabel}')
-      ..writeln(
-        'egress_check: ${egressCheckLabel(externalIp: egress.externalIp, catalogHost: catalogHost)}',
-      )
-      ..writeln('ru_rules_loaded: ${sessionMeta.ruRulesLoaded}')
-      ..writeln(
-        'ru_rules_paths: ${sessionMeta.ruRuleTags.isEmpty ? '(none)' : sessionMeta.ruRuleTags.join(', ')}',
-      )
-      ..writeln('underlying_network: ${underlying ?? '(unsupported)'}')
-      ..writeln('auto_winner_id: ${autoWinnerId ?? '(none)'}')
-      ..writeln('auto_winner_label: ${autoWinnerLabel ?? '(none)'}')
+      ..writeln('external_ip: ${egress.externalIpLabel}');
+    if (!freeKeyClient) {
+      buffer
+        ..writeln('catalog_host: ${formatCatalogHost(catalogHost)}')
+        ..writeln('expected_egress_host: ${expectedHost ?? '(unknown)'}')
+        ..writeln('egress_ok: ${egress.egressOkLabel}')
+        ..writeln(
+          'egress_check: ${egressCheckLabel(externalIp: egress.externalIp, catalogHost: catalogHost)}',
+        )
+        ..writeln('ru_rules_loaded: ${sessionMeta.ruRulesLoaded}')
+        ..writeln(
+          'ru_rules_paths: ${sessionMeta.ruRuleTags.isEmpty ? '(none)' : sessionMeta.ruRuleTags.join(', ')}',
+        );
+    }
+    buffer.writeln('underlying_network: ${underlying ?? '(unsupported)'}');
+    if (!freeKeyClient) {
+      buffer
+        ..writeln('auto_winner_id: ${autoWinnerId ?? '(none)'}')
+        ..writeln('auto_winner_label: ${autoWinnerLabel ?? '(none)'}');
+    }
+    buffer
       ..writeln('last_prove: ${lastProve ?? '(none)'}')
       ..writeln('vpn_stderr_tail:')
       ..writeln(stderrTail ?? '(unsupported)')
@@ -271,7 +280,7 @@ void installFlutterErrorHandler({void Function()? onCrashObserved}) {
   FlutterError.onError = (details) {
     DiagnosticsService.lastFlutterError =
         details.exceptionAsString().split('\n').first;
-    AppLogBuffer.instance.warn(
+    AppLogBuffer.instance.debug(
       'flutter: ${DiagnosticsService.lastFlutterError}',
     );
     try {

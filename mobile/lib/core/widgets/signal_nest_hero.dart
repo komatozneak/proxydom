@@ -263,7 +263,7 @@ class _RefSymNetPainter extends CustomPainter {
     if (emerge < 0.01) return;
 
     final hub = Offset(size.width * 0.5, size.height * 0.52);
-    final orbitR = size.width * 0.40;
+    final orbitR = size.width * 0.47;
     final ellipseY = 0.90;
 
     // Rigid-body spin — seamless, keeps equal spacing.

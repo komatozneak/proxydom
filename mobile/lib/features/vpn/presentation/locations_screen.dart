@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,7 +8,6 @@ import 'package:go_router/go_router.dart';
 import '../../../core/busy/busy_overlay.dart';
 import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
-import '../../account/application/ios_account_nav.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/location_flag_icon.dart';
 import '../../../core/widgets/teremok_snackbar.dart';
@@ -19,6 +17,12 @@ import '../../home/application/vpn_provider.dart';
 import '../../home/application/vpn_status.dart';
 import '../../settings/application/subscription_status_provider.dart';
 import '../../settings/data/subscription_status.dart';
+import '../application/imported_profiles_provider.dart';
+import '../data/hy2_import_store.dart';
+import '../data/subscription_label.dart';
+import 'free_client_chrome.dart';
+import 'pool_server_mark.dart';
+import '../data/share_link_parser.dart';
 import '../data/node_auto_selector.dart';
 import '../data/node_display.dart';
 import '../data/vpn_controller.dart';
@@ -42,7 +46,11 @@ class LocationsScreen extends ConsumerStatefulWidget {
 }
 
 class _LocationsScreenState extends ConsumerState<LocationsScreen> {
+  String _query = '';
+
   List<VpnNode>? _nodes;
+  List<ParsedShareLink> _imported = const [];
+  String? _profileTitle;
   String? _selectedId;
   Object? _error;
   bool _loading = true;
@@ -62,21 +70,42 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     final canPop = GoRouter.maybeOf(context)?.canPop() ?? false;
     final busy = ref.watch(busyOverlayProvider).isBusy;
     ref.watch(vpnProvider);
-    ref.listen<AsyncValue<SubscriptionStatus>>(subscriptionStatusProvider, (
-      previous,
-      next,
-    ) {
-      bool prem(SubscriptionStatus? s) => s != null && s.unlocksPremium;
-      if (prem(previous?.valueOrNull) != prem(next.valueOrNull)) {
-        unawaited(_load());
-      }
-    });
+    if (freeKeyClient) {
+      ref.listen(importedProfilesProvider, (previous, next) {
+        final links = next.valueOrNull;
+        if (links == null) return;
+        unawaited(_applyImported(links));
+      });
+    } else {
+      ref.listen<AsyncValue<SubscriptionStatus>>(subscriptionStatusProvider, (
+        previous,
+        next,
+      ) {
+        bool prem(SubscriptionStatus? s) => s != null && s.unlocksPremium;
+        if (prem(previous?.valueOrNull) != prem(next.valueOrNull)) {
+          unawaited(_load());
+        }
+      });
+    }
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
+      backgroundColor:
+          freeKeyClient ? Colors.transparent : theme.colorScheme.surface,
       appBar: AppBar(
-        title: Text(l.regionTitle),
-        leading: canPop
+        backgroundColor: freeKeyClient ? Colors.transparent : null,
+        surfaceTintColor: freeKeyClient ? Colors.transparent : null,
+        titleSpacing: freeKeyClient ? 44 : null,
+        title: freeKeyClient
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(l.freeServers),
+                  const SizedBox(width: 16),
+                  _ServerCountChip(count: _imported.length),
+                ],
+              )
+            : Text(l.regionTitle),
+        leading: !freeKeyClient && canPop
             ? IconButton(
                 icon: const AppIcon(AppIcons.back),
                 onPressed: busy ? null : () => context.pop(),
@@ -103,7 +132,31 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
         raw.contains('software caused connection abort');
   }
 
+  Future<void> _applyImported(List<ParsedShareLink> links) async {
+    final index = await Hy2ImportStore.instance.selectedIndex();
+    final title = await Hy2ImportStore.instance.profileTitle();
+    if (!mounted) return;
+    setState(() {
+      _imported = links;
+      _profileTitle = title;
+      _nodes = const [];
+      _selectedId = links.isEmpty ? null : '$index';
+      _loading = false;
+      _error = null;
+      _fromCache = false;
+    });
+  }
+
   Future<void> _load() async {
+    if (freeKeyClient) {
+      try {
+        await Hy2ImportStore.instance.refreshSavedUrl();
+      } on FormatException {
+        // Keep the last good list when the network fails.
+      }
+      await _applyImported(await Hy2ImportStore.instance.load());
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
@@ -248,12 +301,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
   }
 
   Future<void> _onLockedPremiumTap() async {
-    // iOS: Account / Telegram bind — not /promo. Android keeps Platega.
-    if (hideInAppPlategaCheckout) {
-      await openIosPremiumAccountPath(context, ref);
-      return;
-    }
-    context.push('/subscription');
+    await context.push('/import');
   }
 
   /// Free/online egress + always keep Premium/locked rows in the pool (gray).
@@ -275,9 +323,192 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     return l.networkErrorFriendly;
   }
 
+  Future<void> _removeImported(int index) async {
+    final selected = _selectedId == '$index';
+    final status = ref.read(vpnProvider);
+    if (selected && (status is VpnConnected || status is VpnConnecting)) {
+      await ref.read(vpnProvider.notifier).disconnect();
+    }
+    await Hy2ImportStore.instance.removeAt(index);
+    await _load();
+  }
+
+  Future<void> _openPoolSheet() async {
+    final theme = Theme.of(context);
+    final premium = <int>[];
+    final general = <int>[];
+    for (var i = 0; i < _imported.length; i++) {
+      final label = labelForShareLink(_imported[i]);
+      if (isPremiumPoolServer(label.title)) {
+        premium.add(i);
+      } else {
+        general.add(i);
+      }
+    }
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        final l = AppL10n.of(sheetContext);
+        return SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            children: [
+              if (premium.isNotEmpty) ...[
+                Text(l.freePoolPremium, style: theme.textTheme.titleSmall),
+                const SizedBox(height: 8),
+                for (final index in premium) _poolRow(index),
+                const SizedBox(height: 16),
+              ],
+              if (general.isNotEmpty) ...[
+                Text(l.freePoolGeneral, style: theme.textTheme.titleSmall),
+                const SizedBox(height: 8),
+                for (final index in general) _poolRow(index),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _poolRow(int index) {
+    final link = _imported[index];
+    final label = labelForShareLink(link);
+    final selected = _selectedId == '$index';
+    return ListTile(
+      leading: PoolServerMark(label: label),
+      title: Text(label.title),
+      subtitle: Text(label.subtitle.isEmpty ? link.endpoint : label.subtitle),
+      selected: selected,
+      onTap: () async {
+        Navigator.of(context).pop();
+        await Hy2ImportStore.instance.select(index);
+        if (!mounted) return;
+        setState(() => _selectedId = '$index');
+        final status = ref.read(vpnProvider);
+        if (status is VpnConnected || status is VpnConnecting) {
+          await ref.read(vpnProvider.notifier).connect(forceRestart: true);
+        }
+      },
+    );
+  }
+
+  Widget _buildImported(ThemeData theme) {
+    final l = AppL10n.of(context);
+    final filtered = <int>[];
+    final q = _query.trim().toLowerCase();
+    for (var i = 0; i < _imported.length; i++) {
+      final link = _imported[i];
+      final hay = '${link.name} ${link.endpoint} ${link.scheme}'.toLowerCase();
+      if (q.isEmpty || hay.contains(q)) filtered.add(i);
+    }
+    final connected = ref.watch(vpnProvider) is VpnConnected;
+    final grouped = _imported.length > 1 ||
+        (_profileTitle != null && _profileTitle!.isNotEmpty);
+    if (grouped) {
+      return Column(
+        children: [
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(44, 8, 16, 0),
+              children: [
+                ListTile(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppBrand.radiusCard),
+                    side: BorderSide(color: theme.colorScheme.outline),
+                  ),
+                  tileColor: theme.colorScheme.surfaceContainerHighest,
+                  title: Text(
+                    _profileTitle ?? l.freeServers,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  trailing: const AppIcon(AppIcons.chevronRight),
+                  onTap: _openPoolSheet,
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
+            child: FreeClientActionBar(
+              onPaste: () => context.push('/import?clipboard=1'),
+              onScan: () => context.push('/scan'),
+            ),
+          ),
+        ],
+      );
+    }
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(44, 8, 16, 8),
+          child: TextField(
+            decoration: InputDecoration(
+              hintText: l.freeSearch,
+              prefixIcon: const AppIcon(AppIcons.search),
+              filled: true,
+              fillColor: theme.colorScheme.surfaceContainerHighest,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppBrand.radiusCard),
+                borderSide: BorderSide(color: theme.colorScheme.outline),
+              ),
+            ),
+            onChanged: (value) => setState(() => _query = value),
+          ),
+        ),
+        Expanded(
+          child: filtered.isEmpty
+              ? const Center(child: FreeClientEmptyState())
+              : ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(44, 0, 16, 0),
+                  itemCount: filtered.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (context, i) {
+                    final index = filtered[i];
+                    final link = _imported[index];
+                    final selected = _selectedId == '$index';
+                    return ImportedProfileCard(
+                      name: link.name,
+                      scheme: link.scheme,
+                      endpoint: link.endpoint,
+                      selected: selected,
+                      connected: selected && connected,
+                      onDelete: () => _removeImported(index),
+                      onTap: () async {
+                        await Hy2ImportStore.instance.select(index);
+                        if (!mounted) return;
+                        setState(() => _selectedId = '$index');
+                        final status = ref.read(vpnProvider);
+                        if (status is VpnConnected || status is VpnConnecting) {
+                          await ref
+                              .read(vpnProvider.notifier)
+                              .connect(forceRestart: true);
+                        }
+                      },
+                    );
+                  },
+                ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
+          child: FreeClientActionBar(
+            onPaste: () => context.push('/import?clipboard=1'),
+            onScan: () => context.push('/scan'),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildBody(AppL10n l, ThemeData theme) {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
+    }
+    if (freeKeyClient) {
+      return _buildImported(theme);
     }
     if (_error != null) {
       return Center(
@@ -576,6 +807,33 @@ class _SignalBars extends StatelessWidget {
           ),
         );
       }),
+    );
+  }
+}
+
+class _ServerCountChip extends StatelessWidget {
+  const _ServerCountChip({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: dark ? AppBrand.surfaceVariantDark : AppBrand.surfaceElevatedLight,
+        borderRadius: BorderRadius.circular(AppBrand.radiusPill),
+        border: Border.all(color: theme.colorScheme.outline),
+      ),
+      child: Text(
+        '$count',
+        style: theme.textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.w800,
+          color: dark ? AppBrand.inkDark : AppBrand.inkLight,
+        ),
+      ),
     );
   }
 }

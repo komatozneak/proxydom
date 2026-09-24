@@ -140,8 +140,14 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
     final osnovnyeLabel = lang == 'en' ? 'Main' : 'Основные';
     final appsSection = lang == 'en' ? 'Apps' : 'Приложения';
 
+    final sheet = theme.brightness == Brightness.dark
+        ? AppBrand.surfaceDark
+        : AppBrand.surfaceElevatedLight;
     return Scaffold(
+      backgroundColor: sheet,
       appBar: AppBar(
+        backgroundColor: sheet,
+        surfaceTintColor: sheet,
         title: Text(l.settingsNoVpn),
         leading: IconButton(
           icon: const AppIcon(AppIcons.back),
@@ -192,9 +198,12 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
                               BorderRadius.circular(AppBrand.radiusNavPill),
                           border: Border.all(color: AppBrand.primary),
                         ),
-                        labelColor: AppBrand.primary,
-                        unselectedLabelColor:
-                            theme.colorScheme.onSurfaceVariant,
+                        labelColor: theme.brightness == Brightness.dark
+                            ? AppBrand.inkDark
+                            : AppBrand.inkLight,
+                        unselectedLabelColor: theme.brightness == Brightness.dark
+                            ? AppBrand.inkMutedDark
+                            : theme.colorScheme.onSurfaceVariant,
                         tabs: [
                           Tab(text: appsLabel),
                           Tab(text: sitesLabel),

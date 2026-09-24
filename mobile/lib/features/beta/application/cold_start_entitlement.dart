@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/config.dart';
 import '../../../core/diagnostics/app_log_buffer.dart';
+import '../../../core/ios_store_gates.dart';
 import '../../../core/router.dart';
 import '../../auth/application/auth_provider.dart';
 import '../../auth/application/auth_state.dart';
@@ -32,11 +33,15 @@ class ColdStartEntitlement {
   static Future<void> runOnce(WidgetRef ref, BuildContext context) async {
     if (_started) return;
     _started = true;
-    AppLogBuffer.instance.info('cold_start.entitlement begin');
+    if (freeKeyClient) {
+      AppLogBuffer.instance.debug('cold_start.entitlement skip free client');
+      return;
+    }
+    AppLogBuffer.instance.debug('cold_start.entitlement begin');
 
     final auth = ref.read(authProvider).valueOrNull;
     if (auth is! AuthStateAuthenticated) {
-      AppLogBuffer.instance.info('cold_start.entitlement skip unauthed');
+      AppLogBuffer.instance.debug('cold_start.entitlement skip unauthed');
       return;
     }
 
@@ -48,23 +53,17 @@ class ColdStartEntitlement {
         entitlement: entitlement,
         userId: userId,
       );
-      AppLogBuffer.instance.info('cold_start.entitlement dest=${dest.name}');
+      AppLogBuffer.instance.debug('cold_start.entitlement dest=${dest.name}');
       if (!context.mounted) return;
       switch (dest) {
         case PostAuthDestination.home:
-          // Already on Home (or shell). Keep postAuthResolved.
-          return;
         case PostAuthDestination.onboarding:
-          await AppRouter.goAfterEntitlement(context, '/onboarding');
         case PostAuthDestination.promo:
-          AppRouter.postAuthResolved = false;
-          context.go('/promo');
         case PostAuthDestination.locked:
-          AppRouter.postAuthResolved = false;
-          context.go('/locked');
+          return;
       }
     } on DioException catch (e) {
-      AppLogBuffer.instance.warn(
+      AppLogBuffer.instance.debug(
         'cold_start.entitlement fail type=${e.type.name} '
         'status=${e.response?.statusCode ?? '-'}',
       );
@@ -81,7 +80,7 @@ class ColdStartEntitlement {
       }
       // Transient network: stay on Home; excludeRoute / LTE will retry later.
     } catch (e) {
-      AppLogBuffer.instance.warn('cold_start.entitlement fail err=$e');
+      AppLogBuffer.instance.debug('cold_start.entitlement fail err=$e');
     }
   }
 }

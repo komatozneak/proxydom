@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/ios_store_gates.dart';
+
 /// In-app auto-reconnect after unexpected VPN drop (revoked / error).
 ///
 /// Distinct from Android system Always-on VPN / lockdown (Kill switch).
@@ -9,9 +11,12 @@ class AutoReconnectPrefs {
 
   static const _key = 'auto_reconnect_enabled';
 
-  /// Android: default ON. iOS: always on — Packet Tunnel /
-  /// `sessionActive` is the source of truth, not this pref.
+  /// Account client: default ON. Imported-profile clients delegate recovery to
+  /// their native VPN session engine.
   static Future<bool> isEnabled() async {
+    // Imported-profile clients let the native session engine own recovery.
+    // A second Flutter reconnect races native dead-tunnel restore.
+    if (freeKeyClient) return false;
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
       return true;
     }

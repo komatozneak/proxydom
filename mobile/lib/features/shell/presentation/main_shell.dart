@@ -1,13 +1,16 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/busy/busy_overlay.dart';
 import '../../../core/busy/busy_overlay_host.dart';
+import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
+import '../../../core/widgets/notebook_paper.dart';
 import '../../../core/widgets/teremok_nav_icon.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../beta/application/cold_start_entitlement.dart';
@@ -65,53 +68,125 @@ class _MainShellState extends ConsumerState<MainShell> {
     final selected = widget.navigationShell.currentIndex;
     final elevated = theme.colorScheme.surfaceContainerHighest;
     final line = theme.colorScheme.outline;
-
+    final paper = theme.brightness == Brightness.dark
+        ? AppBrand.paperDark
+        : AppBrand.paperLight;
+    final bar = SafeArea(
+      top: false,
+      child: SizedBox(
+        height: 76,
+        child: Row(
+          children: [
+            Expanded(
+              child: _SideNavGlyph(
+                icon: AppIcons.mapPin,
+                label: freeKeyClient
+                    ? (Localizations.localeOf(context).languageCode == 'ru'
+                        ? 'Сервера'
+                        : 'Servers')
+                    : l.navLocations,
+                selected: selected == MainShell.locationsIndex,
+                onTap: () => _onTap(MainShell.locationsIndex),
+              ),
+            ),
+            Expanded(
+              child: _CenterNavMark(
+                selected: selected == MainShell.homeIndex,
+                semanticLabel: l.navVpn,
+                onTap: () => _onTap(MainShell.homeIndex),
+              ),
+            ),
+            Expanded(
+              child: _SideNavGlyph(
+                icon: AppIcons.settings,
+                label: l.navSettings,
+                selected: selected == MainShell.settingsIndex,
+                onTap: () => _onTap(MainShell.settingsIndex),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
     return Stack(
       children: [
         Scaffold(
-          body: widget.navigationShell,
-          bottomNavigationBar: DecoratedBox(
-            decoration: BoxDecoration(
-              color: elevated,
-              border: Border(top: BorderSide(color: line)),
-            ),
-            child: SafeArea(
-              top: false,
-              child: SizedBox(
-                height: 76,
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: _SideNavGlyph(
-                        icon: AppIcons.mapPin,
-                        label: l.navLocations,
-                        selected: selected == MainShell.locationsIndex,
-                        onTap: () => _onTap(MainShell.locationsIndex),
+          backgroundColor: freeKeyClient ? paper : theme.colorScheme.surface,
+          body: freeKeyClient
+              ? _PaperStatusScrim(
+                  paper: paper,
+                  dark: theme.brightness == Brightness.dark,
+                  child: NotebookPaper(child: widget.navigationShell),
+                )
+              : widget.navigationShell,
+          bottomNavigationBar: freeKeyClient
+              ? NotebookPaper(
+                  emphasized: true,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      border: Border(
+                        top: BorderSide(
+                          color: AppBrand.paperMargin.withValues(alpha: 0.72),
+                          width: 2.5,
+                        ),
                       ),
                     ),
-                    Expanded(
-                      child: _CenterNavMark(
-                        selected: selected == MainShell.homeIndex,
-                        semanticLabel: l.navVpn,
-                        onTap: () => _onTap(MainShell.homeIndex),
-                      ),
-                    ),
-                    Expanded(
-                      child: _SideNavGlyph(
-                        icon: AppIcons.settings,
-                        label: l.navSettings,
-                        selected: selected == MainShell.settingsIndex,
-                        onTap: () => _onTap(MainShell.settingsIndex),
-                      ),
-                    ),
-                  ],
+                    child: bar,
+                  ),
+                )
+              : DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: elevated,
+                    border: Border(top: BorderSide(color: line)),
+                  ),
+                  child: bar,
                 ),
-              ),
-            ),
-          ),
         ),
         const BusyOverlayHost(),
       ],
+    );
+  }
+}
+
+/// Darker band behind the system status icons so they do not melt into the sheet.
+class _PaperStatusScrim extends StatelessWidget {
+  const _PaperStatusScrim({
+    required this.paper,
+    required this.dark,
+    required this.child,
+  });
+
+  final Color paper;
+  final bool dark;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final top = MediaQuery.paddingOf(context).top;
+    // Same honey as the mid ring behind the house, not a dark slab.
+    final scrim = Color.alphaBlend(
+      AppBrand.flame.withValues(alpha: dark ? 0.22 : 0.16),
+      paper,
+    );
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: dark ? Brightness.light : Brightness.dark,
+        statusBarBrightness: dark ? Brightness.dark : Brightness.light,
+      ),
+      child: Stack(
+        children: [
+          child,
+          if (top > 0)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: top,
+              child: ColoredBox(color: scrim),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -132,9 +207,9 @@ class _SideNavGlyph extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final color = selected
-        ? theme.colorScheme.onSurface
-        : theme.colorScheme.onSurfaceVariant;
+    final dark = theme.brightness == Brightness.dark;
+    final ink = dark ? AppBrand.inkDark : AppBrand.inkLight;
+    final chip = dark ? AppBrand.surfaceVariantDark : AppBrand.surfaceElevatedLight;
 
     return InkWell(
       onTap: onTap,
@@ -146,10 +221,16 @@ class _SideNavGlyph extends StatelessWidget {
             duration: const Duration(milliseconds: 180),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: selected ? AppBrand.inkWithOpacity(0.08) : null,
+              color: chip,
               borderRadius: BorderRadius.circular(AppBrand.radiusNavPill),
+              border: Border.all(
+                color: selected
+                    ? AppBrand.paperMargin
+                    : theme.colorScheme.outline,
+                width: selected ? 1.6 : 1,
+              ),
             ),
-            child: AppIcon(icon, size: 18, color: color),
+            child: AppIcon(icon, size: 18, color: ink),
           ),
           const SizedBox(height: 2),
           Text(
@@ -157,9 +238,9 @@ class _SideNavGlyph extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: theme.textTheme.labelSmall?.copyWith(
-              color: color,
+              color: ink,
               fontSize: 10,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
@@ -181,6 +262,7 @@ class _CenterNavMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return InkWell(
       onTap: onTap,
       customBorder: const CircleBorder(),
@@ -189,7 +271,18 @@ class _CenterNavMark extends StatelessWidget {
         selected: selected,
         label: semanticLabel,
         child: Center(
-          child: TeremokNavIcon(selected: selected, size: 52),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: selected
+                    ? AppBrand.paperMargin
+                    : theme.colorScheme.outline,
+                width: selected ? 1.6 : 1,
+              ),
+            ),
+            child: TeremokNavIcon(selected: selected, size: 52),
+          ),
         ),
       ),
     );

@@ -204,6 +204,33 @@ class VpnController {
     }
   }
 
+  /// Start in-process Xray (same gomobile runtime as Hy2). [configJson] has
+  /// secrets; it is not logged.
+  Future<bool> startXray(
+    String configJson, {
+    String? displayLabel,
+  }) async {
+    try {
+      final paramsJson = jsonEncode({
+        'schemaVersion': 2,
+        'vpnCore': 'xray',
+        'sessionName': kVpnBrandSessionName,
+        'displayLabel': (displayLabel?.trim().isNotEmpty == true)
+            ? displayLabel!.trim()
+            : kVpnBrandSessionName,
+        'outboundType': 'xray',
+        'xrayConfig': configJson,
+      });
+      final result = await _methodChannel.invokeMethod<bool>(
+        'start',
+        {'paramsJson': paramsJson},
+      );
+      return result ?? false;
+    } on PlatformException catch (e) {
+      throw VpnControllerException('xray start failed: ${e.code}');
+    }
+  }
+
   Future<bool> stop({String reason = 'user_tap'}) async {
     try {
       final result = await _methodChannel.invokeMethod<bool>(
@@ -363,6 +390,19 @@ class VpnController {
   Future<bool> openVpnSettings() async {
     try {
       final result = await _methodChannel.invokeMethod<bool>('openVpnSettings');
+      return result ?? false;
+    } on PlatformException {
+      return false;
+    } on MissingPluginException {
+      return false;
+    }
+  }
+
+  /// Opens the system battery exemption screen. Does not promise the grant.
+  Future<bool> requestBatteryExemption() async {
+    try {
+      final result =
+          await _methodChannel.invokeMethod<bool>('requestBatteryExemption');
       return result ?? false;
     } on PlatformException {
       return false;

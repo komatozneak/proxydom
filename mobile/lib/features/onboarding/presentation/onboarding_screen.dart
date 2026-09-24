@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/ios_store_gates.dart';
 import '../../../core/router.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
@@ -55,7 +56,27 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     super.dispose();
   }
 
-  List<_OnboardingCard> _cards(AppL10n l) => [
+  List<_OnboardingCard> _cards(AppL10n l) {
+    if (freeKeyClient) {
+      return [
+        _OnboardingCard(
+          icon: AppIcons.shield,
+          title: l.freeOnboardTitle,
+          body: l.freeOnboardBody,
+        ),
+        _OnboardingCard(
+          icon: AppIcons.clipboard,
+          title: l.freeOnboardAddTitle,
+          body: l.freeOnboardAddBody,
+        ),
+        _OnboardingCard(
+          icon: AppIcons.power,
+          title: l.freeOnboardConnectTitle,
+          body: l.freeOnboardConnectBody,
+        ),
+      ];
+    }
+    return [
         _OnboardingCard(
           icon: AppIcons.power,
           title: l.onboardingConnectTitle,
@@ -67,8 +88,15 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           body: l.onboardingRegionBody,
         ),
       ];
+  }
 
-  Future<void> _finish() async {
+  Future<void> _finish({bool openImport = false}) async {
+    if (freeKeyClient) {
+      await OnboardingPrefs.markWelcomeSeen();
+      AppRouter.welcomeSeenCache = true;
+      if (mounted) context.go(openImport ? '/import' : '/home');
+      return;
+    }
     final auth = ref.read(authProvider).valueOrNull;
     final userId = auth is AuthStateAuthenticated
         ? (jwtSubject(auth.accessToken) ?? 'unknown')
@@ -172,16 +200,29 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             ),
             const SizedBox(height: 20),
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-              child: FilledButton(
-                onPressed: () => _next(cards.length),
-                child: Text(
-                  _index >= cards.length - 1
-                      ? l.onboardingDone
-                      : l.onboardingNext,
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => freeKeyClient && _index >= cards.length - 1
+                      ? _finish(openImport: true)
+                      : _next(cards.length),
+                  child: Text(
+                    freeKeyClient && _index >= cards.length - 1
+                        ? l.freeAddServer
+                        : (_index >= cards.length - 1
+                            ? l.onboardingDone
+                            : l.onboardingNext),
+                  ),
                 ),
               ),
             ),
+            if (freeKeyClient && _index >= cards.length - 1)
+              TextButton(
+                onPressed: _finish,
+                child: Text(l.freeLater),
+              ),
+            const SizedBox(height: 12),
           ],
         ),
       ),

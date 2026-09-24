@@ -38,7 +38,7 @@ class ApiDiscovery {
         return origin;
       }
     }
-    AppLogBuffer.instance.warn(
+    AppLogBuffer.instance.debug(
       'api.discovery: no healthy host among ${_hosts.length}',
     );
     return null;
@@ -53,7 +53,7 @@ class ApiDiscovery {
     final active = prefs.getString(_prefsOriginKey);
     if (active != null && active.isNotEmpty) {
       ApiClient.setBaseOrigin(active);
-      AppLogBuffer.instance.info('api.discovery cached_origin=$active');
+      AppLogBuffer.instance.debug('api.discovery cached_origin=$active');
     }
   }
 
@@ -72,7 +72,7 @@ class ApiDiscovery {
         final resp = await dio.get<Map<String, dynamic>>(
           '$origin/v2/app/resources',
         );
-        AppLogBuffer.instance.info(
+        AppLogBuffer.instance.debug(
           'api.discovery resources origin=$origin ms=${sw.elapsedMilliseconds} '
           'status=${resp.statusCode}',
         );
@@ -93,7 +93,7 @@ class ApiDiscovery {
           }
         }
       } catch (e) {
-        AppLogBuffer.instance.info(
+        AppLogBuffer.instance.debug(
           'api.discovery resources origin=$origin '
           'ms=${sw.elapsedMilliseconds} fail',
         );
@@ -115,7 +115,7 @@ class ApiDiscovery {
     try {
       final resp = await dio.get('$origin/healthz');
       final ok = resp.statusCode == 200;
-      AppLogBuffer.instance.info(
+      AppLogBuffer.instance.debug(
         'api.discovery healthz origin=$origin '
         'ms=${sw.elapsedMilliseconds} ok=$ok',
       );
@@ -124,13 +124,13 @@ class ApiDiscovery {
       try {
         final resp = await dio.get('$origin/health');
         final ok = resp.statusCode == 200;
-        AppLogBuffer.instance.info(
+        AppLogBuffer.instance.debug(
           'api.discovery health origin=$origin '
           'ms=${sw.elapsedMilliseconds} ok=$ok',
         );
         return ok;
       } catch (_) {
-        AppLogBuffer.instance.info(
+        AppLogBuffer.instance.debug(
           'api.discovery health origin=$origin '
           'ms=${sw.elapsedMilliseconds} ok=false',
         );
@@ -143,7 +143,7 @@ class ApiDiscovery {
     ApiClient.setBaseOrigin(origin);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_prefsOriginKey, origin);
-    AppLogBuffer.instance.info('api.discovery: active=$origin');
+    AppLogBuffer.instance.debug('api.discovery: active=$origin');
     debugPrint('api.discovery: active=$origin');
   }
 

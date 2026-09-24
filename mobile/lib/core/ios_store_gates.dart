@@ -1,13 +1,26 @@
 import 'package:flutter/foundation.dart';
 
-/// App Store iOS must not surface Platega hosted checkout (guideline 3.1.1).
-/// Android keeps ADR 017 Platega. See [docs/ops/ios-iap-parked.md].
+/// Store clients are local key importers (ADR 026). Web stays on the account
+/// shell. Uses [defaultTargetPlatform] so widget tests can override with
+/// [debugDefaultTargetPlatformOverride].
+bool get freeKeyClient {
+  if (kIsWeb) return false;
+  return defaultTargetPlatform == TargetPlatform.android ||
+      defaultTargetPlatform == TargetPlatform.iOS;
+}
+
+/// App Store and Play binaries must not surface Platega hosted checkout.
+/// See [docs/ops/ios-iap-parked.md] and ADR 026.
 ///
 /// Uses [defaultTargetPlatform] so widget tests can override with
 /// [debugDefaultTargetPlatformOverride].
-bool get hideInAppPlategaCheckout {
+bool get hideInAppPlategaCheckout => freeKeyClient;
+
+/// Android VpnService can exclude apps. Independent of the cashier hide:
+/// the free client still needs «what works without VPN».
+bool get androidPerAppSplit {
   if (kIsWeb) return false;
-  return defaultTargetPlatform == TargetPlatform.iOS;
+  return defaultTargetPlatform == TargetPlatform.android;
 }
 
 /// Per-app split (VpnService.Builder) is Android-only; iOS consumer VPN has no
@@ -18,8 +31,24 @@ bool get iosAppsSplitUnsupported {
   return defaultTargetPlatform == TargetPlatform.iOS;
 }
 
-/// `teremokconnect://ref` landing. iOS has no in-app promo cashier.
+/// `teremokconnect://ref` landing. Free clients ignore the link.
 String get referralLandingPath {
-  if (hideInAppPlategaCheckout) return '/settings/account';
+  if (freeKeyClient) return '/home';
   return '/settings/account/promo';
+}
+
+/// Routes that would show a paid catalog or an account join.
+bool iosFreeClientRouteBlocked(String location) {
+  if (!freeKeyClient) return false;
+  if (location == '/subscription' ||
+      location == '/premium' ||
+      location == '/locked' ||
+      location == '/promo' ||
+      location == '/restore' ||
+      location == '/recovery') {
+    return true;
+  }
+  if (location.startsWith('/settings/devices')) return true;
+  if (location.startsWith('/settings/account')) return true;
+  return false;
 }

@@ -37,6 +37,9 @@ String sessionProtocolLabel({
   if (config?.xrayProfile?.candidates.isNotEmpty == true) {
     return friendlyProtocolLabel(config!.primaryCandidate.protocol);
   }
+  if (selected.isNotEmpty) {
+    return friendlyProtocolLabel(selected);
+  }
   return friendlyProtocolLabel('vless');
 }
 

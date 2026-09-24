@@ -8,27 +8,32 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/busy/busy_overlay.dart';
 import '../../../core/ios_store_gates.dart';
-import '../../../core/utils/format_utils.dart';
 import '../../../core/theme.dart';
+import '../../../core/utils/format_utils.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/connect_button.dart';
+import '../../../core/widgets/house_pulsar.dart';
 import '../../../core/widgets/signal_nest_hero.dart';
 import '../../../core/widgets/teremok_snackbar.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../account/application/ios_account_nav.dart';
 import '../../session/application/session_provider.dart';
 import '../../session/data/account_session_snapshot.dart';
 import '../../settings/application/subscription_status_provider.dart';
 import '../../settings/data/installed_apps_channel.dart';
 import '../../settings/data/split_tunnel_prefs.dart';
 import '../../settings/data/subscription_status.dart';
+import '../../vpn/application/imported_profiles_provider.dart';
+import '../../vpn/data/hy2_import_store.dart';
+import '../../vpn/data/vpn_service_config.dart';
 import '../../vpn/data/node_auto_selector.dart';
 import '../../vpn/data/node_display.dart';
 import '../../vpn/data/vpn_controller.dart';
 import '../../vpn/data/vpn_node.dart';
 import '../../vpn/domain/vpn_connect_error.dart';
+import '../../vpn/presentation/free_client_chrome.dart';
 import '../../vpn/presentation/vpn_disclosure_dialog.dart';
 import '../../vpn/presentation/vpn_platform_copy.dart';
+import '../data/battery_prompt_prefs.dart';
 import '../application/vpn_provider.dart';
 import '../application/vpn_status.dart';
 import 'widgets/free_quota_bar.dart';
@@ -51,6 +56,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     with WidgetsBindingObserver {
   String _serverTitle = '…';
   String _serverSubtitle = '';
+  String? _importedScheme;
   String _serverFlag = kFlagGlobe;
   bool _selectionIsAuto = true;
   List<String> _autoPoolFlags = const [kFlagGlobe];
@@ -87,25 +93,63 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     }
   }
 
+  Future<void> _maybeAskBattery() async {
+    if (!freeKeyClient) return;
+    if (defaultTargetPlatform != TargetPlatform.android) return;
+    if (await BatteryPromptPrefs.isDismissed()) return;
+    if (!mounted) return;
+    final l = AppL10n.of(context);
+    final allow = await showModalBottomSheet<bool>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                l.freeBatteryTitle,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(l.freeBatteryBody),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: Text(l.freeBatteryAllow),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(l.freeBatteryDismiss),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    if (!mounted || allow == null) return;
+    await BatteryPromptPrefs.dismiss();
+    if (allow) {
+      await VpnController.instance.requestBatteryExemption();
+    }
+  }
+
   Future<void> _refreshEntitlement() async {
+    if (freeKeyClient) return;
     await ref.read(sessionProvider.notifier).refresh();
     await ref.read(subscriptionStatusProvider.notifier).refresh();
   }
 
   Future<void> _openSubscription() async {
     if (_openingSubscription || !mounted) return;
-    if (hideInAppPlategaCheckout) {
-      await openIosPremiumAccountPath(context, ref);
-      return;
-    }
-    // Imperative /subscription can leave matchedLocation on /home; rely on
-    // route currency so a second tap does not push a duplicate page key.
-    final route = ModalRoute.of(context);
-    if (route != null && !route.isCurrent) return;
-    if (GoRouterState.of(context).uri.path == '/subscription') return;
     _openingSubscription = true;
     try {
-      await context.push('/subscription');
+      await context.push('/import');
     } finally {
       if (mounted) _openingSubscription = false;
     }
@@ -161,6 +205,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Future<void> _refreshServerCardBody() async {
+    if (freeKeyClient) {
+      final selected = await Hy2ImportStore.instance.selected();
+      if (!mounted) return;
+      final ru = Localizations.localeOf(context).languageCode == 'ru';
+      setState(() {
+        _selectionIsAuto = false;
+        _autoPoolFlags = const [];
+        _placeStickyKey = selected?.name ?? 'import:empty';
+        if (selected == null) {
+          _serverTitle = ru ? 'Нет ссылки' : 'No link';
+          _serverSubtitle = ru ? 'Вставьте ключ' : 'Paste a key';
+          _importedScheme = null;
+          _serverFlag = kFlagGlobe;
+        } else {
+          _serverTitle = selected.name;
+          _serverSubtitle = selected.endpoint;
+          _importedScheme = selected.scheme;
+          _serverFlag = kFlagGlobe;
+        }
+      });
+      return;
+    }
     final l = AppL10n.of(context);
     final locale = Localizations.localeOf(context).languageCode;
     try {
@@ -364,6 +430,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     }
 
     if (status is VpnDisconnected || status is VpnError) {
+      if (freeKeyClient && _importedScheme == null) {
+        context.push('/import');
+        return;
+      }
       final allowed = await VpnDisclosureDialog.ensureAccepted(context);
       if (!allowed || !mounted) return;
       await notifier.connect();
@@ -381,7 +451,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final theme = Theme.of(context);
     final vpnStatus = ref.watch(vpnProvider);
 
+    if (freeKeyClient) {
+      ref.listen(importedProfilesProvider, (previous, next) {
+        if (next.valueOrNull == null) return;
+        unawaited(_refreshServerCard());
+      });
+    }
+
     ref.listen(vpnProvider, (prev, next) {
+      if (prev is! VpnConnected && next is VpnConnected) {
+        unawaited(_maybeAskBattery());
+      }
       if (prev is VpnConnected &&
           next is VpnConnected &&
           prev.serverName == next.serverName &&
@@ -392,7 +472,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     });
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
+      backgroundColor:
+          freeKeyClient ? Colors.transparent : theme.colorScheme.surface,
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -409,6 +490,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                         ? l.regionAutoSubtitle
                         : l.homeStatServer)
                     : _serverSubtitle,
+                importedScheme: _importedScheme,
                 serverFlag: _serverFlag,
                 selectionIsAuto: _selectionIsAuto,
                 autoPoolFlags: _autoPoolFlags,
@@ -437,6 +519,7 @@ class _DashboardBody extends ConsumerStatefulWidget {
     required this.maxHeight,
     required this.serverTitle,
     required this.serverSubtitle,
+    this.importedScheme,
     required this.serverFlag,
     required this.selectionIsAuto,
     required this.autoPoolFlags,
@@ -453,6 +536,7 @@ class _DashboardBody extends ConsumerStatefulWidget {
   final double maxHeight;
   final String serverTitle;
   final String serverSubtitle;
+  final String? importedScheme;
   final String serverFlag;
   final bool selectionIsAuto;
   final List<String> autoPoolFlags;
@@ -470,6 +554,22 @@ class _DashboardBody extends ConsumerStatefulWidget {
 
 class _DashboardBodyState extends ConsumerState<_DashboardBody> {
   String? _warmingHost;
+  Timer? _uptimeTick;
+
+  @override
+  void initState() {
+    super.initState();
+    _uptimeTick = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted || widget.status is! VpnConnected) return;
+      setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _uptimeTick?.cancel();
+    super.dispose();
+  }
 
   /// Last Free meter so a background refresh does not unmount the bar.
   SubscriptionStatus? _stickyMeteredQuota;
@@ -570,17 +670,16 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
       VpnError(:final code) when code == 'device_limit_reached' =>
         l.settingsDevicesHint,
       VpnError(:final code) when code == 'quota_exceeded' =>
-        hideInAppPlategaCheckout
-            ? l.iosBillingUnavailableBody
-            : l.homeQuotaExceededHint,
+        l.iosBillingUnavailableBody,
       VpnError(:final code) when code == kVpnPathIncompatibleErrorCode =>
         l.homePathIncompatibleHint,
       VpnError() => l.homeErrorFriendly,
     };
     final showVpnSettingsCta =
         status is VpnError && status.code == kVpnConflictErrorCode;
-    final showDevicesCta =
-        status is VpnError && status.code == 'device_limit_reached';
+    final showDevicesCta = !hideInAppPlategaCheckout &&
+        status is VpnError &&
+        status.code == 'device_limit_reached';
     final showQuotaCta = status is VpnError && status.code == 'quota_exceeded';
     final liveQuota = ref.watch(subscriptionStatusProvider).asData?.value;
     if (liveQuota != null) {
@@ -592,10 +691,33 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
     final russian = Localizations.localeOf(context).languageCode == 'ru';
     const gib = 1024.0 * 1024.0 * 1024.0;
 
-    final nestSize = math.min(
-      320.0,
-      math.min(size.width * 0.78, widget.maxHeight * 0.46),
-    );
+    final nestSize = freeKeyClient
+        ? math.min(
+            340.0,
+            math.min(
+              size.width * 0.88,
+              math.max(200.0, widget.maxHeight - 340),
+            ),
+          )
+        : math.min(
+            320.0,
+            math.min(size.width * 0.78, widget.maxHeight * 0.46),
+          );
+
+    if (freeKeyClient) {
+      return _FreeClientHome(
+        nestSize: nestSize,
+        treeState: treeState,
+        status: status,
+        serverTitle: widget.serverTitle,
+        importedScheme: widget.importedScheme,
+        onNestTap: widget.onNestTap,
+        showVpnSettingsCta: showVpnSettingsCta,
+        noVpnEnabled: widget.noVpnEnabled,
+        noVpnTotal: widget.noVpnTotal,
+        onOpenNoVpn: widget.onOpenNoVpn,
+      );
+    }
 
     return Column(
       children: [
@@ -615,12 +737,8 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
               ),
             ),
             exhaustedLabel: l.homeTrafficExhausted,
-            teaser: hideInAppPlategaCheckout
-                ? null
-                : l.homeQuotaUnlimitedTeaser,
-            ctaLabel: hideInAppPlategaCheckout
-                ? null
-                : l.homeQuotaUnlimitedCta,
+            teaser: null,
+            ctaLabel: null,
             onTap: widget.onOpenSubscription,
           ),
           const SizedBox(height: 8),
@@ -692,17 +810,26 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
         if (showQuotaCta) ...[
           const SizedBox(height: 12),
           FilledButton.tonal(
-            onPressed: hideInAppPlategaCheckout
-                ? () => openIosPremiumAccountPath(context, ref)
-                : () => context.push('/locked'),
+            onPressed: () => context.push('/import'),
             child: Text(
-              hideInAppPlategaCheckout
-                  ? l.accountHubTitle
-                  : l.homeQuotaUpgradeCta,
+              Localizations.localeOf(context).languageCode == 'ru'
+                  ? 'Вставить ссылку'
+                  : 'Paste link',
             ),
           ),
         ],
         const SizedBox(height: 16),
+        if (hideInAppPlategaCheckout) ...[
+          FilledButton.tonal(
+            onPressed: () => context.push('/import'),
+            child: Text(
+              Localizations.localeOf(context).languageCode == 'ru'
+                  ? 'Вставить ссылку'
+                  : 'Paste link',
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
         if (!hideInAppPlategaCheckout) ...[
           _NoVpnHomeRow(
             label: l.homeNoVpnRow,
@@ -722,6 +849,159 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
         ),
       ],
     );
+  }
+}
+
+class _FreeClientHome extends StatelessWidget {
+  const _FreeClientHome({
+    required this.nestSize,
+    required this.treeState,
+    required this.status,
+    required this.serverTitle,
+    this.importedScheme,
+    required this.onNestTap,
+    required this.showVpnSettingsCta,
+    required this.noVpnEnabled,
+    required this.noVpnTotal,
+    required this.onOpenNoVpn,
+  });
+
+  final double nestSize;
+  final TreeState treeState;
+  final VpnStatus status;
+  final String serverTitle;
+  final String? importedScheme;
+  final Future<void> Function() onNestTap;
+  final bool showVpnSettingsCta;
+  final int noVpnEnabled;
+  final int noVpnTotal;
+  final VoidCallback onOpenNoVpn;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppL10n.of(context);
+    final empty = serverTitle == '…' ||
+        serverTitle == 'Нет ссылки' ||
+        serverTitle == 'No link';
+    final current = status;
+    final String protocol;
+    final String? uptime;
+    if (current is VpnConnected) {
+      protocol = current.protocol;
+      uptime = _formatUptime(current.connectedSince);
+    } else {
+      final scheme = importedScheme;
+      protocol = scheme == null || scheme.isEmpty
+          ? '—'
+          : friendlyProtocolLabel(scheme);
+      uptime = null;
+    }
+    final profile = empty ? l.freeNoProfile : serverTitle;
+    final statusText = status is VpnConnecting
+        ? l.homeConnecting
+        : empty
+            ? l.homeDisconnected
+            : status is VpnError
+                ? l.homeError
+                : status is VpnConnected
+                    ? l.homeConnected
+                    : l.homeDisconnected;
+
+    final accent = status is VpnConnected
+        ? AppBrand.success
+        : status is VpnConnecting
+            ? AppBrand.warning
+            : AppBrand.destructive;
+
+    return Column(
+      children: [
+        ConnectionStatusPanel(
+          status: statusText,
+          profile: profile,
+          protocol: protocol,
+          uptime: uptime,
+          accent: accent,
+        ),
+        Expanded(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (_showsEmptyHint) ...[
+                const SizedBox(
+                  height: 96,
+                  width: double.infinity,
+                  child: Center(child: FreeClientEmptyState(compact: true)),
+                ),
+                const SizedBox(height: 8),
+              ],
+              SizedBox(
+                width: nestSize,
+                height: nestSize,
+                child: Stack(
+                  alignment: Alignment.center,
+                  clipBehavior: Clip.none,
+                  children: [
+                    if (status is VpnConnecting || status is VpnConnected)
+                      HousePulsar(diameter: nestSize),
+                    SignalNestHero(
+                      key: kHomeSignalNestKey,
+                      state: treeState,
+                      onTap: () => onNestTap(),
+                      size: nestSize,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (showVpnSettingsCta) ...[
+          const SizedBox(height: 12),
+          FilledButton.tonal(
+            onPressed: () async {
+              final opened = await VpnController.instance.openVpnSettings();
+              if (!context.mounted) return;
+              if (!opened) {
+                showTeremokSnackBar(
+                  context,
+                  settingsKillSwitchOpenFailedForPlatform(l),
+                );
+              }
+            },
+            child: Text(l.settingsKillSwitchOpenVpn),
+          ),
+        ],
+        if (status is VpnConnected && androidPerAppSplit) ...[
+          const SizedBox(height: 8),
+          _NoVpnHomeRow(
+            label: l.homeNoVpnRow,
+            enabled: noVpnEnabled,
+            total: noVpnTotal,
+            onTap: onOpenNoVpn,
+          ),
+        ],
+        const SizedBox(height: 12),
+        FreeClientActionBar(
+          onPaste: () => context.push('/import?clipboard=1'),
+          onScan: () => context.push('/scan'),
+        ),
+      ],
+    );
+  }
+
+  bool get _showsEmptyHint {
+    final noProfile = serverTitle == '…' ||
+        serverTitle == 'Нет ссылки' ||
+        serverTitle == 'No link';
+    return noProfile && status is! VpnConnecting && status is! VpnConnected;
+  }
+
+  String _formatUptime(DateTime since) {
+    final d = DateTime.now().difference(since);
+    final h = d.inHours.toString().padLeft(2, '0');
+    final m = (d.inMinutes % 60).toString().padLeft(2, '0');
+    final s = (d.inSeconds % 60).toString().padLeft(2, '0');
+    return '$h:$m:$s';
   }
 }
 
@@ -832,7 +1112,9 @@ class _NoVpnHomeRow extends StatelessWidget {
                   Text(
                     '$enabled / $total',
                     style: theme.textTheme.labelLarge?.copyWith(
-                      color: AppBrand.primary,
+                      color: theme.brightness == Brightness.dark
+                          ? AppBrand.inkDark
+                          : AppBrand.inkLight,
                       fontWeight: FontWeight.w700,
                     ),
                   ),

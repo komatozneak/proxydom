@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/config.dart';
 import '../../../core/diagnostics/app_log_buffer.dart';
+import '../../../core/ios_store_gates.dart';
 import '../../../core/router.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/teremok_snackbar.dart';
@@ -71,6 +72,12 @@ class _PostAuthGateScreenState extends ConsumerState<PostAuthGateScreen> {
   Future<void> _resolve({bool stopOwnVpnFirst = false}) async {
     if (_resolving) return;
     _resolving = true;
+    if (freeKeyClient) {
+      if (!mounted) return;
+      await AppRouter.goAfterEntitlement(context, '/home');
+      _resolving = false;
+      return;
+    }
     AppLogBuffer.instance.info(
       'gate.resolve start stopOwnVpnFirst=$stopOwnVpnFirst',
     );
@@ -128,13 +135,8 @@ class _PostAuthGateScreenState extends ConsumerState<PostAuthGateScreen> {
           AppLogBuffer.instance.info('gate.dest=${dest.name}');
           switch (dest) {
             case PostAuthDestination.promo:
-              AppRouter.postAuthResolved = false;
-              context.go('/promo');
             case PostAuthDestination.locked:
-              AppRouter.postAuthResolved = false;
-              context.go('/locked');
             case PostAuthDestination.onboarding:
-              await AppRouter.goAfterEntitlement(context, '/onboarding');
             case PostAuthDestination.home:
               await AppRouter.goAfterEntitlement(context, '/home');
           }

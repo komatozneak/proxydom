@@ -10,11 +10,14 @@ import '../../../core/app_locale.dart';
 import '../../../core/diagnostics/app_log_buffer.dart';
 import '../../../core/diagnostics/egress_verify.dart';
 import '../../../core/diagnostics/product_log.dart';
+import '../../../core/ios_store_gates.dart';
 import '../../../core/jwt_interceptor.dart';
 import '../../../core/retry_policy.dart';
 import '../../auth/application/auth_provider.dart';
 import '../../auth/application/auth_state.dart';
 import '../../beta/application/beta_usage_tracker.dart';
+import '../../vpn/data/hy2_import_store.dart';
+import '../../vpn/data/xray_share_config.dart';
 import '../../vpn/data/node_auto_selector.dart';
 import '../../vpn/data/node_display.dart';
 import '../../vpn/data/vpn_config.dart';
@@ -30,6 +33,7 @@ import '../../settings/application/subscription_status_provider.dart';
 import '../../settings/data/auto_reconnect_prefs.dart';
 import '../data/external_ip_service.dart';
 import 'vpn_status.dart';
+import 'vpn_status_log.dart';
 
 /// Singleton-репозиторий для VPN-конфига.
 final vpnConfigRepositoryProvider = Provider<VpnConfigRepository>(
@@ -91,6 +95,9 @@ class VpnNotifier extends Notifier<VpnStatus> {
 
   /// Label from catalog after Auto/manual pick (overrides generic host fallback).
   String? _displayLabel;
+  String? _profileHost;
+  bool _freeSessionOpen = false;
+  String? _freeSessionKey;
 
   /// Protocol of the catalog node chosen at fetchConfig / selectNode time
   /// (`kVpnNodeProtocolTrusttunnel` → start TrustTunnel core, ADR 006).
@@ -211,6 +218,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
   Timer? _connectingPoll;
   Timer? _disconnectWatchdog;
   Future<void>? _syncInFlight;
+  final NativeStatusLog _nativeStatusLog = NativeStatusLog();
   DateTime? _connectingUiStartedAt;
 
   /// Cold-start getStatus loop finished — ignore idle demotion until then.
@@ -261,7 +269,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
   /// churn / hung `stop` / missed EventChannel).
   Future<void> reconcileWithNative() async {
     final native = await VpnController.instance.getStatus();
-    _vpnLog('[VPN] reconcileWithNative native=$native ui=$state');
+    final before = vpnUiPhase(state);
     switch (native) {
       case VpnNativeStatus.connected:
         if (state is VpnConnected) return;
@@ -271,18 +279,22 @@ class VpnNotifier extends Notifier<VpnStatus> {
         )) {
           return;
         }
-        try {
-          _config ??= await fetchConfig();
-        } catch (e) {
-          _vpnLog('[VPN] reconcile fetchConfig soft-fail: $e');
+        if (!freeKeyClient) {
+          try {
+            _config ??= await fetchConfig();
+          } catch (e) {
+            _vpnLog('[VPN] reconcile fetchConfig soft-fail: $e');
+          }
         }
         await _enterConnected(freshSession: state is VpnConnecting);
+        _logReconcile(native, before);
       case VpnNativeStatus.connecting:
       case VpnNativeStatus.preparing:
         if (_sessionOwnsUi) return;
         if (state is VpnDisconnected || state is VpnError) {
           state = const VpnConnecting(progress: 0.5);
           _armConnectingPoll();
+          _logReconcile(native, before);
         }
       case VpnNativeStatus.idle:
       case VpnNativeStatus.unknown:
@@ -292,13 +304,16 @@ class VpnNotifier extends Notifier<VpnStatus> {
         }
         if (state is VpnConnecting && _connectInFlight == null) {
           await _failConnectingIdle();
+          _logReconcile(native, before);
         } else if (state is VpnConnected) {
           await _confirmIdleDrop();
+          _logReconcile(native, before);
         }
       case VpnNativeStatus.error:
         if (_sessionOwnsUi) return;
         if (state is! VpnError) {
           state = await _vpnErrorFromNative();
+          _logReconcile(native, before);
         }
       case VpnNativeStatus.disconnecting:
         break;
@@ -307,8 +322,15 @@ class VpnNotifier extends Notifier<VpnStatus> {
         if (state is VpnConnected || state is VpnConnecting) {
           await _clearConnectedSince();
           state = const VpnError(message: 'VPN was revoked by system');
+          _logReconcile(native, before);
         }
     }
+  }
+
+  void _logReconcile(VpnNativeStatus native, String before) {
+    final after = vpnUiPhase(state);
+    if (after == before) return;
+    _vpnLog('vpn.reconcile native=${native.name} from=$before to=$after');
   }
 
   /// Poll native while UI is connecting. Never force-stops (ADR 014 / 015).
@@ -473,7 +495,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
       _lastSessionPhase = VpnSessionPhase.connectedHealthy;
     }
     await _hydrateConnectedUi();
-    final winner = _autoActiveNodeId;
+    final winner = freeKeyClient ? null : _autoActiveNodeId;
     if (winner != null) {
       _applyAutoMint(winner);
     }
@@ -486,6 +508,17 @@ class VpnNotifier extends Notifier<VpnStatus> {
       config: config,
       selectedNodeProtocol: _selectedNodeProtocol,
     );
+    final sessionKey =
+        '${_sessionScheme(protocol)}|$_profileHost|$serverName';
+    if (keepLiveFreeSession(
+      freeClient: freeKeyClient,
+      sessionOpen: _freeSessionOpen,
+      sameProfile: _freeSessionKey == sessionKey,
+    )) {
+      _endSessionWalk();
+      _cancelConnectingWatchdog();
+      return;
+    }
     if (state is VpnConnected && !freshSession) {
       final cur = state as VpnConnected;
       if (cur.serverName == serverName && cur.protocol == protocol) {
@@ -494,7 +527,6 @@ class VpnNotifier extends Notifier<VpnStatus> {
       }
       _endSessionWalk();
       _cancelConnectingWatchdog();
-      _logUiTransition('connected', 'enter_connected');
       state = VpnConnected(
         serverName: serverName,
         protocol: protocol,
@@ -504,8 +536,10 @@ class VpnNotifier extends Notifier<VpnStatus> {
         'winner_id': _autoActiveNodeId,
         'core': config?.activeCore.name,
         'label': serverName,
-        'protocol': protocol,
+        'scheme': _sessionScheme(protocol),
+        'host': _profileHost,
       });
+      _rememberFreeSession(sessionKey);
       unawaited(
           _persistConnectedUi(serverName: serverName, protocol: protocol));
       unawaited(_persistAutoLastWinner());
@@ -528,7 +562,6 @@ class VpnNotifier extends Notifier<VpnStatus> {
     }
     _endSessionWalk();
     _cancelConnectingWatchdog();
-    _logUiTransition('connected', 'enter_connected');
     state = VpnConnected(
       serverName: serverName,
       protocol: protocol,
@@ -538,15 +571,20 @@ class VpnNotifier extends Notifier<VpnStatus> {
       'winner_id': _autoActiveNodeId,
       'core': config?.activeCore.name,
       'label': serverName,
-      'protocol': protocol,
+      'scheme': _sessionScheme(protocol),
+      'host': _profileHost,
     });
+    _rememberFreeSession(sessionKey);
     unawaited(_persistConnectedUi(serverName: serverName, protocol: protocol));
     unawaited(_persistAutoLastWinner());
     final probeToken = ++_egressProbeToken;
     unawaited(_logEgressProbe(token: probeToken));
     unawaited(
       VpnController.instance.getUnderlyingNetworkInterface().then((iface) {
-        ProductLog.event('net.iface', {'name': iface});
+        final name = iface?.trim();
+        if (name == null || name.isEmpty || name == _lastLoggedIface) return;
+        _lastLoggedIface = name;
+        ProductLog.event('net.iface', {'name': name});
       }),
     );
     if (freshSession) {
@@ -559,6 +597,10 @@ class VpnNotifier extends Notifier<VpnStatus> {
   }
 
   Future<void> _hydrateConnectedUi({String? winnerId}) async {
+    if (freeKeyClient) {
+      await _hydrateImportedProfileUi();
+      return;
+    }
     final fromSnap = winnerId?.trim();
     if (fromSnap != null && fromSnap.isNotEmpty && fromSnap != kRegionAutoId) {
       _autoActiveNodeId = fromSnap;
@@ -606,11 +648,31 @@ class VpnNotifier extends Notifier<VpnStatus> {
     } catch (_) {}
   }
 
+  /// A free key client has no catalog session. The selected local profile owns
+  /// user-facing identity; native owns only lifecycle.
+  Future<void> _hydrateImportedProfileUi() async {
+    _config = null;
+    _autoActiveNodeId = null;
+    _catalogHost = null;
+    final imported = await Hy2ImportStore.instance.selected();
+    _displayLabel = imported?.name;
+    _selectedNodeProtocol = imported?.scheme;
+    _profileHost = imported == null
+        ? null
+        : profileHostForLog(imported.endpoint);
+  }
+
   Future<void> _persistConnectedUi({
     required String serverName,
     required String protocol,
   }) async {
     try {
+      if (freeKeyClient) {
+        // Remove account-era VLESS / winner metadata. Import identity is
+        // restored from Hy2ImportStore, never from this catalog cache.
+        await VpnSessionMeta.clear();
+        return;
+      }
       await VpnSessionMeta.saveConnectMeta(
         expectedEgressHost: _config?.expectedEgressHost,
         updateExpectedHost: _config?.expectedEgressHost != null,
@@ -627,6 +689,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
   }
 
   Future<void> _persistAutoLastWinner() async {
+    if (freeKeyClient) return;
     final id = _autoActiveNodeId?.trim();
     if (id == null || id.isEmpty || id == kRegionAutoId) return;
     try {
@@ -650,6 +713,19 @@ class VpnNotifier extends Notifier<VpnStatus> {
       return;
     }
     try {
+      if (freeKeyClient) {
+        _catalogHost = null;
+        final ip = await fetchExternalIp();
+        if (mine != _egressProbeToken || state is! VpnConnected) return;
+        ProductLog.event('vpn.egress_probe', {
+          'external_ip': ip,
+          'profile': _displayLabel,
+          'scheme': _selectedNodeProtocol,
+          'host': _profileHost,
+          'phase': _lastSessionPhase.name,
+        });
+        return;
+      }
       var winnerId = _autoActiveNodeId;
       if (winnerId == null || winnerId.isEmpty) {
         final fromProfile = _config?.hysteriaProfile?.nodeId.trim();
@@ -754,7 +830,8 @@ class VpnNotifier extends Notifier<VpnStatus> {
       VpnNativeStatus? native;
       for (var attempt = 0; attempt < 5; attempt++) {
         native = await VpnController.instance.getStatus();
-        _vpnLog('[VPN] syncFromNative[$attempt] status=$native');
+        final line = _nativeStatusLog.lineFor(native);
+        if (line != null) _vpnLog(line);
         if (native == VpnNativeStatus.connected ||
             native == VpnNativeStatus.connecting ||
             native == VpnNativeStatus.preparing ||
@@ -778,7 +855,8 @@ class VpnNotifier extends Notifier<VpnStatus> {
           return;
         }
         final winner = _autoActiveNodeId;
-        if (_config == null &&
+        if (!freeKeyClient &&
+            _config == null &&
             winner != null &&
             winner.isNotEmpty &&
             winner != kRegionAutoId) {
@@ -815,7 +893,8 @@ class VpnNotifier extends Notifier<VpnStatus> {
         // Nest Connected from a stale ConnectedHealthy (restore / resume).
         if (state is VpnConnected) {
           _vpnLog(
-            '[VPN] syncFromNative idle drop phase=$_lastSessionPhase ui=$state',
+            'vpn.native idle_drop phase=${_lastSessionPhase.name} '
+            'ui=${vpnUiPhase(state)}',
           );
           await _confirmIdleDrop(force: true);
           // iOS may tear NEVPN without our stop; sessionActive (KEY_ACTIVE) means
@@ -880,6 +959,9 @@ class VpnNotifier extends Notifier<VpnStatus> {
     }
     _config = null;
     _displayLabel = null;
+    _profileHost = null;
+    _freeSessionOpen = false;
+    _freeSessionKey = null;
     _selectedNodeProtocol = null;
     _autoMints.clear();
     _autoActiveNodeId = null;
@@ -904,9 +986,10 @@ class VpnNotifier extends Notifier<VpnStatus> {
     if (useAuto) {
       await nodesRepo.setSelectedNodeId(kRegionAutoId);
     }
-    _displayLabel = null;
-    _selectedNodeProtocol = null;
-    List<VpnNode>? catalog;
+      _displayLabel = null;
+      _profileHost = null;
+      _selectedNodeProtocol = null;
+      List<VpnNode>? catalog;
     String? apiNodeId;
     try {
       if (useAuto) {
@@ -1398,6 +1481,14 @@ class VpnNotifier extends Notifier<VpnStatus> {
     bool reuseConfig = false,
     required int gen,
   }) async {
+    if (hideInAppPlategaCheckout) {
+      final imported = await Hy2ImportStore.instance.selected();
+      if (await _abortStaleConnect(gen)) return;
+      if (imported == null) {
+        state = const VpnDisconnected();
+        return;
+      }
+    }
     // Conflict before Connecting — foreign VPN must not paint a spinner.
     final existing = await VpnController.instance.getStatus();
     if (await _abortStaleConnect(gen)) return;
@@ -1447,12 +1538,6 @@ class VpnNotifier extends Notifier<VpnStatus> {
     _armConnectingPoll();
 
     try {
-      final nodesRepo = ref.read(vpnNodesRepositoryProvider);
-      final stored = await nodesRepo.getSelectedNodeId();
-      if (await _abortStaleConnect(gen)) return;
-      final useAuto =
-          stored == null || stored.isEmpty || stored == kRegionAutoId;
-
       state = const VpnConnecting(progress: 0.3);
 
       // 2. Проверяем permission (на Android открывает системный диалог)
@@ -1466,6 +1551,66 @@ class VpnNotifier extends Notifier<VpnStatus> {
       await VpnController.instance.requestNotificationPermission();
       if (await _abortStaleConnect(gen)) return;
       state = const VpnConnecting(progress: 0.5);
+
+      if (hideInAppPlategaCheckout) {
+        // ADR 026: pasted profile only. Do not call GET /vpn/config.
+        final imported = await Hy2ImportStore.instance.selected();
+        if (await _abortStaleConnect(gen)) return;
+        if (imported == null) {
+          state = const VpnError(
+            message: 'hy2_import_required',
+            code: 'hy2_import_required',
+          );
+          return;
+        }
+        _config = null;
+        _autoActiveNodeId = null;
+        _catalogHost = null;
+        _displayLabel = imported.name;
+        _selectedNodeProtocol = imported.scheme;
+        _profileHost = profileHostForLog(imported.endpoint);
+        await VpnSessionMeta.clear();
+        final profile = imported.hy2?.profile;
+        final bool started;
+        if (profile != null) {
+          started = await VpnController.instance.startHysteria(
+            profile,
+            displayLabel: imported.name,
+          );
+        } else if (defaultTargetPlatform == TargetPlatform.android) {
+          final xrayJson = buildXraySocksConfig(imported);
+          if (xrayJson == null) {
+            state = const VpnError(
+              message: 'share_unsupported',
+              code: 'share_unsupported',
+            );
+            return;
+          }
+          started = await VpnController.instance.startXray(
+            xrayJson,
+            displayLabel: imported.name,
+          );
+        } else {
+          state = const VpnError(
+            message: 'share_ios_hy2_only',
+            code: 'share_ios_hy2_only',
+          );
+          return;
+        }
+        if (await _abortStaleConnect(gen)) return;
+        if (!started) {
+          state = await _errorForStartFailure();
+          return;
+        }
+        state = const VpnConnecting(progress: 0.8);
+        return;
+      }
+
+      final nodesRepo = ref.read(vpnNodesRepositoryProvider);
+      final stored = await nodesRepo.getSelectedNodeId();
+      if (await _abortStaleConnect(gen)) return;
+      final useAuto =
+          stored == null || stored.isEmpty || stored == kRegionAutoId;
 
       if (useAuto) {
         await _runAutoProveLoop(gen: gen);
@@ -1714,11 +1859,33 @@ class VpnNotifier extends Notifier<VpnStatus> {
     }
   }
 
+  String? _lastLoggedIface;
+
+  String _sessionScheme(String protocol) {
+    final selected = _selectedNodeProtocol?.trim();
+    if (selected != null && selected.isNotEmpty) return selected;
+    if (protocol.toUpperCase() == 'HYSTERIA2') return 'hysteria2';
+    return protocol.toLowerCase();
+  }
+
+  void _rememberFreeSession(String sessionKey) {
+    if (!freeKeyClient) return;
+    _freeSessionOpen = true;
+    _freeSessionKey = sessionKey;
+  }
+
   void _recordSessionEnd() {
+    _freeSessionOpen = false;
+    _freeSessionKey = null;
     final current = state;
     if (current is! VpnConnected) return;
     final seconds = DateTime.now().difference(current.connectedSince).inSeconds;
-    ProductLog.event('vpn.session_end', {'duration_s': seconds});
+    ProductLog.event('vpn.session_end', {
+      'duration_s': seconds,
+      'profile': current.serverName,
+      'scheme': _sessionScheme(current.protocol),
+      'host': _profileHost,
+    });
     try {
       ref.read(betaUsageTrackerProvider).recordSessionSeconds(seconds);
     } on StateError {
@@ -1728,6 +1895,10 @@ class VpnNotifier extends Notifier<VpnStatus> {
 
   /// Попытка автоматического переподключения через 5 сек (если включено в Settings).
   void _scheduleReconnect() {
+    if (freeKeyClient) {
+      _vpnLog('[VPN] Flutter reconnect skipped; native owns free client');
+      return;
+    }
     if (_suppressAutoReconnect) {
       _vpnLog('[VPN] auto-reconnect suppressed (intentional stop/revoke)');
       return;
@@ -1787,7 +1958,8 @@ class VpnNotifier extends Notifier<VpnStatus> {
       userStopping: _suppressAutoReconnect,
     )) {
       _vpnLog(
-        '[VPN] ignore regressive ${snap.phase.name} last=$_lastSessionPhase ui=$state',
+        'vpn.native ignore regressive ${snap.phase.name} '
+        'last=${_lastSessionPhase.name} ui=${vpnUiPhase(state)}',
       );
       return;
     }
@@ -1800,16 +1972,18 @@ class VpnNotifier extends Notifier<VpnStatus> {
       _connectingUiStartedAt = DateTime.now();
     }
     final winnerId = snap.candidateId?.trim();
-    if (winnerId != null && winnerId.isNotEmpty) {
+    if (!freeKeyClient && winnerId != null && winnerId.isNotEmpty) {
       _autoActiveNodeId = winnerId;
       _applyAutoMint(winnerId);
     }
     if (snap.isProving) {
-      final proveId = snap.candidateId ?? '';
-      if (proveId.isNotEmpty && proveId != _lastLoggedProveId) {
-        _lastLoggedProveId = proveId;
-        _lastProveSummary = 'id=$proveId proving';
-        ProductLog.event('vpn.prove', {'id': proveId, 'ok': 'pending'});
+      if (!freeKeyClient) {
+        final proveId = snap.candidateId ?? '';
+        if (proveId.isNotEmpty && proveId != _lastLoggedProveId) {
+          _lastLoggedProveId = proveId;
+          _lastProveSummary = 'id=$proveId proving';
+          ProductLog.event('vpn.prove', {'id': proveId, 'ok': 'pending'});
+        }
       }
     }
     if (snap.isConnected) {
@@ -1817,13 +1991,14 @@ class VpnNotifier extends Notifier<VpnStatus> {
       _lastProveSummary = 'id=$proveId ok reason=${snap.reason.name}';
       _cancelConnectingWatchdog();
       final alreadyOn = state is VpnConnected;
-      if (!alreadyOn) {
+      if (!freeKeyClient && !alreadyOn) {
         ProductLog.event('vpn.prove', {
           'id': proveId,
           'ok': true,
           'reason': snap.reason.name,
         });
       }
+      if (_freeSessionOpen) return;
       unawaited(
         _enterConnected(freshSession: !alreadyOn && state is VpnConnecting),
       );
@@ -1974,25 +2149,6 @@ class VpnNotifier extends Notifier<VpnStatus> {
     }
   }
 
-  void _logUiTransition(String to, String src) {
-    final from = switch (state) {
-      VpnDisconnected() => 'disconnected',
-      VpnConnecting() => 'connecting',
-      VpnConnected() => 'connected',
-      VpnError() => 'error',
-    };
-    _vpnLog(
-      '[VPN] ui_transition from=$from to=$to src=$src phase=${_lastSessionPhase.name}',
-    );
-    ProductLog.event('vpn.ui_transition', {
-      'from': from,
-      'to': to,
-      'src': src,
-      'phase': _lastSessionPhase.name,
-      'proving': _sessionProving,
-    });
-  }
-
   Future<void> _failConnectingFromNative() async {
     if (_sessionOwnsUi) return;
     if (state is! VpnConnecting) return;
@@ -2008,18 +2164,15 @@ class VpnNotifier extends Notifier<VpnStatus> {
     _cancelConnectingWatchdog();
     _endSessionWalk();
     if (_suppressAutoReconnect) {
-      _logUiTransition('disconnected', 'idle_connecting');
       state = const VpnDisconnected();
       return;
     }
     final detail = await VpnController.instance.getLastError();
     if (!_shouldDropConnectingOnIdle()) return;
     if (detail != null && detail.trim().isNotEmpty) {
-      _logUiTransition('error', 'idle_connecting');
       state = vpnErrorFromNativeDetail(detail);
       return;
     }
-    _logUiTransition('disconnected', 'idle_connecting');
     state = const VpnDisconnected();
   }
 
@@ -2035,7 +2188,6 @@ class VpnNotifier extends Notifier<VpnStatus> {
     _sessionProving = false;
     await _clearConnectedSince();
     final conflict = await VpnController.instance.queryVpnConflict();
-    _logUiTransition('error', 'stuck_connecting');
     if (conflict.foreignAlwaysOn || conflict.foreignVpnActive) {
       _vpnLog('[VPN] connecting stuck — conflict CTA');
       state = await _vpnErrorFromConflict(conflict);
@@ -2083,7 +2235,6 @@ class VpnNotifier extends Notifier<VpnStatus> {
       _recordSessionEnd();
       await _clearConnectedSince();
       _lastSessionPhase = VpnSessionPhase.idle;
-      _logUiTransition('disconnected', 'idle_connected');
       state = const VpnDisconnected();
     }
   }
@@ -2091,6 +2242,10 @@ class VpnNotifier extends Notifier<VpnStatus> {
   /// After unexpected native idle: if the user still wants VPN (sessionActive),
   /// start again. Intentional stop clears sessionActive on iOS/Android.
   Future<void> _reconnectIfSessionActive({required String reason}) async {
+    if (freeKeyClient) {
+      _vpnLog('[VPN] reconnect skipped; native owns free client reason=$reason');
+      return;
+    }
     if (_suppressAutoReconnect) return;
     if (_connectInFlight != null || _autoReconnectArmed) {
       _vpnLog('[VPN] reconnect skip in-flight reason=$reason');

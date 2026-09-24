@@ -11,7 +11,9 @@ import 'core/api_discovery.dart';
 import 'core/config.dart';
 import 'core/diagnostics/app_log_buffer.dart';
 import 'core/diagnostics/diagnostics_service.dart';
+import 'core/diagnostics/tunnel_log_prefs.dart';
 import 'core/internet_permission.dart';
+import 'core/ios_store_gates.dart';
 import 'core/jwt_interceptor.dart';
 import 'core/pair_links.dart';
 import 'core/referral_links.dart';
@@ -27,34 +29,37 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final boot = Stopwatch()..start();
 
-  // Persist first so boot phases land in «Отправить отчёт» even if discovery hangs.
+  // Level before the first line, then the file, so «Выключены» drops boot too.
+  try {
+    await TunnelLogPrefs.read();
+  } catch (_) {}
   try {
     final dir = await getApplicationSupportDirectory();
     await AppLogBuffer.instance.attachPersistFile(
       io.File('${dir.path}/product.log'),
     );
   } catch (_) {
-    // Persist is best-effort; in-memory ring still feeds reports.
+    // Persist is best-effort; in-memory ring still feeds the log screen.
   }
-  AppLogBuffer.instance.info('app.boot t0 ms=${boot.elapsedMilliseconds}');
+  AppLogBuffer.instance.debug('app.boot t0 ms=${boot.elapsedMilliseconds}');
 
   final riveSw = Stopwatch()..start();
   await RiveNative.init();
-  AppLogBuffer.instance.info(
+  AppLogBuffer.instance.debug(
     'app.boot rive.init_ms=${riveSw.elapsedMilliseconds}',
   );
 
   // Android 17: INTERNET grant (iOS no-op). Do not await discovery here —
   // LaunchScreen stays white until runApp; 8s Dio probes used to block first frame.
   final internetOk = await ensureInternetPermissionGranted();
-  AppLogBuffer.instance.info(
+  AppLogBuffer.instance.debug(
     'app.boot internet_ok=$internetOk ms=${boot.elapsedMilliseconds}',
   );
 
   try {
     await ApiDiscovery.instance.loadCachedOrigin();
   } catch (e) {
-    AppLogBuffer.instance.warn('app.boot cache_origin fail: $e');
+    AppLogBuffer.instance.debug('app.boot cache_origin fail: $e');
   }
 
   final container = ProviderContainer();
@@ -67,7 +72,7 @@ void main() async {
       }
     },
   );
-  AppLogBuffer.instance.info(
+  AppLogBuffer.instance.debug(
     'app.boot started baseUrl=${AppConfig.baseUrl} ms=${boot.elapsedMilliseconds}',
   );
   if (AppConfig.baseUrl.contains('10.0.2.2')) {
@@ -96,9 +101,11 @@ void main() async {
   // Do not await auth here: Play 0.1.7 sat on the launcher icon for the full
   // register timeout. GoRouter keeps /bootstrap while [authProvider] loads.
   await AppRouter.warmWelcomeFlag();
-  await attachSeatJoinLinks(container);
-  await attachReferralLinks(container);
-  await attachPairLinks(container);
+  if (!freeKeyClient) {
+    await attachSeatJoinLinks(container);
+    await attachReferralLinks(container);
+    await attachPairLinks(container);
+  }
   container.read(authProvider);
 
   // Связываем GoRouter с authProvider: при смене состояния авторизации
@@ -109,7 +116,7 @@ void main() async {
     fireImmediately: true,
   );
 
-  AppLogBuffer.instance.info(
+  AppLogBuffer.instance.debug(
     'app.boot runApp ms=${boot.elapsedMilliseconds}',
   );
   runApp(
@@ -130,21 +137,21 @@ Future<void> _bootDiscoveryInBackground({
   try {
     await bindProcessToUnderlyingNetwork();
   } catch (e) {
-    AppLogBuffer.instance.warn('app.boot bind_underlying fail: $e');
+    AppLogBuffer.instance.debug('app.boot bind_underlying fail: $e');
   }
   if (!internetOk) {
-    AppLogBuffer.instance.warn('app.boot discovery skipped: INTERNET denied');
+    AppLogBuffer.instance.debug('app.boot discovery skipped: INTERNET denied');
     return;
   }
   final disc = Stopwatch()..start();
   try {
     final origin = await ApiDiscovery.instance.refreshAndSelect();
-    AppLogBuffer.instance.info(
+    AppLogBuffer.instance.debug(
       'app.boot discovery_ms=${disc.elapsedMilliseconds} '
       'origin=${origin ?? 'none'} total_ms=${boot.elapsedMilliseconds}',
     );
   } catch (e) {
-    AppLogBuffer.instance.warn(
+    AppLogBuffer.instance.debug(
       'app.boot discovery fail ms=${disc.elapsedMilliseconds}: $e',
     );
   }

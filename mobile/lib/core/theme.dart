@@ -25,6 +25,12 @@ class AppBrand {
   /// Living House mustard — Nest glyph only.
   static const Color livingHouse = Color(0xFFC78F29);
 
+  /// Honey flame behind the house. Brighter than [livingHouse] so the roof edge stays visible.
+  static const Color flame = Color(0xFFFF8F00);
+
+  /// YouTube play tile. Not a Unicode emoji.
+  static const Color youtubePlay = Color(0xFFFF0000);
+
   /// Accent on dark surfaces — near-white.
   static const Color accentOnDark = Color(0xFFF5F5F5);
 
@@ -48,6 +54,21 @@ class AppBrand {
   static const Color surfaceLight = Color(0xFFF4F4F5);
 
   static const Color surfaceDark = Color(0xFF121212);
+
+  /// Free-client sheet: cream, lighter than the house so the roof stays separate.
+  static const Color paperLight = Color(0xFFF6F1EA);
+
+  /// Same hue as [paperLight], deepened so it stays oak rather than navy.
+  static const Color paperDark = Color(0xFF221C1A);
+
+  /// Ivory grid ink for the dark sheet. Drawn at low alpha so it does not cut type.
+  static const Color paperGrid = Color(0xFFF4EDE3);
+
+  /// Pencil grid on the light sheet. Darker than [paperLight].
+  static const Color paperGridLight = Color(0xFFB7A898);
+
+  /// Margin rule: living-house mustard mixed toward [destructive].
+  static const Color paperMargin = Color(0xFFD4682E);
 
   /// Dark elevated cards — enough lift off [surfaceDark] so numbers read.
   static const Color surfaceVariantDark = Color(0xFF2C2C32);
