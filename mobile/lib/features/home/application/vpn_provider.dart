@@ -240,6 +240,9 @@ class VpnNotifier extends Notifier<VpnStatus> {
   /// and syncFromNative auto-reconnect until the next user [connect].
   bool _suppressAutoReconnect = false;
 
+  /// True while a server switch is waiting for the previous tunnel to go idle.
+  bool _switchStop = false;
+
   /// One PathIncompatible Auto retry on Wi-Fi (issue #147).
   bool _wifiAutoRetryUsed = false;
   bool _wifiRetryPending = false;
@@ -453,7 +456,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
     // Auto SOCKS prove: session snapshot is SoT. Binding+TUN in the shade
     // must still paint Nest Connected (ConnectedHealthy can lag / miss).
     if (_sessionProving) return;
-    if (_suppressAutoReconnect) return;
+    if (_suppressAutoReconnect || _switchStop) return;
     final effectiveGen = gen ?? _activeConnectGen ?? _connectGeneration;
     if (_enterConnectedGenInFlight == effectiveGen) {
       return;
@@ -1521,7 +1524,35 @@ class VpnNotifier extends Notifier<VpnStatus> {
     if (state is VpnError || state is VpnDisconnected) {
       state = const VpnConnecting(progress: 0.0);
     }
-    if (forceRestart && existing == VpnNativeStatus.connected) {
+    if (hideInAppPlategaCheckout && forceRestart) {
+      state = const VpnConnecting(progress: 0.2);
+      final busy = existing == VpnNativeStatus.connected ||
+          existing == VpnNativeStatus.connecting ||
+          existing == VpnNativeStatus.preparing ||
+          existing == VpnNativeStatus.disconnecting;
+      if (busy) {
+        _switchStop = true;
+        var idle = false;
+        try {
+          try {
+            await VpnController.instance.stop(reason: 'switch_server');
+          } catch (_) {}
+          idle = await waitUntilNativeIdle(
+            timeout: const Duration(seconds: 8),
+          );
+        } finally {
+          _switchStop = false;
+        }
+        if (await _abortStaleConnect(gen)) return;
+        if (!idle) {
+          state = const VpnError(
+            message: 'switch_not_idle',
+            code: 'switch_not_idle',
+          );
+          return;
+        }
+      }
+    } else if (forceRestart && existing == VpnNativeStatus.connected) {
       try {
         await VpnController.instance.stop(reason: 'force_restart');
       } catch (_) {}
