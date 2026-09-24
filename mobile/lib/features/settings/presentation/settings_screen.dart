@@ -271,7 +271,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final showNoVpn = androidPerAppSplit;
     final notifOn = _notifEnabled ?? true;
     final autoOn = _autoReconnect ?? false;
-    final showConnectionSection = showAutoReconnect || showNotif || showNoVpn;
     final themeMode =
         ref.watch(themeModeProvider).valueOrNull ?? ThemeMode.system;
     final locale = ref.watch(localeProvider).valueOrNull ??
@@ -292,113 +291,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            _SectionLabel(l.settingsSupport),
-            _SettingsCard(
-              children: [
-                if (AppConfig.authAnonymous)
-                  _SettingsRow(
-                    icon: AppIcons.siteTelegram,
-                    title: l.settingsSupport,
-                    subtitle: l.settingsSupportHintIos,
-                    onTap: () {
-                      SupportContact.open(screen: 'Настройки');
-                    },
-                  ),
-                if (AppConfig.authAnonymous) const _CardDivider(),
-                _SettingsRow(
-                  icon: AppIcons.bug,
-                  title: l.settingsSendReport,
-                  subtitle: l.settingsSendReportHint,
-                  onTap: _reportSending ? null : _onSendReportPressed,
-                  trailing: _reportSending
-                      ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : null,
-                ),
-              ],
-            ),
-            if (showConnectionSection) ...[
-              const SizedBox(height: 20),
-              _SectionLabel(l.settingsSectionConnection),
-              _SettingsCard(
-                children: [
-                  if (showAutoReconnect)
-                    _SettingsRow(
-                      icon: AppIcons.refresh,
-                      title: l.settingsAutoReconnect,
-                      subtitle: l.settingsAutoReconnectHint,
-                      trailing: Switch(
-                        value: autoOn,
-                        onChanged:
-                            _autoReconnectLoading || _autoReconnect == null
-                                ? null
-                                : _onAutoReconnectChanged,
-                      ),
-                    ),
-                  if (showNotif) ...[
-                    if (showAutoReconnect) const _CardDivider(),
-                    _SettingsRow(
-                      icon: AppIcons.notifications,
-                      title: l.settingsVpnNotificationTitle,
-                      subtitle: l.settingsVpnNotificationHint,
-                      trailing: Switch(
-                        value: notifOn,
-                        onChanged: _notifLoading || _notifEnabled == null
-                            ? null
-                            : _onNotifChanged,
-                      ),
-                    ),
-                    if (QsTilePrefs.isSupported) ...[
-                      const _CardDivider(),
-                      _SettingsRow(
-                        icon: AppIcons.house,
-                        title: l.settingsQsTileTitle,
-                        subtitle: l.settingsQsTileHint,
-                        onTap: _qsAdding ? null : _onAddQsTile,
-                        trailing: _qsAdding
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : null,
-                      ),
-                    ],
-                  ],
-                  if (showNoVpn) ...[
-                    if (showAutoReconnect || showNotif) const _CardDivider(),
-                    _SettingsRow(
-                      icon: AppIcons.sliders,
-                      title: l.settingsNoVpn,
-                      subtitle: l.settingsNoVpnHint,
-                      onTap: () => context.go('/settings/no-vpn'),
-                    ),
-                  ],
-                ],
-              ),
-            ],
-            const SizedBox(height: 20),
-            _SectionLabel(l.settingsSectionApp),
-            _SettingsCard(
-              children: [
-                _SettingsRow(
-                  icon: AppIcons.globe,
-                  title: l.settingsLanguage,
-                  subtitle: localeLabel,
-                  onTap: _pickLocale,
-                ),
-                const _CardDivider(),
-                _SettingsRow(
-                  icon: AppIcons.palette,
-                  title: l.settingsAppearance,
-                  subtitle: _themeModeLabel(l, themeMode),
-                  onTap: _pickThemeMode,
-                ),
-              ],
+            ..._settingsSections(
+              l: l,
+              showAutoReconnect: showAutoReconnect,
+              showNotif: showNotif,
+              showNoVpn: showNoVpn,
+              autoOn: autoOn,
+              notifOn: notifOn,
+              localeLabel: localeLabel,
+              themeMode: themeMode,
             ),
             const SizedBox(height: 28),
             if (_versionLabel.isNotEmpty)
@@ -423,6 +324,131 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
       ),
     );
+  }
+
+  List<Widget> _settingsSections({
+    required AppL10n l,
+    required bool showAutoReconnect,
+    required bool showNotif,
+    required bool showNoVpn,
+    required bool autoOn,
+    required bool notifOn,
+    required String localeLabel,
+    required ThemeMode themeMode,
+  }) {
+    final sections = <({String title, List<Widget> rows})>[
+      (
+        title: l.settingsSupport,
+        rows: [
+          if (AppConfig.authAnonymous)
+            _SettingsRow(
+              icon: AppIcons.siteTelegram,
+              title: l.settingsSupport,
+              subtitle: l.settingsSupportHintIos,
+              onTap: () {
+                SupportContact.open(screen: 'Настройки');
+              },
+            ),
+          _SettingsRow(
+            icon: AppIcons.bug,
+            title: l.settingsSendReport,
+            subtitle: l.settingsSendReportHint,
+            onTap: _reportSending ? null : _onSendReportPressed,
+            trailing: _reportSending
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : null,
+          ),
+        ],
+      ),
+      (
+        title: l.settingsSectionConnection,
+        rows: [
+          if (showAutoReconnect)
+            _SettingsRow(
+              icon: AppIcons.refresh,
+              title: l.settingsAutoReconnect,
+              subtitle: l.settingsAutoReconnectHint,
+              trailing: Switch(
+                value: autoOn,
+                onChanged: _autoReconnectLoading || _autoReconnect == null
+                    ? null
+                    : _onAutoReconnectChanged,
+              ),
+            ),
+          if (showNotif)
+            _SettingsRow(
+              icon: AppIcons.notifications,
+              title: l.settingsVpnNotificationTitle,
+              subtitle: l.settingsVpnNotificationHint,
+              trailing: Switch(
+                value: notifOn,
+                onChanged: _notifLoading || _notifEnabled == null
+                    ? null
+                    : _onNotifChanged,
+              ),
+            ),
+          if (showNotif && QsTilePrefs.isSupported)
+            _SettingsRow(
+              icon: AppIcons.house,
+              title: l.settingsQsTileTitle,
+              subtitle: l.settingsQsTileHint,
+              onTap: _qsAdding ? null : _onAddQsTile,
+              trailing: _qsAdding
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : null,
+            ),
+          if (showNoVpn)
+            _SettingsRow(
+              icon: AppIcons.sliders,
+              title: l.settingsNoVpn,
+              subtitle: l.settingsNoVpnHint,
+              onTap: () => context.go('/settings/no-vpn'),
+            ),
+        ],
+      ),
+      (
+        title: l.settingsSectionApp,
+        rows: [
+          _SettingsRow(
+            icon: AppIcons.globe,
+            title: l.settingsLanguage,
+            subtitle: localeLabel,
+            onTap: _pickLocale,
+          ),
+          _SettingsRow(
+            icon: AppIcons.palette,
+            title: l.settingsAppearance,
+            subtitle: _themeModeLabel(l, themeMode),
+            onTap: _pickThemeMode,
+          ),
+        ],
+      ),
+    ];
+    final out = <Widget>[];
+    for (final section in sections) {
+      if (section.rows.isEmpty) continue;
+      if (out.isNotEmpty) out.add(const SizedBox(height: 20));
+      out.add(_SectionLabel(section.title));
+      out.add(_SettingsCard(children: _divided(section.rows)));
+    }
+    return out;
+  }
+
+  List<Widget> _divided(List<Widget> rows) {
+    final out = <Widget>[];
+    for (var i = 0; i < rows.length; i++) {
+      if (i > 0) out.add(const _CardDivider());
+      out.add(rows[i]);
+    }
+    return out;
   }
 }
 
