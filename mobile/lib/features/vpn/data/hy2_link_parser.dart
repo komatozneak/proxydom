@@ -43,12 +43,12 @@ ParsedHy2Link parseHy2Link(String raw) {
   if (sni.isEmpty) {
     throw const FormatException('missing sni');
   }
-  final name = uri.fragment.trim().isEmpty ? host : uri.fragment.trim();
+  final title = shareServerTitle(decodedShareFragment(text), host);
   return ParsedHy2Link(
-    name: name,
+    name: title,
     profile: HysteriaProfile(
       schemaVersion: 1,
-      nodeId: name,
+      nodeId: host,
       server: '$host:$port',
       auth: auth,
       username: username,
@@ -56,6 +56,26 @@ ParsedHy2Link parseHy2Link(String raw) {
       socksListen: '127.0.0.1:10808',
     ),
   );
+}
+
+/// Fragment after `#`, decoded once. `Uri.fragment` leaves `%D0…` on this scheme.
+String decodedShareFragment(String raw) {
+  final hash = raw.indexOf('#');
+  if (hash < 0 || hash + 1 >= raw.length) return '';
+  final tail = raw.substring(hash + 1).trim();
+  try {
+    return Uri.decodeComponent(tail);
+  } on ArgumentError {
+    return tail;
+  }
+}
+
+/// Title before ` · `. Falls back to [fallback] when the remark is empty.
+String shareServerTitle(String remark, String fallback) {
+  const sep = ' · ';
+  final at = remark.indexOf(sep);
+  final title = (at < 0 ? remark : remark.substring(0, at)).trim();
+  return title.isEmpty ? fallback : title;
 }
 
 /// Newline-separated subscription body, or one bare URI.

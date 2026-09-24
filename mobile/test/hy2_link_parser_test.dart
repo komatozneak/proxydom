@@ -12,6 +12,18 @@ void main() {
     expect(parsed.name, 'Europe');
   });
 
+  test('percent-encoded remark becomes the server title', () {
+    const uri =
+        'hysteria2://user:pass@45.91.248.91:443/?sni=hy2-us.teremokconnect.online'
+        '#%D0%A1%D0%A8%D0%90%20%C2%B7%20%D0%A1%D0%B5%D1%80%D0%B2%D0%B8%D1%81%D1%8B';
+    final parsed = parseHy2Link(uri);
+    expect(parsed.name, 'США');
+    expect(parsed.profile.server, '45.91.248.91:443');
+    expect(parsed.profile.sni, 'hy2-us.teremokconnect.online');
+    expect(parsed.profile.auth, 'user:pass');
+    expect(parsed.profile.nodeId, '45.91.248.91');
+  });
+
   test('parseHy2Subscription reads several lines and skips comments', () {
     const body = '''
 # comment
