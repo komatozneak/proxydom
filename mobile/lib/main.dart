@@ -41,25 +41,25 @@ void main() async {
   } catch (_) {
     // Persist is best-effort; in-memory ring still feeds the log screen.
   }
-  AppLogBuffer.instance.info('app.boot t0 ms=${boot.elapsedMilliseconds}');
+  AppLogBuffer.instance.debug('app.boot t0 ms=${boot.elapsedMilliseconds}');
 
   final riveSw = Stopwatch()..start();
   await RiveNative.init();
-  AppLogBuffer.instance.info(
+  AppLogBuffer.instance.debug(
     'app.boot rive.init_ms=${riveSw.elapsedMilliseconds}',
   );
 
   // Android 17: INTERNET grant (iOS no-op). Do not await discovery here —
   // LaunchScreen stays white until runApp; 8s Dio probes used to block first frame.
   final internetOk = await ensureInternetPermissionGranted();
-  AppLogBuffer.instance.info(
+  AppLogBuffer.instance.debug(
     'app.boot internet_ok=$internetOk ms=${boot.elapsedMilliseconds}',
   );
 
   try {
     await ApiDiscovery.instance.loadCachedOrigin();
   } catch (e) {
-    AppLogBuffer.instance.warn('app.boot cache_origin fail: $e');
+    AppLogBuffer.instance.debug('app.boot cache_origin fail: $e');
   }
 
   final container = ProviderContainer();
@@ -72,7 +72,7 @@ void main() async {
       }
     },
   );
-  AppLogBuffer.instance.info(
+  AppLogBuffer.instance.debug(
     'app.boot started baseUrl=${AppConfig.baseUrl} ms=${boot.elapsedMilliseconds}',
   );
   if (AppConfig.baseUrl.contains('10.0.2.2')) {
@@ -116,7 +116,7 @@ void main() async {
     fireImmediately: true,
   );
 
-  AppLogBuffer.instance.info(
+  AppLogBuffer.instance.debug(
     'app.boot runApp ms=${boot.elapsedMilliseconds}',
   );
   runApp(
@@ -137,21 +137,21 @@ Future<void> _bootDiscoveryInBackground({
   try {
     await bindProcessToUnderlyingNetwork();
   } catch (e) {
-    AppLogBuffer.instance.warn('app.boot bind_underlying fail: $e');
+    AppLogBuffer.instance.debug('app.boot bind_underlying fail: $e');
   }
   if (!internetOk) {
-    AppLogBuffer.instance.warn('app.boot discovery skipped: INTERNET denied');
+    AppLogBuffer.instance.debug('app.boot discovery skipped: INTERNET denied');
     return;
   }
   final disc = Stopwatch()..start();
   try {
     final origin = await ApiDiscovery.instance.refreshAndSelect();
-    AppLogBuffer.instance.info(
+    AppLogBuffer.instance.debug(
       'app.boot discovery_ms=${disc.elapsedMilliseconds} '
       'origin=${origin ?? 'none'} total_ms=${boot.elapsedMilliseconds}',
     );
   } catch (e) {
-    AppLogBuffer.instance.warn(
+    AppLogBuffer.instance.debug(
       'app.boot discovery fail ms=${disc.elapsedMilliseconds}: $e',
     );
   }

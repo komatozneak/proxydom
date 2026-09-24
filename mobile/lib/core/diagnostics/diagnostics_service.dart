@@ -280,7 +280,7 @@ void installFlutterErrorHandler({void Function()? onCrashObserved}) {
   FlutterError.onError = (details) {
     DiagnosticsService.lastFlutterError =
         details.exceptionAsString().split('\n').first;
-    AppLogBuffer.instance.warn(
+    AppLogBuffer.instance.debug(
       'flutter: ${DiagnosticsService.lastFlutterError}',
     );
     try {
