@@ -91,6 +91,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       appBar: AppBar(
         backgroundColor: freeKeyClient ? Colors.transparent : null,
         surfaceTintColor: freeKeyClient ? Colors.transparent : null,
+        titleSpacing: freeKeyClient ? 44 : null,
         title: freeKeyClient
             ? Row(
                 mainAxisSize: MainAxisSize.min,
@@ -335,7 +336,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          padding: const EdgeInsets.fromLTRB(44, 8, 16, 8),
           child: TextField(
             decoration: InputDecoration(
               hintText: l.freeSearch,
@@ -354,7 +355,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
           child: filtered.isEmpty
               ? const Center(child: FreeClientEmptyState())
               : ListView.separated(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.fromLTRB(44, 0, 16, 0),
                   itemCount: filtered.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 8),
                   itemBuilder: (context, i) {
@@ -384,7 +385,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
                 ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
+          padding: const EdgeInsets.fromLTRB(44, 8, 24, 12),
           child: FreeClientActionBar(
             onPaste: () => context.push('/import?clipboard=1'),
             onScan: () => context.push('/scan'),
