@@ -427,6 +427,9 @@ class TeremokVpnService : VpnService() {
     private val tunInterface = AtomicReference<ParcelFileDescriptor?>(null)
     @Volatile
     private var isRunning = false
+
+    @Volatile
+    var provenEgressIp: String? = null
     /** True only while [startVpn] is establishing TUN/core (not onCreate hint). */
     @Volatile
     private var establishInProgress = false
@@ -990,7 +993,7 @@ class TeremokVpnService : VpnService() {
         alive: () -> Boolean = { true },
     ) {
         if (!alive()) return
-        if (isRunning || HysteriaBridge.instance.isRunning.get()) {
+        if (isRunning || HysteriaBridge.instance.running()) {
             Log.w(TAG, "startVpn: previous hysteria still up — stop before establish")
             teardownCores()
         }
@@ -1212,7 +1215,7 @@ class TeremokVpnService : VpnService() {
         }
         val hy = HysteriaBridge.instance
         hy.bind(this)
-        if (hy.isRunning.get()) {
+        if (hy.running()) {
             hy.stop()
         }
         if (!alive()) {
@@ -2069,10 +2072,6 @@ object VpnStatusBroadcaster {
     /** Последний статус — для getStatus() когда VpnService не bound к Activity. */
     @Volatile
     private var lastStatus: String = "idle"
-
-    @Volatile
-    @Volatile
-    var provenEgressIp: String? = null
 
     private var lastErrorMessage: String? = null
 

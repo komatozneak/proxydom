@@ -35,6 +35,8 @@ class HysteriaBridge private constructor() {
     var lastErrorMessage: String? = null
         private set
 
+    fun running(): Boolean = isRunning.get()
+
     fun bind(service: VpnService) {
         vpnService = service
     }
