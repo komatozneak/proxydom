@@ -102,7 +102,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
                 ],
               )
             : Text(l.regionTitle),
-        leading: canPop
+        leading: !freeKeyClient && canPop
             ? IconButton(
                 icon: const AppIcon(AppIcons.back),
                 onPressed: busy ? null : () => context.pop(),

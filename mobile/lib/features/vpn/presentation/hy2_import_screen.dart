@@ -27,7 +27,17 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
   List<ParsedShareLink> _preview = const [];
   String? _error;
   bool _busy = false;
+  bool _hasSaved = false;
   var _clipboardApplied = false;
+
+  @override
+  void initState() {
+    super.initState();
+    Hy2ImportStore.instance.load().then((links) {
+      if (!mounted) return;
+      setState(() => _hasSaved = links.isNotEmpty);
+    });
+  }
 
   @override
   void didChangeDependencies() {
@@ -117,16 +127,18 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
-        leading: IconButton(
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/home');
-            }
-          },
-          icon: const _AddBackMark(),
-        ),
+        leading: _hasSaved
+            ? IconButton(
+                onPressed: () {
+                  if (context.canPop()) {
+                    context.pop();
+                  } else {
+                    context.go('/home');
+                  }
+                },
+                icon: const _AddBackMark(),
+              )
+            : null,
         title: Text(l.freeAddTitle),
       ),
       body: SafeArea(
