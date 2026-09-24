@@ -509,7 +509,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
       selectedNodeProtocol: _selectedNodeProtocol,
     );
     final sessionKey =
-        '${_selectedNodeProtocol ?? protocol}|$_profileHost|$serverName';
+        '${_sessionScheme(protocol)}|$_profileHost|$serverName';
     if (keepLiveFreeSession(
       freeClient: freeKeyClient,
       sessionOpen: _freeSessionOpen,
@@ -527,7 +527,6 @@ class VpnNotifier extends Notifier<VpnStatus> {
       }
       _endSessionWalk();
       _cancelConnectingWatchdog();
-      _logUiTransition('connected', 'enter_connected');
       state = VpnConnected(
         serverName: serverName,
         protocol: protocol,
@@ -537,9 +536,8 @@ class VpnNotifier extends Notifier<VpnStatus> {
         'winner_id': _autoActiveNodeId,
         'core': config?.activeCore.name,
         'label': serverName,
-        'scheme': _selectedNodeProtocol ?? protocol,
+        'scheme': _sessionScheme(protocol),
         'host': _profileHost,
-        'protocol': protocol,
       });
       _rememberFreeSession(sessionKey);
       unawaited(
@@ -564,7 +562,6 @@ class VpnNotifier extends Notifier<VpnStatus> {
     }
     _endSessionWalk();
     _cancelConnectingWatchdog();
-    _logUiTransition('connected', 'enter_connected');
     state = VpnConnected(
       serverName: serverName,
       protocol: protocol,
@@ -574,9 +571,8 @@ class VpnNotifier extends Notifier<VpnStatus> {
       'winner_id': _autoActiveNodeId,
       'core': config?.activeCore.name,
       'label': serverName,
-      'scheme': _selectedNodeProtocol ?? protocol,
+      'scheme': _sessionScheme(protocol),
       'host': _profileHost,
-      'protocol': protocol,
     });
     _rememberFreeSession(sessionKey);
     unawaited(_persistConnectedUi(serverName: serverName, protocol: protocol));
@@ -585,7 +581,10 @@ class VpnNotifier extends Notifier<VpnStatus> {
     unawaited(_logEgressProbe(token: probeToken));
     unawaited(
       VpnController.instance.getUnderlyingNetworkInterface().then((iface) {
-        ProductLog.event('net.iface', {'name': iface});
+        final name = iface?.trim();
+        if (name == null || name.isEmpty || name == _lastLoggedIface) return;
+        _lastLoggedIface = name;
+        ProductLog.event('net.iface', {'name': name});
       }),
     );
     if (freshSession) {
@@ -1860,6 +1859,15 @@ class VpnNotifier extends Notifier<VpnStatus> {
     }
   }
 
+  String? _lastLoggedIface;
+
+  String _sessionScheme(String protocol) {
+    final selected = _selectedNodeProtocol?.trim();
+    if (selected != null && selected.isNotEmpty) return selected;
+    if (protocol.toUpperCase() == 'HYSTERIA2') return 'hysteria2';
+    return protocol.toLowerCase();
+  }
+
   void _rememberFreeSession(String sessionKey) {
     if (!freeKeyClient) return;
     _freeSessionOpen = true;
@@ -1875,7 +1883,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
     ProductLog.event('vpn.session_end', {
       'duration_s': seconds,
       'profile': current.serverName,
-      'scheme': current.protocol,
+      'scheme': _sessionScheme(current.protocol),
       'host': _profileHost,
     });
     try {
@@ -2141,22 +2149,6 @@ class VpnNotifier extends Notifier<VpnStatus> {
     }
   }
 
-  void _logUiTransition(String to, String src) {
-    final from = switch (state) {
-      VpnDisconnected() => 'disconnected',
-      VpnConnecting() => 'connecting',
-      VpnConnected() => 'connected',
-      VpnError() => 'error',
-    };
-    ProductLog.event('vpn.ui_transition', {
-      'from': from,
-      'to': to,
-      'src': src,
-      'phase': _lastSessionPhase.name,
-      'proving': _sessionProving,
-    });
-  }
-
   Future<void> _failConnectingFromNative() async {
     if (_sessionOwnsUi) return;
     if (state is! VpnConnecting) return;
@@ -2172,18 +2164,15 @@ class VpnNotifier extends Notifier<VpnStatus> {
     _cancelConnectingWatchdog();
     _endSessionWalk();
     if (_suppressAutoReconnect) {
-      _logUiTransition('disconnected', 'idle_connecting');
       state = const VpnDisconnected();
       return;
     }
     final detail = await VpnController.instance.getLastError();
     if (!_shouldDropConnectingOnIdle()) return;
     if (detail != null && detail.trim().isNotEmpty) {
-      _logUiTransition('error', 'idle_connecting');
       state = vpnErrorFromNativeDetail(detail);
       return;
     }
-    _logUiTransition('disconnected', 'idle_connecting');
     state = const VpnDisconnected();
   }
 
@@ -2199,7 +2188,6 @@ class VpnNotifier extends Notifier<VpnStatus> {
     _sessionProving = false;
     await _clearConnectedSince();
     final conflict = await VpnController.instance.queryVpnConflict();
-    _logUiTransition('error', 'stuck_connecting');
     if (conflict.foreignAlwaysOn || conflict.foreignVpnActive) {
       _vpnLog('[VPN] connecting stuck — conflict CTA');
       state = await _vpnErrorFromConflict(conflict);
@@ -2247,7 +2235,6 @@ class VpnNotifier extends Notifier<VpnStatus> {
       _recordSessionEnd();
       await _clearConnectedSince();
       _lastSessionPhase = VpnSessionPhase.idle;
-      _logUiTransition('disconnected', 'idle_connected');
       state = const VpnDisconnected();
     }
   }
