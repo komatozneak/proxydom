@@ -244,6 +244,8 @@ class VpnNotifier extends Notifier<VpnStatus> {
   bool _switchStop = false;
   int _dialGen = 0;
   int _liveDialGen = 0;
+  int _nativeGenFloor = 0;
+  int _lastNativeGen = 0;
 
   /// One PathIncompatible Auto retry on Wi-Fi (issue #147).
   bool _wifiAutoRetryUsed = false;
@@ -1614,6 +1616,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
         final bool started;
         if (profile != null) {
           final dial = _dialGen == 0 ? ++_dialGen : _dialGen;
+          _nativeGenFloor = _lastNativeGen;
           ProductLog.event('vpn.connect_attempt', {
             'profile': shown.title,
             'scheme': imported.scheme,
@@ -1624,8 +1627,8 @@ class VpnNotifier extends Notifier<VpnStatus> {
             profile,
             displayLabel: shown.title,
           );
-          if (started && _dialGen == dial) {
-            _liveDialGen = dial;
+          if (!started || _dialGen != dial) {
+            started = false;
           }
         } else if (defaultTargetPlatform == TargetPlatform.android) {
           final xrayJson = buildXraySocksConfig(imported);
@@ -2013,6 +2016,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
       );
       return;
     }
+    _lastNativeGen = snap.generation;
     _lastSessionPhase = snap.phase;
     _sessionOwnsUi = snap.ownsConnectUi;
     final wasProving = _sessionProving;
@@ -2037,6 +2041,13 @@ class VpnNotifier extends Notifier<VpnStatus> {
       }
     }
     if (snap.isConnected) {
+      if (hideInAppPlategaCheckout &&
+          (snap.generation <= _nativeGenFloor || _switchStop)) {
+        return;
+      }
+      if (hideInAppPlategaCheckout) {
+        _liveDialGen = _dialGen;
+      }
       final proveId = snap.candidateId ?? _autoActiveNodeId ?? '';
       _lastProveSummary = 'id=$proveId ok reason=${snap.reason.name}';
       _cancelConnectingWatchdog();

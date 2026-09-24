@@ -479,8 +479,8 @@ class TeremokVpnService : VpnService() {
             emit: (SessionSnapshot) -> Unit,
         ): Boolean {
             if (!alive()) return false
-            startVpn(username, protocol, params)
-            return isRunning
+            startVpn(username, protocol, params, alive)
+            return isRunning && alive()
         }
 
         override fun teardownGeneration(generation: Long) {
@@ -987,13 +987,17 @@ class TeremokVpnService : VpnService() {
         username: String,
         protocol: String,
         params: Map<String, Any?>,
+        alive: () -> Boolean = { true },
     ) {
-        if (isRunning) {
-            Log.w(TAG, "startVpn: already running — teardown+reapply new params")
+        if (!alive()) return
+        if (isRunning || HysteriaBridge.instance.isRunning.get()) {
+            Log.w(TAG, "startVpn: previous hysteria still up — stop before establish")
             teardownCores()
         }
+        if (!alive()) return
         if (establishInProgress) {
-            Log.w(TAG, "startVpn: establish already in progress, skip")
+            Log.w(TAG, "startVpn: establish already in progress")
+            failStart("establish already in progress")
             return
         }
         establishInProgress = true
@@ -1018,7 +1022,7 @@ class TeremokVpnService : VpnService() {
             }
 
             if (isHysteriaCore(params)) {
-                startHysteriaOnWorker(username, protocol, params)
+                startHysteriaOnWorker(username, protocol, params, alive)
                 return
             }
             if (isXrayShareCore(params)) {
@@ -1129,6 +1133,7 @@ class TeremokVpnService : VpnService() {
         username: String,
         protocol: String,
         params: Map<String, Any?>,
+        alive: () -> Boolean = { true },
     ) {
         val server = (params["hysteriaServer"] as? String)?.trim().orEmpty()
         val auth = (params["hysteriaAuth"] as? String)?.trim().orEmpty()
@@ -1200,8 +1205,19 @@ class TeremokVpnService : VpnService() {
         }
         VpnUnderlyingNetworkPolicy.applyTo(this)
 
+        if (!alive()) {
+            teardownCores()
+            return
+        }
         val hy = HysteriaBridge.instance
         hy.bind(this)
+        if (hy.isRunning.get()) {
+            hy.stop()
+        }
+        if (!alive()) {
+            teardownCores()
+            return
+        }
         if (!hy.start(
                 server = server,
                 auth = auth,
@@ -1239,8 +1255,16 @@ class TeremokVpnService : VpnService() {
             label = "hysteria",
             configJson = hysteriaTun2SocksConfig(mtu),
         )
+        if (!alive()) {
+            teardownCores()
+            return
+        }
         if (!probeSocksHttps(probeCandidate)) {
             failStart("$nodeId@$server: SOCKS HTTPS probe failed")
+            return
+        }
+        if (!alive()) {
+            teardownCores()
             return
         }
 

@@ -97,8 +97,11 @@ func Start(configJSON string) string {
 	alreadyRunning := hyClient != nil
 	mu.Unlock()
 	if alreadyRunning {
-		// SOCKS prove already started the core; refresh site-split suffixes.
-		return ""
+		prev, ok := loadStartConfig()
+		if ok && prev.Server == cfg.Server && prev.Auth == cfg.Auth {
+			return ""
+		}
+		return "already running"
 	}
 	if cfg.Server == "" || cfg.Auth == "" {
 		return "server and auth are required"
