@@ -11,7 +11,9 @@ import '../../../l10n/app_localizations.dart';
 import '../../home/application/vpn_provider.dart';
 import '../data/hy2_import_store.dart';
 import '../data/share_link_parser.dart';
+import '../data/subscription_label.dart';
 import 'free_client_chrome.dart';
+import 'pool_server_mark.dart';
 
 /// Add a link or key, preview the profiles, then save or connect.
 class Hy2ImportScreen extends ConsumerStatefulWidget {
@@ -266,11 +268,19 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
                     else
                       for (var i = 0; i < _preview.length; i++) ...[
                         if (i > 0) const SizedBox(height: 8),
-                        ImportedProfileCard(
-                          name: _preview[i].name,
-                          scheme: _preview[i].scheme,
-                          endpoint: _preview[i].endpoint,
-                          selected: i == 0,
+                        Builder(
+                          builder: (context) {
+                            final label = labelForShareLink(_preview[i]);
+                            return ListTile(
+                              leading: PoolServerMark(label: label),
+                              title: Text(label.title),
+                              subtitle: Text(
+                                label.subtitle.isEmpty
+                                    ? _preview[i].endpoint
+                                    : label.subtitle,
+                              ),
+                            );
+                          },
                         ),
                       ],
                   ],
