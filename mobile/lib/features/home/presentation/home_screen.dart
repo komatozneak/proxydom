@@ -926,12 +926,14 @@ class _FreeClientHome extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              SizedBox(
-                height: 96,
-                width: double.infinity,
-                child: Center(child: _houseSlot()),
-              ),
-              const SizedBox(height: 8),
+              if (_showsEmptyHint) ...[
+                const SizedBox(
+                  height: 96,
+                  width: double.infinity,
+                  child: Center(child: FreeClientEmptyState(compact: true)),
+                ),
+                const SizedBox(height: 8),
+              ],
               SizedBox(
                 width: nestSize,
                 height: nestSize,
@@ -987,14 +989,11 @@ class _FreeClientHome extends StatelessWidget {
     );
   }
 
-  Widget _houseSlot() {
+  bool get _showsEmptyHint {
     final noProfile = serverTitle == '…' ||
         serverTitle == 'Нет ссылки' ||
         serverTitle == 'No link';
-    if (noProfile && status is! VpnConnecting && status is! VpnConnected) {
-      return const FreeClientEmptyState(compact: true);
-    }
-    return const SizedBox.shrink();
+    return noProfile && status is! VpnConnecting && status is! VpnConnected;
   }
 
   String _formatUptime(DateTime since) {
