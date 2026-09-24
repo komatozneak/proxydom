@@ -33,6 +33,7 @@ import '../../settings/application/subscription_status_provider.dart';
 import '../../settings/data/auto_reconnect_prefs.dart';
 import '../data/external_ip_service.dart';
 import 'vpn_status.dart';
+import 'vpn_status_log.dart';
 
 /// Singleton-репозиторий для VPN-конфига.
 final vpnConfigRepositoryProvider = Provider<VpnConfigRepository>(
@@ -214,6 +215,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
   Timer? _connectingPoll;
   Timer? _disconnectWatchdog;
   Future<void>? _syncInFlight;
+  final NativeStatusLog _nativeStatusLog = NativeStatusLog();
   DateTime? _connectingUiStartedAt;
 
   /// Cold-start getStatus loop finished — ignore idle demotion until then.
@@ -264,7 +266,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
   /// churn / hung `stop` / missed EventChannel).
   Future<void> reconcileWithNative() async {
     final native = await VpnController.instance.getStatus();
-    _vpnLog('[VPN] reconcileWithNative native=$native ui=$state');
+    final before = vpnUiPhase(state);
     switch (native) {
       case VpnNativeStatus.connected:
         if (state is VpnConnected) return;
@@ -282,12 +284,14 @@ class VpnNotifier extends Notifier<VpnStatus> {
           }
         }
         await _enterConnected(freshSession: state is VpnConnecting);
+        _logReconcile(native, before);
       case VpnNativeStatus.connecting:
       case VpnNativeStatus.preparing:
         if (_sessionOwnsUi) return;
         if (state is VpnDisconnected || state is VpnError) {
           state = const VpnConnecting(progress: 0.5);
           _armConnectingPoll();
+          _logReconcile(native, before);
         }
       case VpnNativeStatus.idle:
       case VpnNativeStatus.unknown:
@@ -297,13 +301,16 @@ class VpnNotifier extends Notifier<VpnStatus> {
         }
         if (state is VpnConnecting && _connectInFlight == null) {
           await _failConnectingIdle();
+          _logReconcile(native, before);
         } else if (state is VpnConnected) {
           await _confirmIdleDrop();
+          _logReconcile(native, before);
         }
       case VpnNativeStatus.error:
         if (_sessionOwnsUi) return;
         if (state is! VpnError) {
           state = await _vpnErrorFromNative();
+          _logReconcile(native, before);
         }
       case VpnNativeStatus.disconnecting:
         break;
@@ -312,8 +319,15 @@ class VpnNotifier extends Notifier<VpnStatus> {
         if (state is VpnConnected || state is VpnConnecting) {
           await _clearConnectedSince();
           state = const VpnError(message: 'VPN was revoked by system');
+          _logReconcile(native, before);
         }
     }
+  }
+
+  void _logReconcile(VpnNativeStatus native, String before) {
+    final after = vpnUiPhase(state);
+    if (after == before) return;
+    _vpnLog('vpn.reconcile native=${native.name} from=$before to=$after');
   }
 
   /// Poll native while UI is connecting. Never force-stops (ADR 014 / 015).
@@ -793,7 +807,8 @@ class VpnNotifier extends Notifier<VpnStatus> {
       VpnNativeStatus? native;
       for (var attempt = 0; attempt < 5; attempt++) {
         native = await VpnController.instance.getStatus();
-        _vpnLog('[VPN] syncFromNative[$attempt] status=$native');
+        final line = _nativeStatusLog.lineFor(native);
+        if (line != null) _vpnLog(line);
         if (native == VpnNativeStatus.connected ||
             native == VpnNativeStatus.connecting ||
             native == VpnNativeStatus.preparing ||
@@ -855,7 +870,8 @@ class VpnNotifier extends Notifier<VpnStatus> {
         // Nest Connected from a stale ConnectedHealthy (restore / resume).
         if (state is VpnConnected) {
           _vpnLog(
-            '[VPN] syncFromNative idle drop phase=$_lastSessionPhase ui=$state',
+            'vpn.native idle_drop phase=${_lastSessionPhase.name} '
+            'ui=${vpnUiPhase(state)}',
           );
           await _confirmIdleDrop(force: true);
           // iOS may tear NEVPN without our stop; sessionActive (KEY_ACTIVE) means
@@ -1892,7 +1908,8 @@ class VpnNotifier extends Notifier<VpnStatus> {
       userStopping: _suppressAutoReconnect,
     )) {
       _vpnLog(
-        '[VPN] ignore regressive ${snap.phase.name} last=$_lastSessionPhase ui=$state',
+        'vpn.native ignore regressive ${snap.phase.name} '
+        'last=${_lastSessionPhase.name} ui=${vpnUiPhase(state)}',
       );
       return;
     }
