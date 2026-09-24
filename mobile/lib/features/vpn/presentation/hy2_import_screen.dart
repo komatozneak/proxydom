@@ -25,10 +25,14 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
   final _controller = TextEditingController();
   final _fieldFocus = FocusNode();
   List<ParsedShareLink> _preview = const [];
+  String? _previewTitle;
   String? _error;
   bool _busy = false;
+  bool _loadingPreview = false;
+  bool _subscriptionUrl = false;
   bool _hasSaved = false;
   var _clipboardApplied = false;
+  int _previewGen = 0;
 
   @override
   void initState() {
@@ -66,11 +70,45 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
   }
 
   void _previewInput(String raw) {
+    final text = raw.trim();
+    final gen = ++_previewGen;
+    if (isPendingSubscriptionUrl(text)) {
+      setState(() {
+        _subscriptionUrl = true;
+        _loadingPreview = true;
+        _error = null;
+        _preview = const [];
+        _previewTitle = null;
+      });
+      Hy2ImportStore.instance.previewSubscription(text).then((result) {
+        if (!mounted || gen != _previewGen) return;
+        setState(() {
+          _loadingPreview = false;
+          _preview = result.links;
+          _previewTitle = result.title;
+          _error = result.links.isEmpty ? 'empty' : null;
+        });
+      }).catchError((Object _) {
+        if (!mounted || gen != _previewGen) return;
+        setState(() {
+          _loadingPreview = false;
+          _preview = const [];
+          _previewTitle = null;
+          _error = 'bad';
+        });
+      });
+      return;
+    }
+    setState(() {
+      _subscriptionUrl = false;
+      _loadingPreview = false;
+      _previewTitle = null;
+    });
     try {
-      final links = parseShareSubscription(raw.trim());
+      final links = parseShareSubscription(text);
       setState(() {
         _preview = links;
-        _error = links.isEmpty ? 'empty' : null;
+        _error = text.isEmpty || links.isNotEmpty ? null : 'empty';
       });
     } on FormatException {
       setState(() {
@@ -79,6 +117,9 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
       });
     }
   }
+
+  bool get _canSave =>
+      !_busy && _error == null && (_subscriptionUrl || _preview.isNotEmpty);
 
   Future<void> _save({required bool connect}) async {
     setState(() {
@@ -191,6 +232,10 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
                       onPaste: _pasteClipboard,
                       onScan: () => context.push('/scan'),
                     ),
+                    if (_loadingPreview) ...[
+                      const SizedBox(height: 8),
+                      const LinearProgressIndicator(),
+                    ],
                     if (_error != null) ...[
                       const SizedBox(height: 8),
                       Text(
@@ -206,6 +251,16 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
                       ),
                     ),
                     const SizedBox(height: 8),
+                    if (_previewTitle != null && _previewTitle!.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Text(
+                          _previewTitle!,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
                     if (_preview.isEmpty)
                       const FreeClientEmptyState(compact: true)
                     else
@@ -223,9 +278,7 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
               ),
               const SizedBox(height: 12),
               FilledButton(
-                onPressed: _busy || _preview.isEmpty
-                    ? null
-                    : () => _save(connect: true),
+                onPressed: _canSave ? () => _save(connect: true) : null,
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   backgroundColor: theme.colorScheme.primary,
@@ -238,9 +291,7 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
               ),
               const SizedBox(height: 8),
               OutlinedButton(
-                onPressed: _busy || _preview.isEmpty
-                    ? null
-                    : () => _save(connect: false),
+                onPressed: _canSave ? () => _save(connect: false) : null,
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   foregroundColor: theme.colorScheme.onSurface,

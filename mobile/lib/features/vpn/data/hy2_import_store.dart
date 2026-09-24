@@ -188,6 +188,20 @@ class Hy2ImportStore {
     return links;
   }
 
+  /// Download a subscription and parse it without writing the store.
+  Future<({List<ParsedShareLink> links, String? title})> previewSubscription(
+    String url,
+  ) async {
+    final fetched = await _fetch(url);
+    final links = parseShareSubscription(fetched.body);
+    if (links.isEmpty) {
+      throw const FormatException('no links');
+    }
+    final title =
+        fetched.profileTitle ?? titleFromSubscriptionBody(fetched.body);
+    return (links: links, title: title);
+  }
+
   Future<({String body, String? profileTitle})> _fetch(String url) async {
     final client = HttpClient();
     try {

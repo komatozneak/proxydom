@@ -45,4 +45,17 @@ hysteria2://user:pass@203.0.113.12:443/?sni=c.example#Charlie
     expect(links, hasLength(1));
     expect(links.single.name, 'Wrapped');
   });
+
+  test('an https subscription address is not an empty key list', () {
+    const url =
+        'https://api.teremokconnect.online:8443/api/v1/sub/example-token';
+    expect(isPendingSubscriptionUrl(url), isTrue);
+    expect(parseShareSubscription(url), isEmpty);
+    const body = '''
+# Teremok VPN
+hysteria2://user:pass@203.0.113.12:443/?sni=c.example#Charlie
+''';
+    expect(isPendingSubscriptionUrl(body), isFalse);
+    expect(parseShareSubscription(body), hasLength(1));
+  });
 }

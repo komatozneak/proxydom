@@ -162,3 +162,10 @@ String? _decodeUtf8Base64(String payload) {
     return null;
   }
 }
+
+/// True when [raw] is an http(s) subscription address, not a list of keys.
+bool isPendingSubscriptionUrl(String raw) {
+  final text = raw.trim();
+  if (!looksLikeSubscriptionUrl(text)) return false;
+  return parseShareSubscription(text).isEmpty;
+}
