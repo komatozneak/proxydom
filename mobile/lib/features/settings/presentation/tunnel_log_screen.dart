@@ -173,24 +173,45 @@ class _TunnelLogScreenState extends State<TunnelLogScreen> {
           ),
           SafeArea(
             top: false,
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _action(AppIcons.refresh, l.tunnelLogsRefresh, _reload),
-                  _action(
-                    AppIcons.clipboard,
-                    l.tunnelLogsCopy,
-                    () => _copy(visible),
-                  ),
-                  _action(
-                    AppIcons.download,
-                    l.tunnelLogsExport,
-                    () => _copy(_lines),
-                  ),
-                  _action(AppIcons.trash, l.tunnelLogsDelete, _delete),
-                ],
-              ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: _action(
+                        AppIcons.refresh,
+                        l.tunnelLogsRefresh,
+                        _reload,
+                      ),
+                    ),
+                    Expanded(
+                      child: _action(
+                        AppIcons.clipboard,
+                        l.tunnelLogsCopy,
+                        () => _copy(visible),
+                      ),
+                    ),
+                  ],
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _action(
+                        AppIcons.download,
+                        l.tunnelLogsExport,
+                        () => _copy(_lines),
+                      ),
+                    ),
+                    Expanded(
+                      child: _action(
+                        AppIcons.trash,
+                        l.tunnelLogsDelete,
+                        _delete,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         ],
@@ -202,7 +223,7 @@ class _TunnelLogScreenState extends State<TunnelLogScreen> {
     return TextButton.icon(
       onPressed: onTap,
       icon: AppIcon(icon, size: 18, color: AppBrand.secondary),
-      label: Text(label),
+      label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
     );
   }
 
