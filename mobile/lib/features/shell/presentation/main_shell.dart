@@ -163,8 +163,9 @@ class _PaperStatusScrim extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final top = MediaQuery.paddingOf(context).top;
+    // Same honey as the mid ring behind the house, not a dark slab.
     final scrim = Color.alphaBlend(
-      Colors.black.withValues(alpha: dark ? 0.45 : 0.14),
+      AppBrand.flame.withValues(alpha: dark ? 0.22 : 0.16),
       paper,
     );
     return AnnotatedRegion<SystemUiOverlayStyle>(
