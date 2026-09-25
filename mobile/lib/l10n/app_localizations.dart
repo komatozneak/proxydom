@@ -1576,7 +1576,7 @@ abstract class AppL10n {
   /// No description provided for @tunnelLogsExport.
   ///
   /// In en, this message translates to:
-  /// **'Export all'**
+  /// **'Share'**
   String get tunnelLogsExport;
 
   /// No description provided for @tunnelLogsDelete.

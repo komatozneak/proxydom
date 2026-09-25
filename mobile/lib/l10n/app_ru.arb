@@ -290,7 +290,7 @@
   "tunnelLogsNetwork": "Сеть",
   "tunnelLogsRefresh": "Обновить",
   "tunnelLogsCopy": "Копировать",
-  "tunnelLogsExport": "Экспорт всех",
+  "tunnelLogsExport": "Поделиться",
   "tunnelLogsDelete": "Удалить",
   "tunnelLogsCopied": "Лог скопирован",
   "tunnelLogsEmpty": "Записей нет",

@@ -49,6 +49,7 @@ abstract final class AppIcons {
   static const IconData back = PhosphorIconsRegular.arrowLeft;
   static const IconData backBold = PhosphorIconsBold.arrowLeft;
   static const IconData download = PhosphorIconsRegular.cloudArrowDown;
+  static const IconData share = PhosphorIconsRegular.shareNetwork;
   static const IconData upload = PhosphorIconsRegular.cloudArrowUp;
   static const IconData globe = PhosphorIconsRegular.globe;
   static const IconData globeHemisphereWest =

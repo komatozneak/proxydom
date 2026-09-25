@@ -809,7 +809,7 @@ class AppL10nEn extends AppL10n {
   String get tunnelLogsCopy => 'Copy';
 
   @override
-  String get tunnelLogsExport => 'Export all';
+  String get tunnelLogsExport => 'Share';
 
   @override
   String get tunnelLogsDelete => 'Delete';

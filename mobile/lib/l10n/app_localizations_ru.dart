@@ -809,7 +809,7 @@ class AppL10nRu extends AppL10n {
   String get tunnelLogsCopy => 'Копировать';
 
   @override
-  String get tunnelLogsExport => 'Экспорт всех';
+  String get tunnelLogsExport => 'Поделиться';
 
   @override
   String get tunnelLogsDelete => 'Удалить';

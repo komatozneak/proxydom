@@ -34,4 +34,20 @@ class NetBindLogTest {
         scheduled?.run()
         assertEquals(listOf("error net.bind iface=rmnet1 ok=false retries=1"), emitted)
     }
+
+    @Test
+    fun `a second success inside the window is dropped`() {
+        val emitted = mutableListOf<String>()
+        var clock = 5_000L
+        val log = NetBindLog(
+            emit = { level, event, fields -> emitted.add("$level $event $fields") },
+            postDelayed = { _, _ -> },
+            cancel = {},
+            now = { clock },
+        )
+        log.record("rmnet1", ok = true)
+        clock += 1
+        log.record("rmnet1", ok = true)
+        assertEquals(listOf("debug net.bind iface=rmnet1 ok=true retries=0"), emitted)
+    }
 }

@@ -39,12 +39,12 @@ class SessionTrace {
   }
 }
 
-/// Intermediate steps stay debug. A proved tunnel is info. A failed step is error.
+/// Intermediate steps stay debug. The egress probe, not the phase, is info.
 ProductLogLevel levelForVpnPhase(String phase) {
   return switch (phase) {
     'fail' || 'Error' => ProductLogLevel.error,
     'ConnectedDegraded' || 'Degraded' => ProductLogLevel.warn,
-    'connected' || 'ConnectedHealthy' => ProductLogLevel.info,
+    'connected' || 'ConnectedHealthy' => ProductLogLevel.debug,
     _ => ProductLogLevel.debug,
   };
 }

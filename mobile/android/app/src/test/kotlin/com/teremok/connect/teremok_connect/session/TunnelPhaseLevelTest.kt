@@ -7,7 +7,7 @@ class TunnelPhaseLevelTest {
     @Test
     fun `healthy is info and a terminal egress failure is error`() {
         assertEquals("debug", tunnelPhaseLevel(SessionPhase.Binding, SessionReason.None))
-        assertEquals("info", tunnelPhaseLevel(SessionPhase.ConnectedHealthy, SessionReason.EgressOk))
+        assertEquals("debug", tunnelPhaseLevel(SessionPhase.ConnectedHealthy, SessionReason.EgressOk))
         assertEquals("warn", tunnelPhaseLevel(SessionPhase.ConnectedDegraded, SessionReason.Degraded))
         assertEquals(
             "error",

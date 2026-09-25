@@ -170,7 +170,6 @@ class VpnNotifier extends Notifier<VpnStatus> {
       'vpn.connect_abort',
       level: ProductLogLevel.debug,
       sid: _sid,
-      fields: _sessionFields,
       extra: {'gen': gen, 'now': _connectGeneration},
     );
     _endSessionWalk();
@@ -332,16 +331,6 @@ class VpnNotifier extends Notifier<VpnStatus> {
     final line = _nativeStatusLog.lineFor(status);
     if (line == null) return;
     _vpnLog(line);
-    ProductLog.event(
-      'vpn.native',
-      level: switch (status) {
-        VpnNativeStatus.error || VpnNativeStatus.revoked =>
-          ProductLogLevel.error,
-        VpnNativeStatus.connected => ProductLogLevel.info,
-        _ => ProductLogLevel.debug,
-      },
-      fields: {'status': status.name},
-    );
   }
 
   bool _coreStartLogged = false;
@@ -354,7 +343,6 @@ class VpnNotifier extends Notifier<VpnStatus> {
         'vpn.core_start',
         level: ProductLogLevel.info,
         sid: _sid,
-        fields: _sessionFields,
         extra: {'ok': true},
       );
       unawaited(_logShareTcp());
@@ -365,7 +353,6 @@ class VpnNotifier extends Notifier<VpnStatus> {
         'vpn.core_start',
         level: ProductLogLevel.error,
         sid: _sid,
-        fields: _sessionFields,
         extra: {'ok': false, 'error': detail},
       );
     }));
@@ -379,7 +366,6 @@ class VpnNotifier extends Notifier<VpnStatus> {
       'vpn.server_tcp',
       level: ProductLogLevel.debug,
       sid: _sid,
-      fields: _sessionFields,
       extra: {'detail': detail},
     );
   }
@@ -573,17 +559,6 @@ class VpnNotifier extends Notifier<VpnStatus> {
         protocol: protocol,
         connectedSince: cur.connectedSince,
       );
-      ProductLog.event(
-        'vpn.connected',
-        level: ProductLogLevel.info,
-        fields: {
-          'winner_id': _autoActiveNodeId,
-          'core': config?.activeCore.name,
-          'label': serverName,
-          'scheme': _sessionScheme(protocol),
-          'host': _profileHost,
-        },
-      );
       _rememberFreeSession(sessionKey);
       unawaited(_persistConnectedUi());
       return;
@@ -609,17 +584,6 @@ class VpnNotifier extends Notifier<VpnStatus> {
       serverName: serverName,
       protocol: protocol,
       connectedSince: since,
-    );
-    ProductLog.event(
-      'vpn.connected',
-      level: ProductLogLevel.info,
-      fields: {
-        'winner_id': _autoActiveNodeId,
-        'core': config?.activeCore.name,
-        'label': serverName,
-        'scheme': _sessionScheme(protocol),
-        'host': _profileHost,
-      },
     );
     SessionTrace.mark('connected');
     _rememberFreeSession(sessionKey);
@@ -683,7 +647,6 @@ class VpnNotifier extends Notifier<VpnStatus> {
         'vpn.egress_probe',
         level: ok ? ProductLogLevel.info : ProductLogLevel.error,
         sid: _sid,
-        fields: _sessionFields,
         extra: {
           'ok': ok,
           'external_ip': ok ? shownIp : 'fail',
@@ -1118,16 +1081,6 @@ class VpnNotifier extends Notifier<VpnStatus> {
           final dial = _dialGen == 0 ? ++_dialGen : _dialGen;
           _handshakeHost = imported.endpoint;
           _nativeGenFloor = _lastNativeGen;
-          ProductLog.event(
-            'vpn.connect_attempt',
-            level: ProductLogLevel.info,
-            fields: {
-              'profile': shown.title,
-              'scheme': imported.scheme,
-              'host': _profileHost,
-              'sni': profile.sni,
-            },
-          );
           final raw = await VpnController.instance.startHysteria(
             profile,
             displayLabel: shown.title,
@@ -1284,7 +1237,6 @@ class VpnNotifier extends Notifier<VpnStatus> {
       'vpn.disconnect',
       level: ProductLogLevel.info,
       sid: _sid,
-      fields: _sessionFields,
       extra: {'reason': reason, 'native_before': native.name},
     );
     final uiBusy = state is VpnConnected || state is VpnConnecting;
@@ -1364,7 +1316,6 @@ class VpnNotifier extends Notifier<VpnStatus> {
         'vpn.disconnect',
         level: ProductLogLevel.info,
         sid: _sid,
-        fields: _sessionFields,
         extra: {'native_after': after.name},
       );
       _cancelDisconnectWatchdog();
@@ -1664,7 +1615,6 @@ class VpnNotifier extends Notifier<VpnStatus> {
                 'vpn.server_tcp',
                 level: ProductLogLevel.error,
                 sid: _sid,
-                fields: _sessionFields,
                 extra: {'detail': err.message},
               );
             }

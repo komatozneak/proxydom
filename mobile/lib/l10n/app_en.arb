@@ -464,7 +464,7 @@
   "tunnelLogsNetwork": "Network",
   "tunnelLogsRefresh": "Refresh",
   "tunnelLogsCopy": "Copy",
-  "tunnelLogsExport": "Export all",
+  "tunnelLogsExport": "Share",
   "tunnelLogsDelete": "Delete",
   "tunnelLogsCopied": "Log copied",
   "tunnelLogsEmpty": "No entries",

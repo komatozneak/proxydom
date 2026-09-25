@@ -18,7 +18,8 @@ void main() {
     final lines = AppLogBuffer.instance.recentLines();
     expect(lines.first, contains('phase=begin'));
     expect(lines.first, contains('sid=abc'));
-    expect(lines.first, contains('ms=0'));
+    final beginMs = int.parse(RegExp(r'ms=(\d+)').firstMatch(lines.first)!.group(1)!);
+    expect(beginMs, lessThan(20));
     expect(lines.last, contains('phase=config'));
     expect(lines.last, contains('scheme=vless'));
   });

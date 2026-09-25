@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../core/diagnostics/app_log_buffer.dart';
 import '../../../core/diagnostics/product_log.dart';
@@ -121,7 +122,7 @@ class _TunnelLogScreenState extends State<TunnelLogScreen> {
   Future<void> _copy(List<String> lines) async {
     UiLog.action(
       'logs',
-      'export',
+      'copy',
       level: ProductLogLevel.info,
       extra: {'lines': lines.length},
     );
@@ -129,6 +130,30 @@ class _TunnelLogScreenState extends State<TunnelLogScreen> {
     await Clipboard.setData(ClipboardData(text: text));
     if (!mounted) return;
     showTeremokSnackBar(context, AppL10n.of(context).tunnelLogsCopied);
+  }
+
+  Future<void> _shareAll() async {
+    final l = AppL10n.of(context);
+    final lines = _lines;
+    UiLog.action(
+      'logs',
+      'share',
+      level: ProductLogLevel.info,
+      extra: {'lines': lines.length},
+    );
+    if (lines.isEmpty) {
+      showTeremokSnackBar(context, l.tunnelLogsEmpty);
+      return;
+    }
+    final box = context.findRenderObject();
+    final origin = box is RenderBox && box.hasSize
+        ? box.localToGlobal(Offset.zero) & box.size
+        : null;
+    await Share.share(
+      redactTunnelLog(lines.join('\n')),
+      subject: l.tunnelLogsTitle,
+      sharePositionOrigin: origin,
+    );
   }
 
   Future<void> _delete() async {
@@ -254,9 +279,9 @@ class _TunnelLogScreenState extends State<TunnelLogScreen> {
                   children: [
                     Expanded(
                       child: _action(
-                        AppIcons.download,
+                        AppIcons.share,
                         l.tunnelLogsExport,
-                        () => _copy(_lines),
+                        _shareAll,
                       ),
                     ),
                     Expanded(
