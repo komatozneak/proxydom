@@ -37,7 +37,9 @@ func prepareCoreLog(configJSON string) {
 	coreMu.Lock()
 	coreDir = strings.TrimSpace(env.Dir)
 	coreLevel = normalizeCoreLevel(env.Level)
+	level := coreLevel
 	coreMu.Unlock()
+	setTunnelLogLevel(level)
 }
 
 func normalizeCoreLevel(raw string) string {

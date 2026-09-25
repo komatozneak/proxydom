@@ -6,6 +6,7 @@ require (
 	github.com/apernet/hysteria/core/v2 v2.6.2
 	github.com/xjasonlyu/tun2socks/v2 v2.6.0
 	github.com/xtls/xray-core v1.8.24
+	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.57.0
 	golang.org/x/sys v0.48.0
 	google.golang.org/protobuf v1.34.2
@@ -42,7 +43,6 @@ require (
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/mock v0.5.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.uber.org/zap v1.27.0 // indirect
 	go4.org/netipx v0.0.0-20231129151722-fdeea329fbba // indirect
 	golang.org/x/exp v0.0.0-20240531132922-fd00a4e0eefc // indirect
 	golang.org/x/mobile v0.0.0-20260908204917-8b95e45f8d3e // indirect

@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/xjasonlyu/tun2socks/v2/core"
-	"github.com/xjasonlyu/tun2socks/v2/core/option"
 	"github.com/xjasonlyu/tun2socks/v2/tunnel"
 	"gvisor.dev/gvisor/pkg/buffer"
 	"gvisor.dev/gvisor/pkg/tcpip/header"
@@ -80,13 +78,7 @@ func StartPacketTun(mtu int) string {
 	ep.AddNotify(dev)
 
 	tunnel.T().SetDialer(&hyDialer{c: hyClient})
-	st, err := core.CreateStack(&core.Config{
-		LinkEndpoint:     ep,
-		TransportHandler: tunnel.T(),
-		Options: []option.Option{
-			option.WithTCPModerateReceiveBuffer(true),
-		},
-	})
+	st, err := createTunStack(ep)
 	if err != nil {
 		ep.Close()
 		return fmt.Sprintf("packet tun stack: %v", err)

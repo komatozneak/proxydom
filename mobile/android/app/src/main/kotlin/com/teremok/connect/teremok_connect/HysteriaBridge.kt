@@ -100,7 +100,7 @@ class HysteriaBridge private constructor() {
                     "directSuffixes=${suffixes.length()}",
             )
             Hy2bind.setProtector(Hy2VpnProtector(svc))
-            val err: String? = Hy2bind.start(obj.toString())
+            val err: String? = Hy2bind.start(CoreLog.enrich(svc, obj.toString()))
             if (!err.isNullOrBlank()) {
                 lastErrorMessage = err
                 Log.e(TAG, "start: Hy2bind.start error=$err")
