@@ -14,15 +14,20 @@ class ShareSessionLog {
 
   static void emit(
     String name, {
+    required ProductLogLevel level,
     String? sid,
     Map<String, Object?> fields = const {},
     Map<String, Object?> extra = const {},
   }) {
-    ProductLog.event(name, {
-      if (sid != null && sid.isNotEmpty) 'sid': sid,
-      ...fields,
-      ...extra,
-    });
+    ProductLog.event(
+      name,
+      level: level,
+      fields: {
+        if (sid != null && sid.isNotEmpty) 'sid': sid,
+        ...fields,
+        ...extra,
+      },
+    );
   }
 
   /// Protocol facts safe to print. No password, URI, or key material.

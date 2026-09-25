@@ -13,7 +13,7 @@ import 'connect_button.dart';
 ///
 /// | State | House | Network |
 /// |---|---|---|
-/// | disconnected | still, house only | hidden |
+/// | disconnected | quiet breath, house is the start | hidden |
 /// | connecting | soft seamless hop | nest emerges + orbits |
 /// | connected | barely breathes | same nest, calmer |
 /// | error | frozen + grey | hidden |
@@ -123,7 +123,8 @@ class _SignalNestHeroState extends State<SignalNestHero>
     final t = _tSec;
     switch (widget.state) {
       case TreeState.disconnected:
-        final p = 1.0 + 0.005 * (0.5 + 0.5 * math.sin(t * math.pi * 2 / 3.6));
+        // Idle house is the only start control, so the breath has to read.
+        final p = 1.0 + 0.018 * (0.5 + 0.5 * math.sin(t * math.pi * 2 / 3.6));
         return (sx: p, sy: p, dy: 0);
       case TreeState.connecting:
         return _slimeHop(t, 0.45);

@@ -9,8 +9,10 @@ import (
 	"strings"
 
 	"github.com/xtls/xray-core/app/dispatcher"
+	xraylog "github.com/xtls/xray-core/app/log"
 	"github.com/xtls/xray-core/app/proxyman"
 	"github.com/xtls/xray-core/app/router"
+	clog "github.com/xtls/xray-core/common/log"
 	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/common/protocol"
 	"github.com/xtls/xray-core/common/serial"
@@ -24,9 +26,9 @@ import (
 	vmess "github.com/xtls/xray-core/proxy/vmess"
 	vmessout "github.com/xtls/xray-core/proxy/vmess/outbound"
 	"github.com/xtls/xray-core/transport/internet"
+	"github.com/xtls/xray-core/transport/internet/kcp"
 	"github.com/xtls/xray-core/transport/internet/reality"
 	"github.com/xtls/xray-core/transport/internet/tls"
-	"github.com/xtls/xray-core/transport/internet/kcp"
 	"github.com/xtls/xray-core/transport/internet/websocket"
 	"google.golang.org/protobuf/proto"
 )
@@ -125,6 +127,13 @@ func loadShareConfig(configJSON string) (*xcore.Config, error) {
 	}
 	return &xcore.Config{
 		App: []*serial.TypedMessage{
+			// None: Xray's own logger would write every Info line. Our handler
+			// keeps the decision lines after New() replaces the process logger.
+			serial.ToTypedMessage(&xraylog.Config{
+				ErrorLogType:  xraylog.LogType_None,
+				ErrorLogLevel: clog.Severity_Info,
+				AccessLogType: xraylog.LogType_None,
+			}),
 			serial.ToTypedMessage(&dispatcher.Config{}),
 			serial.ToTypedMessage(&proxyman.InboundConfig{}),
 			serial.ToTypedMessage(&proxyman.OutboundConfig{}),

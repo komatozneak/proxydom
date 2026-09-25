@@ -788,6 +788,18 @@ class AppL10nEn extends AppL10n {
   String get tunnelLogsSession => 'Session';
 
   @override
+  String get tunnelLogsUi => 'Interface';
+
+  @override
+  String get tunnelLogsCore => 'Core';
+
+  @override
+  String get tunnelLogsDns => 'DNS';
+
+  @override
+  String get tunnelLogsFetch => 'Subscription';
+
+  @override
   String get tunnelLogsNetwork => 'Network';
 
   @override
@@ -1594,43 +1606,43 @@ class AppL10nEn extends AppL10n {
   String get iosAdvancedFeaturesCta => 'Advanced features';
 
   @override
-  String get vpnDisclosureTitle => 'Protected connection';
+  String get vpnDisclosureTitle => 'How the tunnel starts';
 
   @override
   String get vpnDisclosureLead =>
-      'Before the first connect, we explain how VPN works in Teremok and which data the service needs.';
+      'The house starts a tunnel from the line you chose. This screen explains that before Android asks for VPN permission.';
 
   @override
-  String get vpnDisclosureVpnTitle => 'Why Android VPN is required';
+  String get vpnDisclosureVpnTitle => 'What the app does';
 
   @override
   String get vpnDisclosureVpnBody =>
-      'The app uses the system VpnService to create a protected tunnel after you tap Connect. App traffic on the device is routed through this tunnel to Teremok VPN servers. This is the core function of the app — a protected connection, not access to a private corporate network.';
+      'After you accept, the house opens a local tunnel for the selected line. Device traffic goes to the server in that line. Android then shows its own VPN permission once.';
 
   @override
-  String get vpnDisclosureVpnTitleIos => 'Why a VPN configuration is required';
+  String get vpnDisclosureVpnTitleIos => 'What the app does';
 
   @override
   String get vpnDisclosureVpnBodyIos =>
-      'The app uses a system Network Extension (Packet Tunnel) to create a protected tunnel after you tap Connect. Device traffic is routed through this tunnel to Teremok VPN servers. This is the core function of the app — a protected connection on public networks, not access to a private corporate network and not traffic circumvention marketing.';
+      'After you accept, the house opens a local tunnel for the selected line. Device traffic goes to the server in that line. iPhone then shows its own VPN permission once.';
 
   @override
-  String get vpnDisclosureDataTitle => 'What data we process';
+  String get vpnDisclosureDataTitle => 'What stays on the phone';
 
   @override
   String get vpnDisclosureDataBody =>
-      'Install ID (device ID) and account ID — to grant access and restore it after reinstall. Subscription purchase history (via the payment provider; we do not store card numbers). On your request — a diagnostic report from Settings. Aggregated usage summary (connect attempts, session length) — without browsing history.';
+      'The access line stays on the device. A diagnostic report leaves the phone only if you send it from Settings. Browsing history is not recorded.';
 
   @override
   String get vpnDisclosureDataBodyIos =>
-      'Install ID (device ID) and account ID — to grant access and restore it after reinstall. On your request — a diagnostic report from Settings. Aggregated usage summary (connect attempts, session length) — without browsing history. We do not sell tunnel traffic or monetize other apps’ packets.';
+      'The access line stays on the device. A diagnostic report leaves the phone only if you send it from Settings. Browsing history is not recorded.';
 
   @override
-  String get vpnDisclosureNotTitle => 'What we do not do';
+  String get vpnDisclosureNotTitle => 'What the app does not do';
 
   @override
   String get vpnDisclosureNotBody =>
-      'We do not log visited websites and do not use an advertising ID. We do not monetize other apps’ traffic by manipulating ads.';
+      'It does not keep a history of sites and it does not read an advertising ID. It does not sell access or hand out servers: you bring the line.';
 
   @override
   String get vpnDisclosureAccept => 'Accept and continue';
@@ -1713,7 +1725,7 @@ class AppL10nEn extends AppL10n {
   String get freeAddHint => 'Paste a link or a key.';
 
   @override
-  String get freeSaveConnect => 'Save and connect';
+  String get freeSaveConnect => 'Save';
 
   @override
   String get freeSaveOnly => 'Save only';

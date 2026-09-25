@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/diagnostics/ui_log.dart';
 import '../../../core/ios_store_gates.dart';
 import '../../../core/router.dart';
 import '../../../core/theme.dart';
@@ -73,24 +74,35 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       ];
     }
     return [
-        _OnboardingCard(
-          icon: AppIcons.power,
-          title: l.onboardingConnectTitle,
-          body: onboardingConnectBodyForPlatform(l),
-        ),
-        _OnboardingCard(
-          icon: AppIcons.servers,
-          title: l.onboardingRegionTitle,
-          body: l.onboardingRegionBody,
-        ),
-      ];
+      _OnboardingCard(
+        icon: AppIcons.power,
+        title: l.onboardingConnectTitle,
+        body: onboardingConnectBodyForPlatform(l),
+      ),
+      _OnboardingCard(
+        icon: AppIcons.servers,
+        title: l.onboardingRegionTitle,
+        body: l.onboardingRegionBody,
+      ),
+    ];
   }
 
   Future<void> _finish({bool openImport = false}) async {
     if (freeKeyClient) {
+      UiLog.action(
+        'onboarding',
+        'finish',
+        extra: {'route': openImport ? '/import' : '/home'},
+      );
       await OnboardingPrefs.markWelcomeSeen();
       AppRouter.welcomeSeenCache = true;
-      if (mounted) context.go(openImport ? '/import' : '/home');
+      if (!mounted) return;
+      // Same push as Home, so «Добавить» has a back path to the house.
+      context.go('/home');
+      if (!openImport) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        AppRouter.config.push('/import');
+      });
     }
   }
 

@@ -57,3 +57,15 @@ enum class SessionReason {
         }
     }
 }
+
+/** Log level for a published session snapshot. Intermediate phases stay debug. */
+fun tunnelPhaseLevel(phase: SessionPhase, reason: SessionReason): String = when (phase) {
+    SessionPhase.ConnectedHealthy -> "info"
+    SessionPhase.ConnectedDegraded -> "warn"
+    SessionPhase.Error -> when (reason) {
+        SessionReason.Cancelled -> "debug"
+        SessionReason.PathIncompatible -> "warn"
+        else -> "error"
+    }
+    else -> "debug"
+}

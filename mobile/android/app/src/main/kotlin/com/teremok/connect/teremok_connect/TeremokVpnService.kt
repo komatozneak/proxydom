@@ -323,6 +323,7 @@ class TeremokVpnService : VpnService() {
          */
         fun readSingBoxStderrTail(context: android.content.Context, maxLines: Int): String {
             val ring = DiagnosticRing.tail(maxLines)
+            val core = CoreLog.readTail(context, maxLines)
             val file = java.io.File(context.filesDir, "xray/stderr.log")
             val fileTail = if (!file.exists()) {
                 ""
@@ -332,7 +333,7 @@ class TeremokVpnService : VpnService() {
                     if (lines.isEmpty()) "" else lines.takeLast(maxLines).joinToString("\n")
                 }.getOrDefault("")
             }
-            return listOf(ring, fileTail).filter { it.isNotBlank() }.joinToString("\n")
+            return listOf(ring, core, fileTail).filter { it.isNotBlank() }.joinToString("\n")
         }
 
         fun sessionPrefs(context: android.content.Context) =
@@ -510,7 +511,7 @@ class TeremokVpnService : VpnService() {
 
         override fun onPathDead(generation: Long, detail: String) {
             Log.e(TAG, "path dead gen=$generation $detail")
-            DiagnosticRing.append(TAG, "path dead gen=$generation $detail")
+            DiagnosticRing.event("error", "vpn.path", "phase=dead gen=$generation $detail")
             recoverDeadTunnel("path_dead $detail")
         }
 
@@ -730,7 +731,11 @@ class TeremokVpnService : VpnService() {
             "beginDeadRecover reason=$reason attempt=$deadRecoverAttempts/" +
                 "${DeadTunnelReconnect.MAX_ATTEMPTS}",
         )
-        DiagnosticRing.append(TAG, "vpn.recover attempt=$deadRecoverAttempts $reason")
+        DiagnosticRing.event(
+            "warn",
+            "vpn.recover",
+            "attempt=$deadRecoverAttempts reason=$reason",
+        )
         if (!enqueuePersistedStart(reason)) {
             coreRecovering = false
             Log.w(TAG, "beginDeadRecover: no persisted session")
@@ -1068,7 +1073,10 @@ class TeremokVpnService : VpnService() {
         username: String,
         params: Map<String, Any?>,
     ) {
-        val configJson = (params["xrayConfig"] as? String)?.trim().orEmpty()
+        val configJson = CoreLog.enrich(
+            this,
+            (params["xrayConfig"] as? String)?.trim().orEmpty(),
+        )
         if (configJson.isEmpty()) {
             failStart("xray config missing")
             return
@@ -1132,8 +1140,9 @@ class TeremokVpnService : VpnService() {
         val kcp = configJson.contains("\"network\":\"kcp\"") ||
             configJson.contains("\"network\": \"kcp\"")
         val reach = if (kcp) "udp" else tcpReach(serverHost, serverPort)
-        lastShareTcp = "server=$serverHost:$serverPort tcp=$reach"
-        DiagnosticRing.append(TAG, "vpn.server_tcp $lastShareTcp")
+        val tcpLine = "server=$serverHost:$serverPort tcp=$reach"
+        lastShareTcp = tcpLine
+        DiagnosticRing.event("debug", "vpn.server_tcp", tcpLine)
         val probe = VpnPingMonitor.socksConnectProbe(socksPort = 10809)
         if (probe !is VpnPingMonitor.SocksHttpsResult.Ok) {
             val reason = (probe as? VpnPingMonitor.SocksHttpsResult.Fail)?.reason
@@ -1488,7 +1497,11 @@ class TeremokVpnService : VpnService() {
     private fun failStart(message: String) {
         establishInProgress = false
         VpnStatusBroadcaster.setError(message)
-        DiagnosticRing.append(TAG, "failStart autoProving=$autoProving recovering=$coreRecovering msg=$message")
+        DiagnosticRing.event(
+            "error",
+            "vpn.fail",
+            "autoProving=$autoProving recovering=$coreRecovering",
+        )
         if (autoProving) {
             Log.w(TAG, "failStart during auto prove (no stopSelf): $message")
             teardownCores()
@@ -2020,6 +2033,14 @@ object VpnChannelRegistry {
                         result.success(
                             TeremokVpnService.readSingBoxStderrTail(appContext, maxLines),
                         )
+                    }
+                    "setCoreLogLevel" -> {
+                        CoreLog.override = call.argument<String>("level")
+                        result.success(true)
+                    }
+                    "clearCoreLog" -> {
+                        CoreLog.clear(appContext)
+                        result.success(true)
                     }
                     "getUnderlyingNetworkInterface" -> {
                         result.success(DefaultNetworkMonitor.currentInterfaceName ?: "(unknown)")

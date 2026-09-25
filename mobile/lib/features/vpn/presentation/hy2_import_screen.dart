@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/diagnostics/ui_log.dart';
 import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
@@ -10,6 +11,7 @@ import '../../../core/widgets/notebook_paper.dart';
 import '../../../core/widgets/teremok_snackbar.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../home/application/vpn_provider.dart';
+import '../../home/application/vpn_status.dart';
 import '../data/hy2_import_store.dart';
 import '../data/share_link_parser.dart';
 import '../data/subscription_link_inbox.dart';
@@ -75,6 +77,12 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
   Future<void> _pasteClipboard() async {
     final data = await Clipboard.getData(Clipboard.kTextPlain);
     final text = data?.text?.trim() ?? '';
+    UiLog.action(
+      'import',
+      'paste',
+      result: text.isEmpty ? 'empty' : 'ok',
+      extra: {'chars': text.length},
+    );
     if (!mounted || text.isEmpty) return;
     _controller.text = text;
     _previewInput(text);
@@ -99,8 +107,14 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
           _previewTitle = result.title;
           _error = result.links.isEmpty ? 'empty' : null;
         });
-      }).catchError((Object _) {
+      }).catchError((Object error) {
         if (!mounted || gen != _previewGen) return;
+        UiLog.action(
+          'import',
+          'preview',
+          result: 'fail',
+          reason: error.runtimeType.toString(),
+        );
         setState(() {
           _loadingPreview = false;
           _preview = const [];
@@ -122,11 +136,18 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
         _error = text.isEmpty || links.isNotEmpty ? null : 'empty';
       });
     } on FormatException {
+      UiLog.action('import', 'preview', result: 'bad');
       setState(() {
         _preview = const [];
         _error = 'bad';
       });
     }
+  }
+
+  Future<void> _stopLiveTunnel({required String reason}) async {
+    final status = ref.read(vpnProvider);
+    if (status is! VpnConnected && status is! VpnConnecting) return;
+    await ref.read(vpnProvider.notifier).disconnect(reason: reason);
   }
 
   bool get _canSave =>
@@ -136,6 +157,7 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
       (_subscriptionUrl || _preview.isNotEmpty);
 
   Future<void> _save({required bool connect}) async {
+    UiLog.action('import', 'save', extra: {'connect': connect});
     setState(() {
       _busy = true;
       _error = null;
@@ -143,10 +165,16 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
     try {
       final links = await Hy2ImportStore.instance.saveInput(_controller.text);
       if (!mounted) return;
+      UiLog.action(
+        'import',
+        'save',
+        result: 'ok',
+        extra: {'links': links.length, 'connect': connect},
+      );
       showTeremokSnackBar(context, AppL10n.of(context).freeServerAdded);
       if (connect && links.isNotEmpty) {
         if (!mounted) return;
-        await ref.read(vpnProvider.notifier).connect(forceRestart: true);
+        await _stopLiveTunnel(reason: 'import');
         if (!mounted) return;
         context.go('/home');
         return;
@@ -155,12 +183,19 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
       context.go('/locations');
     } on FormatException {
       if (!mounted) return;
+      UiLog.action('import', 'save', result: 'bad');
       setState(() {
         _busy = false;
         _error = 'bad';
       });
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
+      UiLog.action(
+        'import',
+        'save',
+        result: 'fail',
+        reason: error.runtimeType.toString(),
+      );
       setState(() {
         _busy = false;
         _error = 'bad';
@@ -178,166 +213,169 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
     final keyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
     return NotebookPaper(
       child: Scaffold(
-      backgroundColor: Colors.transparent,
-      resizeToAvoidBottomInset: true,
-      appBar: AppBar(
         backgroundColor: Colors.transparent,
-        surfaceTintColor: Colors.transparent,
-        leading: _hasSaved
-            ? IconButton(
-                onPressed: () {
-                  if (context.canPop()) {
-                    context.pop();
-                  } else {
-                    context.go('/home');
-                  }
-                },
-                icon: const _AddBackMark(),
-              )
-            : null,
-        title: Text(l.freeAddTitle),
-      ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: ListView(
-                  keyboardDismissBehavior:
-                      ScrollViewKeyboardDismissBehavior.onDrag,
-                  children: [
-                    Text(
-                      l.freeAddHint,
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _controller,
-                      focusNode: _fieldFocus,
-                      minLines: keyboard ? 2 : 4,
-                      maxLines: keyboard ? 3 : 6,
-                      onChanged: _previewInput,
-                      decoration: InputDecoration(
-                        hintText: l.freeAddHint,
-                        filled: true,
-                        fillColor: theme.colorScheme.surfaceContainerHighest,
-                        suffixIcon: _controller.text.isEmpty
-                            ? null
-                            : IconButton(
-                                onPressed: () {
-                                  _controller.clear();
-                                  _previewInput('');
-                                },
-                                icon: const AppIcon(AppIcons.x, size: 18),
-                              ),
-                        border: OutlineInputBorder(
-                          borderRadius:
-                              BorderRadius.circular(AppBrand.radiusCard),
-                          borderSide:
-                              BorderSide(color: theme.colorScheme.outline),
+        resizeToAvoidBottomInset: true,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+          leading: _hasSaved
+              ? IconButton(
+                  onPressed: () {
+                    if (context.canPop()) {
+                      context.pop();
+                    } else {
+                      context.go('/home');
+                    }
+                  },
+                  icon: const _AddBackMark(),
+                )
+              : null,
+          title: Text(l.freeAddTitle),
+        ),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: ListView(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    children: [
+                      Text(
+                        l.freeAddHint,
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    FreeClientActionBar(
-                      onPaste: _pasteClipboard,
-                      onScan: () => context.push('/scan'),
-                    ),
-                    if (_loadingPreview) ...[
-                      const SizedBox(height: 8),
-                      const LinearProgressIndicator(),
-                    ],
-                    if (_error != null) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        _error == 'load'
-                            ? l.freeSubscriptionLoadFail
-                            : l.freeLinkInvalid,
-                        style: TextStyle(color: theme.colorScheme.error),
-                      ),
-                    ],
-                    const SizedBox(height: 16),
-                    Text(
-                      l.freePreview,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    if (_previewTitle != null && _previewTitle!.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Text(
-                          _previewTitle!,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: _controller,
+                        focusNode: _fieldFocus,
+                        minLines: keyboard ? 2 : 4,
+                        maxLines: keyboard ? 3 : 6,
+                        onChanged: _previewInput,
+                        decoration: InputDecoration(
+                          hintText: l.freeAddHint,
+                          filled: true,
+                          fillColor: theme.colorScheme.surfaceContainerHighest,
+                          suffixIcon: _controller.text.isEmpty
+                              ? null
+                              : IconButton(
+                                  onPressed: () {
+                                    _controller.clear();
+                                    _previewInput('');
+                                  },
+                                  icon: const AppIcon(AppIcons.x, size: 18),
+                                ),
+                          border: OutlineInputBorder(
+                            borderRadius:
+                                BorderRadius.circular(AppBrand.radiusCard),
+                            borderSide:
+                                BorderSide(color: theme.colorScheme.outline),
                           ),
                         ),
                       ),
-                    if (_loadingPreview)
-                      const SizedBox.shrink()
-                    else if (_error != null)
-                      const SizedBox.shrink()
-                    else if (_preview.isEmpty)
-                      const FreeClientEmptyState(compact: true)
-                    else
-                      for (var i = 0; i < _preview.length; i++) ...[
-                        if (i > 0) const SizedBox(height: 8),
-                        Builder(
-                          builder: (context) {
-                            final label = labelForShareLink(_preview[i]);
-                            return ListTile(
-                              leading: PoolServerMark(label: label),
-                              title: Text(label.title),
-                              subtitle: Text(
-                                label.subtitle.isEmpty
-                                    ? _preview[i].endpoint
-                                    : label.subtitle,
-                              ),
-                            );
-                          },
+                      const SizedBox(height: 12),
+                      FreeClientActionBar(
+                        onPaste: _pasteClipboard,
+                        onScan: () {
+                          UiLog.action('import', 'scan');
+                          context.push('/scan');
+                        },
+                      ),
+                      if (_loadingPreview) ...[
+                        const SizedBox(height: 8),
+                        const LinearProgressIndicator(),
+                      ],
+                      if (_error != null) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          _error == 'load'
+                              ? l.freeSubscriptionLoadFail
+                              : l.freeLinkInvalid,
+                          style: TextStyle(color: theme.colorScheme.error),
                         ),
                       ],
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-              FilledButton(
-                onPressed: _canSave ? () => _save(connect: true) : null,
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  backgroundColor: theme.colorScheme.primary,
-                  foregroundColor: theme.colorScheme.onPrimary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppBrand.radiusPill),
+                      const SizedBox(height: 16),
+                      Text(
+                        l.freePreview,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      if (_previewTitle != null && _previewTitle!.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Text(
+                            _previewTitle!,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      if (_loadingPreview)
+                        const SizedBox.shrink()
+                      else if (_error != null)
+                        const SizedBox.shrink()
+                      else if (_preview.isEmpty)
+                        const FreeClientEmptyState(compact: true)
+                      else
+                        for (var i = 0; i < _preview.length; i++) ...[
+                          if (i > 0) const SizedBox(height: 8),
+                          Builder(
+                            builder: (context) {
+                              final label = labelForShareLink(_preview[i]);
+                              return ListTile(
+                                leading: PoolServerMark(label: label),
+                                title: Text(label.title),
+                                subtitle: Text(
+                                  label.subtitle.isEmpty
+                                      ? _preview[i].endpoint
+                                      : label.subtitle,
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                    ],
                   ),
                 ),
-                child: Text(l.freeSaveConnect),
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton(
-                onPressed: _canSave ? () => _save(connect: false) : null,
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  foregroundColor: theme.colorScheme.onSurface,
-                  side: BorderSide(
-                    color: theme.colorScheme.outline,
-                    width: 1.4,
+                const SizedBox(height: 12),
+                FilledButton(
+                  onPressed: _canSave ? () => _save(connect: true) : null,
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    backgroundColor: theme.colorScheme.primary,
+                    foregroundColor: theme.colorScheme.onPrimary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppBrand.radiusPill),
+                    ),
                   ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppBrand.radiusPill),
-                  ),
+                  child: Text(l.freeSaveConnect),
                 ),
-                child: Text(l.freeSaveOnly),
-              ),
-            ],
+                const SizedBox(height: 8),
+                OutlinedButton(
+                  onPressed: _canSave ? () => _save(connect: false) : null,
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    foregroundColor: theme.colorScheme.onSurface,
+                    side: BorderSide(
+                      color: theme.colorScheme.outline,
+                      width: 1.4,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppBrand.radiusPill),
+                    ),
+                  ),
+                  child: Text(l.freeSaveOnly),
+                ),
+              ],
+            ),
           ),
         ),
-      ),
       ),
     );
   }
@@ -355,7 +393,8 @@ class _AddBackMark extends StatelessWidget {
       height: 36,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: dark ? AppBrand.surfaceVariantDark : AppBrand.surfaceElevatedLight,
+        color:
+            dark ? AppBrand.surfaceVariantDark : AppBrand.surfaceElevatedLight,
         shape: BoxShape.circle,
         border: Border.all(color: theme.colorScheme.outline),
       ),

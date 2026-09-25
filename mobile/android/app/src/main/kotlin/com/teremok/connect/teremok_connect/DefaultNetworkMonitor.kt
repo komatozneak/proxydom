@@ -116,7 +116,7 @@ internal object DefaultNetworkMonitor {
                     defaultNetwork = null
                     currentInterfaceName = null
                     Log.i(TAG, "physical underlying lost")
-                    DiagnosticRing.append(TAG, "net.lost")
+                    DiagnosticRing.event("warn", "net.lost")
                 }
                 val active = cm.activeNetwork
                 if (!isVpn(cm, active)) {
@@ -207,7 +207,7 @@ internal object DefaultNetworkMonitor {
         defaultNetwork = network
         currentInterfaceName = iface
         Log.i(TAG, "default interface: $iface")
-        DiagnosticRing.append(TAG, "net.iface $iface")
+        DiagnosticRing.event("debug", "net.iface", "iface=$iface")
         val ctx = appContext
         if (ctx != null) {
             VpnUnderlyingNetworkPolicy.bindProcessTo(ctx, network, iface)
@@ -228,7 +228,7 @@ internal object DefaultNetworkMonitor {
         val tunUp = TeremokVpnService.currentInstance()?.hasLiveTun() == true
         if (tunUp) {
             Log.i(TAG, "keep process bind — TUN up, no replacement physical")
-            DiagnosticRing.append(TAG, "bind.process keep tun_up")
+            DiagnosticRing.event("debug", "net.bind", "action=keep")
             return
         }
         VpnUnderlyingNetworkPolicy.clearProcessBind(ctx)

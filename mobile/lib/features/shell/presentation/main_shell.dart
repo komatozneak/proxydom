@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/busy/busy_overlay.dart';
+import '../../../core/diagnostics/ui_log.dart';
 import '../../../core/busy/busy_overlay_host.dart';
 import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
@@ -38,7 +39,19 @@ class MainShell extends ConsumerStatefulWidget {
 
 class _MainShellState extends ConsumerState<MainShell> {
   void _onTap(int index) {
-    if (ref.read(busyOverlayProvider).isBusy) return;
+    const names = ['servers', 'home', 'settings'];
+    final name = index >= 0 && index < names.length ? names[index] : '$index';
+    if (ref.read(busyOverlayProvider).isBusy) {
+      UiLog.action(
+        'shell',
+        'tab',
+        result: 'ignored',
+        reason: 'busy',
+        extra: {'tab': name},
+      );
+      return;
+    }
+    UiLog.action('shell', 'tab', extra: {'tab': name});
     if (index == MainShell.locationsIndex) {
       ref.read(modesTabTickProvider.notifier).state++;
     }
@@ -199,7 +212,8 @@ class _SideNavGlyph extends StatelessWidget {
     final theme = Theme.of(context);
     final dark = theme.brightness == Brightness.dark;
     final ink = dark ? AppBrand.inkDark : AppBrand.inkLight;
-    final chip = dark ? AppBrand.surfaceVariantDark : AppBrand.surfaceElevatedLight;
+    final chip =
+        dark ? AppBrand.surfaceVariantDark : AppBrand.surfaceElevatedLight;
 
     return InkWell(
       onTap: onTap,
@@ -214,9 +228,8 @@ class _SideNavGlyph extends StatelessWidget {
               color: chip,
               borderRadius: BorderRadius.circular(AppBrand.radiusNavPill),
               border: Border.all(
-                color: selected
-                    ? AppBrand.paperMargin
-                    : theme.colorScheme.outline,
+                color:
+                    selected ? AppBrand.paperMargin : theme.colorScheme.outline,
                 width: selected ? 1.6 : 1,
               ),
             ),
@@ -265,9 +278,8 @@ class _CenterNavMark extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
-                color: selected
-                    ? AppBrand.paperMargin
-                    : theme.colorScheme.outline,
+                color:
+                    selected ? AppBrand.paperMargin : theme.colorScheme.outline,
                 width: selected ? 1.6 : 1,
               ),
             ),

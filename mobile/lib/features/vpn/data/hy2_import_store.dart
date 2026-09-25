@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'document_fetch_log.dart';
 import 'hy2_link_parser.dart';
 import 'route_document.dart';
 import 'share_link_parser.dart';
@@ -84,11 +85,14 @@ class ShareCatalog {
       lastUpdated: identical(lastUpdated, _keep)
           ? this.lastUpdated
           : lastUpdated as String?,
-      webPageUrl:
-          identical(webPageUrl, _keep) ? this.webPageUrl : webPageUrl as String?,
-      supportUrl:
-          identical(supportUrl, _keep) ? this.supportUrl : supportUrl as String?,
-      announce: identical(announce, _keep) ? this.announce : announce as String?,
+      webPageUrl: identical(webPageUrl, _keep)
+          ? this.webPageUrl
+          : webPageUrl as String?,
+      supportUrl: identical(supportUrl, _keep)
+          ? this.supportUrl
+          : supportUrl as String?,
+      announce:
+          identical(announce, _keep) ? this.announce : announce as String?,
     );
   }
 }
@@ -394,7 +398,8 @@ class Hy2ImportStore {
     final catalogs = List<ShareCatalog>.from(blob.catalogs);
     var selected = 0;
     if (target != null) {
-      final existing = catalogs.indexWhere((catalog) => catalog.url == target.url);
+      final existing =
+          catalogs.indexWhere((catalog) => catalog.url == target.url);
       if (existing >= 0) {
         final previous = catalogs[existing];
         catalogs[existing] = previous.copyWith(
@@ -443,8 +448,19 @@ class Hy2ImportStore {
     final fetched = await _fetch(target.url);
     final links = parseShareSubscription(fetched.body);
     if (links.isEmpty) {
+      logDocumentFetch(
+        url: target.url,
+        links: 0,
+        decision: 'drop',
+        error: 'no_links',
+      );
       throw const FormatException('no links');
     }
+    logDocumentFetch(
+      url: target.url,
+      links: links.length,
+      decision: 'replace',
+    );
     final title = fetched.profileTitle ??
         target.title ??
         titleFromSubscriptionBody(fetched.body);
@@ -454,7 +470,9 @@ class Hy2ImportStore {
   Future<_Fetched> _fetch(
     String url, {
     String? etag,
+    int? localLinks,
   }) async {
+    final started = Stopwatch()..start();
     final client = HttpClient();
     try {
       final request = await client
@@ -468,6 +486,13 @@ class Hy2ImportStore {
           await request.close().timeout(const Duration(seconds: 10));
       if (response.statusCode == HttpStatus.notModified) {
         await response.drain<void>();
+        logDocumentFetch(
+          url: url,
+          elapsedMs: started.elapsedMilliseconds,
+          status: response.statusCode,
+          decision: 'keep',
+          localLinks: localLinks,
+        );
         return _Fetched(
           body: '',
           etag: etag,
@@ -481,13 +506,27 @@ class Hy2ImportStore {
       );
       if (decision == DocumentSyncDecision.drop ||
           decision == DocumentSyncDecision.keep) {
+        logDocumentFetch(
+          url: url,
+          elapsedMs: started.elapsedMilliseconds,
+          status: response.statusCode,
+          decision: decision.name,
+          error: decision.name,
+        );
         throw DocumentSyncException(decision);
       }
+      logDocumentFetch(
+        url: url,
+        elapsedMs: started.elapsedMilliseconds,
+        status: response.statusCode,
+        decision: 'fetched',
+      );
       final redirect = response.headers.value('new-url') ??
           response.headers.value('fallback-url');
       return _Fetched(
         body: body,
-        profileTitle: decodeProfileTitle(response.headers.value('profile-title')),
+        profileTitle:
+            decodeProfileTitle(response.headers.value('profile-title')),
         etag: response.headers.value('etag'),
         status: response.statusCode,
         userInfo: response.headers.value('subscription-userinfo'),
@@ -499,9 +538,23 @@ class Hy2ImportStore {
         announce: response.headers.value('announce'),
         redirectUrl: redirect,
       );
-    } on SocketException {
+    } on SocketException catch (e) {
+      logDocumentFetch(
+        url: url,
+        elapsedMs: started.elapsedMilliseconds,
+        decision: 'keep',
+        error: 'SocketException',
+        detail: e,
+      );
       throw const DocumentSyncException(DocumentSyncDecision.keep);
-    } on TimeoutException {
+    } on TimeoutException catch (e) {
+      logDocumentFetch(
+        url: url,
+        elapsedMs: started.elapsedMilliseconds,
+        decision: 'keep',
+        error: 'TimeoutException',
+        detail: e,
+      );
       throw const DocumentSyncException(DocumentSyncDecision.keep);
     } finally {
       client.close(force: true);
@@ -619,7 +672,11 @@ class _Pulled {
 Future<_Pulled?> _pull(ShareCatalog catalog, {bool followed = false}) async {
   final url = catalog.url;
   if (url == null || url.isEmpty) return null;
-  final fetched = await Hy2ImportStore.instance._fetch(url, etag: catalog.etag);
+  final fetched = await Hy2ImportStore.instance._fetch(
+    url,
+    etag: catalog.etag,
+    localLinks: catalog.lines.length,
+  );
   if (fetched.status == HttpStatus.notModified) return null;
   final nextUrl = fetched.redirectUrl?.trim();
   if (!followed && nextUrl != null && nextUrl.isNotEmpty && nextUrl != url) {
@@ -627,8 +684,21 @@ Future<_Pulled?> _pull(ShareCatalog catalog, {bool followed = false}) async {
   }
   final links = parseShareSubscription(fetched.body);
   if (links.isEmpty) {
+    logDocumentFetch(
+      url: url,
+      status: fetched.status,
+      links: 0,
+      decision: 'drop',
+      error: 'no_links',
+    );
     throw const DocumentSyncException(DocumentSyncDecision.drop);
   }
+  logDocumentFetch(
+    url: url,
+    status: fetched.status,
+    links: links.length,
+    decision: 'replace',
+  );
   final title = catalog.titleIsCustom
       ? catalog.title
       : _titleFor(
@@ -857,10 +927,12 @@ class _Blob {
               if (catalog.fallbackTitle != null)
                 'fallbackTitle': catalog.fallbackTitle,
               if (catalog.titleIsCustom) 'titleIsCustom': true,
-              if (catalog.trafficMeta != null) 'trafficMeta': catalog.trafficMeta,
+              if (catalog.trafficMeta != null)
+                'trafficMeta': catalog.trafficMeta,
               if (catalog.updateIntervalHours != null)
                 'updateIntervalHours': catalog.updateIntervalHours,
-              if (catalog.lastUpdated != null) 'lastUpdated': catalog.lastUpdated,
+              if (catalog.lastUpdated != null)
+                'lastUpdated': catalog.lastUpdated,
               if (catalog.webPageUrl != null) 'webPageUrl': catalog.webPageUrl,
               if (catalog.supportUrl != null) 'supportUrl': catalog.supportUrl,
               if (catalog.announce != null) 'announce': catalog.announce,

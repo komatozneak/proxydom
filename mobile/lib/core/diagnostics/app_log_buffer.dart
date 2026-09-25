@@ -4,7 +4,9 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import 'tunnel_log_format.dart';
 import 'tunnel_log_level.dart';
+import 'tunnel_log_redact.dart';
 
 /// In-memory ring buffer for lightweight diagnostic logs (no PII).
 ///
@@ -51,8 +53,11 @@ class AppLogBuffer {
 
   void _append(String level, String message) {
     if (!minLevel.allows(level)) return;
-    final line =
-        '${DateTime.now().toUtc().toIso8601String()} [$level] $message';
+    final body = maskTunnelIpv4(message);
+    final source = tunnelLogSource(body);
+    final line = '${tunnelLogStamp()} [$level] [$source] $body';
+    // flutter run prints this; release sideload stays quiet.
+    if (kDebugMode) debugPrint(line);
     _lines.addLast(line);
     while (_lines.length > maxLines) {
       _lines.removeFirst();

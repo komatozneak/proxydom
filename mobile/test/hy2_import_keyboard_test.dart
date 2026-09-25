@@ -39,7 +39,7 @@ void main() {
     await tester.pump();
 
     expect(tester.takeException(), isNull);
-    expect(find.text('Сохранить и подключить'), findsOneWidget);
+    expect(find.text('Сохранить'), findsOneWidget);
     expect(find.text('Только сохранить'), findsOneWidget);
   });
 

@@ -304,12 +304,20 @@ class VpnSessionEngine(
             }
             if (!socksOk) {
                 Log.i(TAG, "auto prove fail node=${cand.nodeId}")
-                DiagnosticRing.append(TAG, "vpn.prove id=${cand.nodeId} ok=false")
+                DiagnosticRing.event(
+                    "debug",
+                    "vpn.prove",
+                    "id=${cand.nodeId} ok=false",
+                )
                 host.teardownGeneration(gen)
                 return@firstSuccess false
             }
             Log.i(TAG, "auto prove ok node=${cand.nodeId} — establishing TUN")
-            DiagnosticRing.append(TAG, "vpn.prove id=${cand.nodeId} ok=true")
+            DiagnosticRing.event(
+                "info",
+                "vpn.prove",
+                "id=${cand.nodeId} ok=true",
+            )
             val up = try {
                 host.establishGeneration(
                     generation = gen,
@@ -428,11 +436,12 @@ class VpnSessionEngine(
                 "reason=${next.reason} transport=${next.transport.toWire()} " +
                 "iface=${next.underlyingIface}",
         )
-        DiagnosticRing.append(
-            TAG,
+        DiagnosticRing.event(
+            tunnelPhaseLevel(next.phase, next.reason),
+            "vpn.phase",
             "phase=${next.phase} gen=${next.generation} " +
-                "reason=${next.reason} candidate=${next.candidateId} " +
-                "iface=${next.underlyingIface}",
+                "reason=${next.reason} candidate=${next.candidateId.orEmpty()} " +
+                "iface=${next.underlyingIface.orEmpty()}",
         )
         host.onSnapshot(next)
     }

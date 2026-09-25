@@ -7,10 +7,9 @@ import '../../../l10n/app_localizations.dart';
 import '../data/vpn_disclosure_prefs.dart';
 import 'vpn_platform_copy.dart';
 
-/// Prominent VPN disclosure before first Connect (Play + App Store 5.4).
+/// Shown from the house tap, before the system VPN permission.
 ///
-/// Shown from Home Nest tap before OS VPN permission. Decline leaves prefs
-/// unset so the next Nest tap shows this again.
+/// Decline leaves prefs unset so the next house tap shows this again.
 class VpnDisclosureDialog extends StatelessWidget {
   const VpnDisclosureDialog({super.key});
 

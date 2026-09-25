@@ -1,20 +1,36 @@
 package com.teremok.connect.teremok_connect
 
+import java.time.Instant
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+
 /**
  * Short in-process ring for owner diagnostic reports.
  *
- * Captures TeremokVpn / VpnSessionEngine / PathHealth / HysteriaBridge
- * lines without tokens or Hy2 auth. Survives until process death; Dart
- * [AppLogBuffer] persists the product events across kills.
+ * Same line as the Dart buffer: millisecond UTC, level, source, event.
+ * Survives until process death; Dart [AppLogBuffer] persists product events.
  */
 internal object DiagnosticRing {
     const val MAX_LINES = 400
 
     private val lock = Any()
     private val lines = ArrayDeque<String>(MAX_LINES + 1)
+    private val stamp: DateTimeFormatter = DateTimeFormatter
+        .ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
+        .withZone(ZoneOffset.UTC)
+    private val ipv4 = Regex(
+        """\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b""",
+    )
 
-    fun append(tag: String, message: String) {
-        val line = "${System.currentTimeMillis()} ${redact("$tag $message")}"
+    fun event(
+        level: String,
+        event: String,
+        fields: String = "",
+        nowMs: Long = System.currentTimeMillis(),
+    ) {
+        val source = event.substringBefore('.', "app")
+        val body = if (fields.isBlank()) event else "$event ${fields.trim()}"
+        val line = "${stamp.format(Instant.ofEpochMilli(nowMs))} [$level] [$source] ${redact(body)}"
         synchronized(lock) {
             lines.addLast(line)
             while (lines.size > MAX_LINES) {
@@ -35,12 +51,16 @@ internal object DiagnosticRing {
         synchronized(lock) { lines.clear() }
     }
 
-    /** Strip secrets so reports can go to Telegram. */
+    /** Strip secrets and node addresses so reports can leave the phone. */
     fun redact(message: String): String {
         var out = message
         out = AUTH_KV.replace(out, "$1=***")
         out = BEARER.replace(out, "Bearer ***")
         out = UUID_TOKEN.replace(out, "***")
+        out = ipv4.replace(out) { match ->
+            val parts = match.value.split('.')
+            "${parts[0]}.${parts[1]}.***.***"
+        }
         return out
     }
 

@@ -7,6 +7,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../../../core/config.dart';
 import '../../../core/diagnostics/tunnel_log_level.dart';
 import '../../../core/diagnostics/tunnel_log_prefs.dart';
+import '../../../core/diagnostics/ui_log.dart';
 import '../../../core/ios_store_gates.dart';
 import '../../../core/support_contact.dart';
 import '../../../core/theme.dart';
@@ -83,6 +84,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _notifEnabled = value;
     });
     await VpnNotificationPrefs.setEnabled(value);
+    UiLog.action('settings', 'notification', extra: {'on': value});
     if (!mounted) return;
     setState(() => _notifLoading = false);
   }
@@ -91,6 +93,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (_qsAdding) return;
     setState(() => _qsAdding = true);
     final result = await QsTilePrefs.requestAdd();
+    UiLog.action('settings', 'qs_tile', result: result);
     if (!mounted) return;
     setState(() => _qsAdding = false);
     final l = AppL10n.of(context);
@@ -109,6 +112,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _autoReconnect = value;
     });
     await AutoReconnectPrefs.setEnabled(value);
+    UiLog.action('settings', 'auto_reconnect', extra: {'on': value});
     if (!mounted) return;
     setState(() => _autoReconnectLoading = false);
   }
@@ -169,6 +173,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       },
     );
     if (chosen == null || !mounted) return;
+    UiLog.action('settings', 'theme', extra: {'mode': chosen.name});
     await ref.read(themeModeProvider.notifier).setMode(chosen);
   }
 
@@ -202,6 +207,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       },
     );
     if (chosen == null || !mounted) return;
+    UiLog.action('settings', 'locale', extra: {'lang': chosen.languageCode});
     await ref.read(localeProvider.notifier).setLocale(chosen);
   }
 
@@ -292,6 +298,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             title: l.tunnelLogsTitle,
             subtitle: _logLevelLabel(l, _logLevel),
             onTap: () async {
+              UiLog.action('settings', 'logs');
               await context.push('/settings/logs');
               if (mounted) await _loadLogLevel();
             },
@@ -339,7 +346,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               icon: AppIcons.sliders,
               title: l.settingsNoVpn,
               subtitle: l.settingsNoVpnHint,
-              onTap: () => context.go('/settings/no-vpn'),
+              onTap: () {
+                UiLog.action('settings', 'no_vpn');
+                context.go('/settings/no-vpn');
+              },
             ),
         ],
       ),

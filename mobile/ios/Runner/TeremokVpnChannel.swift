@@ -114,6 +114,8 @@ enum TeremokVpnChannel {
         }
       case "getSingBoxStderrTail", "getVpnCoreStderrTail":
         result(UserDefaults(suiteName: appGroupId)?.string(forKey: lastErrorKey))
+      case "setCoreLogLevel", "clearCoreLog":
+        result(true)
       case "getUnderlyingNetworkInterface":
         result(nil)
       case "requestAddQsTile", "isShadeNotificationEnabled",

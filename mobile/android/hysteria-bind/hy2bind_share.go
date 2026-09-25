@@ -39,6 +39,7 @@ func StartShare(configJSON string) string {
 	if configJSON == "" {
 		return "empty xray config"
 	}
+	prepareCoreLog(configJSON)
 	registerXrayProtector()
 	lastProtectErr.Store("")
 	cfg, err := loadShareConfig(configJSON)
@@ -49,9 +50,13 @@ func StartShare(configJSON string) string {
 	if err != nil {
 		return fmt.Sprintf("xray: %v", err)
 	}
+	// New() installs Xray's log.Instance. Bind after that so decision lines
+	// reach the file instead of stdout.
+	bindCoreLogHandler()
 	if err := inst.Start(); err != nil {
 		return fmt.Sprintf("xray: %v", err)
 	}
+	noteShareCore()
 	shareMu.Lock()
 	prev := shareInst
 	shareInst = inst
