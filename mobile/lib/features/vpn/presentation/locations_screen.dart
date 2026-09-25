@@ -250,47 +250,18 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       return;
     }
 
-    final l = AppL10n.of(context);
     final vpnStatus = ref.read(vpnProvider);
     final hotSwitch = !regionPickUsesBusyOverlay(vpnStatus);
 
-    // Hot switch: leave Locations immediately; Nest Connecting is the progress UX.
-    // Busy overlay over the region list blocked the UI for ~18s when mint raced
-    // after stop (API without TUN).
     if (hotSwitch) {
       if (!mounted) return;
       setState(() => _selectedId = id);
       context.go('/home');
-      try {
-        await ref.read(vpnProvider.notifier).selectNode(id);
-      } catch (e) {
-        if (!mounted) return;
-        final msg = _isTransientNetwork(e)
-            ? AppL10n.of(context).networkErrorFriendly
-            : l.regionChangeFailed(e.toString());
-        showTeremokSnackBar(context, msg);
-      }
       return;
     }
 
-    try {
-      await ref.read(busyOverlayProvider.notifier).run(
-            () => ref.read(vpnProvider.notifier).selectNode(id),
-            workingTitle: l.regionSwitchingTitle,
-            workingBody: l.regionSwitchingBody,
-            successTitle: l.regionSwitchedTitle,
-            failedTitle: l.regionSwitchFailedTitle,
-            successHold: const Duration(milliseconds: 350),
-          );
-      if (!mounted) return;
-      setState(() => _selectedId = id);
-    } catch (e) {
-      if (!mounted) return;
-      final msg = _isTransientNetwork(e)
-          ? AppL10n.of(context).networkErrorFriendly
-          : l.regionChangeFailed(e.toString());
-      showTeremokSnackBar(context, msg);
-    }
+    if (!mounted) return;
+    setState(() => _selectedId = id);
   }
 
   Future<void> _onLockedPremiumTap() async {

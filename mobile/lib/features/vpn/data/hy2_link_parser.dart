@@ -41,10 +41,9 @@ ParsedHy2Link parseHy2Link(String raw) {
       colon < 0 ? '' : Uri.decodeComponent(userInfo.substring(colon + 1));
   final auth = password.isEmpty ? username : '$username:$password';
   final port = uri.hasPort ? uri.port : 443;
-  final sni = (uri.queryParameters['sni'] ?? '').trim();
-  if (sni.isEmpty) {
-    throw const FormatException('missing sni');
-  }
+  // Official URI scheme: omitted sni means the TLS name is the host.
+  final queriedSni = (uri.queryParameters['sni'] ?? '').trim();
+  final sni = queriedSni.isEmpty ? host : queriedSni;
   final insecure = uri.queryParameters['insecure'] == '1' ||
       uri.queryParameters['allowInsecure'] == '1';
   final obfs = (uri.queryParameters['obfs'] ?? '').trim();

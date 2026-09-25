@@ -38,6 +38,21 @@ hysteria2://user:pass@203.0.113.12:443/?sni=c.example#Charlie
     expect(links[1].name, 'Shadow');
   });
 
+  test('base64 body without padding and with line breaks still yields lines', () {
+    const plain = 'hysteria2://user:pass@1.2.3.4:443/?sni=a.example#A\n';
+    final padded = base64Encode(utf8.encode(plain));
+    final bare = padded.replaceAll('=', '');
+    final wrapped = StringBuffer();
+    for (var i = 0; i < bare.length; i += 8) {
+      final end = i + 8 > bare.length ? bare.length : i + 8;
+      wrapped.writeln(bare.substring(i, end));
+    }
+    final links = parseShareSubscription(wrapped.toString());
+    expect(links, hasLength(1));
+    expect(links.single.scheme, 'hysteria2');
+    expect(links.single.hy2?.profile.sni, 'a.example');
+  });
+
   test('base64 subscription body unwraps to uri lines', () {
     const plain = 'vless://u@203.0.113.30:443#Wrapped\n';
     final blob = base64Encode(utf8.encode(plain));

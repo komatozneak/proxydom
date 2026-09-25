@@ -36,6 +36,21 @@ hy2://c:d@5.6.7.8:443/?sni=b.example.com#B
     expect(links.last.name, 'B');
   });
 
+  test('omitted sni uses the host as the TLS name', () {
+    const uri = 'hysteria2://user:pass@203.0.113.12:443#Plain';
+    final parsed = parseHy2Link(uri);
+    expect(parsed.profile.sni, '203.0.113.12');
+    expect(parsed.profile.server, '203.0.113.12:443');
+    expect(parsed.name, 'Plain');
+  });
+
+  test('an explicit sni query still wins over the host', () {
+    const uri = 'hy2://user:pass@203.0.113.12:443/?sni=edge.example#Named';
+    final parsed = parseHy2Link(uri);
+    expect(parsed.profile.sni, 'edge.example');
+    expect(parsed.name, 'Named');
+  });
+
   test('insecure and salamander are kept on the profile', () {
     const uri =
         'hysteria2://standHy2pass@95.182.81.27:20002'
