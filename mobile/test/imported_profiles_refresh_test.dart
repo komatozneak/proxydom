@@ -20,4 +20,23 @@ void main() {
     await done.future.timeout(const Duration(seconds: 1));
     expect((await store.load()).single.endpoint, contains('203.0.113.12'));
   });
+
+  test('a second pasted link is kept beside the first', () async {
+    SharedPreferences.setMockInitialValues({});
+    final store = Hy2ImportStore.instance;
+    await store.saveInput(
+      'hysteria2://user:pass@203.0.113.12:443/?sni=c.example#Charlie',
+    );
+    await store.saveInput(
+      'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
+      '?security=reality&sni=www.example.com&pbk=PUBLIC&sid=ab#Alpha',
+    );
+    final links = await store.load();
+    expect(links, hasLength(2));
+    expect(links.last.scheme, 'vless');
+    expect((await store.selected())?.scheme, 'vless');
+    final catalogs = await store.catalogs();
+    expect(catalogs, hasLength(2));
+    expect(catalogs.last.title, 'Alpha');
+  });
 }

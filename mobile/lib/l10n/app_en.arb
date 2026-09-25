@@ -796,8 +796,11 @@
   "freePreview": "Found",
   "freeServerAdded": "Server added",
   "freeLinkInvalid": "Could not read that link",
+  "freeSubscriptionLoadFail": "The subscription did not load. The document host did not answer.",
+  "freeSharePool": "Share",
+  "freeShareFail": "Could not create the link",
   "freeOnboardTitle": "Server list",
-  "freeOnboardBody": "A subscription link or a key becomes a profile. Its servers stay in one list.",
+  "freeOnboardBody": "An address or a key becomes a profile. Its servers stay in one list.",
   "freeOnboardAddTitle": "Pick a server",
   "freeOnboardAddBody": "Each server has a name and a short line. You choose which one to use.",
   "freeOnboardConnectTitle": "Connect with one tap",
@@ -812,5 +815,17 @@
   "freeIosHy2Only": "iPhone starts Hysteria2 only",
   "freePoolGeneral": "General",
   "freeSearch": "Search servers",
-  "freeDelete": "Remove"
+  "freeDelete": "Remove",
+  "freeDeleteServerTitle": "Remove this server?",
+  "freeDeleteServerBody": "The link is deleted from this phone.",
+  "freeDeleteCatalogTitle": "Remove this list?",
+  "freeDeleteCatalogBody": "Every server in the list is deleted from this phone.",
+  "freeRefresh": "Refresh",
+  "freeRefreshDone": "Updated: {count}",
+  "@freeRefreshDone": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "freeRefreshFail": "Could not refresh"
 }

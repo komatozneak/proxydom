@@ -344,11 +344,8 @@ String autoSelectionDisplayFlag({
   return kFlagGlobe;
 }
 
-/// Which Locations section a node belongs to (first match wins).
+/// Which list a route belongs to. Paid sections are not used.
 LocationSection locationSectionFor(VpnNode node) {
-  if (node.isYoutube || node.isGaming || node.requiresPremium) {
-    return LocationSection.premium;
-  }
   final region = (node.region ?? '').trim().toLowerCase();
   final label = (node.label.isNotEmpty ? node.label : node.name).toLowerCase();
   if (region == 'eu' ||
@@ -365,7 +362,6 @@ LocationSection locationSectionFor(VpnNode node) {
       label.contains('united states')) {
     return LocationSection.general;
   }
-  // Fallback: product flag heuristics.
   final flag = flagForNode(node);
   if (flag == kFlagEurope || flag == kFlagUsa) return LocationSection.general;
   return LocationSection.other;

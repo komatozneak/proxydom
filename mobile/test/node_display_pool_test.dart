@@ -294,10 +294,10 @@ void main() {
       final place = placeForNode(india, index: 0);
       expect(place.title, 'Индия');
       expect(place.flag, '🇮🇳');
-      expect(locationSectionFor(india), LocationSection.premium);
+      expect(locationSectionFor(india), LocationSection.other);
     });
 
-    test('groupNodesByLocationSection order Premium then General EU+US', () {
+    test('groupNodesByLocationSection is a flat list without a paid section', () {
       const yt = VpnNode(
         id: 'yt',
         label: 'YouTube · Premium',
@@ -328,9 +328,9 @@ void main() {
         region: 'us',
       );
       final g = groupNodesByLocationSection([us, eu, yt]);
-      expect(g[LocationSection.premium]!.single.id, 'yt');
+      expect(g[LocationSection.premium], isEmpty);
       expect(g[LocationSection.general]!.map((n) => n.id), ['eu', 'us']);
-      expect(g[LocationSection.other], isEmpty);
+      expect(g[LocationSection.other]!.single.id, 'yt');
     });
   });
 

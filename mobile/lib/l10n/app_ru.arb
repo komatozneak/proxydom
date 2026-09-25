@@ -585,8 +585,11 @@
   "freePreview": "Найдено",
   "freeServerAdded": "Сервер добавлен",
   "freeLinkInvalid": "Ссылка не разобрана",
+  "freeSubscriptionLoadFail": "Подписка не загрузилась. Адрес документа не ответил.",
+  "freeSharePool": "Поделиться",
+  "freeShareFail": "Не удалось создать ссылку",
   "freeOnboardTitle": "Список серверов",
-  "freeOnboardBody": "Ссылка подписки или ключ становятся профилем. Серверы из неё собираются в один список.",
+  "freeOnboardBody": "Адрес документа или ключ становятся профилем. Серверы из него собираются в один список.",
   "freeOnboardAddTitle": "Выберите сервер",
   "freeOnboardAddBody": "У каждого сервера своё имя и подпись. Какой использовать — выбираете вы.",
   "freeOnboardConnectTitle": "Подключайтесь одним нажатием",
@@ -601,5 +604,17 @@
   "freeIosHy2Only": "На iPhone запускается только Hysteria2",
   "freePoolGeneral": "Общего назначения",
   "freeSearch": "Поиск серверов",
-  "freeDelete": "Удалить"
+  "freeDelete": "Удалить",
+  "freeDeleteServerTitle": "Удалить этот сервер?",
+  "freeDeleteServerBody": "Ссылка сотрётся с этого телефона.",
+  "freeDeleteCatalogTitle": "Удалить этот список?",
+  "freeDeleteCatalogBody": "Все серверы из списка сотрутся с этого телефона.",
+  "freeRefresh": "Обновить",
+  "freeRefreshDone": "Обновлено: {count}",
+  "@freeRefreshDone": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "freeRefreshFail": "Не удалось обновить"
 }

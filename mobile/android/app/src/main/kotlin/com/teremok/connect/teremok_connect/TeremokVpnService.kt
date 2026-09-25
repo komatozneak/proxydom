@@ -16,8 +16,14 @@ import android.os.SystemClock
 import android.provider.Settings
 import android.system.OsConstants
 import android.util.Log
+import hy2bind.Hy2bind
 import java.net.InetAddress
 import java.net.InetSocketAddress
+import android.system.ErrnoException
+import android.system.Os
+import android.system.StructPollfd
+import android.system.StructTimeval
+import java.io.FileDescriptor
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -427,6 +433,8 @@ class TeremokVpnService : VpnService() {
     private val tunInterface = AtomicReference<ParcelFileDescriptor?>(null)
     @Volatile
     private var isRunning = false
+    @Volatile
+    var lastShareTcp: String? = null
 
     @Volatile
     var provenEgressIp: String? = null
@@ -963,6 +971,9 @@ class TeremokVpnService : VpnService() {
                 sni = sni,
                 socksListen = socksListen,
                 directDomainSuffixes = directDomainSuffixesOf(params),
+                insecure = params["hysteriaInsecure"] == true,
+                obfs = (params["hysteriaObfs"] as? String).orEmpty(),
+                obfsPassword = (params["hysteriaObfsPassword"] as? String).orEmpty(),
             )) {
             Log.w(TAG, "proveHysteriaSocks: start failed ${hy.lastErrorMessage}")
             return false
@@ -1087,6 +1098,11 @@ class TeremokVpnService : VpnService() {
         }
         builder.addDnsServer("1.1.1.1")
         builder.addDnsServer("8.8.8.8")
+        val server = Regex(""""address"\s*:\s*"([^"]+)"\s*,\s*"port"\s*:\s*(\d+)""")
+            .find(configJson)
+        val serverHost = server?.groupValues?.getOrNull(1).orEmpty()
+        val serverPort = server?.groupValues?.getOrNull(2)?.toIntOrNull() ?: 0
+        applyBypassRoutes(builder, serverHost, params)
         applyDisallowedApplications(builder, params)
         currentStatus = "connecting"
         VpnStatusBroadcaster.emit(currentStatus)
@@ -1113,11 +1129,35 @@ class TeremokVpnService : VpnService() {
             failStart(hy.lastErrorMessage ?: "Xray tun pump failed")
             return
         }
+        val kcp = configJson.contains("\"network\":\"kcp\"") ||
+            configJson.contains("\"network\": \"kcp\"")
+        val reach = if (kcp) "udp" else tcpReach(serverHost, serverPort)
+        lastShareTcp = "server=$serverHost:$serverPort tcp=$reach"
+        DiagnosticRing.append(TAG, "vpn.server_tcp $lastShareTcp")
         val probe = VpnPingMonitor.socksConnectProbe(socksPort = 10809)
         if (probe !is VpnPingMonitor.SocksHttpsResult.Ok) {
-            failStart("Xray SOCKS probe failed")
+            val reason = (probe as? VpnPingMonitor.SocksHttpsResult.Fail)?.reason
+                ?: "unknown"
+            failStart("Xray SOCKS probe failed: $reason")
             return
         }
+        val protectErr = Hy2bind.lastProtectError()?.trim().orEmpty()
+        if (protectErr.isNotEmpty()) {
+            failStart(protectErr)
+            return
+        }
+        val exit = VpnPingMonitor.socksExitIpByIpv4(socksPort = 10809)
+        val carrierIp = readCarrierIpv4()
+        val exitIp = exit.ip
+        if (exitIp.isNullOrBlank() || exitIp == carrierIp) {
+            val reach = tcpReach(serverHost, serverPort)
+            failStart(
+                "Xray egress empty exit=$exitIp carrier=$carrierIp " +
+                    "reason=${exit.reason} server=$serverHost:$serverPort tcp=$reach",
+            )
+            return
+        }
+        provenEgressIp = exitIp
         isRunning = true
         establishInProgress = false
         coreRecovering = false
@@ -1138,6 +1178,7 @@ class TeremokVpnService : VpnService() {
         params: Map<String, Any?>,
         alive: () -> Boolean = { true },
     ) {
+        lastShareTcp = null
         val server = (params["hysteriaServer"] as? String)?.trim().orEmpty()
         val auth = (params["hysteriaAuth"] as? String)?.trim().orEmpty()
         if (server.isEmpty() || auth.isEmpty()) {
@@ -1228,6 +1269,9 @@ class TeremokVpnService : VpnService() {
                 sni = sni,
                 socksListen = socksListen,
                 directDomainSuffixes = directDomainSuffixesOf(params),
+                insecure = params["hysteriaInsecure"] == true,
+                obfs = (params["hysteriaObfs"] as? String).orEmpty(),
+                obfsPassword = (params["hysteriaObfsPassword"] as? String).orEmpty(),
             )) {
             failStart(hy.lastErrorMessage ?: "Hysteria start failed")
             return
@@ -1379,6 +1423,66 @@ class TeremokVpnService : VpnService() {
             )
         }
         return okFlag.get()
+    }
+
+    private fun tcpReach(host: String, port: Int): String {
+        if (host.isEmpty() || port <= 0) return "no_target"
+        val fd = try {
+            Os.socket(OsConstants.AF_INET, OsConstants.SOCK_STREAM, 0)
+        } catch (e: ErrnoException) {
+            return "socket=${e.message ?: "err"}"
+        }
+        return try {
+            val raw = FileDescriptor::class.java.getDeclaredField("descriptor").let { field ->
+                field.isAccessible = true
+                field.getInt(fd)
+            }
+            if (!protect(raw)) return "protect_failed"
+            Os.setsockoptTimeval(
+                fd,
+                OsConstants.SOL_SOCKET,
+                OsConstants.SO_SNDTIMEO,
+                StructTimeval.fromMillis(3000),
+            )
+            try {
+                Os.connect(fd, InetSocketAddress(InetAddress.getByName(host), port))
+                "ok"
+            } catch (e: ErrnoException) {
+                if (e.errno != OsConstants.EINPROGRESS &&
+                    e.message?.contains("EINPROGRESS") != true
+                ) {
+                    "ErrnoException=${e.message ?: "err"}"
+                } else {
+                    waitTcpConnected(fd, host, port)
+                }
+            }
+        } catch (e: Exception) {
+            "${e.javaClass.simpleName}=${e.message ?: "err"}"
+        } finally {
+            runCatching { Os.close(fd) }
+        }
+    }
+
+    private fun waitTcpConnected(fd: FileDescriptor, host: String, port: Int): String {
+        val pollFd = StructPollfd()
+        pollFd.fd = fd
+        pollFd.events = OsConstants.POLLOUT.toShort()
+        val ready = try {
+            Os.poll(arrayOf(pollFd), 3000)
+        } catch (e: ErrnoException) {
+            return "poll=${e.message ?: "err"}"
+        }
+        if (ready == 0) return "ETIMEDOUT"
+        return try {
+            Os.connect(fd, InetSocketAddress(InetAddress.getByName(host), port))
+            "ok"
+        } catch (e: ErrnoException) {
+            when (e.errno) {
+                OsConstants.EISCONN -> "ok"
+                OsConstants.EALREADY, OsConstants.EINPROGRESS -> "ETIMEDOUT"
+                else -> "errno=${e.errno}"
+            }
+        }
     }
 
     private fun failStart(message: String) {
@@ -1810,6 +1914,9 @@ object VpnChannelRegistry {
                     }
                     "getLastError" -> {
                         result.success(VpnStatusBroadcaster.lastError())
+                    }
+                    "getShareTcp" -> {
+                        result.success(serviceProvider()?.lastShareTcp)
                     }
                     "getProvenEgress" -> {
                         result.success(serviceProvider()?.provenEgressIp)

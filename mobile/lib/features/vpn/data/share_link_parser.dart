@@ -163,9 +163,16 @@ String? _decodeUtf8Base64(String payload) {
   }
 }
 
-/// True when [raw] is an http(s) subscription address, not a list of keys.
+/// True when [raw] is a subscription document address, not a list of keys.
+///
+/// A broken deeplink is pending so the import screen shows an error and does
+/// not treat it as share lines. `http://` is a real document address.
 bool isPendingSubscriptionUrl(String raw) {
-  final text = raw.trim();
-  if (!looksLikeSubscriptionUrl(text)) return false;
-  return parseShareSubscription(text).isEmpty;
+  try {
+    final target = subscriptionDocumentTarget(raw);
+    if (target == null) return false;
+    return parseShareSubscription(target.url).isEmpty;
+  } on FormatException {
+    return true;
+  }
 }

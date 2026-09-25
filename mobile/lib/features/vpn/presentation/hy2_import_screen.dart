@@ -6,11 +6,13 @@ import 'package:go_router/go_router.dart';
 import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
+import '../../../core/widgets/notebook_paper.dart';
 import '../../../core/widgets/teremok_snackbar.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../home/application/vpn_provider.dart';
 import '../data/hy2_import_store.dart';
 import '../data/share_link_parser.dart';
+import '../data/subscription_link_inbox.dart';
 import '../data/subscription_label.dart';
 import 'free_client_chrome.dart';
 import 'pool_server_mark.dart';
@@ -48,6 +50,13 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    final pending = SubscriptionLinkInbox.take();
+    if (pending != null && pending.isNotEmpty) {
+      _clipboardApplied = true;
+      _controller.text = pending;
+      _previewInput(pending);
+      return;
+    }
     if (_clipboardApplied) return;
     final paste =
         GoRouterState.of(context).uri.queryParameters['clipboard'] == '1';
@@ -96,7 +105,7 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
           _loadingPreview = false;
           _preview = const [];
           _previewTitle = null;
-          _error = 'bad';
+          _error = 'load';
         });
       });
       return;
@@ -121,7 +130,10 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
   }
 
   bool get _canSave =>
-      !_busy && _error == null && (_subscriptionUrl || _preview.isNotEmpty);
+      !_busy &&
+      !_loadingPreview &&
+      _error == null &&
+      (_subscriptionUrl || _preview.isNotEmpty);
 
   Future<void> _save({required bool connect}) async {
     setState(() {
@@ -133,7 +145,6 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
       if (!mounted) return;
       showTeremokSnackBar(context, AppL10n.of(context).freeServerAdded);
       if (connect && links.isNotEmpty) {
-        await Hy2ImportStore.instance.select(0);
         if (!mounted) return;
         await ref.read(vpnProvider.notifier).connect(forceRestart: true);
         if (!mounted) return;
@@ -165,7 +176,9 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
     }
     final theme = Theme.of(context);
     final keyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
-    return Scaffold(
+    return NotebookPaper(
+      child: Scaffold(
+      backgroundColor: Colors.transparent,
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -241,7 +254,9 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
                     if (_error != null) ...[
                       const SizedBox(height: 8),
                       Text(
-                        l.freeLinkInvalid,
+                        _error == 'load'
+                            ? l.freeSubscriptionLoadFail
+                            : l.freeLinkInvalid,
                         style: TextStyle(color: theme.colorScheme.error),
                       ),
                     ],
@@ -263,7 +278,11 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
                           ),
                         ),
                       ),
-                    if (_preview.isEmpty)
+                    if (_loadingPreview)
+                      const SizedBox.shrink()
+                    else if (_error != null)
+                      const SizedBox.shrink()
+                    else if (_preview.isEmpty)
                       const FreeClientEmptyState(compact: true)
                     else
                       for (var i = 0; i < _preview.length; i++) ...[
@@ -318,6 +337,7 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

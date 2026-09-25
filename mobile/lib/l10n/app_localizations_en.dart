@@ -1728,11 +1728,21 @@ class AppL10nEn extends AppL10n {
   String get freeLinkInvalid => 'Could not read that link';
 
   @override
+  String get freeSubscriptionLoadFail =>
+      'The subscription did not load. The document host did not answer.';
+
+  @override
+  String get freeSharePool => 'Share';
+
+  @override
+  String get freeShareFail => 'Could not create the link';
+
+  @override
   String get freeOnboardTitle => 'Server list';
 
   @override
   String get freeOnboardBody =>
-      'A subscription link or a key becomes a profile. Its servers stay in one list.';
+      'An address or a key becomes a profile. Its servers stay in one list.';
 
   @override
   String get freeOnboardAddTitle => 'Pick a server';
@@ -1781,4 +1791,28 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get freeDelete => 'Remove';
+
+  @override
+  String get freeDeleteServerTitle => 'Remove this server?';
+
+  @override
+  String get freeDeleteServerBody => 'The link is deleted from this phone.';
+
+  @override
+  String get freeDeleteCatalogTitle => 'Remove this list?';
+
+  @override
+  String get freeDeleteCatalogBody =>
+      'Every server in the list is deleted from this phone.';
+
+  @override
+  String get freeRefresh => 'Refresh';
+
+  @override
+  String freeRefreshDone(int count) {
+    return 'Updated: $count';
+  }
+
+  @override
+  String get freeRefreshFail => 'Could not refresh';
 }

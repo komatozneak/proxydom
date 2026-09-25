@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/busy/busy_overlay.dart';
+import '../../../core/diagnostics/product_log.dart';
 import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
@@ -406,6 +407,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
     final notifier = ref.read(vpnProvider.notifier);
     final status = ref.read(vpnProvider);
+    final nativeHint = status.runtimeType.toString();
+    ProductLog.event('ui.tap', {
+      'action': status is VpnConnected ||
+              status is VpnConnecting ||
+              notifier.isConnectInFlight
+          ? 'disconnect'
+          : 'connect',
+      'ui': nativeHint,
+    });
 
     // Connecting: second tap cancels the walk (issue #147). Do not reconcile
     // with native here — getStatus() idle during Binding/Proving used to

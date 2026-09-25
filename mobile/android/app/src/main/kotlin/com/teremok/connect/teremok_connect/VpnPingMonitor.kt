@@ -13,8 +13,13 @@ import java.net.URI
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import java.security.SecureRandom
+import java.security.cert.X509Certificate
+import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLSocket
 import javax.net.ssl.SSLSocketFactory
+import javax.net.ssl.TrustManager
+import javax.net.ssl.X509TrustManager
 
 /**
  * Periodic path-latency probe for Home `ms`.
@@ -214,6 +219,57 @@ class VpnPingMonitor(
             }
         }.getOrNull()
 
+        /**
+         * Exit IPv4 through SOCKS without a domain lookup. Xray has no DNS
+         * config, so `ipv4.icanhazip.com` times out while a connect to
+         * 1.1.1.1 still works.
+         */
+        data class ExitIp(val ip: String?, val reason: String)
+
+        /** Exit IPv4 via the same SOCKS CONNECT to 1.1.1.1:443 that already succeeds. */
+        fun socksExitIpByIpv4(
+            socksHost: String = GvisorTun2Socks.SOCKS_HOST,
+            socksPort: Int = GvisorTun2Socks.SOCKS_PORT,
+            timeoutMs: Int = PROBE_TIMEOUT_MS,
+        ): ExitIp = try {
+            Socket().use { plain ->
+                plain.soTimeout = timeoutMs
+                plain.connect(InetSocketAddress(socksHost, socksPort), timeoutMs)
+                val out = DataOutputStream(plain.getOutputStream())
+                val inp = DataInputStream(plain.getInputStream())
+                socks5Greeting(out, inp)
+                socks5ConnectIpv4(out, inp, "1.1.1.1", 443)
+                val ssl = probeTls(plain)
+                try {
+                    ssl.soTimeout = timeoutMs
+                    ssl.startHandshake()
+                    val writer = ssl.getOutputStream()
+                    writer.write(
+                        (
+                            "GET /cdn-cgi/trace HTTP/1.0\r\n" +
+                                "Host: 1.1.1.1\r\nConnection: close\r\n\r\n"
+                            ).toByteArray(StandardCharsets.US_ASCII),
+                    )
+                    writer.flush()
+                    val text = ssl.getInputStream().readBytes()
+                        .toString(StandardCharsets.US_ASCII)
+                    val ip = Regex("""(?m)^ip=(\d{1,3}(?:\.\d{1,3}){3})\s*$""")
+                        .find(text)
+                        ?.groupValues
+                        ?.getOrNull(1)
+                    if (ip.isNullOrBlank()) {
+                        ExitIp(null, "no_ip")
+                    } else {
+                        ExitIp(ip, "")
+                    }
+                } finally {
+                    runCatching { ssl.close() }
+                }
+            }
+        } catch (e: Exception) {
+            ExitIp(null, "${e.javaClass.simpleName}=${e.message ?: "err"}")
+        }
+
         fun socksHttpOk(
             socksHost: String = GvisorTun2Socks.SOCKS_HOST,
             socksPort: Int = GvisorTun2Socks.SOCKS_PORT,
@@ -352,6 +408,21 @@ class VpnPingMonitor(
                     (System.nanoTime() - started) / 1_000_000L
                 }
             }.getOrNull()
+
+        private fun probeTls(plain: Socket): SSLSocket {
+            val trustAll = arrayOf<TrustManager>(object : X509TrustManager {
+                override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) = Unit
+                override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) = Unit
+                override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
+            })
+            val context = SSLContext.getInstance("TLS")
+            context.init(null, trustAll, SecureRandom())
+            val ssl = context.socketFactory.createSocket(plain, "1.1.1.1", 443, true) as SSLSocket
+            val params = ssl.sslParameters
+            params.endpointIdentificationAlgorithm = null
+            ssl.sslParameters = params
+            return ssl
+        }
 
         private fun socks5ConnectIpv4(
             out: DataOutputStream,

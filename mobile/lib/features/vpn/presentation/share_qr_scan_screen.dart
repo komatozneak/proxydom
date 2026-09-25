@@ -38,7 +38,6 @@ class _ShareQrScanScreenState extends ConsumerState<ShareQrScanScreen> {
     _handled = true;
     try {
       await Hy2ImportStore.instance.saveInput(raw);
-      await Hy2ImportStore.instance.select(0);
       if (!mounted) return;
       showTeremokSnackBar(context, AppL10n.of(context).freeServerAdded);
       await ref.read(vpnProvider.notifier).connect(forceRestart: true);

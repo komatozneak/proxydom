@@ -180,6 +180,10 @@ class VpnController {
           'hysteriaBandwidthUp': profile.bandwidthUp,
         if (profile.bandwidthDown != null)
           'hysteriaBandwidthDown': profile.bandwidthDown,
+        if (profile.insecure) 'hysteriaInsecure': true,
+        if (profile.obfs.isNotEmpty) 'hysteriaObfs': profile.obfs,
+        if (profile.obfsPassword.isNotEmpty)
+          'hysteriaObfsPassword': profile.obfsPassword,
         'controlPlaneHosts': VpnServiceConfig.controlPlaneHostsOf(),
         if (disallowedApps.isNotEmpty) 'disallowedApplications': disallowedApps,
         if (directSuffixes.isNotEmpty) 'directDomainSuffixes': directSuffixes,
@@ -229,6 +233,48 @@ class VpnController {
     } on PlatformException catch (e) {
       throw VpnControllerException('xray start failed: ${e.code}');
     }
+  }
+
+  Future<String?> getLastError() async {
+    try {
+      return await _methodChannel.invokeMethod<String>('getLastError');
+    } on PlatformException {
+      return null;
+    } on MissingPluginException {
+      return null;
+    }
+  }
+
+  Future<String?> getShareTcp() async {
+    try {
+      return await _methodChannel.invokeMethod<String>('getShareTcp');
+    } on PlatformException {
+      return null;
+    } on MissingPluginException {
+      return null;
+    }
+  }
+
+  /// True only after native leaves preparing/connecting. [start] itself returns
+  /// when the service accepts the command, before the worker finishes.
+  Future<bool> waitUntilSessionSettled() async {
+    final deadline = DateTime.now().add(const Duration(seconds: 25));
+    var sawBusy = false;
+    while (DateTime.now().isBefore(deadline)) {
+      final status = await getStatus();
+      if (status == VpnNativeStatus.connecting ||
+          status == VpnNativeStatus.preparing ||
+          status == VpnNativeStatus.connected) {
+        sawBusy = true;
+      }
+      if (sawBusy && status == VpnNativeStatus.connected) return true;
+      if (sawBusy &&
+          (status == VpnNativeStatus.error || status == VpnNativeStatus.idle)) {
+        return false;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    }
+    return false;
   }
 
   Future<String?> provenEgressIp() async {
@@ -310,14 +356,6 @@ class VpnController {
       return false;
     } on MissingPluginException {
       return false;
-    }
-  }
-
-  Future<String?> getLastError() async {
-    try {
-      return await _methodChannel.invokeMethod<String>('getLastError');
-    } on PlatformException {
-      return null;
     }
   }
 

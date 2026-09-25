@@ -24,7 +24,9 @@ void main() {
     );
 
     expect(find.text('Добавить'), findsNothing);
-    final buttons = tester.widgetList<FilledButton>(find.byType(FilledButton));
+    final buttons = tester.widgetList<FilledButton>(
+      find.byWidgetPredicate((widget) => widget is FilledButton),
+    );
     final colors = buttons
         .map((button) => button.style?.backgroundColor?.resolve({}))
         .toList();

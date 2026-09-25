@@ -13,6 +13,7 @@ import 'core/diagnostics/app_log_buffer.dart';
 import 'core/diagnostics/diagnostics_service.dart';
 import 'core/diagnostics/tunnel_log_prefs.dart';
 import 'core/internet_permission.dart';
+import 'core/legacy_account_cache.dart';
 import 'core/router.dart';
 
 void main() async {
@@ -67,6 +68,7 @@ void main() async {
     );
   }
 
+  await discardLegacyAccountCache();
   await AppRouter.warmWelcomeFlag();
 
   AppLogBuffer.instance.debug(

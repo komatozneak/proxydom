@@ -3241,6 +3241,24 @@ abstract class AppL10n {
   /// **'Could not read that link'**
   String get freeLinkInvalid;
 
+  /// No description provided for @freeSubscriptionLoadFail.
+  ///
+  /// In en, this message translates to:
+  /// **'The subscription did not load. The document host did not answer.'**
+  String get freeSubscriptionLoadFail;
+
+  /// No description provided for @freeSharePool.
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get freeSharePool;
+
+  /// No description provided for @freeShareFail.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not create the link'**
+  String get freeShareFail;
+
   /// No description provided for @freeOnboardTitle.
   ///
   /// In en, this message translates to:
@@ -3342,6 +3360,48 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Remove'**
   String get freeDelete;
+
+  /// No description provided for @freeDeleteServerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove this server?'**
+  String get freeDeleteServerTitle;
+
+  /// No description provided for @freeDeleteServerBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The link is deleted from this phone.'**
+  String get freeDeleteServerBody;
+
+  /// No description provided for @freeDeleteCatalogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove this list?'**
+  String get freeDeleteCatalogTitle;
+
+  /// No description provided for @freeDeleteCatalogBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Every server in the list is deleted from this phone.'**
+  String get freeDeleteCatalogBody;
+
+  /// No description provided for @freeRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get freeRefresh;
+
+  /// No description provided for @freeRefreshDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated: {count}'**
+  String freeRefreshDone(int count);
+
+  /// No description provided for @freeRefreshFail.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not refresh'**
+  String get freeRefreshFail;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

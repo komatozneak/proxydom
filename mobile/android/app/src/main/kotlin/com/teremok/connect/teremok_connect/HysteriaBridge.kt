@@ -64,6 +64,9 @@ class HysteriaBridge private constructor() {
         sni: String,
         socksListen: String,
         directDomainSuffixes: List<String> = emptyList(),
+        insecure: Boolean = false,
+        obfs: String = "",
+        obfsPassword: String = "",
     ): Boolean {
         val svc = vpnService
         if (svc == null) {
@@ -75,6 +78,9 @@ class HysteriaBridge private constructor() {
         obj.put("auth", auth)
         obj.put("sni", sni)
         obj.put("socks_listen", socksListen)
+        if (insecure) obj.put("insecure", true)
+        if (obfs.isNotBlank()) obj.put("obfs", obfs)
+        if (obfsPassword.isNotEmpty()) obj.put("obfs_password", obfsPassword)
         val suffixes = org.json.JSONArray()
         for (raw in directDomainSuffixes) {
             val s = raw.trim().lowercase()

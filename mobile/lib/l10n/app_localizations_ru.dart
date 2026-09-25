@@ -1733,11 +1733,21 @@ class AppL10nRu extends AppL10n {
   String get freeLinkInvalid => 'Ссылка не разобрана';
 
   @override
+  String get freeSubscriptionLoadFail =>
+      'Подписка не загрузилась. Адрес документа не ответил.';
+
+  @override
+  String get freeSharePool => 'Поделиться';
+
+  @override
+  String get freeShareFail => 'Не удалось создать ссылку';
+
+  @override
   String get freeOnboardTitle => 'Список серверов';
 
   @override
   String get freeOnboardBody =>
-      'Ссылка подписки или ключ становятся профилем. Серверы из неё собираются в один список.';
+      'Адрес документа или ключ становятся профилем. Серверы из него собираются в один список.';
 
   @override
   String get freeOnboardAddTitle => 'Выберите сервер';
@@ -1786,4 +1796,28 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get freeDelete => 'Удалить';
+
+  @override
+  String get freeDeleteServerTitle => 'Удалить этот сервер?';
+
+  @override
+  String get freeDeleteServerBody => 'Ссылка сотрётся с этого телефона.';
+
+  @override
+  String get freeDeleteCatalogTitle => 'Удалить этот список?';
+
+  @override
+  String get freeDeleteCatalogBody =>
+      'Все серверы из списка сотрутся с этого телефона.';
+
+  @override
+  String get freeRefresh => 'Обновить';
+
+  @override
+  String freeRefreshDone(int count) {
+    return 'Обновлено: $count';
+  }
+
+  @override
+  String get freeRefreshFail => 'Не удалось обновить';
 }

@@ -1,9 +1,12 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../core/busy/busy_overlay.dart';
 import '../../../core/ios_store_gates.dart';
@@ -17,6 +20,7 @@ import '../../home/application/vpn_provider.dart';
 import '../../home/application/vpn_status.dart';
 import '../application/imported_profiles_provider.dart';
 import '../data/hy2_import_store.dart';
+import '../data/route_document.dart';
 import '../data/subscription_label.dart';
 import 'free_client_chrome.dart';
 import 'pool_server_mark.dart';
@@ -48,12 +52,13 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
 
   List<VpnNode>? _nodes;
   List<ParsedShareLink> _imported = const [];
-  String? _profileTitle;
+  List<ShareCatalog> _catalogs = const [];
   String? _selectedId;
   Object? _error;
   bool _loading = true;
   bool _lockdownHint = false;
   bool _fromCache = false;
+  final _refreshing = <String>{};
 
   @override
   void initState() {
@@ -122,11 +127,11 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
 
   Future<void> _applyImported(List<ParsedShareLink> links) async {
     final index = await Hy2ImportStore.instance.selectedIndex();
-    final title = await Hy2ImportStore.instance.profileTitle();
+    final catalogs = await Hy2ImportStore.instance.catalogs();
     if (!mounted) return;
     setState(() {
       _imported = links;
-      _profileTitle = title;
+      _catalogs = catalogs;
       _nodes = const [];
       _selectedId = links.isEmpty ? null : '$index';
       _loading = false;
@@ -312,6 +317,8 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
   }
 
   Future<void> _removeImported(int index) async {
+    final ok = await confirmImportedDelete(context, catalog: false);
+    if (!ok || !mounted) return;
     final selected = _selectedId == '$index';
     final status = ref.read(vpnProvider);
     if (selected && (status is VpnConnected || status is VpnConnecting)) {
@@ -321,30 +328,103 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     await _load();
   }
 
-  Future<void> _deleteProfile() async {
+  Future<void> _deleteProfile(String id) async {
+    final ok = await confirmImportedDelete(context, catalog: true);
+    if (!ok || !mounted) return;
     final status = ref.read(vpnProvider);
     if (status is VpnConnected || status is VpnConnecting) {
       await ref.read(vpnProvider.notifier).disconnect();
     }
-    await Hy2ImportStore.instance.clear();
+    await Hy2ImportStore.instance.removeCatalog(id);
     if (!mounted) return;
     setState(() {
-      _imported = const [];
-      _profileTitle = null;
-      _selectedId = null;
+      _catalogs = [
+        for (final catalog in _catalogs)
+          if (catalog.id != id) catalog,
+      ];
+      if (_catalogs.isEmpty) {
+        _imported = const [];
+        _selectedId = null;
+      }
     });
+    await _load();
   }
 
-  Future<void> _openPoolSheet() async {
+  Future<void> _shareCatalog(ShareCatalog catalog) async {
+    final l = AppL10n.of(context);
+    final text = catalog.lines.join('\n');
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(catalog.title),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (text.length <= 800) QrImageView(data: text, size: 180),
+              if (text.length <= 800) const SizedBox(height: 12),
+              SelectableText(text),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: text));
+                Navigator.of(context).pop();
+              },
+              child: Text(l.freeSharePool),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _refreshCatalog(ShareCatalog catalog) async {
+    final url = catalog.url;
+    if (url == null || url.isEmpty || _refreshing.contains(catalog.id)) return;
+    final l = AppL10n.of(context);
+    setState(() => _refreshing.add(catalog.id));
+    try {
+      final outcome =
+          await Hy2ImportStore.instance.refreshCatalog(catalog.id);
+      if (!mounted) return;
+      await _applyImported(await Hy2ImportStore.instance.load());
+      if (!mounted) return;
+      final status = ref.read(vpnProvider);
+      final live = status is VpnConnected || status is VpnConnecting;
+      if (outcome.kind == ShareRefreshKind.deleted) {
+        if (outcome.selectionLeftThisList && live) {
+          await ref.read(vpnProvider.notifier).disconnect();
+        }
+        return;
+      }
+      if (outcome.kind == ShareRefreshKind.unchanged) return;
+      showTeremokSnackBar(context, l.freeRefreshDone(outcome.count));
+      if (outcome.selectionLeftThisList && live) {
+        await ref.read(vpnProvider.notifier).connect(forceRestart: true);
+      }
+    } on Exception {
+      if (!mounted) return;
+      showTeremokSnackBar(context, l.freeRefreshFail);
+    } finally {
+      if (mounted) setState(() => _refreshing.remove(catalog.id));
+    }
+  }
+
+  Future<void> _openPoolSheet(ShareCatalog catalog) async {
     final theme = Theme.of(context);
     final premium = <int>[];
     final general = <int>[];
-    for (var i = 0; i < _imported.length; i++) {
-      final label = labelForShareLink(_imported[i]);
+    for (final raw in catalog.lines) {
+      final index = _imported.indexWhere((link) => link.raw == raw);
+      if (index < 0) continue;
+      final label = labelForShareLink(_imported[index]);
       if (isPremiumPoolServer(label.title)) {
-        premium.add(i);
+        premium.add(index);
       } else {
-        general.add(i);
+        general.add(index);
       }
     }
     await showModalBottomSheet<void>(
@@ -396,6 +476,104 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     );
   }
 
+  Widget _catalogCard(ThemeData theme, AppL10n l, ShareCatalog catalog) {
+    final title = catalog.title.trim().isEmpty ? l.freeServers : catalog.title;
+    return Material(
+      color: theme.colorScheme.surfaceContainerHighest,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppBrand.radiusCard),
+        side: BorderSide(color: theme.colorScheme.outline),
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: InkWell(
+                onTap: () => _openPoolSheet(catalog),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      catalog.lines.length > 1
+                          ? '$title · ${catalog.lines.length}'
+                          : title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            VerticalDivider(
+              width: 1,
+              thickness: 1,
+              color: theme.colorScheme.outline,
+            ),
+            Tooltip(
+              message: l.freeSharePool,
+              child: InkWell(
+                onTap: () => _shareCatalog(catalog),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: AppIcon(AppIcons.qrCode, size: 20),
+                ),
+              ),
+            ),
+            if (catalog.url != null && catalog.url!.isNotEmpty) ...[
+              VerticalDivider(
+                width: 1,
+                thickness: 1,
+                color: theme.colorScheme.outline,
+              ),
+              Tooltip(
+                message: l.freeRefresh,
+                child: InkWell(
+                  onTap: _refreshing.contains(catalog.id)
+                      ? null
+                      : () => _refreshCatalog(catalog),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: _refreshing.contains(catalog.id)
+                        ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: theme.colorScheme.primary,
+                            ),
+                          )
+                        : const AppIcon(AppIcons.refresh, size: 20),
+                  ),
+                ),
+              ),
+            ],
+            VerticalDivider(
+              width: 1,
+              thickness: 1,
+              color: theme.colorScheme.outline,
+            ),
+            Tooltip(
+              message: l.freeDelete,
+              child: InkWell(
+                onTap: () => _deleteProfile(catalog.id),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: AppIcon(AppIcons.trash, size: 20),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildImported(ThemeData theme) {
     final l = AppL10n.of(context);
     final filtered = <int>[];
@@ -406,8 +584,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       if (q.isEmpty || hay.contains(q)) filtered.add(i);
     }
     final connected = ref.watch(vpnProvider) is VpnConnected;
-    final grouped = _imported.length > 1 ||
-        (_profileTitle != null && _profileTitle!.isNotEmpty);
+    final grouped = _catalogs.isNotEmpty;
     if (grouped) {
       return Column(
         children: [
@@ -415,30 +592,10 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(44, 8, 16, 0),
               children: [
-                ListTile(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppBrand.radiusCard),
-                    side: BorderSide(color: theme.colorScheme.outline),
-                  ),
-                  tileColor: theme.colorScheme.surfaceContainerHighest,
-                  title: Text(
-                    _profileTitle ?? l.freeServers,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        onPressed: _deleteProfile,
-                        icon: const AppIcon(AppIcons.trash, size: 20),
-                      ),
-                      const AppIcon(AppIcons.chevronRight),
-                    ],
-                  ),
-                  onTap: _openPoolSheet,
-                ),
+                for (var i = 0; i < _catalogs.length; i++) ...[
+                  if (i > 0) const SizedBox(height: 8),
+                  _catalogCard(theme, l, _catalogs[i]),
+                ],
               ],
             ),
           ),
@@ -481,6 +638,9 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
                     final index = filtered[i];
                     final link = _imported[index];
                     final selected = _selectedId == '$index';
+                    final iosBlocked = !kIsWeb &&
+                        defaultTargetPlatform == TargetPlatform.iOS &&
+                        !canDialScheme(link.scheme, ios: true);
                     return ImportedProfileCard(
                       name: link.name,
                       scheme: link.scheme,
@@ -488,7 +648,9 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
                       selected: selected,
                       connected: selected && connected,
                       onDelete: () => _removeImported(index),
-                      onTap: () async {
+                      onTap: iosBlocked
+                          ? null
+                          : () async {
                         await Hy2ImportStore.instance.select(index);
                         if (!mounted) return;
                         setState(() => _selectedId = '$index');

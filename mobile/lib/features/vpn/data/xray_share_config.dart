@@ -11,25 +11,46 @@ String? buildXraySocksConfig(ParsedShareLink link) {
   if (link.isHysteria2) return null;
   final outbound = _outbound(link);
   if (outbound == null) return null;
+  outbound['tag'] = 'proxy';
   return jsonEncode({
+    'log': {'loglevel': 'warning'},
     'inbounds': [
       {
         'listen': '127.0.0.1',
         'port': xraySocksPort,
         'protocol': 'socks',
         'settings': {'udp': true, 'auth': 'noauth'},
+        'tag': 'socks-in',
       },
     ],
-    'outbounds': [outbound],
+    'outbounds': [
+      outbound,
+      {'protocol': 'freedom', 'tag': 'direct'},
+    ],
+    'routing': {
+      'domainStrategy': 'AsIs',
+      'rules': [
+        {
+          'type': 'field',
+          'ip': [
+            '10.0.0.0/8',
+            '172.16.0.0/12',
+            '192.168.0.0/16',
+            '127.0.0.0/8',
+          ],
+          'outboundTag': 'direct',
+        },
+      ],
+    },
   });
 }
 
 Map<String, Object?>? _outbound(ParsedShareLink link) {
   switch (link.scheme) {
     case 'vless':
-      return _vlessOrTrojan(link, protocol: 'vless');
+      return _vless(link);
     case 'trojan':
-      return _vlessOrTrojan(link, protocol: 'trojan');
+      return _trojan(link);
     case 'vmess':
       return _vmess(link);
     case 'ss':
@@ -39,10 +60,7 @@ Map<String, Object?>? _outbound(ParsedShareLink link) {
   }
 }
 
-Map<String, Object?>? _vlessOrTrojan(
-  ParsedShareLink link, {
-  required String protocol,
-}) {
+Map<String, Object?>? _vless(ParsedShareLink link) {
   final uri = Uri.parse(link.raw);
   final host = uri.host.trim();
   if (host.isEmpty || uri.userInfo.isEmpty) return null;
@@ -53,20 +71,45 @@ Map<String, Object?>? _vlessOrTrojan(
   final security = (q['security'] ?? 'tls').trim();
   final sni = (q['sni'] ?? q['peer'] ?? host).trim();
   final flow = (q['flow'] ?? '').trim();
-  final userMap = <String, Object?>{
-    if (protocol == 'vless') 'id': user,
-    if (protocol == 'vless') 'encryption': q['encryption'] ?? 'none',
-    if (protocol == 'trojan') 'password': user,
-    if (flow.isNotEmpty) 'flow': flow,
-  };
   return {
-    'protocol': protocol,
+    'protocol': 'vless',
     'settings': {
       'vnext': [
         {
           'address': host,
           'port': port,
-          'users': [userMap],
+          'users': [
+            {
+              'id': user,
+              'encryption': q['encryption'] ?? 'none',
+              if (flow.isNotEmpty) 'flow': flow,
+            },
+          ],
+        },
+      ],
+    },
+    'streamSettings': _stream(q, network: network, security: security, sni: sni),
+  };
+}
+
+Map<String, Object?>? _trojan(ParsedShareLink link) {
+  final uri = Uri.parse(link.raw);
+  final host = uri.host.trim();
+  if (host.isEmpty || uri.userInfo.isEmpty) return null;
+  final password = Uri.decodeComponent(uri.userInfo);
+  final port = uri.hasPort ? uri.port : 443;
+  final q = uri.queryParameters;
+  final network = (q['type'] ?? q['net'] ?? 'tcp').trim();
+  final security = (q['security'] ?? 'tls').trim();
+  final sni = (q['sni'] ?? q['peer'] ?? host).trim();
+  return {
+    'protocol': 'trojan',
+    'settings': {
+      'servers': [
+        {
+          'address': host,
+          'port': port,
+          'password': password,
         },
       ],
     },
@@ -144,6 +187,8 @@ Map<String, Object?>? _shadowsocks(ParsedShareLink link) {
     host = hp.first;
     port = int.tryParse(hp[1]) ?? 8388;
   }
+  final uri = Uri.tryParse(link.raw.split('#').first);
+  final q = uri?.queryParameters ?? const <String, String>{};
   return {
     'protocol': 'shadowsocks',
     'settings': {
@@ -156,6 +201,12 @@ Map<String, Object?>? _shadowsocks(ParsedShareLink link) {
         },
       ],
     },
+    'streamSettings': _stream(
+      q,
+      network: (q['type'] ?? q['net'] ?? 'tcp').trim(),
+      security: 'none',
+      sni: host,
+    ),
   };
 }
 
@@ -165,8 +216,13 @@ Map<String, Object?> _stream(
   required String security,
   required String sni,
 }) {
+  final normalized = switch (network) {
+    '' => 'tcp',
+    'mkcp' => 'kcp',
+    _ => network,
+  };
   final stream = <String, Object?>{
-    'network': network.isEmpty ? 'tcp' : network,
+    'network': normalized,
     'security': security.isEmpty ? 'none' : security,
   };
   if (security == 'tls') {
@@ -184,11 +240,17 @@ Map<String, Object?> _stream(
       'fingerprint': (q['fp'] ?? '').isEmpty ? 'chrome' : q['fp'],
     };
   }
-  if (network == 'ws') {
+  if (normalized == 'ws') {
     stream['wsSettings'] = {
       'path': (q['path'] ?? '/').isEmpty ? '/' : q['path'],
       if ((q['host'] ?? '').isNotEmpty) 'headers': {'Host': q['host']},
     };
+  }
+  if (normalized == 'kcp') {
+    final seed = (q['seed'] ?? q['path'] ?? '').trim();
+    if (seed.isNotEmpty && seed != '/') {
+      stream['kcpSettings'] = {'seed': seed};
+    }
   }
   return stream;
 }

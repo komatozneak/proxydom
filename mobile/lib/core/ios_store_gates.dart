@@ -3,18 +3,10 @@ import 'package:flutter/foundation.dart';
 /// Store clients are local key importers (ADR 026). Web stays on the account
 /// shell. Uses [defaultTargetPlatform] so widget tests can override with
 /// [debugDefaultTargetPlatformOverride].
-bool get freeKeyClient {
-  if (kIsWeb) return false;
-  return defaultTargetPlatform == TargetPlatform.android ||
-      defaultTargetPlatform == TargetPlatform.iOS;
-}
+bool get freeKeyClient => !kIsWeb;
 
-/// App Store and Play binaries must not surface Platega hosted checkout.
-/// See [docs/ops/ios-iap-parked.md] and ADR 026.
-///
-/// Uses [defaultTargetPlatform] so widget tests can override with
-/// [debugDefaultTargetPlatformOverride].
-bool get hideInAppPlategaCheckout => freeKeyClient;
+/// The phone binary has no cashier. Web is not a store client either.
+bool get hideInAppPlategaCheckout => true;
 
 /// Android VpnService can exclude apps. Independent of the cashier hide:
 /// the free client still needs «what works without VPN».

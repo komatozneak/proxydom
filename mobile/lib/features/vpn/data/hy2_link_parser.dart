@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'vpn_config.dart';
 
 /// One pasted Hysteria2 server.
@@ -43,6 +45,10 @@ ParsedHy2Link parseHy2Link(String raw) {
   if (sni.isEmpty) {
     throw const FormatException('missing sni');
   }
+  final insecure = uri.queryParameters['insecure'] == '1' ||
+      uri.queryParameters['allowInsecure'] == '1';
+  final obfs = (uri.queryParameters['obfs'] ?? '').trim();
+  final obfsPassword = uri.queryParameters['obfs-password'] ?? '';
   final title = shareServerTitle(decodedShareFragment(text), host);
   return ParsedHy2Link(
     name: title,
@@ -54,6 +60,9 @@ ParsedHy2Link parseHy2Link(String raw) {
       username: username,
       sni: sni,
       socksListen: '127.0.0.1:10808',
+      insecure: insecure,
+      obfs: obfs,
+      obfsPassword: obfsPassword,
     ),
   );
 }
@@ -91,10 +100,119 @@ List<ParsedHy2Link> parseHy2Subscription(String body) {
   return out;
 }
 
-/// True when [raw] is an http(s) subscription URL, not a Hy2 URI.
-bool looksLikeSubscriptionUrl(String raw) {
+/// Web document the user pasted. [url] has no fragment; [title] is `#name`.
+class SubscriptionDocumentTarget {
+  const SubscriptionDocumentTarget({required this.url, this.title});
+
+  final String url;
+  final String? title;
+}
+
+/// One http(s) document, or null when [raw] is share lines.
+///
+/// Throws [FormatException] `subscription` when a Happ/Teremok deeplink does
+/// not contain an http(s) address. No request is made.
+SubscriptionDocumentTarget? subscriptionDocumentTarget(String raw) {
   final text = raw.trim();
+  if (text.isEmpty) return null;
+  final lower = text.toLowerCase();
+  if (lower.startsWith('https://') || lower.startsWith('http://')) {
+    return _webTarget(text);
+  }
+  if (lower.startsWith('happ://') || lower.startsWith('teremok://')) {
+    return _deeplinkTarget(text);
+  }
+  return null;
+}
+
+/// True when [raw] is an http(s) subscription document, not a share line.
+bool looksLikeSubscriptionUrl(String raw) {
+  try {
+    return subscriptionDocumentTarget(raw) != null;
+  } on FormatException {
+    return false;
+  }
+}
+
+SubscriptionDocumentTarget _webTarget(String text) {
   final uri = Uri.tryParse(text);
-  if (uri == null) return false;
-  return uri.scheme == 'https' || uri.scheme == 'http';
+  if (uri == null || uri.host.isEmpty) {
+    throw const FormatException('subscription');
+  }
+  final scheme = uri.scheme.toLowerCase();
+  if (scheme != 'https' && scheme != 'http') {
+    throw const FormatException('subscription');
+  }
+  final title = _fragmentTitle(uri);
+  var url = uri.replace(fragment: '').toString();
+  if (url.endsWith('#')) url = url.substring(0, url.length - 1);
+  return SubscriptionDocumentTarget(
+    url: url,
+    title: title,
+  );
+}
+
+SubscriptionDocumentTarget _deeplinkTarget(String text) {
+  final nested = RegExp(
+    r'^(?:teremok|happ)://(?:add|import)/(https?://.*)$',
+    caseSensitive: false,
+  ).firstMatch(text);
+  if (nested != null) {
+    return _requireWeb(nested.group(1)!);
+  }
+  final uri = Uri.tryParse(text);
+  if (uri == null) throw const FormatException('subscription');
+  final fromQuery = uri.queryParameters['url'];
+  if (fromQuery != null && fromQuery.trim().isNotEmpty) {
+    return _requireWeb(fromQuery.trim());
+  }
+  final host = uri.host.toLowerCase();
+  if (host == 'sub') {
+    var payload = uri.path;
+    if (payload.startsWith('/')) payload = payload.substring(1);
+    final decoded = _utf8Base64(payload);
+    if (decoded == null) throw const FormatException('subscription');
+    return _requireWeb(decoded.trim());
+  }
+  final marker = text.indexOf('://');
+  final payload = marker < 0 ? '' : text.substring(marker + 3);
+  final decoded = _utf8Base64(payload);
+  final decodedLower = decoded?.trim().toLowerCase() ?? '';
+  if (decoded != null &&
+      (decodedLower.startsWith('https://') ||
+          decodedLower.startsWith('http://'))) {
+    return _requireWeb(decoded.trim());
+  }
+  throw const FormatException('subscription');
+}
+
+SubscriptionDocumentTarget _requireWeb(String text) {
+  final lower = text.toLowerCase();
+  if (!lower.startsWith('https://') && !lower.startsWith('http://')) {
+    throw const FormatException('subscription');
+  }
+  return _webTarget(text);
+}
+
+String? _fragmentTitle(Uri uri) {
+  final raw = uri.fragment.trim();
+  if (raw.isEmpty) return null;
+  try {
+    final decoded = Uri.decodeComponent(raw).trim();
+    return decoded.isEmpty ? null : decoded;
+  } on ArgumentError {
+    return raw;
+  }
+}
+
+String? _utf8Base64(String payload) {
+  final normalized = payload.replaceAll('-', '+').replaceAll('_', '/');
+  final pad = normalized.length % 4 == 0
+      ? normalized
+      : normalized.padRight(normalized.length + (4 - normalized.length % 4), '=');
+  try {
+    return utf8.decode(base64Decode(pad));
+  } on FormatException {
+    return null;
+  }
 }

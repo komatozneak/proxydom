@@ -173,12 +173,17 @@ func buildClientConfig(cfg startConfig) (*client.Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("resolve: %w", err)
 	}
+	factory, err := connFactoryFor(cfg)
+	if err != nil {
+		return nil, err
+	}
 	return &client.Config{
-		ConnFactory: &protectedFactory{},
+		ConnFactory: factory,
 		ServerAddr:  udpAddr,
 		Auth:        cfg.Auth,
 		TLSConfig: client.TLSConfig{
-			ServerName: cfg.SNI,
+			ServerName:         cfg.SNI,
+			InsecureSkipVerify: cfg.Insecure,
 		},
 		// Official TUN clients set this: TCP() returns before the server
 		// confirms the dest, saving one RTT on every YouTube/page socket.

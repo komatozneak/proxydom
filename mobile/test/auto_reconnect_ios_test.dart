@@ -42,12 +42,10 @@ void main() {
     expect(await AutoReconnectPrefs.isEnabled(), isFalse);
   });
 
-  test('non-store platform keeps auto-reconnect default on', () async {
+  test('configurator leaves reconnect to the native engine', () async {
     SharedPreferences.setMockInitialValues({});
     debugDefaultTargetPlatformOverride = TargetPlatform.linux;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
-    expect(await AutoReconnectPrefs.isEnabled(), isTrue);
-    await AutoReconnectPrefs.setEnabled(false);
     expect(await AutoReconnectPrefs.isEnabled(), isFalse);
   });
 

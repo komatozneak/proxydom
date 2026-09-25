@@ -11,6 +11,7 @@ import (
 	"log"
 	"net"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -34,6 +35,9 @@ type startConfig struct {
 	SNI                  string   `json:"sni"`
 	SocksListen          string   `json:"socks_listen"`
 	DirectDomainSuffixes []string `json:"direct_domain_suffixes"`
+	Insecure             bool     `json:"insecure"`
+	Obfs                 string   `json:"obfs"`
+	ObfsPassword         string   `json:"obfs_password"`
 }
 
 type protectedFactory struct{}
@@ -65,6 +69,37 @@ func (f *protectedFactory) New(addr net.Addr) (net.PacketConn, error) {
 		return nil, protErr
 	}
 	return pc, nil
+}
+
+func connFactoryFor(cfg startConfig) (client.ConnFactory, error) {
+	kind := strings.TrimSpace(strings.ToLower(cfg.Obfs))
+	if kind == "" {
+		return &protectedFactory{}, nil
+	}
+	if kind != "salamander" {
+		return nil, fmt.Errorf("unsupported obfs %q", cfg.Obfs)
+	}
+	if len(cfg.ObfsPassword) < 4 {
+		return nil, errors.New("obfs password must be at least 4 bytes")
+	}
+	return &obfsFactory{password: cfg.ObfsPassword}, nil
+}
+
+type obfsFactory struct {
+	password string
+}
+
+func (f *obfsFactory) New(addr net.Addr) (net.PacketConn, error) {
+	pc, err := (&protectedFactory{}).New(addr)
+	if err != nil {
+		return nil, err
+	}
+	wrapped, err := wrapSalamander(pc, []byte(f.password))
+	if err != nil {
+		_ = pc.Close()
+		return nil, err
+	}
+	return wrapped, nil
 }
 
 var (

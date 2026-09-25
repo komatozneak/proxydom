@@ -9,17 +9,19 @@ import (
 	"net"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
-	xcore "github.com/xtls/xray-core/core"
-	"github.com/xtls/xray-core/transport/internet"
 	tuncore "github.com/xjasonlyu/tun2socks/v2/core"
 	"github.com/xjasonlyu/tun2socks/v2/core/device/fdbased"
 	"github.com/xjasonlyu/tun2socks/v2/core/option"
 	M "github.com/xjasonlyu/tun2socks/v2/metadata"
-	"github.com/xjasonlyu/tun2socks/v2/tunnel"
 	"github.com/xjasonlyu/tun2socks/v2/proxy"
+	"github.com/xjasonlyu/tun2socks/v2/tunnel"
+	xnet "github.com/xtls/xray-core/common/net"
+	xcore "github.com/xtls/xray-core/core"
+	"github.com/xtls/xray-core/transport/internet"
 )
 
 // shareSocks is the local Xray SOCKS inbound. Hy2 keeps :10808.
@@ -38,8 +40,16 @@ func StartShare(configJSON string) string {
 		return "empty xray config"
 	}
 	registerXrayProtector()
-	inst, err := xcore.StartInstance("json", []byte(configJSON))
+	lastProtectErr.Store("")
+	cfg, err := loadShareConfig(configJSON)
 	if err != nil {
+		return fmt.Sprintf("xray: %v", err)
+	}
+	inst, err := xcore.New(cfg)
+	if err != nil {
+		return fmt.Sprintf("xray: %v", err)
+	}
+	if err := inst.Start(); err != nil {
 		return fmt.Sprintf("xray: %v", err)
 	}
 	shareMu.Lock()
@@ -69,25 +79,57 @@ func shareRunning() bool {
 }
 
 var xrayProtectOnce sync.Once
+var lastProtectErr atomic.Value
+
+// LastProtectError is the latest VpnService.protect failure. Empty if the
+// last dial was protected. Xray ignores a controller error and would still
+// connect the socket, so a failed protect also closes the fd.
+func LastProtectError() string {
+	text, _ := lastProtectErr.Load().(string)
+	return text
+}
 
 func registerXrayProtector() {
 	xrayProtectOnce.Do(func() {
-		internet.RegisterDialerController(func(network, address string, conn syscall.RawConn) error {
+		internet.UseAlternativeSystemDialer(protectedSystemDialer{})
+	})
+}
+
+// protectedSystemDialer owns the socket: protect(fd) then connect.
+// A failed protect returns an error. The fd is not closed inside Control,
+// because Xray has not handed the socket to connect yet.
+type protectedSystemDialer struct{}
+
+func (protectedSystemDialer) DestIpAddress() xnet.IP { return nil }
+
+func (protectedSystemDialer) Dial(
+	ctx context.Context,
+	_ xnet.Address,
+	dest xnet.Destination,
+	_ *internet.SocketConfig,
+) (net.Conn, error) {
+	dialer := &net.Dialer{
+		Timeout: 8 * time.Second,
+		Control: func(network, address string, c syscall.RawConn) error {
 			var protectErr error
-			ctrlErr := conn.Control(func(fd uintptr) {
+			ctrlErr := c.Control(func(fd uintptr) {
 				mu.Lock()
 				p := protector
 				mu.Unlock()
-				if p != nil && !p.Protect(int(fd)) {
+				if p == nil || !p.Protect(int(fd)) {
 					protectErr = errors.New("protect failed")
+					lastProtectErr.Store("protect failed")
+					return
 				}
+				lastProtectErr.Store("")
 			})
 			if ctrlErr != nil {
 				return ctrlErr
 			}
 			return protectErr
-		})
-	})
+		},
+	}
+	return dialer.DialContext(ctx, dest.Network.SystemString(), dest.NetAddr())
 }
 
 // StartShareTun pumps VpnService TUN to the local Xray SOCKS inbound.
@@ -266,6 +308,33 @@ func readSocksBound(conn net.Conn) (string, int, error) {
 	}
 }
 
+const socksUDPHeaderMax = 3 + 1 + 255 + 2
+
+func socksUDPPayload(pkt []byte) ([]byte, error) {
+	if len(pkt) < 4 {
+		return nil, errors.New("socks udp short")
+	}
+	var rest int
+	switch pkt[3] {
+	case 0x01:
+		rest = 4 + 2
+	case 0x04:
+		rest = 16 + 2
+	case 0x03:
+		if len(pkt) < 5 {
+			return nil, errors.New("socks udp short")
+		}
+		rest = 1 + int(pkt[4]) + 2
+	default:
+		return nil, errors.New("socks udp atyp")
+	}
+	off := 4 + rest
+	if len(pkt) < off {
+		return nil, errors.New("socks udp short")
+	}
+	return pkt[off:], nil
+}
+
 func socksAddr(host string, port int) []byte {
 	if ip := net.ParseIP(host); ip != nil {
 		if v4 := ip.To4(); v4 != nil {
@@ -302,8 +371,22 @@ type socksUDP struct {
 }
 
 func (s *socksUDP) ReadFrom(b []byte) (int, net.Addr, error) {
-	n, _, err := s.udp.ReadFrom(b)
-	return n, nil, err
+	// Reply is RSV, FRAG, address, then the datagram. tun2socks wants only
+	// the datagram; leaving the header on makes DNS answers unreadable.
+	buf := make([]byte, len(b)+socksUDPHeaderMax)
+	n, _, err := s.udp.ReadFrom(buf)
+	if err != nil {
+		return 0, nil, err
+	}
+	payload, err := socksUDPPayload(buf[:n])
+	if err != nil {
+		return 0, nil, err
+	}
+	if len(payload) > len(b) {
+		return 0, nil, io.ErrShortBuffer
+	}
+	copy(b, payload)
+	return len(payload), nil, nil
 }
 
 func (s *socksUDP) WriteTo(b []byte, _ net.Addr) (int, error) {

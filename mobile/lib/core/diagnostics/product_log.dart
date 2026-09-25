@@ -16,7 +16,7 @@ class ProductLog {
 
   static String _fmt(Object value) {
     final raw = value.toString().replaceAll(RegExp(r'\s+'), ' ').trim();
-    if (raw.length <= 120) return raw;
-    return '${raw.substring(0, 117)}...';
+    if (raw.length <= 500) return raw;
+    return '${raw.substring(0, 497)}...';
   }
 }

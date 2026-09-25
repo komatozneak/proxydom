@@ -542,6 +542,9 @@ class HysteriaProfile {
     required this.socksListen,
     this.bandwidthUp,
     this.bandwidthDown,
+    this.insecure = false,
+    this.obfs = '',
+    this.obfsPassword = '',
   });
 
   final int schemaVersion;
@@ -553,6 +556,13 @@ class HysteriaProfile {
   final String socksListen;
   final String? bandwidthUp;
   final String? bandwidthDown;
+
+  /// Skip TLS verification. Share links set this with `insecure=1`.
+  final bool insecure;
+
+  /// Hysteria2 packet obfuscator, empty or `salamander`.
+  final String obfs;
+  final String obfsPassword;
 
   factory HysteriaProfile.fromJson(Map<String, dynamic> json) {
     final schemaVersion = json['schema_version'] as int? ?? 1;
@@ -576,6 +586,9 @@ class HysteriaProfile {
       socksListen: json['socks_listen'] as String? ?? '127.0.0.1:10808',
       bandwidthUp: json['bandwidth_up'] as String?,
       bandwidthDown: json['bandwidth_down'] as String?,
+      insecure: json['insecure'] == true,
+      obfs: json['obfs'] as String? ?? '',
+      obfsPassword: json['obfs_password'] as String? ?? '',
     );
   }
 
@@ -589,6 +602,9 @@ class HysteriaProfile {
         'socks_listen': socksListen,
         if (bandwidthUp != null) 'bandwidth_up': bandwidthUp,
         if (bandwidthDown != null) 'bandwidth_down': bandwidthDown,
+        if (insecure) 'insecure': true,
+        if (obfs.isNotEmpty) 'obfs': obfs,
+        if (obfsPassword.isNotEmpty) 'obfs_password': obfsPassword,
       };
 }
 

@@ -280,15 +280,72 @@ class ImportedProfileCard extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (connected)
-              Icon(AppIcons.checkCircleFill, color: AppBrand.success, size: 18),
+              const Icon(AppIcons.checkCircleFill, color: AppBrand.success, size: 18),
             if (onDelete != null)
-              IconButton(
+              SheetTintTrashButton(
                 tooltip: l.freeDelete,
-                onPressed: onDelete,
-                icon: const AppIcon(AppIcons.trash, size: 18),
+                onPressed: onDelete!,
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Asks before a server or a whole list is removed.
+Future<bool> confirmImportedDelete(
+  BuildContext context, {
+  required bool catalog,
+}) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) {
+      final l = AppL10n.of(dialogContext);
+      return AlertDialog(
+        title: Text(
+          catalog ? l.freeDeleteCatalogTitle : l.freeDeleteServerTitle,
+        ),
+        content: Text(
+          catalog ? l.freeDeleteCatalogBody : l.freeDeleteServerBody,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(l.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(l.freeDelete),
+          ),
+        ],
+      );
+    },
+  );
+  return ok == true;
+}
+
+/// Trash sits on a patch the color of the notebook sheet.
+class SheetTintTrashButton extends StatelessWidget {
+  const SheetTintTrashButton({
+    super.key,
+    required this.onPressed,
+    required this.tooltip,
+  });
+
+  final VoidCallback onPressed;
+  final String tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Material(
+      color: dark ? AppBrand.paperDark : AppBrand.paperLight,
+      borderRadius: BorderRadius.circular(12),
+      child: IconButton(
+        tooltip: tooltip,
+        onPressed: onPressed,
+        icon: const AppIcon(AppIcons.trash, size: 20),
       ),
     );
   }
