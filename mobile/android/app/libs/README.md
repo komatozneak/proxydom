@@ -1,7 +1,6 @@
 # android/app/libs
 
-Hysteria2 AAR (`hysteria-client.aar`) is built by `mobile/android/hysteria-bind/build-aar.sh`.
+The APK links only `hysteria-client.aar`, built by `mobile/android/hysteria-bind/build-aar.sh`.
+That binary is both the Hysteria2 engine and the in-process Xray core (`xtls/xray-core`) used for VLESS Reality.
 
-Xray `libXray.aar` and TrustTunnel `trusttunnel-client-android.aar` are **removed** (ADR 018). Do not vendor them.
-
-**Do not** place `libbox.aar` here — sing-box runtime removed (ADR 005).
+`libXray.aar` and `trusttunnel-client-android.aar` may sit in this folder. They are not on the Gradle classpath. Owner 2026-09-26 allows vendoring them; this slice does not link a second Xray runtime next to hy2bind.
