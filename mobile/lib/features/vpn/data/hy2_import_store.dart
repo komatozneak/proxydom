@@ -478,7 +478,7 @@ class Hy2ImportStore {
       final request = await client
           .getUrl(Uri.parse(url))
           .timeout(const Duration(seconds: 10));
-      request.headers.set(HttpHeaders.userAgentHeader, 'TeremokConnect/1.0');
+      request.headers.set(HttpHeaders.userAgentHeader, 'ProxyDom/1.0');
       if (etag != null && etag.isNotEmpty) {
         request.headers.set(HttpHeaders.ifNoneMatchHeader, etag);
       }
