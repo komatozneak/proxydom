@@ -286,7 +286,7 @@ abstract class AppL10n {
   /// No description provided for @homeNoVpnRow.
   ///
   /// In en, this message translates to:
-  /// **'What works without VPN?'**
+  /// **'Allowlists'**
   String get homeNoVpnRow;
 
   /// No description provided for @premiumHeadline.
@@ -358,13 +358,13 @@ abstract class AppL10n {
   /// No description provided for @settingsNoVpn.
   ///
   /// In en, this message translates to:
-  /// **'What works without VPN?'**
+  /// **'Allowlists'**
   String get settingsNoVpn;
 
   /// No description provided for @settingsNoVpnHint.
   ///
   /// In en, this message translates to:
-  /// **'Sites that skip the VPN'**
+  /// **'Apps and sites that go around'**
   String get settingsNoVpnHint;
 
   /// No description provided for @modesTitle.

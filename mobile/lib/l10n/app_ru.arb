@@ -37,7 +37,7 @@
       "limit": {"type": "String"}
     }
   },
-  "homeNoVpnRow": "Что работает без VPN?",
+  "homeNoVpnRow": "Белые списки",
   "premiumHeadline": "Расширенные локации",
   "premiumBody": "Премиум открывает дополнительные локации, до 5 устройств и снимает лимит 4,20 ГБ.",
   "premiumFeatureYt": "Дополнительные локации для просмотра",
@@ -49,8 +49,8 @@
   "subscriptionPay": "Оплатить",
   "locationsPremiumLocked": "Премиум",
   "locationsPremiumUnavailable": "Доступно в Premium",
-  "settingsNoVpn": "Что работает без VPN?",
-  "settingsNoVpnHint": "Сайты, которые идут мимо VPN",
+  "settingsNoVpn": "Белые списки",
+  "settingsNoVpnHint": "Приложения и сайты, которые идут мимо",
   "modesTitle": "Режим",
   "modesSubtitle": "Как работает VPN",
   "modeSmartTitle": "Умный режим",

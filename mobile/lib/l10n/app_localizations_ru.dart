@@ -104,7 +104,7 @@ class AppL10nRu extends AppL10n {
   }
 
   @override
-  String get homeNoVpnRow => 'Что работает без VPN?';
+  String get homeNoVpnRow => 'Белые списки';
 
   @override
   String get premiumHeadline => 'Расширенные локации';
@@ -142,10 +142,10 @@ class AppL10nRu extends AppL10n {
   String get locationsPremiumUnavailable => 'Доступно в Premium';
 
   @override
-  String get settingsNoVpn => 'Что работает без VPN?';
+  String get settingsNoVpn => 'Белые списки';
 
   @override
-  String get settingsNoVpnHint => 'Сайты, которые идут мимо VPN';
+  String get settingsNoVpnHint => 'Приложения и сайты, которые идут мимо';
 
   @override
   String get modesTitle => 'Режим';

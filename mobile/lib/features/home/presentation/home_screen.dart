@@ -901,6 +901,10 @@ class _NoVpnHomeRow extends StatelessWidget {
     final elevated = theme.colorScheme.surfaceContainerHighest;
     final line = theme.colorScheme.outline;
     final showAppsPin = !iosAppsSplitUnsupported;
+    final mute = theme.colorScheme.onSurfaceVariant;
+    final ink = theme.brightness == Brightness.dark
+        ? AppBrand.inkDark
+        : AppBrand.inkLight;
 
     return Material(
       color: elevated,
@@ -914,35 +918,93 @@ class _NoVpnHomeRow extends StatelessWidget {
         child: ConstrainedBox(
           constraints: const BoxConstraints(minHeight: 48),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            // Same two Expanded halves + 8dp gap as FreeClientActionBar.
             child: Row(
               children: [
                 Expanded(
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        // Ghost icon+gap so the label sits on the «Вставить» line.
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const SizedBox(width: 18),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontSize: 15.5,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.1,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: AppIcon(
+                            AppIcons.chevronLeft,
+                            size: 18,
+                            color: mute,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-                if (showAppsPin) ...[
-                  Text(
-                    '$enabled / $total',
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: theme.brightness == Brightness.dark
-                          ? AppBrand.inkDark
-                          : AppBrand.inkLight,
-                      fontWeight: FontWeight.w700,
+                SizedBox(
+                  width: 8,
+                  child: Center(
+                    child: Container(
+                      width: 1.5,
+                      height: 22,
+                      color: line,
                     ),
                   ),
-                  const SizedBox(width: 4),
-                ],
-                AppIcon(
-                  AppIcons.chevronRight,
-                  size: 18,
-                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        if (showAppsPin)
+                          // Ghost icon+gap so the count sits on the «QR» text line.
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const SizedBox(width: 18),
+                              const SizedBox(width: 8),
+                              Text(
+                                '$enabled / $total',
+                                style: theme.textTheme.labelLarge?.copyWith(
+                                  color: ink,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: AppIcon(
+                            AppIcons.chevronRight,
+                            size: 18,
+                            color: mute,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
