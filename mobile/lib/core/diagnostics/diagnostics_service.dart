@@ -8,7 +8,6 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../api_client.dart';
-import '../config.dart';
 import '../ios_store_gates.dart';
 import 'app_log_buffer.dart';
 import 'tunnel_log_redact.dart';
@@ -93,7 +92,6 @@ class DiagnosticsService {
       ..writeln('generated_utc: $generatedUtc')
       ..writeln('app: $appLabel')
       ..writeln('package: ${packageInfo.packageName}')
-      ..writeln('api_base: ${AppConfig.baseUrl}')
       ..writeln(
           'app_env: ${const String.fromEnvironment('APP_ENV', defaultValue: 'prod')}')
       ..writeln('platform: ${_platformLabel()}')
