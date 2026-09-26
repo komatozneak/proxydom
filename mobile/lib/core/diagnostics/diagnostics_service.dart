@@ -8,9 +8,9 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../api_client.dart';
-import '../config.dart';
 import '../ios_store_gates.dart';
 import 'app_log_buffer.dart';
+import 'tunnel_log_redact.dart';
 import 'egress_verify.dart';
 import '../../features/home/application/vpn_status.dart';
 import '../../features/vpn/data/vpn_config.dart';
@@ -57,7 +57,8 @@ class DiagnosticsService {
   }) async {
     final generatedUtc = DateTime.now().toUtc().toIso8601String();
     final packageInfo = await PackageInfo.fromPlatform();
-    final appLabel = 'Теремок VPN ${packageInfo.version}+${packageInfo.buildNumber}';
+    final appLabel =
+        'Прокси Дом ${packageInfo.version}+${packageInfo.buildNumber}';
 
     final nativeStatus = await _probe(
           VpnController.instance.getStatus(),
@@ -69,7 +70,8 @@ class DiagnosticsService {
     final stderrTail = await _probe(
       VpnController.instance.getVpnCoreStderrTail(maxLines: 400),
     );
-    final nativeLogTail = await _probe(VpnController.instance.getNativeLogTail());
+    final nativeLogTail =
+        await _probe(VpnController.instance.getNativeLogTail());
     final tunnelHealth = await _probeHealth();
     final underlying = await _probe(
       VpnController.instance.getUnderlyingNetworkInterface(),
@@ -90,8 +92,8 @@ class DiagnosticsService {
       ..writeln('generated_utc: $generatedUtc')
       ..writeln('app: $appLabel')
       ..writeln('package: ${packageInfo.packageName}')
-      ..writeln('api_base: ${AppConfig.baseUrl}')
-      ..writeln('app_env: ${const String.fromEnvironment('APP_ENV', defaultValue: 'prod')}')
+      ..writeln(
+          'app_env: ${const String.fromEnvironment('APP_ENV', defaultValue: 'prod')}')
       ..writeln('platform: ${_platformLabel()}')
       ..writeln('vpn_ui: $vpnUiLine')
       ..writeln('vpn_native: ${nativeStatus.name}')
@@ -120,7 +122,7 @@ class DiagnosticsService {
     buffer
       ..writeln('last_prove: ${lastProve ?? '(none)'}')
       ..writeln('vpn_stderr_tail:')
-      ..writeln(stderrTail ?? '(unsupported)')
+      ..writeln(redactTunnelLog(stderrTail ?? '(unsupported)'))
       ..writeln('ios_native_tail:')
       ..writeln(nativeLogTail ?? '(unsupported)')
       ..writeln('ios_tunnel_health:')

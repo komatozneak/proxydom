@@ -102,7 +102,7 @@ void main() {
     test('DNS: Google/YT via proxy; others via direct (no FakeDNS)', () {
       final config = buildAndParse(makeInputs());
       final dns = config['dns'] as Map;
-      expect(dns['hosts']['api.teremokconnect.online'], '176.114.64.174');
+      expect(dns.containsKey('hosts'), isFalse);
       expect(dns['queryStrategy'], 'UseIPv4');
       final servers = dns['servers'] as List;
       expect(servers, hasLength(4));
@@ -339,17 +339,17 @@ void main() {
           ['socks-in']);
     });
 
-    test('control-plane domain routes to direct before proxy', () {
+    test('routing does not force teremokconnect.online direct', () {
       final config = buildAndParse(makeInputs());
       final rules = (config['routing'] as Map)['rules'] as List;
-      final apiRule = rules.firstWhere(
-        (r) =>
-            ((r as Map)['domain'] as List?)?.contains(
-              'full:api.teremokconnect.online',
-            ) ??
-            false,
-      ) as Map;
-      expect(apiRule['outboundTag'], 'direct');
+      final pinned = rules.where((r) {
+        final domain = (r as Map)['domain'];
+        if (domain is! List) return false;
+        return domain.any(
+          (entry) => entry.toString().contains('teremokconnect.online'),
+        );
+      });
+      expect(pinned, isEmpty);
     });
 
     test('inbounds: tun-in + socks-in for gVisor default', () {

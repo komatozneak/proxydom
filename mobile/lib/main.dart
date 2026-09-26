@@ -13,6 +13,7 @@ import 'core/diagnostics/app_log_buffer.dart';
 import 'core/diagnostics/diagnostics_service.dart';
 import 'core/diagnostics/tunnel_log_prefs.dart';
 import 'core/internet_permission.dart';
+import 'core/ios_store_gates.dart';
 import 'core/legacy_account_cache.dart';
 import 'core/router.dart';
 
@@ -96,6 +97,10 @@ Future<void> _bootDiscoveryInBackground({
   }
   if (!internetOk) {
     AppLogBuffer.instance.debug('app.boot discovery skipped: INTERNET denied');
+    return;
+  }
+  if (freeKeyClient) {
+    AppLogBuffer.instance.debug('app.boot discovery skipped: local key client');
     return;
   }
   final disc = Stopwatch()..start();

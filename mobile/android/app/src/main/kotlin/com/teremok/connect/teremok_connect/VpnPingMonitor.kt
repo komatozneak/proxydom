@@ -630,7 +630,7 @@ class VpnPingMonitor(
             if (connectMs == null) {
                 Log.i(TAG, "SOCKS CONNECT failed")
             } else {
-                DiagnosticRing.append(TAG, "path.connect ok=true")
+                DiagnosticRing.event("debug", "net.path", "ok=true")
                 val clamped = clampDelayMs(connectMs) ?: return null
                 return Sample(clamped, "socks5")
             }

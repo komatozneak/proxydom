@@ -1,6 +1,8 @@
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
+import 'diagnostics/ui_log.dart';
+
 import '../features/home/presentation/home_screen.dart';
 import '../features/onboarding/data/onboarding_prefs.dart';
 import '../features/onboarding/presentation/onboarding_screen.dart';
@@ -26,6 +28,7 @@ class AppRouter {
   static final GoRouter config = GoRouter(
     navigatorKey: rootNavigatorKey,
     initialLocation: '/home',
+    observers: [UiNavObserver()],
     redirect: (context, state) {
       final loc = state.matchedLocation;
       final goingToOnboarding = loc == '/onboarding';
@@ -36,13 +39,22 @@ class AppRouter {
       final goingToImport = loc == '/import';
       final goingToScan = loc == '/scan';
       final introDone = welcomeSeenCache == true;
+      final String? next;
       if (!introDone && !goingToOnboarding) {
-        return '/onboarding';
+        next = '/onboarding';
+      } else if (inShell || goingToImport || goingToOnboarding || goingToScan) {
+        next = null;
+      } else {
+        next = '/home';
       }
-      if (inShell || goingToImport || goingToOnboarding || goingToScan) {
-        return null;
+      if (next != null && next != loc) {
+        UiLog.action(
+          'router',
+          'redirect',
+          extra: {'from': loc, 'to': next},
+        );
       }
-      return '/home';
+      return next;
     },
     routes: [
       GoRoute(

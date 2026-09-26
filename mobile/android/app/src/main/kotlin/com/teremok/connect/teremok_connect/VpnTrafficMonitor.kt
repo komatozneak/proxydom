@@ -8,7 +8,7 @@ import android.util.Log
 import java.util.Locale
 
 /**
- * Home / shade ↓↑ from the TUN interface, not UID TrafficStats.
+ * Home / shade ↓↑ from tunnel payload counters, not `/proc/net/dev`.
  *
  * libbox CommandClient is gone (ADR 005 / 018). A stub that always emitted
  * zeros made a live VpnService look dead after screen lock.
@@ -54,7 +54,7 @@ class VpnTrafficMonitor(
         lastRx = -1L
         lastTx = -1L
         lastAt = 0L
-        Log.i(TAG, "traffic monitor started (tun sysfs)")
+        Log.i(TAG, "traffic monitor started (tunnel counters)")
         worker = Thread(
             {
                 while (running) {

@@ -19,8 +19,7 @@ Widget _nestHarness() {
         return Scaffold(
           body: TextButton(
             onPressed: () async {
-              final allowed =
-                  await VpnDisclosureDialog.ensureAccepted(context);
+              final allowed = await VpnDisclosureDialog.ensureAccepted(context);
               if (allowed) _connects++;
             },
             child: const Text('nest'),
@@ -45,13 +44,13 @@ void main() {
     await tester.tap(find.text('nest'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Защищённое соединение'), findsOneWidget);
+    expect(find.text('Как включается туннель'), findsOneWidget);
     expect(_connects, 0);
 
     await tester.tap(find.text('Не сейчас'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Защищённое соединение'), findsNothing);
+    expect(find.text('Как включается туннель'), findsNothing);
     expect(_connects, 0);
     expect(await VpnDisclosurePrefs.isAccepted(), isFalse);
   });
@@ -65,7 +64,7 @@ void main() {
 
     await tester.tap(find.text('nest'));
     await tester.pumpAndSettle();
-    expect(find.text('Защищённое соединение'), findsOneWidget);
+    expect(find.text('Как включается туннель'), findsOneWidget);
     expect(_connects, 0);
   });
 
@@ -77,14 +76,14 @@ void main() {
     await tester.tap(find.text('Принимаю и продолжить'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Защищённое соединение'), findsNothing);
+    expect(find.text('Как включается туннель'), findsNothing);
     expect(_connects, 1);
     expect(await VpnDisclosurePrefs.isAccepted(), isTrue);
 
     await tester.tap(find.text('nest'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Защищённое соединение'), findsNothing);
+    expect(find.text('Как включается туннель'), findsNothing);
     expect(_connects, 2);
   });
 }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/diagnostics/ui_log.dart';
 import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
@@ -115,10 +116,12 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
   }
 
   Future<void> _reconnect() async {
+    UiLog.action('no_vpn', 'reconnect');
     setState(() => _reconnecting = true);
     final l = AppL10n.of(context);
     try {
       final ok = await ref.read(vpnProvider.notifier).reconnectToApplyRouting();
+      UiLog.action('no_vpn', 'reconnect', result: ok ? 'ok' : 'fail');
       if (!mounted) return;
       showTeremokSnackBar(
         context,
@@ -201,9 +204,10 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
                         labelColor: theme.brightness == Brightness.dark
                             ? AppBrand.inkDark
                             : AppBrand.inkLight,
-                        unselectedLabelColor: theme.brightness == Brightness.dark
-                            ? AppBrand.inkMutedDark
-                            : theme.colorScheme.onSurfaceVariant,
+                        unselectedLabelColor:
+                            theme.brightness == Brightness.dark
+                                ? AppBrand.inkMutedDark
+                                : theme.colorScheme.onSurfaceVariant,
                         tabs: [
                           Tab(text: appsLabel),
                           Tab(text: sitesLabel),
@@ -250,6 +254,11 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
                           iconsByPackage: const {},
                           showIosNote: true,
                           onToggleOsnovnye: (id, v) async {
+                            UiLog.action(
+                              'no_vpn',
+                              'main',
+                              extra: {'id': id, 'on': v},
+                            );
                             await SplitTunnelPrefs.setOsnovnyeEnabled(id, v);
                             await _afterMutation();
                           },
@@ -259,6 +268,11 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
                             );
                           },
                           onToggleSite: (site, enabled) async {
+                            UiLog.action(
+                              'no_vpn',
+                              'site',
+                              extra: {'on': enabled},
+                            );
                             await SplitTunnelPrefs.updateSite(
                               site.copyWith(enabled: enabled),
                             );
@@ -275,9 +289,13 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
                               disallowed: _disallowed,
                               sectionLabel: appsSection,
                               lockdownOn: _lockdownOn,
-                              lockdownWarning:
-                                  l.splitTunnelAppsLockdownWarning,
+                              lockdownWarning: l.splitTunnelAppsLockdownWarning,
                               onToggle: (pkg, bypass) async {
+                                UiLog.action(
+                                  'no_vpn',
+                                  'app',
+                                  extra: {'bypass': bypass},
+                                );
                                 await SplitTunnelPrefs.setDisallowedPackage(
                                   pkg,
                                   bypass,
@@ -298,6 +316,11 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
                                     a.packageName: a.iconPng!,
                               },
                               onToggleOsnovnye: (id, v) async {
+                                UiLog.action(
+                                  'no_vpn',
+                                  'main',
+                                  extra: {'id': id, 'on': v},
+                                );
                                 await SplitTunnelPrefs.setOsnovnyeEnabled(
                                   id,
                                   v,
@@ -306,11 +329,15 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
                               },
                               onExpandOsnovnye: () {
                                 setState(
-                                  () =>
-                                      _osnovnyeExpanded = !_osnovnyeExpanded,
+                                  () => _osnovnyeExpanded = !_osnovnyeExpanded,
                                 );
                               },
                               onToggleSite: (site, enabled) async {
+                                UiLog.action(
+                                  'no_vpn',
+                                  'site',
+                                  extra: {'on': enabled},
+                                );
                                 await SplitTunnelPrefs.updateSite(
                                   site.copyWith(enabled: enabled),
                                 );
@@ -375,7 +402,12 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
         ],
       ),
     );
-    if (ok != true || !mounted) return;
+    if (ok != true || !mounted) {
+      UiLog.action('no_vpn', 'delete_site',
+          result: 'ignored', reason: 'confirm');
+      return;
+    }
+    UiLog.action('no_vpn', 'delete_site');
     await SplitTunnelPrefs.deleteSite(site.id);
     await _afterMutation();
   }
@@ -709,10 +741,12 @@ class _AddSiteSheetState extends State<_AddSiteSheet> {
     );
     if (!mounted) return;
     if (result is DomainNormalizeOk) {
+      UiLog.action('no_vpn', 'add_site', result: 'ok');
       Navigator.pop(context, true);
       return;
     }
     final err = result as DomainNormalizeErr;
+    UiLog.action('no_vpn', 'add_site', result: 'bad', reason: err.kind.name);
     setState(() {
       _saving = false;
       _error = switch (err.kind) {

@@ -161,9 +161,10 @@ class PathHealth {
                         "prove ok candidate=$candidateLabel underlying=$iface " +
                             "attempt=$attempt latency_ms=$latencyMs",
                     )
-                    DiagnosticRing.append(
-                        TAG,
-                        "vpn.prove ok candidate=$candidateLabel attempt=$attempt",
+                    DiagnosticRing.event(
+                        "info",
+                        "vpn.prove",
+                        "ok=true candidate=$candidateLabel attempt=$attempt",
                     )
                     return HealthResult.Ok(rttMs = latencyMs, attempt = attempt)
                 }
@@ -173,9 +174,10 @@ class PathHealth {
                         "attempt=$attempt/$XRAY_SOCKS_PROBE_ATTEMPTS " +
                         "latency_ms=$latencyMs err=${outcome.detail}",
                 )
-                DiagnosticRing.append(
-                    TAG,
-                    "vpn.prove fail candidate=$candidateLabel reason=${outcome.detail}",
+                DiagnosticRing.event(
+                    "debug",
+                    "vpn.prove",
+                    "ok=false candidate=$candidateLabel reason=${outcome.detail}",
                 )
                 Thread.sleep(XRAY_SOCKS_PROBE_RETRY_SLEEP_MS)
             }

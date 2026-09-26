@@ -13,9 +13,7 @@ import (
 	"syscall"
 	"time"
 
-	tuncore "github.com/xjasonlyu/tun2socks/v2/core"
 	"github.com/xjasonlyu/tun2socks/v2/core/device/fdbased"
-	"github.com/xjasonlyu/tun2socks/v2/core/option"
 	M "github.com/xjasonlyu/tun2socks/v2/metadata"
 	"github.com/xjasonlyu/tun2socks/v2/proxy"
 	"github.com/xjasonlyu/tun2socks/v2/tunnel"
@@ -39,6 +37,7 @@ func StartShare(configJSON string) string {
 	if configJSON == "" {
 		return "empty xray config"
 	}
+	prepareCoreLog(configJSON)
 	registerXrayProtector()
 	lastProtectErr.Store("")
 	cfg, err := loadShareConfig(configJSON)
@@ -49,9 +48,13 @@ func StartShare(configJSON string) string {
 	if err != nil {
 		return fmt.Sprintf("xray: %v", err)
 	}
+	// New() installs Xray's log.Instance. Bind after that so decision lines
+	// reach the file instead of stdout.
+	bindCoreLogHandler()
 	if err := inst.Start(); err != nil {
 		return fmt.Sprintf("xray: %v", err)
 	}
+	noteShareCore()
 	shareMu.Lock()
 	prev := shareInst
 	shareInst = inst
@@ -156,13 +159,7 @@ func StartShareTun(fd int, mtu int) string {
 		return fmt.Sprintf("tun fd: %v", err)
 	}
 	tunnel.T().SetDialer(&socksDialer{addr: shareSocks})
-	st, err := tuncore.CreateStack(&tuncore.Config{
-		LinkEndpoint:     dev,
-		TransportHandler: tunnel.T(),
-		Options: []option.Option{
-			option.WithTCPModerateReceiveBuffer(true),
-		},
-	})
+	st, err := createTunStack(dev)
 	if err != nil {
 		dev.Close()
 		return fmt.Sprintf("tun stack: %v", err)

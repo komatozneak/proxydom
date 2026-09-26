@@ -11,8 +11,7 @@ import 'vpn_route_policy.dart';
 import 'vpn_service_config.dart';
 import 'vpn_session_snapshot.dart';
 
-bool get _isIosSplit =>
-    !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
+bool get _isIosSplit => !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
 
 /// Bridge between Flutter UI and Android VpnService (Hysteria2, ADR 018).
 ///
@@ -103,8 +102,7 @@ class VpnController {
       if (disallowedApps.isNotEmpty) 'disallowedApplications': disallowedApps,
       // Android: Go hyDialer suffixes. iOS: prioritized OS routes only.
       if (directSuffixes.isNotEmpty) 'directDomainSuffixes': directSuffixes,
-      if (iosCustomHosts.isNotEmpty)
-        'iosCustomResolutionHosts': iosCustomHosts,
+      if (iosCustomHosts.isNotEmpty) 'iosCustomResolutionHosts': iosCustomHosts,
       if (iosCatalogHosts.isNotEmpty)
         'iosCatalogResolutionHosts': iosCatalogHosts,
     });
@@ -356,6 +354,31 @@ class VpnController {
       return false;
     } on MissingPluginException {
       return false;
+    }
+  }
+
+  /// Core decision log level. Applied on the next Xray start.
+  Future<void> setCoreLogLevel(String level) async {
+    try {
+      await _methodChannel.invokeMethod<void>(
+        'setCoreLogLevel',
+        {'level': level},
+      );
+    } on PlatformException {
+      return;
+    } on MissingPluginException {
+      return;
+    }
+  }
+
+  /// Drop the on-disk core windows. The in-memory product ring is separate.
+  Future<void> clearCoreLog() async {
+    try {
+      await _methodChannel.invokeMethod<void>('clearCoreLog');
+    } on PlatformException {
+      return;
+    } on MissingPluginException {
+      return;
     }
   }
 

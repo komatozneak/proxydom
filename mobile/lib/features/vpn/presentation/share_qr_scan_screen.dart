@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
+import '../../../core/diagnostics/ui_log.dart';
 import '../../../core/widgets/teremok_snackbar.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../home/application/vpn_provider.dart';
+import '../../home/application/vpn_status.dart';
 import '../data/hy2_import_store.dart';
 
 /// Camera opens only while this screen is up. The raw code is not logged.
@@ -36,14 +38,19 @@ class _ShareQrScanScreenState extends ConsumerState<ShareQrScanScreen> {
         .firstWhere((value) => value.isNotEmpty, orElse: () => '');
     if (raw.isEmpty) return;
     _handled = true;
+    UiLog.action('scan', 'code', extra: {'chars': raw.length});
     try {
       await Hy2ImportStore.instance.saveInput(raw);
       if (!mounted) return;
       showTeremokSnackBar(context, AppL10n.of(context).freeServerAdded);
-      await ref.read(vpnProvider.notifier).connect(forceRestart: true);
+      final status = ref.read(vpnProvider);
+      if (status is VpnConnected || status is VpnConnecting) {
+        await ref.read(vpnProvider.notifier).disconnect(reason: 'import');
+      }
       if (!mounted) return;
       context.go('/home');
     } on FormatException {
+      UiLog.action('scan', 'code', result: 'bad');
       if (!mounted) return;
       setState(() {
         _handled = false;

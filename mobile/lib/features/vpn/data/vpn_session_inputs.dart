@@ -218,9 +218,5 @@ final _ipv4Host = RegExp(r'^(\d{1,3}\.){3}\d{1,3}$');
 String? ipv4Cidr(String host) {
   if (host.isEmpty || host == 'unknown') return null;
   if (_ipv4Host.hasMatch(host)) return '$host/32';
-  if (host == 'api.teremokconnect.online' ||
-      host.endsWith('.teremokconnect.online')) {
-    return '${AppConfig.vpsIpv4}/32';
-  }
   return null;
 }

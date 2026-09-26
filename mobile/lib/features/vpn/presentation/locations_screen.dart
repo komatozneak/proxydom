@@ -9,6 +9,8 @@ import 'package:go_router/go_router.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../core/busy/busy_overlay.dart';
+import '../../../core/diagnostics/product_log.dart';
+import '../../../core/diagnostics/ui_log.dart';
 import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
@@ -241,30 +243,49 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     });
   }
 
+  Future<void> _chooseImported(int index, {String? scheme}) async {
+    UiLog.action(
+      'locations',
+      'select',
+      extra: {
+        'index': index,
+        if (scheme != null) 'scheme': scheme,
+      },
+    );
+    await Hy2ImportStore.instance.select(index);
+    if (!mounted) return;
+    setState(() => _selectedId = '$index');
+    await _leaveForHouse('server_pick');
+  }
+
+  Future<void> _leaveForHouse(String reason) async {
+    final status = ref.read(vpnProvider);
+    final live = status is VpnConnected || status is VpnConnecting;
+    UiLog.action(
+      'locations',
+      'home',
+      extra: {'disconnect': live, 'why': reason},
+    );
+    if (live) {
+      await ref.read(vpnProvider.notifier).disconnect(reason: reason);
+    }
+    if (!mounted) return;
+    context.go('/home');
+  }
+
   Future<void> _pick(String id) async {
-    if (ref.read(busyOverlayProvider).isBusy) return;
-
-    // Already selected — just return Home without reconnect churn.
-    if (id == (_selectedId ?? kRegionAutoId)) {
-      context.go('/home');
+    if (ref.read(busyOverlayProvider).isBusy) {
+      UiLog.action('locations', 'pick', result: 'ignored', reason: 'busy');
       return;
     }
-
-    final vpnStatus = ref.read(vpnProvider);
-    final hotSwitch = !regionPickUsesBusyOverlay(vpnStatus);
-
-    if (hotSwitch) {
-      if (!mounted) return;
-      setState(() => _selectedId = id);
-      context.go('/home');
-      return;
-    }
-
+    UiLog.action('locations', 'pick', extra: {'id': id});
     if (!mounted) return;
     setState(() => _selectedId = id);
+    await _leaveForHouse('server_pick');
   }
 
   Future<void> _onLockedPremiumTap() async {
+    UiLog.action('locations', 'premium', result: 'import');
     await context.push('/import');
   }
 
@@ -289,10 +310,19 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
 
   Future<void> _removeImported(int index) async {
     final ok = await confirmImportedDelete(context, catalog: false);
-    if (!ok || !mounted) return;
+    if (!ok || !mounted) {
+      UiLog.action('locations', 'delete', result: 'ignored', reason: 'confirm');
+      return;
+    }
     final selected = _selectedId == '$index';
     final status = ref.read(vpnProvider);
-    if (selected && (status is VpnConnected || status is VpnConnecting)) {
+    final live = status is VpnConnected || status is VpnConnecting;
+    UiLog.action(
+      'locations',
+      'delete',
+      extra: {'index': index, 'disconnect': selected && live},
+    );
+    if (selected && live) {
       await ref.read(vpnProvider.notifier).disconnect();
     }
     await Hy2ImportStore.instance.removeAt(index);
@@ -301,9 +331,15 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
 
   Future<void> _deleteProfile(String id) async {
     final ok = await confirmImportedDelete(context, catalog: true);
-    if (!ok || !mounted) return;
+    if (!ok || !mounted) {
+      UiLog.action('locations', 'delete_list',
+          result: 'ignored', reason: 'confirm');
+      return;
+    }
     final status = ref.read(vpnProvider);
-    if (status is VpnConnected || status is VpnConnecting) {
+    final live = status is VpnConnected || status is VpnConnecting;
+    UiLog.action('locations', 'delete_list', extra: {'disconnect': live});
+    if (live) {
       await ref.read(vpnProvider.notifier).disconnect();
     }
     await Hy2ImportStore.instance.removeCatalog(id);
@@ -354,30 +390,77 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
 
   Future<void> _refreshCatalog(ShareCatalog catalog) async {
     final url = catalog.url;
-    if (url == null || url.isEmpty || _refreshing.contains(catalog.id)) return;
+    if (url == null || url.isEmpty || _refreshing.contains(catalog.id)) {
+      UiLog.action(
+        'locations',
+        'refresh',
+        level: _refreshing.contains(catalog.id)
+            ? ProductLogLevel.warn
+            : ProductLogLevel.debug,
+        result: 'rejected',
+        reason: _refreshing.contains(catalog.id) ? 'busy' : 'no_url',
+      );
+      return;
+    }
+    UiLog.action(
+      'locations',
+      'refresh',
+      level: ProductLogLevel.info,
+    );
     final l = AppL10n.of(context);
     setState(() => _refreshing.add(catalog.id));
     try {
-      final outcome =
-          await Hy2ImportStore.instance.refreshCatalog(catalog.id);
+      final outcome = await Hy2ImportStore.instance.refreshCatalog(catalog.id);
       if (!mounted) return;
       await _applyImported(await Hy2ImportStore.instance.load());
       if (!mounted) return;
       final status = ref.read(vpnProvider);
       final live = status is VpnConnected || status is VpnConnecting;
       if (outcome.kind == ShareRefreshKind.deleted) {
+        UiLog.action(
+          'locations',
+          'refresh',
+          level: ProductLogLevel.info,
+          result: 'deleted',
+          extra: {'disconnect': outcome.selectionLeftThisList && live},
+        );
         if (outcome.selectionLeftThisList && live) {
           await ref.read(vpnProvider.notifier).disconnect();
         }
         return;
       }
-      if (outcome.kind == ShareRefreshKind.unchanged) return;
+      if (outcome.kind == ShareRefreshKind.unchanged) {
+        UiLog.action(
+          'locations',
+          'refresh',
+          level: ProductLogLevel.info,
+          result: 'unchanged',
+        );
+        return;
+      }
+      UiLog.action(
+        'locations',
+        'refresh',
+        level: ProductLogLevel.info,
+        result: 'replaced',
+        extra: {
+          'links': outcome.count,
+          'restart': false,
+        },
+      );
       showTeremokSnackBar(context, l.freeRefreshDone(outcome.count));
       if (outcome.selectionLeftThisList && live) {
-        await ref.read(vpnProvider.notifier).connect(forceRestart: true);
+        await ref.read(vpnProvider.notifier).disconnect(reason: 'refresh');
       }
-    } on Exception {
+    } on Exception catch (e) {
       if (!mounted) return;
+      UiLog.action(
+        'locations',
+        'refresh',
+        level: ProductLogLevel.warn,
+        result: 'fail',
+        reason: e.runtimeType.toString(),
+      );
       showTeremokSnackBar(context, l.freeRefreshFail);
     } finally {
       if (mounted) setState(() => _refreshing.remove(catalog.id));
@@ -436,14 +519,27 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       selected: selected,
       onTap: () async {
         Navigator.of(context).pop();
-        await Hy2ImportStore.instance.select(index);
-        if (!mounted) return;
-        setState(() => _selectedId = '$index');
-        final status = ref.read(vpnProvider);
-        if (status is VpnConnected || status is VpnConnecting) {
-          await ref.read(vpnProvider.notifier).connect(forceRestart: true);
-        }
+        await _chooseImported(index);
       },
+    );
+  }
+
+  /// Fixed slot. A progress indicator in a stretched row otherwise grows into
+  /// a wide ellipse and the refresh cell no longer matches the icon buttons.
+  Widget _catalogIconButton({
+    required String tooltip,
+    required VoidCallback? onTap,
+    required Widget icon,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        child: SizedBox(
+          width: 48,
+          child: Center(child: icon),
+        ),
+      ),
     );
   }
 
@@ -486,15 +582,10 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
               thickness: 1,
               color: theme.colorScheme.outline,
             ),
-            Tooltip(
-              message: l.freeSharePool,
-              child: InkWell(
-                onTap: () => _shareCatalog(catalog),
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: AppIcon(AppIcons.qrCode, size: 20),
-                ),
-              ),
+            _catalogIconButton(
+              tooltip: l.freeSharePool,
+              onTap: () => _shareCatalog(catalog),
+              icon: const AppIcon(AppIcons.qrCode, size: 20),
             ),
             if (catalog.url != null && catalog.url!.isNotEmpty) ...[
               VerticalDivider(
@@ -502,26 +593,24 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
                 thickness: 1,
                 color: theme.colorScheme.outline,
               ),
-              Tooltip(
-                message: l.freeRefresh,
-                child: InkWell(
-                  onTap: _refreshing.contains(catalog.id)
-                      ? null
-                      : () => _refreshCatalog(catalog),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: _refreshing.contains(catalog.id)
-                        ? SizedBox(
+              _catalogIconButton(
+                tooltip: l.freeRefresh,
+                onTap: _refreshing.contains(catalog.id)
+                    ? null
+                    : () => _refreshCatalog(catalog),
+                icon: _refreshing.contains(catalog.id)
+                    ? SizedBox.square(
+                        dimension: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: theme.colorScheme.primary,
+                          constraints: const BoxConstraints.tightFor(
                             width: 20,
                             height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: theme.colorScheme.primary,
-                            ),
-                          )
-                        : const AppIcon(AppIcons.refresh, size: 20),
-                  ),
-                ),
+                          ),
+                        ),
+                      )
+                    : const AppIcon(AppIcons.refresh, size: 20),
               ),
             ],
             VerticalDivider(
@@ -529,15 +618,10 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
               thickness: 1,
               color: theme.colorScheme.outline,
             ),
-            Tooltip(
-              message: l.freeDelete,
-              child: InkWell(
-                onTap: () => _deleteProfile(catalog.id),
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: AppIcon(AppIcons.trash, size: 20),
-                ),
-              ),
+            _catalogIconButton(
+              tooltip: l.freeDelete,
+              onTap: () => _deleteProfile(catalog.id),
+              icon: const AppIcon(AppIcons.trash, size: 20),
             ),
           ],
         ),
@@ -573,8 +657,14 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
             child: FreeClientActionBar(
-              onPaste: () => context.push('/import?clipboard=1'),
-              onScan: () => context.push('/scan'),
+              onPaste: () {
+                UiLog.action('locations', 'paste');
+                context.push('/import?clipboard=1');
+              },
+              onScan: () {
+                UiLog.action('locations', 'scan');
+                context.push('/scan');
+              },
             ),
           ),
         ],
@@ -619,18 +709,18 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
                       selected: selected,
                       connected: selected && connected,
                       onDelete: () => _removeImported(index),
-                      onTap: iosBlocked
-                          ? null
-                          : () async {
-                        await Hy2ImportStore.instance.select(index);
-                        if (!mounted) return;
-                        setState(() => _selectedId = '$index');
-                        final status = ref.read(vpnProvider);
-                        if (status is VpnConnected || status is VpnConnecting) {
-                          await ref
-                              .read(vpnProvider.notifier)
-                              .connect(forceRestart: true);
+                      onTap: () async {
+                        if (iosBlocked) {
+                          UiLog.action(
+                            'locations',
+                            'pick',
+                            result: 'blocked',
+                            reason: 'ios_scheme',
+                            extra: {'scheme': link.scheme},
+                          );
+                          return;
                         }
+                        await _chooseImported(index, scheme: link.scheme);
                       },
                     );
                   },
@@ -639,8 +729,14 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
         Padding(
           padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
           child: FreeClientActionBar(
-            onPaste: () => context.push('/import?clipboard=1'),
-            onScan: () => context.push('/scan'),
+            onPaste: () {
+              UiLog.action('locations', 'paste');
+              context.push('/import?clipboard=1');
+            },
+            onScan: () {
+              UiLog.action('locations', 'scan');
+              context.push('/scan');
+            },
           ),
         ),
       ],
@@ -966,7 +1062,8 @@ class _ServerCountChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
-        color: dark ? AppBrand.surfaceVariantDark : AppBrand.surfaceElevatedLight,
+        color:
+            dark ? AppBrand.surfaceVariantDark : AppBrand.surfaceElevatedLight,
         borderRadius: BorderRadius.circular(AppBrand.radiusPill),
         border: Border.all(color: theme.colorScheme.outline),
       ),

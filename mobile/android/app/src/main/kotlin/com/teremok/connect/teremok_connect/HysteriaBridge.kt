@@ -53,7 +53,7 @@ class HysteriaBridge private constructor() {
         } catch (t: Throwable) {
             lastErrorMessage = t.message ?: t.toString()
             Log.e(TAG, "loadLibrary: hyjni failed", t)
-            DiagnosticRing.append(TAG, "hy2.socks start ok=false reason=load_failed")
+            DiagnosticRing.event("error", "hy2.socks", "action=start ok=false reason=load_failed")
             false
         }
     }
@@ -100,21 +100,25 @@ class HysteriaBridge private constructor() {
                     "directSuffixes=${suffixes.length()}",
             )
             Hy2bind.setProtector(Hy2VpnProtector(svc))
-            val err: String? = Hy2bind.start(obj.toString())
+            val err: String? = Hy2bind.start(CoreLog.enrich(svc, obj.toString()))
             if (!err.isNullOrBlank()) {
                 lastErrorMessage = err
                 Log.e(TAG, "start: Hy2bind.start error=$err")
-                DiagnosticRing.append(TAG, "hy2.socks start ok=false reason=hy2_start")
+                DiagnosticRing.event("error", "hy2.socks", "action=start ok=false reason=hy2_start")
                 return false
             }
             isRunning.set(true)
             Log.i(TAG, "start: Hy2 SOCKS on $socksListen server=$server")
-            DiagnosticRing.append(TAG, "hy2.socks start ok=true")
+            DiagnosticRing.event(
+                "info",
+                "hy2.socks",
+                "action=start ok=true port=$socksListen",
+            )
             true
         } catch (t: Throwable) {
             lastErrorMessage = t.message ?: t.toString()
             Log.e(TAG, "start: failed", t)
-            DiagnosticRing.append(TAG, "hy2.socks start ok=false reason=start_failed")
+            DiagnosticRing.event("error", "hy2.socks", "action=start ok=false reason=start_failed")
             false
         }
     }

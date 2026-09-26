@@ -355,8 +355,8 @@ void main() {
       expect(service.dnsServers, ['10.255.255.2']);
       expect(service.outboundServer, 'unknown-vps.example');
       expect(service.outboundServerPort, 443);
-      expect(service.sessionName, 'Теремок VPN');
-      expect(service.displayLabel, 'Теремок VPN');
+      expect(service.sessionName, 'Прокси Дом');
+      expect(service.displayLabel, 'Прокси Дом');
       expect(service.outboundType, 'vless');
     });
 
@@ -381,7 +381,7 @@ void main() {
       expect(service.addressPrefix, 30);
       expect(service.routes, contains('0.0.0.0/0'));
       expect(service.routes, isNot(contains('::/0')));
-      expect(service.sessionName, 'Теремок VPN');
+      expect(service.sessionName, 'Прокси Дом');
       expect(service.outboundType, 'vless');
       expect(service.outboundServer, 'real-server.example');
       expect(service.outboundServerPort, 8443);
@@ -408,7 +408,7 @@ void main() {
       expect(resolveVpnDisplayLabel(config), 'Нидерланды');
       final service = VpnServiceConfig.fromVpnConfig(config);
       expect(service.displayLabel, 'Нидерланды');
-      expect(service.sessionName, 'Теремок VPN');
+      expect(service.sessionName, 'Прокси Дом');
     });
 
     test('resolveVpnDisplayLabel: unknown host is brand, not Сервер 1', () {
@@ -422,11 +422,11 @@ void main() {
           ),
         ),
       );
-      expect(resolveVpnDisplayLabel(config), 'Теремок VPN');
+      expect(resolveVpnDisplayLabel(config), 'Прокси Дом');
       expect(resolveVpnDisplayLabel(config), isNot(contains('Сервер')));
       expect(
         VpnServiceConfig.fromVpnConfig(config).displayLabel,
-        'Теремок VPN',
+        'Прокси Дом',
       );
     });
 
@@ -465,7 +465,7 @@ void main() {
       expect(map['outboundServer'], 's');
       expect(map['outboundServerPort'], 443);
       expect(map['outboundUuid'], 'u');
-      expect(map['controlPlaneHosts'], contains('176.114.64.174'));
+      expect(map['controlPlaneHosts'], isEmpty);
       expect(map['egressHosts'], ['s']);
     });
   });

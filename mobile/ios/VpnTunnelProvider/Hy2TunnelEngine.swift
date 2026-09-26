@@ -13,7 +13,8 @@ import Hy2bind
 /// + `packetFlow` pump. SOCKS-only is never Connected.
 ///
 /// Path changes: `NWPathMonitor` → debounced `Hy2bindResetNetwork` (keep TUN).
-/// Hy2 endpoint IP is always in excludedRoutes /32 (WireGuard-style).
+/// A share hostname is resolved with getaddrinfo before tunnel settings.
+/// That one A is the excluded /32 and the address Go dials. SNI stays the name.
 /// Sites use exact-host OS excludedRoutes; Go hyDialer direct is disabled.
 ///
 /// IPv6: claim `::/0` so Safari/YouTube cannot leak AAAA to LTE (RF TSPU).
@@ -72,26 +73,58 @@ final class Hy2TunnelEngine: NSObject {
       completion(Self.err(2, "invalid Hy2 paramsJson"))
       return
     }
-    // Catalog uses IP endpoints; hostname without sync route refresh is fail-fast.
-    if !TunnelRouteMerge.isIPv4Literal(cfg.remoteHost)
-      && !TunnelRouteMerge.isIPv6Literal(cfg.remoteHost)
-    {
-      completion(Self.err(3, "Hy2 endpoint must be IP literal for excludedRoutes"))
-      return
-    }
-    let baseIPv4 = TunnelRouteMerge.ipv4Excludes(
-      endpointHost: cfg.remoteHost,
-      controlPlaneHosts: cfg.controlPlaneHosts
-    )
-    let baseIPv6 = TunnelRouteMerge.ipv6Excludes(
-      endpointHost: cfg.remoteHost,
-      controlPlaneHosts: cfg.controlPlaneHosts
-    )
+    // getaddrinfo must finish before setTunnelNetworkSettings. After that,
+    // DNS is 1.1.1.1 inside the tunnel and Go's ResolveUDPAddr would loop.
+    // The same A is pinned into excludedRoutes and the Go server string.
     DispatchQueue.global(qos: .userInitiated).async { [weak self] in
       guard let self else { return }
+      let pinned: Hy2StartConfig
+      if TunnelRouteMerge.isIPv4Literal(cfg.remoteHost)
+        || TunnelRouteMerge.isIPv6Literal(cfg.remoteHost)
+      {
+        pinned = cfg
+      } else {
+        switch Self.resolveEndpointIPv4(cfg.remoteHost) {
+        case .ip(let ip):
+          guard let next = cfg.pinned(toIPv4: ip) else {
+            self.failStart(
+              startToken: startToken,
+              code: 3,
+              message: "Hy2 endpoint pin failed",
+              completion: completion
+            )
+            return
+          }
+          pinned = next
+        case .empty:
+          self.failStart(
+            startToken: startToken,
+            code: 3,
+            message: "Hy2 endpoint DNS empty",
+            completion: completion
+          )
+          return
+        case .timedOut:
+          self.failStart(
+            startToken: startToken,
+            code: 3,
+            message: "Hy2 endpoint DNS timeout",
+            completion: completion
+          )
+          return
+        }
+      }
+      let baseIPv4 = TunnelRouteMerge.ipv4Excludes(
+        endpointHost: pinned.remoteHost,
+        controlPlaneHosts: pinned.controlPlaneHosts
+      )
+      let baseIPv6 = TunnelRouteMerge.ipv6Excludes(
+        endpointHost: pinned.remoteHost,
+        controlPlaneHosts: pinned.controlPlaneHosts
+      )
       let plan = Self.resolveExactRoutes(
-        customHosts: cfg.iosCustomResolutionHosts,
-        catalogHosts: cfg.iosCatalogResolutionHosts,
+        customHosts: pinned.iosCustomResolutionHosts,
+        catalogHosts: pinned.iosCatalogResolutionHosts,
         baseIPv4: baseIPv4,
         baseIPv6: baseIPv6
       )
@@ -102,7 +135,7 @@ final class Hy2TunnelEngine: NSObject {
         }
         self.applyTunnel(
           provider: provider,
-          cfg: cfg,
+          cfg: pinned,
           routePlan: plan,
           startToken: startToken,
           completion: completion
@@ -135,7 +168,8 @@ final class Hy2TunnelEngine: NSObject {
       excludedIPv6: routePlan.v6
     )
     TeremokVpnShared.appendNativeLog(
-      "PacketTunnel.exclude requested=\(routePlan.requestedHosts) "
+      "PacketTunnel.exclude host=\(cfg.dialHost) pin=\(cfg.remoteHost) "
+        + "requested=\(routePlan.requestedHosts) "
         + "completed=\(routePlan.completedHosts) resolved=\(routePlan.resolvedHosts) "
         + "v4=\(routePlan.v4.count) v6=\(routePlan.v6.count) "
         + "dropped_v4=\(routePlan.droppedIPv4) dropped_v6=\(routePlan.droppedIPv6) "
@@ -202,6 +236,23 @@ final class Hy2TunnelEngine: NSObject {
     lifecycleLock.lock()
     defer { lifecycleLock.unlock() }
     return token == lifecycleToken
+  }
+
+  /// DNS failure stays on the main queue and does not apply tunnel settings.
+  private func failStart(
+    startToken: UInt64,
+    code: Int,
+    message: String,
+    completion: @escaping (Error?) -> Void
+  ) {
+    DispatchQueue.main.async { [weak self] in
+      guard let self else { return }
+      guard self.isCurrentStart(startToken) else {
+        completion(Self.err(6, "Hy2 start cancelled"))
+        return
+      }
+      completion(Self.err(code, message))
+    }
   }
 
   func healthDictionary() -> [String: Any] {
@@ -492,6 +543,32 @@ final class Hy2TunnelEngine: NSObject {
     )
   }
 
+  private enum EndpointDNS {
+    case ip(String)
+    case empty
+    case timedOut
+  }
+
+  /// One A record for the Hy2 peer, on the physical resolver. AAAA is ignored:
+  /// the node socket is IPv4, and a later Go lookup must not pick a second A.
+  private static func resolveEndpointIPv4(_ host: String) -> EndpointDNS {
+    let box = EndpointAddressBox()
+    let group = DispatchGroup()
+    group.enter()
+    DispatchQueue.global(qos: .userInitiated).async {
+      box.publish(resolveName(host).v4.first)
+      group.leave()
+    }
+    let wait = group.wait(timeout: .now() + resolutionTimeout)
+    if wait == .timedOut {
+      return .timedOut
+    }
+    guard let ip = box.take(), !ip.isEmpty else {
+      return .empty
+    }
+    return .ip(ip)
+  }
+
   private static func resolveName(_ name: String) -> HostRouteAddresses {
     if TunnelRouteMerge.isIPv4Literal(name) {
       return HostRouteAddresses(v4: [name], v6: [])
@@ -645,13 +722,60 @@ extension Hy2TunnelEngine: Hy2bindPacketWriterProtocol {
 }
 #endif
 
+/// One published A. The writer stores it before `group.leave`.
+private final class EndpointAddressBox {
+  private let lock = NSLock()
+  private var storage: String?
+
+  func publish(_ ip: String?) {
+    lock.lock()
+    storage = ip
+    lock.unlock()
+  }
+
+  func take() -> String? {
+    lock.lock()
+    defer { lock.unlock() }
+    return storage
+  }
+}
+
 /// Maps Flutter `paramsJson` (same keys as Android) to hy2bind Start JSON.
 struct Hy2StartConfig {
+  /// Address used for `excludedRoutes` and `tunnelRemoteAddress`. An IP after pin.
   var remoteHost: String
+  /// Host from the share line, before pin. Logged; not a secret.
+  var dialHost: String
   var goJSON: String
   var controlPlaneHosts: [String]
   var iosCustomResolutionHosts: [String]
   var iosCatalogResolutionHosts: [String]
+  var serverPort: Int
+  var auth: String
+  var explicitSNI: String
+  var socksListen: String
+
+  /// Rewrite Go's dial address to one A. SNI stays the name so the cert matches.
+  func pinned(toIPv4 ip: String) -> Hy2StartConfig? {
+    let trimmedSNI = explicitSNI.trimmingCharacters(in: .whitespacesAndNewlines)
+    let sni = trimmedSNI.isEmpty ? dialHost : trimmedSNI
+    let go: [String: Any] = [
+      "server": "\(ip):\(serverPort)",
+      "auth": auth,
+      "sni": sni,
+      "socks_listen": socksListen,
+    ]
+    guard
+      let goData = try? JSONSerialization.data(withJSONObject: go),
+      let goJSON = String(data: goData, encoding: .utf8)
+    else {
+      return nil
+    }
+    var copy = self
+    copy.remoteHost = ip
+    copy.goJSON = goJSON
+    return copy
+  }
 
   static func parse(_ paramsJson: String) -> Hy2StartConfig? {
     guard
@@ -675,7 +799,9 @@ struct Hy2StartConfig {
         .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
         .filter { !$0.isEmpty }
     }
-    let host = server.split(separator: ":", maxSplits: 1).first.map(String.init) ?? server
+    let parts = server.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
+    let host = parts.first.map(String.init) ?? server
+    let port = parts.count == 2 ? Int(parts[1]) ?? 443 : 443
     // ADR 025: iOS never feeds direct_domain_suffixes to Go. Direct paths are
     // only exact destination IPs in NetworkExtension excludedRoutes.
     let go: [String: Any] = [
@@ -692,10 +818,15 @@ struct Hy2StartConfig {
     }
     return Hy2StartConfig(
       remoteHost: host,
+      dialHost: host,
       goJSON: goJSON,
       controlPlaneHosts: controlPlane,
       iosCustomResolutionHosts: customHosts,
-      iosCatalogResolutionHosts: catalogHosts
+      iosCatalogResolutionHosts: catalogHosts,
+      serverPort: port,
+      auth: auth,
+      explicitSNI: sni,
+      socksListen: socks
     )
   }
 

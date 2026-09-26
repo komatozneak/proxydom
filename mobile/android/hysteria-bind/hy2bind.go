@@ -16,10 +16,8 @@ import (
 	"time"
 
 	"github.com/apernet/hysteria/core/v2/client"
-	"github.com/xjasonlyu/tun2socks/v2/core"
 	"github.com/xjasonlyu/tun2socks/v2/core/device"
 	"github.com/xjasonlyu/tun2socks/v2/core/device/fdbased"
-	"github.com/xjasonlyu/tun2socks/v2/core/option"
 	"github.com/xjasonlyu/tun2socks/v2/tunnel"
 	gstack "gvisor.dev/gvisor/pkg/tcpip/stack"
 )
@@ -123,6 +121,7 @@ func SetProtector(p Protector) {
 // Site-split suffixes are JSON-only (`direct_domain_suffixes`). Rebuild
 // hysteria-client.aar after changing this package — an old AAR ignores the field.
 func Start(configJSON string) string {
+	applyTunnelLogLevel(configJSON)
 	var cfg startConfig
 	if err := json.Unmarshal([]byte(configJSON), &cfg); err != nil {
 		return err.Error()
@@ -197,13 +196,7 @@ func StartTun(fd int, mtu int) string {
 		return fmt.Sprintf("tun fd: %v", err)
 	}
 	tunnel.T().SetDialer(&hyDialer{c: hyClient})
-	st, err := core.CreateStack(&core.Config{
-		LinkEndpoint:     dev,
-		TransportHandler: tunnel.T(),
-		Options: []option.Option{
-			option.WithTCPModerateReceiveBuffer(true),
-		},
-	})
+	st, err := createTunStack(dev)
 	if err != nil {
 		dev.Close()
 		return fmt.Sprintf("tun stack: %v", err)
@@ -241,6 +234,7 @@ func StopTun() {
 func Stop() {
 	StopTun()
 	stopShare()
+	dnsCacheClear()
 	mu.Lock()
 	ln := socksLn
 	c := hyClient

@@ -1531,6 +1531,30 @@ abstract class AppL10n {
   /// **'Session'**
   String get tunnelLogsSession;
 
+  /// No description provided for @tunnelLogsUi.
+  ///
+  /// In en, this message translates to:
+  /// **'Interface'**
+  String get tunnelLogsUi;
+
+  /// No description provided for @tunnelLogsCore.
+  ///
+  /// In en, this message translates to:
+  /// **'Core'**
+  String get tunnelLogsCore;
+
+  /// No description provided for @tunnelLogsDns.
+  ///
+  /// In en, this message translates to:
+  /// **'DNS'**
+  String get tunnelLogsDns;
+
+  /// No description provided for @tunnelLogsFetch.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscription'**
+  String get tunnelLogsFetch;
+
   /// No description provided for @tunnelLogsNetwork.
   ///
   /// In en, this message translates to:
@@ -1552,7 +1576,7 @@ abstract class AppL10n {
   /// No description provided for @tunnelLogsExport.
   ///
   /// In en, this message translates to:
-  /// **'Export all'**
+  /// **'Share'**
   String get tunnelLogsExport;
 
   /// No description provided for @tunnelLogsDelete.
@@ -1678,7 +1702,7 @@ abstract class AppL10n {
   /// No description provided for @settingsQsTileManual.
   ///
   /// In en, this message translates to:
-  /// **'Add manually: shade → pencil → “Teremok VPN”'**
+  /// **'Add manually: shade → pencil → “Proxy Dom”'**
   String get settingsQsTileManual;
 
   /// No description provided for @settingsQsTileNotAdded.
@@ -3004,67 +3028,67 @@ abstract class AppL10n {
   /// No description provided for @vpnDisclosureTitle.
   ///
   /// In en, this message translates to:
-  /// **'Protected connection'**
+  /// **'How the tunnel starts'**
   String get vpnDisclosureTitle;
 
   /// No description provided for @vpnDisclosureLead.
   ///
   /// In en, this message translates to:
-  /// **'Before the first connect, we explain how VPN works in Teremok and which data the service needs.'**
+  /// **'The house starts a tunnel from the line you chose. This screen explains that before Android asks for VPN permission.'**
   String get vpnDisclosureLead;
 
   /// No description provided for @vpnDisclosureVpnTitle.
   ///
   /// In en, this message translates to:
-  /// **'Why Android VPN is required'**
+  /// **'What the app does'**
   String get vpnDisclosureVpnTitle;
 
   /// No description provided for @vpnDisclosureVpnBody.
   ///
   /// In en, this message translates to:
-  /// **'The app uses the system VpnService to create a protected tunnel after you tap Connect. App traffic on the device is routed through this tunnel to Teremok VPN servers. This is the core function of the app — a protected connection, not access to a private corporate network.'**
+  /// **'After you accept, the house opens a local tunnel for the selected line. Device traffic goes to the server in that line. Android then shows its own VPN permission once.'**
   String get vpnDisclosureVpnBody;
 
   /// No description provided for @vpnDisclosureVpnTitleIos.
   ///
   /// In en, this message translates to:
-  /// **'Why a VPN configuration is required'**
+  /// **'What the app does'**
   String get vpnDisclosureVpnTitleIos;
 
   /// No description provided for @vpnDisclosureVpnBodyIos.
   ///
   /// In en, this message translates to:
-  /// **'The app uses a system Network Extension (Packet Tunnel) to create a protected tunnel after you tap Connect. Device traffic is routed through this tunnel to Teremok VPN servers. This is the core function of the app — a protected connection on public networks, not access to a private corporate network and not traffic circumvention marketing.'**
+  /// **'After you accept, the house opens a local tunnel for the selected line. Device traffic goes to the server in that line. iPhone then shows its own VPN permission once.'**
   String get vpnDisclosureVpnBodyIos;
 
   /// No description provided for @vpnDisclosureDataTitle.
   ///
   /// In en, this message translates to:
-  /// **'What data we process'**
+  /// **'What stays on the phone'**
   String get vpnDisclosureDataTitle;
 
   /// No description provided for @vpnDisclosureDataBody.
   ///
   /// In en, this message translates to:
-  /// **'Install ID (device ID) and account ID — to grant access and restore it after reinstall. Subscription purchase history (via the payment provider; we do not store card numbers). On your request — a diagnostic report from Settings. Aggregated usage summary (connect attempts, session length) — without browsing history.'**
+  /// **'The access line stays on the device. A diagnostic report leaves the phone only if you send it from Settings. Browsing history is not recorded.'**
   String get vpnDisclosureDataBody;
 
   /// No description provided for @vpnDisclosureDataBodyIos.
   ///
   /// In en, this message translates to:
-  /// **'Install ID (device ID) and account ID — to grant access and restore it after reinstall. On your request — a diagnostic report from Settings. Aggregated usage summary (connect attempts, session length) — without browsing history. We do not sell tunnel traffic or monetize other apps’ packets.'**
+  /// **'The access line stays on the device. A diagnostic report leaves the phone only if you send it from Settings. Browsing history is not recorded.'**
   String get vpnDisclosureDataBodyIos;
 
   /// No description provided for @vpnDisclosureNotTitle.
   ///
   /// In en, this message translates to:
-  /// **'What we do not do'**
+  /// **'What the app does not do'**
   String get vpnDisclosureNotTitle;
 
   /// No description provided for @vpnDisclosureNotBody.
   ///
   /// In en, this message translates to:
-  /// **'We do not log visited websites and do not use an advertising ID. We do not monetize other apps’ traffic by manipulating ads.'**
+  /// **'It does not keep a history of sites and it does not read an advertising ID. It does not sell access or hand out servers: you bring the line.'**
   String get vpnDisclosureNotBody;
 
   /// No description provided for @vpnDisclosureAccept.
@@ -3214,7 +3238,7 @@ abstract class AppL10n {
   /// No description provided for @freeSaveConnect.
   ///
   /// In en, this message translates to:
-  /// **'Save and connect'**
+  /// **'Save'**
   String get freeSaveConnect;
 
   /// No description provided for @freeSaveOnly.
@@ -3268,7 +3292,7 @@ abstract class AppL10n {
   /// No description provided for @freeOnboardBody.
   ///
   /// In en, this message translates to:
-  /// **'A subscription link or a key becomes a profile. Its servers stay in one list.'**
+  /// **'An address or a key becomes a profile. Its servers stay in one list.'**
   String get freeOnboardBody;
 
   /// No description provided for @freeOnboardAddTitle.

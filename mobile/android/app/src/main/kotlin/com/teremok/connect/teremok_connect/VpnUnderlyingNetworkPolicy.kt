@@ -4,6 +4,8 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.VpnService
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 
 /**
@@ -15,6 +17,17 @@ import android.util.Log
  */
 internal object VpnUnderlyingNetworkPolicy {
     private const val TAG = "VpnUnderlyingNetPolicy"
+
+    private val bindLog: NetBindLog by lazy {
+        val handler = Handler(Looper.getMainLooper())
+        NetBindLog(
+            emit = { level, event, fields ->
+                DiagnosticRing.event(level, event, fields)
+            },
+            postDelayed = { delay, task -> handler.postDelayed(task, delay) },
+            cancel = { task -> handler.removeCallbacks(task) },
+        )
+    }
 
     data class Underlying(
         val network: Network,
@@ -63,10 +76,11 @@ internal object VpnUnderlyingNetworkPolicy {
         return runCatching {
             val ok = cm.bindProcessToNetwork(network)
             Log.i(TAG, "bindProcessToNetwork iface=$iface ok=$ok")
-            DiagnosticRing.append(TAG, "bind.process $iface ok=$ok")
+            bindLog.record(iface, ok)
             ok
         }.getOrElse {
             Log.w(TAG, "bindProcessToNetwork failed iface=$iface", it)
+            bindLog.record(iface, false)
             false
         }
     }
@@ -80,7 +94,11 @@ internal object VpnUnderlyingNetworkPolicy {
         return runCatching {
             val ok = cm.bindProcessToNetwork(null)
             Log.i(TAG, "bindProcessToNetwork clear ok=$ok")
-            DiagnosticRing.append(TAG, "bind.process clear ok=$ok")
+            DiagnosticRing.event(
+                if (ok) "debug" else "error",
+                "net.bind",
+                "action=clear ok=$ok",
+            )
             ok
         }.getOrElse {
             Log.w(TAG, "bindProcessToNetwork clear failed", it)
@@ -105,10 +123,15 @@ internal object VpnUnderlyingNetworkPolicy {
         return runCatching {
             vpn.setUnderlyingNetworks(arrayOf(picked.network))
             Log.i(TAG, "setUnderlyingNetworks iface=${picked.interfaceName}")
-            DiagnosticRing.append(TAG, "net.iface ${picked.interfaceName}")
+            DiagnosticRing.event("debug", "net.iface", "iface=${picked.interfaceName}")
             true
         }.getOrElse {
             Log.w(TAG, "setUnderlyingNetworks failed iface=${picked.interfaceName}", it)
+            DiagnosticRing.event(
+                "error",
+                "net.iface",
+                "iface=${picked.interfaceName} ok=false",
+            )
             false
         }
     }

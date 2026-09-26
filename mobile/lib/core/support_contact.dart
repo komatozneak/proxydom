@@ -61,7 +61,7 @@ class SupportContact {
     required String screen,
   }) {
     return '''
-Здравствуйте! Нужна помощь с доступом Teremok VPN.
+Здравствуйте! Нужна помощь с доступом Прокси Дом.
 
 ID устройства: $deviceId
 Версия: $version

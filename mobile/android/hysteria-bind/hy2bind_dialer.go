@@ -14,8 +14,9 @@ import (
 )
 
 // Nested QUIC (YouTube HTTP/3 inside Hy2 QUIC) makes page clicks wait on a
-// second handshake. Same Cronet fail-fast as Xray `quic-reject`: drop UDP/443
-// so the app retries TCP immediately. DNS UDP/53 still goes through Hy2.
+// second handshake. UDP/443 is refused in the gVisor handler with ICMP port
+// unreachable (see installUDPForwarder). This error is the backstop if a
+// datagram is already inside a session. DNS UDP/53 still goes through Hy2.
 var errQuicReject = errors.New("quic-reject")
 
 // EU Hy2 → these Google caches (SK Broadband / LG Uplus) stall YouTube
@@ -66,10 +67,6 @@ func (d *hyDialer) DialUDP(m *M.Metadata) (net.PacketConn, error) {
 	if m.DstPort == 443 {
 		return nil, errQuicReject
 	}
-	u, err := d.c.UDP()
-	if err != nil {
-		return nil, err
-	}
 	orig := m.UDPAddr()
 	if orig == nil {
 		orig = &net.UDPAddr{IP: net.IPv4zero, Port: int(m.DstPort)}
@@ -78,7 +75,11 @@ func (d *hyDialer) DialUDP(m *M.Metadata) (net.PacketConn, error) {
 	if shouldHijackDNS(m.DstIP, m.DstPort) {
 		send = "1.1.1.1:53"
 	}
-	return newHyPacketConn(u, orig, send, isDNSPacketDest(orig, send)), nil
+	// Open the Hy2 UDP session on the first real send. Identical DNS questions
+	// share one lookup and never open a second session.
+	return newLazyHyPacketConn(func() (client.HyUDPConn, error) {
+		return d.c.UDP()
+	}, orig, send, isDNSPacketDest(orig, send)), nil
 }
 
 func isDNSPacketDest(orig net.Addr, send string) bool {
@@ -119,10 +120,13 @@ func (timeoutError) Timeout() bool   { return true }
 func (timeoutError) Temporary() bool { return true }
 
 type hyPacketConn struct {
+	opener   func() (client.HyUDPConn, error)
 	u        client.HyUDPConn
 	orig     net.Addr
 	send     string
 	isDNS    bool
+	dnsKey   string
+	shut     bool
 	incoming chan udpRecv
 	closed   chan struct{}
 	closeMu  sync.Once
@@ -131,24 +135,40 @@ type hyPacketConn struct {
 }
 
 func newHyPacketConn(u client.HyUDPConn, orig net.Addr, send string, isDNS bool) *hyPacketConn {
-	c := &hyPacketConn{
-		u:        u,
+	c := newLazyHyPacketConn(nil, orig, send, isDNS)
+	c.u = u
+	go c.recvLoop()
+	return c
+}
+
+func newLazyHyPacketConn(
+	opener func() (client.HyUDPConn, error),
+	orig net.Addr,
+	send string,
+	isDNS bool,
+) *hyPacketConn {
+	return &hyPacketConn{
+		opener:   opener,
 		orig:     orig,
 		send:     send,
 		isDNS:    isDNS,
 		incoming: make(chan udpRecv),
 		closed:   make(chan struct{}),
 	}
-	go c.recvLoop()
-	return c
 }
 
 func (c *hyPacketConn) recvLoop() {
 	defer close(c.incoming)
 	for {
 		b, addr, err := c.u.Receive()
-		if c.isDNS && err == nil && len(b) > 0 {
-			b = filterDNSResponse(b)
+		if c.isDNS {
+			key := c.dnsKeySnapshot()
+			if err != nil {
+				dnsFail(c, key, err)
+			} else if len(b) > 0 {
+				b = filterDNSResponse(b)
+				dnsComplete(c, key, b)
+			}
 		}
 		pkt := udpRecv{b: b, addr: addr, err: err}
 		select {
@@ -195,19 +215,109 @@ func (c *hyPacketConn) ReadFrom(p []byte) (int, net.Addr, error) {
 }
 
 func (c *hyPacketConn) WriteTo(p []byte, addr net.Addr) (int, error) {
+	if c.isDNS {
+		switch decision, hit := dnsPlan(c, p); decision {
+		case dnsHit:
+			c.deliverLocal(hit)
+			return len(p), nil
+		case dnsJoined, dnsRepeat:
+			return len(p), nil
+		}
+	}
+	if err := c.ensureUpstream(); err != nil {
+		dnsFail(c, c.dnsKeySnapshot(), err)
+		return 0, err
+	}
 	dest := c.send
 	if dest == "" && addr != nil {
 		dest = addr.String()
 	}
 	if err := c.u.Send(p, dest); err != nil {
+		dnsFail(c, c.dnsKeySnapshot(), err)
 		return 0, err
 	}
 	return len(p), nil
 }
 
+func (c *hyPacketConn) rememberDNSKey(key string) {
+	c.mu.Lock()
+	if c.dnsKey == "" {
+		c.dnsKey = key
+	}
+	c.mu.Unlock()
+}
+
+func (c *hyPacketConn) dnsKeySnapshot() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.dnsKey
+}
+
+func (c *hyPacketConn) ensureUpstream() error {
+	c.mu.Lock()
+	if c.u != nil {
+		c.mu.Unlock()
+		return nil
+	}
+	if c.shut {
+		c.mu.Unlock()
+		return net.ErrClosed
+	}
+	opener := c.opener
+	c.mu.Unlock()
+	if opener == nil {
+		return net.ErrClosed
+	}
+	u, err := opener()
+	if err != nil {
+		return err
+	}
+	c.mu.Lock()
+	if c.shut || c.u != nil {
+		c.mu.Unlock()
+		_ = u.Close()
+		if c.shut {
+			return net.ErrClosed
+		}
+		return nil
+	}
+	c.u = u
+	c.mu.Unlock()
+	go c.recvLoop()
+	return nil
+}
+
+func (c *hyPacketConn) deliverLocal(b []byte) {
+	if len(b) == 0 {
+		return
+	}
+	pkt := udpRecv{b: append([]byte(nil), b...), addr: c.send}
+	select {
+	case <-c.closed:
+	case c.incoming <- pkt:
+	}
+}
+
+func (c *hyPacketConn) failLocal(err error) {
+	if err == nil {
+		return
+	}
+	select {
+	case <-c.closed:
+	case c.incoming <- udpRecv{err: err}:
+	}
+}
+
 func (c *hyPacketConn) Close() error {
+	c.mu.Lock()
+	c.shut = true
+	u := c.u
+	c.mu.Unlock()
 	c.closeMu.Do(func() { close(c.closed) })
-	return c.u.Close()
+	if u != nil {
+		return u.Close()
+	}
+	return nil
 }
 
 func (c *hyPacketConn) LocalAddr() net.Addr {

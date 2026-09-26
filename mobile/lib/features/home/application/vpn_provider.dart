@@ -5,8 +5,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../core/diagnostics/app_log_buffer.dart';
 import '../../../core/diagnostics/product_log.dart';
+import '../../../core/diagnostics/session_trace.dart';
 import '../../../core/ios_store_gates.dart';
 import '../../vpn/data/hy2_import_store.dart';
 import '../../vpn/data/route_document.dart';
@@ -21,6 +21,7 @@ import '../../vpn/data/vpn_session_snapshot.dart';
 import '../../vpn/data/xray_share_config.dart';
 import '../../vpn/domain/vpn_connect_error.dart';
 import '../../settings/data/auto_reconnect_prefs.dart';
+import '../../settings/data/split_tunnel_prefs.dart';
 import 'vpn_status.dart';
 import 'vpn_status_log.dart';
 
@@ -167,8 +168,8 @@ class VpnNotifier extends Notifier<VpnStatus> {
     if (!_isConnectStale(gen)) return false;
     ShareSessionLog.emit(
       'vpn.connect_abort',
+      level: ProductLogLevel.debug,
       sid: _sid,
-      fields: _sessionFields,
       extra: {'gen': gen, 'now': _connectGeneration},
     );
     _endSessionWalk();
@@ -310,6 +311,11 @@ class VpnNotifier extends Notifier<VpnStatus> {
         if (state is VpnConnected || state is VpnConnecting) {
           await _clearConnectedSince();
           state = const VpnError(message: 'VPN was revoked by system');
+          ProductLog.event(
+            'vpn.connect_fail',
+            level: ProductLogLevel.error,
+            fields: {'code': 'revoked'},
+          );
           _logReconcile(native, before);
         }
     }
@@ -321,6 +327,12 @@ class VpnNotifier extends Notifier<VpnStatus> {
     _vpnLog('vpn.reconcile native=${native.name} from=$before to=$after');
   }
 
+  void _logNativeStatus(VpnNativeStatus status) {
+    final line = _nativeStatusLog.lineFor(status);
+    if (line == null) return;
+    _vpnLog(line);
+  }
+
   bool _coreStartLogged = false;
 
   void _logCoreStart({required bool ok}) {
@@ -329,8 +341,8 @@ class VpnNotifier extends Notifier<VpnStatus> {
     if (ok) {
       ShareSessionLog.emit(
         'vpn.core_start',
+        level: ProductLogLevel.info,
         sid: _sid,
-        fields: _sessionFields,
         extra: {'ok': true},
       );
       unawaited(_logShareTcp());
@@ -339,8 +351,8 @@ class VpnNotifier extends Notifier<VpnStatus> {
     unawaited(VpnController.instance.getLastError().then((detail) {
       ShareSessionLog.emit(
         'vpn.core_start',
+        level: ProductLogLevel.error,
         sid: _sid,
-        fields: _sessionFields,
         extra: {'ok': false, 'error': detail},
       );
     }));
@@ -352,8 +364,8 @@ class VpnNotifier extends Notifier<VpnStatus> {
     if (detail == null || detail.trim().isEmpty) return;
     ShareSessionLog.emit(
       'vpn.server_tcp',
+      level: ProductLogLevel.debug,
       sid: _sid,
-      fields: _sessionFields,
       extra: {'detail': detail},
     );
   }
@@ -524,8 +536,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
       config: config,
       selectedNodeProtocol: _selectedNodeProtocol,
     );
-    final sessionKey =
-        '${_sessionScheme(protocol)}|$_profileHost|$serverName';
+    final sessionKey = '${_sessionScheme(protocol)}|$_profileHost|$serverName';
     if (keepLiveFreeSession(
       freeClient: freeKeyClient,
       sessionOpen: _freeSessionOpen,
@@ -548,13 +559,6 @@ class VpnNotifier extends Notifier<VpnStatus> {
         protocol: protocol,
         connectedSince: cur.connectedSince,
       );
-      ProductLog.event('vpn.connected', {
-        'winner_id': _autoActiveNodeId,
-        'core': config?.activeCore.name,
-        'label': serverName,
-        'scheme': _sessionScheme(protocol),
-        'host': _profileHost,
-      });
       _rememberFreeSession(sessionKey);
       unawaited(_persistConnectedUi());
       return;
@@ -581,13 +585,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
       protocol: protocol,
       connectedSince: since,
     );
-    ProductLog.event('vpn.connected', {
-      'winner_id': _autoActiveNodeId,
-      'core': config?.activeCore.name,
-      'label': serverName,
-      'scheme': _sessionScheme(protocol),
-      'host': _profileHost,
-    });
+    SessionTrace.mark('connected');
     _rememberFreeSession(sessionKey);
     unawaited(_persistConnectedUi());
     final probeToken = ++_egressProbeToken;
@@ -597,7 +595,11 @@ class VpnNotifier extends Notifier<VpnStatus> {
         final name = iface?.trim();
         if (name == null || name.isEmpty || name == _lastLoggedIface) return;
         _lastLoggedIface = name;
-        ProductLog.event('net.iface', {'name': name});
+        ProductLog.event(
+          'net.iface',
+          level: ProductLogLevel.debug,
+          fields: {'name': name},
+        );
       }),
     );
   }
@@ -613,13 +615,10 @@ class VpnNotifier extends Notifier<VpnStatus> {
     _autoActiveNodeId = null;
     _catalogHost = null;
     final imported = await Hy2ImportStore.instance.selected();
-    _displayLabel = imported == null
-        ? null
-        : labelForShareLink(imported).title;
+    _displayLabel = imported == null ? null : labelForShareLink(imported).title;
     _selectedNodeProtocol = imported?.scheme;
-    _profileHost = imported == null
-        ? null
-        : profileHostForLog(imported.endpoint);
+    _profileHost =
+        imported == null ? null : profileHostForLog(imported.endpoint);
   }
 
   Future<void> _persistConnectedUi() async {
@@ -646,8 +645,8 @@ class VpnNotifier extends Notifier<VpnStatus> {
       final error = ok ? null : await VpnController.instance.getLastError();
       ShareSessionLog.emit(
         'vpn.egress_probe',
+        level: ok ? ProductLogLevel.info : ProductLogLevel.error,
         sid: _sid,
-        fields: _sessionFields,
         extra: {
           'ok': ok,
           'external_ip': ok ? shownIp : 'fail',
@@ -661,7 +660,12 @@ class VpnNotifier extends Notifier<VpnStatus> {
         await VpnController.instance.stop(reason: 'egress_fail');
       }
     } catch (e) {
-      _vpnLog('[VPN] egress_probe failed: $e', warn: true);
+      ProductLog.event(
+        'vpn.egress_probe',
+        level: ProductLogLevel.error,
+        fields: {'ok': false, 'error': e.runtimeType.toString()},
+      );
+      _vpnLog('[VPN] egress_probe failed: $e');
     }
   }
 
@@ -694,8 +698,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
       VpnNativeStatus? native;
       for (var attempt = 0; attempt < 5; attempt++) {
         native = await VpnController.instance.getStatus();
-        final line = _nativeStatusLog.lineFor(native);
-        if (line != null) _vpnLog(line);
+        _logNativeStatus(native);
         if (native == VpnNativeStatus.connected ||
             native == VpnNativeStatus.connecting ||
             native == VpnNativeStatus.preparing ||
@@ -778,6 +781,11 @@ class VpnNotifier extends Notifier<VpnStatus> {
         }
       }
     } catch (e) {
+      ProductLog.event(
+        'vpn.sync',
+        level: ProductLogLevel.error,
+        fields: {'error': e.runtimeType.toString()},
+      );
       _vpnLog('[VPN] syncFromNative failed: $e');
     } finally {
       _nativeSyncComplete = true;
@@ -800,7 +808,6 @@ class VpnNotifier extends Notifier<VpnStatus> {
     _egressProbeToken++;
   }
 
-
   Future<void> _onAutoPathIncompatible({
     required String reason,
     String? underlying,
@@ -821,12 +828,16 @@ class VpnNotifier extends Notifier<VpnStatus> {
       iface = null;
     }
     final wifi = isWifiUnderlying(iface: iface, transport: transport);
-    ProductLog.event('vpn.connect_fail', {
-      'code': kVpnPathIncompatibleErrorCode,
-      'reason': reason,
-      'underlying': iface,
-      'attempt': _autoConnectAttempt,
-    });
+    ProductLog.event(
+      'vpn.connect_fail',
+      level: ProductLogLevel.error,
+      fields: {
+        'code': kVpnPathIncompatibleErrorCode,
+        'reason': reason,
+        'underlying': iface,
+        'attempt': _autoConnectAttempt,
+      },
+    );
     if (shouldRetryAutoOnWifi(
       alreadyRetried: _wifiAutoRetryUsed,
       userStopping: _suppressAutoReconnect,
@@ -855,7 +866,6 @@ class VpnNotifier extends Notifier<VpnStatus> {
       code: kVpnPathIncompatibleErrorCode,
     );
   }
-
 
   /// Explicit stop → start so route-mode / site prefs enter the next runtime config.
   Future<bool> reconnectToApplyRouting() async {
@@ -1051,23 +1061,26 @@ class VpnNotifier extends Notifier<VpnStatus> {
         _sessionFields = ShareSessionLog.fieldsFor(imported);
         ShareSessionLog.emit(
           'vpn.connect_begin',
+          level: ProductLogLevel.info,
           sid: _sid,
           fields: _sessionFields,
           extra: {'gen': gen},
         );
+        SessionTrace.begin(_sid);
         await VpnSessionMeta.clear();
+        final blocked = await SplitTunnelPrefs.loadDisallowedPackages();
+        SessionTrace.mark('profile', {'scheme': imported.scheme});
+        SessionTrace.mark('per_app', {
+          'mode': blocked.isEmpty ? 'all' : 'bypass',
+          'apps': blocked.length,
+        });
         final profile = imported.hy2?.profile;
         var started = false;
+        SessionTrace.mark('config', {'scheme': imported.scheme});
         if (profile != null) {
           final dial = _dialGen == 0 ? ++_dialGen : _dialGen;
           _handshakeHost = imported.endpoint;
           _nativeGenFloor = _lastNativeGen;
-          ProductLog.event('vpn.connect_attempt', {
-            'profile': shown.title,
-            'scheme': imported.scheme,
-            'host': _profileHost,
-            'sni': profile.sni,
-          });
           final raw = await VpnController.instance.startHysteria(
             profile,
             displayLabel: shown.title,
@@ -1077,17 +1090,20 @@ class VpnNotifier extends Notifier<VpnStatus> {
             defaultTargetPlatform == TargetPlatform.android) {
           final xrayJson = buildXraySocksConfig(imported);
           if (xrayJson == null) {
+            SessionTrace.mark('fail', {'code': 'share_unsupported'});
             state = const VpnError(
               message: 'share_unsupported',
               code: 'share_unsupported',
             );
             return;
           }
+          SessionTrace.mark('dns', {'dns': 'system'});
           started = await VpnController.instance.startXray(
             xrayJson,
             displayLabel: shown.title,
           );
         } else {
+          SessionTrace.mark('fail', {'code': 'share_ios_hy2_only'});
           state = const VpnError(
             message: 'share_ios_hy2_only',
             code: 'share_ios_hy2_only',
@@ -1096,9 +1112,11 @@ class VpnNotifier extends Notifier<VpnStatus> {
         }
         if (await _abortStaleConnect(gen)) return;
         if (!started) {
+          SessionTrace.mark('fail', {'code': 'start'});
           state = await _errorForStartFailure();
           return;
         }
+        SessionTrace.mark('vpn_service');
         state = const VpnConnecting(progress: 0.8);
         await _waitUntilHandshakeSettles(gen);
         return;
@@ -1111,13 +1129,17 @@ class VpnNotifier extends Notifier<VpnStatus> {
     } catch (e, st) {
       if (await _abortStaleConnect(gen)) return;
       _cancelConnectingWatchdog();
-      _vpnLog('[VPN] connect failed: $e\n$st', warn: true);
-      ProductLog.event('vpn.connect_fail', {
-        'code': e is DioException
-            ? (e.error ?? e.response?.statusCode)
-            : e.runtimeType,
-        'message': e.toString(),
-      });
+      _vpnLog('[VPN] connect failed: $e\n$st');
+      ProductLog.event(
+        'vpn.connect_fail',
+        level: ProductLogLevel.error,
+        fields: {
+          'code': e is DioException
+              ? (e.error ?? e.response?.statusCode)
+              : e.runtimeType,
+          'message': e.toString(),
+        },
+      );
       if (e is DioException) {
         final code = e.response?.statusCode ?? 0;
         if (e.error == 'device_limit_reached') {
@@ -1213,8 +1235,8 @@ class VpnNotifier extends Notifier<VpnStatus> {
     final native = await VpnController.instance.getStatus();
     ShareSessionLog.emit(
       'vpn.disconnect',
+      level: ProductLogLevel.info,
       sid: _sid,
-      fields: _sessionFields,
       extra: {'reason': reason, 'native_before': native.name},
     );
     final uiBusy = state is VpnConnected || state is VpnConnecting;
@@ -1230,6 +1252,11 @@ class VpnNotifier extends Notifier<VpnStatus> {
               .wipeSession(reason: reason)
               .timeout(const Duration(seconds: 10));
         } catch (e) {
+          ProductLog.event(
+            'vpn.disconnect',
+            level: ProductLogLevel.error,
+            fields: {'reason': 'wipe', 'error': e.runtimeType.toString()},
+          );
           _vpnLog('[VPN] idle wipeSession error: $e');
           rethrow;
         }
@@ -1245,6 +1272,11 @@ class VpnNotifier extends Notifier<VpnStatus> {
     // If stop() hangs, don't leave Nest spinning forever.
     _cancelDisconnectWatchdog();
     _disconnectWatchdog = Timer(const Duration(seconds: 10), () async {
+      ProductLog.event(
+        'vpn.disconnect',
+        level: ProductLogLevel.warn,
+        fields: {'reason': 'watchdog'},
+      );
       _vpnLog('[VPN] disconnect watchdog fired ui=$state');
       _connectInFlight = null;
       final still = await VpnController.instance.getStatus();
@@ -1263,17 +1295,27 @@ class VpnNotifier extends Notifier<VpnStatus> {
           : VpnController.instance.stop(reason: reason);
       await stop.timeout(const Duration(seconds: 10));
     } on TimeoutException catch (e) {
+      ProductLog.event(
+        'vpn.disconnect',
+        level: ProductLogLevel.warn,
+        fields: {'reason': 'timeout'},
+      );
       _vpnLog('[VPN] disconnect stop timeout: $e');
       if (wipeNativeSession) rethrow;
     } catch (e) {
+      ProductLog.event(
+        'vpn.disconnect',
+        level: ProductLogLevel.error,
+        fields: {'reason': 'stop', 'error': e.runtimeType.toString()},
+      );
       _vpnLog('[VPN] disconnect error: $e');
       if (wipeNativeSession) rethrow;
     } finally {
       final after = await VpnController.instance.getStatus();
       ShareSessionLog.emit(
         'vpn.disconnect',
+        level: ProductLogLevel.info,
         sid: _sid,
-        fields: _sessionFields,
         extra: {'native_after': after.name},
       );
       _cancelDisconnectWatchdog();
@@ -1313,12 +1355,16 @@ class VpnNotifier extends Notifier<VpnStatus> {
     final current = state;
     if (current is! VpnConnected) return;
     final seconds = DateTime.now().difference(current.connectedSince).inSeconds;
-    ProductLog.event('vpn.session_end', {
-      'duration_s': seconds,
-      'profile': current.serverName,
-      'scheme': _sessionScheme(current.protocol),
-      'host': _profileHost,
-    });
+    ProductLog.event(
+      'vpn.session_end',
+      level: ProductLogLevel.info,
+      fields: {
+        'duration_s': seconds,
+        'profile': current.serverName,
+        'scheme': _sessionScheme(current.protocol),
+        'host': _profileHost,
+      },
+    );
   }
 
   /// Попытка автоматического переподключения через 5 сек (если включено в Settings).
@@ -1360,13 +1406,23 @@ class VpnNotifier extends Notifier<VpnStatus> {
   void _subscribeToStatus() {
     _statusSubscription ??= VpnController.instance.statusStream.listen(
       _onNativeStatus,
-      onError: (e) {
+      onError: (Object e) {
+        ProductLog.event(
+          'vpn.status_stream',
+          level: ProductLogLevel.error,
+          fields: {'error': e.runtimeType.toString()},
+        );
         _vpnLog('[VPN] statusStream error: $e');
       },
     );
     _sessionSubscription ??= VpnController.instance.sessionStream.listen(
       _onSessionSnapshot,
-      onError: (e) {
+      onError: (Object e) {
+        ProductLog.event(
+          'vpn.session_stream',
+          level: ProductLogLevel.error,
+          fields: {'error': e.runtimeType.toString()},
+        );
         _vpnLog('[VPN] sessionStream error: $e');
       },
     );
@@ -1401,7 +1457,11 @@ class VpnNotifier extends Notifier<VpnStatus> {
         if (proveId.isNotEmpty && proveId != _lastLoggedProveId) {
           _lastLoggedProveId = proveId;
           _lastProveSummary = 'id=$proveId proving';
-          ProductLog.event('vpn.prove', {'id': proveId, 'ok': 'pending'});
+          ProductLog.event(
+            'vpn.prove',
+            level: ProductLogLevel.debug,
+            fields: {'id': proveId, 'ok': 'pending'},
+          );
         }
       }
     }
@@ -1418,11 +1478,15 @@ class VpnNotifier extends Notifier<VpnStatus> {
       _cancelConnectingWatchdog();
       final alreadyOn = state is VpnConnected;
       if (!freeKeyClient && !alreadyOn) {
-        ProductLog.event('vpn.prove', {
-          'id': proveId,
-          'ok': true,
-          'reason': snap.reason.name,
-        });
+        ProductLog.event(
+          'vpn.prove',
+          level: ProductLogLevel.info,
+          fields: {
+            'id': proveId,
+            'ok': true,
+            'reason': snap.reason.name,
+          },
+        );
       }
       if (_freeSessionOpen) return;
       unawaited(
@@ -1447,12 +1511,16 @@ class VpnNotifier extends Notifier<VpnStatus> {
       _endSessionWalk();
       _cancelConnectingWatchdog();
       _lastProveSummary = 'id=${snap.candidateId} fail ${snap.reason.name}';
-      ProductLog.event('vpn.connect_fail', {
-        'code': snap.reason.name,
-        'detail': snap.detail,
-        'underlying': snap.underlyingIface,
-        'attempt': _autoConnectAttempt,
-      });
+      ProductLog.event(
+        'vpn.connect_fail',
+        level: ProductLogLevel.error,
+        fields: {
+          'code': snap.reason.name,
+          'detail': snap.detail,
+          'underlying': snap.underlyingIface,
+          'attempt': _autoConnectAttempt,
+        },
+      );
       state = vpnErrorFromSession(snap);
       return;
     }
@@ -1514,6 +1582,11 @@ class VpnNotifier extends Notifier<VpnStatus> {
         if (wasConnected) _recordSessionEnd();
         unawaited(_clearConnectedSince());
         state = const VpnError(message: 'VPN was revoked by system');
+        ProductLog.event(
+          'vpn.connect_fail',
+          level: ProductLogLevel.error,
+          fields: {'code': 'revoked'},
+        );
         if (wasConnected) {
           _scheduleReconnect();
         }
@@ -1528,16 +1601,20 @@ class VpnNotifier extends Notifier<VpnStatus> {
         unawaited(
           _vpnErrorFromNative().then((err) {
             if (_sessionOwnsUi || state is VpnError) return;
-            ProductLog.event('vpn.connect_fail', {
-              'code': err.code,
-              'message': err.message,
-              'host': _profileHost,
-            });
+            ProductLog.event(
+              'vpn.connect_fail',
+              level: ProductLogLevel.error,
+              fields: {
+                'code': err.code,
+                'message': err.message,
+                'host': _profileHost,
+              },
+            );
             if (err.message.contains('tcp=')) {
               ShareSessionLog.emit(
                 'vpn.server_tcp',
+                level: ProductLogLevel.error,
                 sid: _sid,
-                fields: _sessionFields,
                 extra: {'detail': err.message},
               );
             }
@@ -1599,11 +1676,21 @@ class VpnNotifier extends Notifier<VpnStatus> {
     await _clearConnectedSince();
     final conflict = await VpnController.instance.queryVpnConflict();
     if (conflict.foreignAlwaysOn || conflict.foreignVpnActive) {
+      ProductLog.event(
+        'vpn.connect_fail',
+        level: ProductLogLevel.error,
+        fields: {'code': 'conflict'},
+      );
       _vpnLog('[VPN] connecting stuck — conflict CTA');
       state = await _vpnErrorFromConflict(conflict);
       return;
     }
     // iOS has no getVpnConflict — do not paint Android "another VPN" copy.
+    ProductLog.event(
+      'vpn.connect_fail',
+      level: ProductLogLevel.error,
+      fields: {'code': kVpnConnectTimeoutErrorCode},
+    );
     _vpnLog('[VPN] connecting stuck — connect_timeout');
     final detail = await VpnController.instance.getLastError();
     if (detail != null && detail.trim().isNotEmpty) {
@@ -1653,7 +1740,8 @@ class VpnNotifier extends Notifier<VpnStatus> {
   /// start again. Intentional stop clears sessionActive on iOS/Android.
   Future<void> _reconnectIfSessionActive({required String reason}) async {
     if (freeKeyClient) {
-      _vpnLog('[VPN] reconnect skipped; native owns free client reason=$reason');
+      _vpnLog(
+          '[VPN] reconnect skipped; native owns free client reason=$reason');
       return;
     }
     if (_suppressAutoReconnect) return;
@@ -1686,13 +1774,8 @@ class VpnNotifier extends Notifier<VpnStatus> {
   }
 }
 
-void _vpnLog(String message, {bool warn = false}) {
-  debugPrint(message);
-  if (warn) {
-    AppLogBuffer.instance.warn(message);
-  } else {
-    AppLogBuffer.instance.info(message);
-  }
+void _vpnLog(String message) {
+  if (kDebugMode) debugPrint(message);
 }
 
 String? _apiErrorCode(DioException e) {

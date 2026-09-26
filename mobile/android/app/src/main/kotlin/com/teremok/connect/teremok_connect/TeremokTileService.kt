@@ -11,7 +11,7 @@ import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 
 /**
- * Quick Settings tile «Теремок VPN».
+ * Quick Settings tile «Прокси Дом».
  *
  * Toggle only: ACTIVE while up / bringing up, INACTIVE when idle.
  * Click always start/stop (Amnezia). Always-on may restart the tunnel.

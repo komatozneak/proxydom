@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/busy/busy_overlay.dart';
 import '../../../core/diagnostics/product_log.dart';
+import '../../../core/diagnostics/ui_log.dart';
 import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
@@ -135,7 +136,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Future<void> _refreshEntitlement() async {}
 
   Future<void> _openSubscription() async {
-    if (_openingSubscription || !mounted) return;
+    if (_openingSubscription || !mounted) {
+      UiLog.action('home', 'import', result: 'ignored', reason: 'busy');
+      return;
+    }
+    UiLog.action('home', 'import');
     _openingSubscription = true;
     try {
       await context.push('/import');
@@ -403,40 +408,70 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   Future<void> _onNestTap() async {
     // Region switch owns the shell busy overlay — don't fight it.
-    if (ref.read(busyOverlayProvider).isBusy) return;
+    if (ref.read(busyOverlayProvider).isBusy) {
+      final connecting = ref.read(vpnProvider) is VpnConnecting ||
+          ref.read(vpnProvider.notifier).isConnectInFlight;
+      UiLog.action(
+        'home',
+        'nest',
+        level: ProductLogLevel.warn,
+        result: 'rejected',
+        reason: connecting ? 'already_connecting' : 'busy',
+      );
+      return;
+    }
 
     final notifier = ref.read(vpnProvider.notifier);
     final status = ref.read(vpnProvider);
-    final nativeHint = status.runtimeType.toString();
-    ProductLog.event('ui.tap', {
-      'action': status is VpnConnected ||
-              status is VpnConnecting ||
-              notifier.isConnectInFlight
-          ? 'disconnect'
-          : 'connect',
-      'ui': nativeHint,
-    });
+    final ui = status.runtimeType.toString();
 
     // Connecting: second tap cancels the walk (issue #147). Do not reconcile
     // with native here — getStatus() idle during Binding/Proving used to
     // demote Nest to rest while the tunnel was coming up.
     if (status is VpnConnecting || notifier.isConnectInFlight) {
+      UiLog.action(
+        'home',
+        'nest',
+        level: ProductLogLevel.info,
+        extra: {'do': 'disconnect', 'ui': ui},
+      );
       await notifier.disconnect();
       return;
     }
 
     if (status is VpnDisconnected || status is VpnError) {
       if (freeKeyClient && _importedScheme == null) {
+        UiLog.action('home', 'nest', result: 'import', extra: {'ui': ui});
         context.push('/import');
         return;
       }
       final allowed = await VpnDisclosureDialog.ensureAccepted(context);
-      if (!allowed || !mounted) return;
+      if (!allowed || !mounted) {
+        UiLog.action(
+          'home',
+          'nest',
+          result: 'ignored',
+          reason: allowed ? 'unmounted' : 'disclosure',
+        );
+        return;
+      }
+      UiLog.action(
+        'home',
+        'nest',
+        level: ProductLogLevel.info,
+        extra: {'do': 'connect', 'ui': ui},
+      );
       await notifier.connect();
       return;
     }
 
     if (status is VpnConnected) {
+      UiLog.action(
+        'home',
+        'nest',
+        level: ProductLogLevel.info,
+        extra: {'do': 'disconnect', 'ui': ui},
+      );
       await notifier.disconnect();
     }
   }
@@ -494,9 +529,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 noVpnTotal: _noVpnTotal,
                 onNestTap: _onNestTap,
                 onPlaceRefresh: _refreshServerCard,
-                onOpenLocations: () => context.go('/locations'),
+                onOpenLocations: () {
+                  UiLog.action('home', 'open', extra: {'route': '/locations'});
+                  context.go('/locations');
+                },
                 onOpenSubscription: _openSubscription,
                 onOpenNoVpn: () async {
+                  UiLog.action('home', 'open',
+                      extra: {'route': '/settings/no-vpn'});
                   await context.push('/settings/no-vpn');
                   if (mounted) unawaited(_refreshNoVpnCounter());
                 },
@@ -783,6 +823,11 @@ class _FreeClientHome extends StatelessWidget {
           FilledButton.tonal(
             onPressed: () async {
               final opened = await VpnController.instance.openVpnSettings();
+              UiLog.action(
+                'home',
+                'vpn_settings',
+                result: opened ? 'ok' : 'fail',
+              );
               if (!context.mounted) return;
               if (!opened) {
                 showTeremokSnackBar(
@@ -805,8 +850,14 @@ class _FreeClientHome extends StatelessWidget {
         ],
         const SizedBox(height: 12),
         FreeClientActionBar(
-          onPaste: () => context.push('/import?clipboard=1'),
-          onScan: () => context.push('/scan'),
+          onPaste: () {
+            UiLog.action('home', 'paste');
+            context.push('/import?clipboard=1');
+          },
+          onScan: () {
+            UiLog.action('home', 'scan');
+            context.push('/scan');
+          },
         ),
       ],
     );
