@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import '../../../core/config.dart';
 import 'vpn_route_policy.dart';
 import 'vpn_session_inputs.dart';
 
@@ -157,14 +156,6 @@ class XrayConfigBuilder {
         'port': '53',
         'outboundTag': 'dns-out',
       },
-      {
-        'type': 'field',
-        'domain': [
-          'domain:teremokconnect.online',
-          'full:api.teremokconnect.online',
-        ],
-        'outboundTag': 'direct',
-      },
       if (directCidrs.isNotEmpty)
         {'type': 'field', 'ip': directCidrs, 'outboundTag': 'direct'},
 
@@ -289,9 +280,6 @@ class XrayConfigBuilder {
     ];
 
     final dns = <String, dynamic>{
-      'hosts': {
-        'api.teremokconnect.online': AppConfig.vpsControlPlaneIpv4,
-      },
       'queryStrategy': 'UseIPv4',
       'servers': dnsServers,
     };

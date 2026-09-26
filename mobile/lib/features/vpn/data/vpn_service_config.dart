@@ -7,7 +7,7 @@ import 'vpn_config.dart';
 import 'vpn_node.dart';
 
 /// User-facing brand name for VPN session / fallback labels (no Marzban id).
-const kVpnBrandSessionName = 'Теремок VPN';
+const kVpnBrandSessionName = 'Прокси Дом';
 
 /// Normalize outbound type for native/UI (never `"unknown"`).
 String normalizeOutboundType(String? type) {
@@ -180,18 +180,15 @@ class VpnServiceConfig {
   /// Hosts that must stay off TUN via Android [excludeRoute].
   List<String> get controlPlaneHosts => controlPlaneHostsOf();
 
-  /// Hosts that must stay off TUN (API master). Used by Hy2 start params.
+  /// Extra hosts for Android [excludeRoute]. The selected node is excluded
+  /// separately as [outboundServer]. A hostname of the old control plane is
+  /// not pinned to a baked-in address.
   static List<String> controlPlaneHostsOf() {
     final hosts = <String>{};
     try {
       final host = Uri.parse(AppConfig.baseUrl).host;
-      if (host.isEmpty) {
-        // keep empty
-      } else if (RegExp(r'^(\d{1,3}\.){3}\d{1,3}$').hasMatch(host)) {
+      if (RegExp(r'^(\d{1,3}\.){3}\d{1,3}$').hasMatch(host)) {
         hosts.add(host);
-      } else if (host == 'api.teremokconnect.online' ||
-          host.endsWith('.teremokconnect.online')) {
-        hosts.add(AppConfig.vpsIpv4);
       }
     } catch (_) {
       // ignore malformed baseUrl in tests
