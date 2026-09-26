@@ -144,12 +144,21 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
 
   Future<void> _load() async {
     if (freeKeyClient) {
+      // Paint the saved list before the subscription fetch. A 10s timeout
+      // on a saved URL must not hide paste behind the spinner.
       try {
-        await Hy2ImportStore.instance.refreshSavedUrl();
-      } on FormatException {
-        // Keep the last good list when the network fails.
+        await paintImportedServers(
+          readLocal: () => Hy2ImportStore.instance.load(),
+          refresh: () => Hy2ImportStore.instance.refreshSavedUrl(),
+          paint: (links) async {
+            if (!mounted) return;
+            await _applyImported(links);
+          },
+        );
+      } catch (_) {
+        if (!mounted) return;
+        setState(() => _loading = false);
       }
-      await _applyImported(await Hy2ImportStore.instance.load());
       return;
     }
     setState(() {
