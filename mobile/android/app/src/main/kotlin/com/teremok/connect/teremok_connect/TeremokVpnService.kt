@@ -445,7 +445,7 @@ class TeremokVpnService : VpnService() {
     /** Prevents concurrent [teardownCores] from main + session dispatcher (fdsan). */
     private val teardownInFlight = AtomicBoolean(false)
     private var trafficMonitor: VpnTrafficMonitor? = null
-    private var notificationSessionLine: String = "Теремок VPN"
+    private var notificationSessionLine: String = "Прокси Дом"
     private val pathHealth = PathHealth()
     private val mainHandler = Handler(Looper.getMainLooper())
     private var vpnWakeLock: PowerManager.WakeLock? = null
@@ -884,7 +884,7 @@ class TeremokVpnService : VpnService() {
         val label = listOf(
             params["displayLabel"] as? String,
             params["sessionName"] as? String,
-        ).firstOrNull { !it.isNullOrBlank() } ?: "Теремок VPN"
+        ).firstOrNull { !it.isNullOrBlank() } ?: "Прокси Дом"
 
         val fromParams = (params["outboundType"] as? String)?.trim().orEmpty()
         val proto = when {
@@ -1083,7 +1083,7 @@ class TeremokVpnService : VpnService() {
         }
         val sessionName = (params["sessionName"] as? String)
             ?.takeIf { it.isNotBlank() }
-            ?: "Теремок VPN"
+            ?: "Прокси Дом"
         val mtu = 1280
         val address = (params["address"] as? String) ?: "10.255.255.1"
         val addressPrefix = (params["addressPrefix"] as? Number)?.toInt() ?: 30
@@ -1203,7 +1203,7 @@ class TeremokVpnService : VpnService() {
 
         val sessionName = (params["sessionName"] as? String)
             ?.takeIf { it.isNotBlank() }
-            ?: "Теремок VPN"
+            ?: "Прокси Дом"
         val carrierIp = readCarrierIpv4()
         // Hy2 QUIC overhead on LTE: 1500 inner packets fragment and stall
         // the first request of each page. Video then recovers via TCP MSS.

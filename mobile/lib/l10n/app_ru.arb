@@ -316,7 +316,7 @@
   "settingsQsTileAddHint": "Показать системный запрос на добавление плитки",
   "settingsQsTileAdded": "Плитка добавлена в шторку",
   "settingsQsTileAlreadyAdded": "Плитка уже в шторке — откройте панель и пролистайте",
-  "settingsQsTileManual": "Добавьте вручную: шторка → карандаш → «Теремок VPN»",
+  "settingsQsTileManual": "Добавьте вручную: шторка → карандаш → «Прокси Дом»",
   "settingsQsTileNotAdded": "Плитка не добавлена",
   "homeAbout": "О приложении",
   "homeConfigError": "Не удалось получить конфиг: {message}",

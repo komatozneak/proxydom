@@ -495,7 +495,7 @@
   "settingsQsTileAddHint": "Show the system prompt to pin the tile",
   "settingsQsTileAdded": "Tile added to Quick Settings",
   "settingsQsTileAlreadyAdded": "Tile already in Quick Settings — open the shade and scroll",
-  "settingsQsTileManual": "Add manually: shade → pencil → “Teremok VPN”",
+  "settingsQsTileManual": "Add manually: shade → pencil → “Proxy Dom”",
   "settingsQsTileNotAdded": "The tile was not added",
   "homeAbout": "About",
   "homeConfigError": "Failed to get config: {message}",

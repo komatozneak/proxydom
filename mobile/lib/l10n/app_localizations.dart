@@ -1702,7 +1702,7 @@ abstract class AppL10n {
   /// No description provided for @settingsQsTileManual.
   ///
   /// In en, this message translates to:
-  /// **'Add manually: shade → pencil → “Teremok VPN”'**
+  /// **'Add manually: shade → pencil → “Proxy Dom”'**
   String get settingsQsTileManual;
 
   /// No description provided for @settingsQsTileNotAdded.

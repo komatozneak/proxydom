@@ -884,7 +884,7 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get settingsQsTileManual =>
-      'Добавьте вручную: шторка → карандаш → «Теремок VPN»';
+      'Добавьте вручную: шторка → карандаш → «Прокси Дом»';
 
   @override
   String get settingsQsTileNotAdded => 'Плитка не добавлена';

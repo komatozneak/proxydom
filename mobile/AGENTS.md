@@ -1,6 +1,16 @@
-# Mobile AGENTS — Teremok Connect client
+# Mobile AGENTS — Прокси Дом
 
 Rules for AI agents working in `mobile/`. Complements root `AGENTS.md`.
+
+## Name
+
+Google Play: **Прокси Дом**. English name: **Proxy Dom**. Package **`com.proxy.dom`**. The Telegram bot stays **Теремок VPN**.
+Repo and domains stay `teremok` / `teremokconnect`. The Gradle `applicationId` slice is not landed yet. iOS bundle id is still `online.teremokconnect.app`.
+Name rule: `.cursor/rules/05-product-names.mdc`.
+
+## Dial set
+
+Working lines only: Hysteria2, Hysteria2 `obfs=salamander`, VLESS, VLESS Reality. Trojan, Shadowsocks, and VMess are out of the product. Policy: `docs/product-policy.md`.
 
 ## Brand / palette
 

@@ -58,7 +58,7 @@ class DiagnosticsService {
     final generatedUtc = DateTime.now().toUtc().toIso8601String();
     final packageInfo = await PackageInfo.fromPlatform();
     final appLabel =
-        'Теремок VPN ${packageInfo.version}+${packageInfo.buildNumber}';
+        'Прокси Дом ${packageInfo.version}+${packageInfo.buildNumber}';
 
     final nativeStatus = await _probe(
           VpnController.instance.getStatus(),

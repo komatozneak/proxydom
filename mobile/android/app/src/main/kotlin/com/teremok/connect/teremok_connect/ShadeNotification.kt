@@ -133,7 +133,7 @@ object ShadeNotification {
         val status = line.ifBlank { context.getString(R.string.vpn_notification_connected) }
         val builder = NotificationCompat.Builder(context, channel)
             .setSmallIcon(R.drawable.ic_stat_teremok)
-            .setContentTitle("Теремок VPN")
+            .setContentTitle("Прокси Дом")
             .setContentText(status)
             .setOngoing(true)
             .setOnlyAlertOnce(true)

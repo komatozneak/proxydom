@@ -17,6 +17,6 @@
         <activity
             android:name=".DebugVpnActivity"
             android:exported="true"
-            android:label="Teremok Debug VPN"/>
+            android:label="Прокси Дом Debug"/>
     </application>
 </manifest>

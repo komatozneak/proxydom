@@ -883,7 +883,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get settingsQsTileManual =>
-      'Add manually: shade → pencil → “Teremok VPN”';
+      'Add manually: shade → pencil → “Proxy Dom”';
 
   @override
   String get settingsQsTileNotAdded => 'The tile was not added';
