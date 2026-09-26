@@ -70,6 +70,7 @@ abstract final class AppIcons {
   static const IconData bug = PhosphorIconsRegular.bug;
   static const IconData notifications = PhosphorIconsRegular.bell;
   static const IconData chevronRight = PhosphorIconsRegular.caretRight;
+  static const IconData chevronLeft = PhosphorIconsRegular.caretLeft;
   static const IconData search = PhosphorIconsRegular.magnifyingGlass;
   static const IconData plus = PhosphorIconsRegular.plus;
   static const IconData trash = PhosphorIconsRegular.trash;

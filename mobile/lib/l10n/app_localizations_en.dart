@@ -104,7 +104,7 @@ class AppL10nEn extends AppL10n {
   }
 
   @override
-  String get homeNoVpnRow => 'What works without VPN?';
+  String get homeNoVpnRow => 'Allowlists';
 
   @override
   String get premiumHeadline => 'More locations';
@@ -142,10 +142,10 @@ class AppL10nEn extends AppL10n {
   String get locationsPremiumUnavailable => 'Available with Premium';
 
   @override
-  String get settingsNoVpn => 'What works without VPN?';
+  String get settingsNoVpn => 'Allowlists';
 
   @override
-  String get settingsNoVpnHint => 'Sites that skip the VPN';
+  String get settingsNoVpnHint => 'Apps and sites that go around';
 
   @override
   String get modesTitle => 'Mode';

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'app_icon.dart';
 
-/// Center bottom-nav mark: monochrome Living House circle with «VPN» cutout.
+/// Center bottom-nav mark: monochrome Living House circle with «DOM» cutout.
 ///
 /// Asset is already charcoal/white — do not [ColorFilter] it (would crush tones).
 /// Selected: full opacity + slight scale; idle: muted.
@@ -24,8 +24,9 @@ class TeremokNavIcon extends StatelessWidget {
     final theme = Theme.of(context);
 
     return AnimatedScale(
-      // Idle stays close to selected — both states read “larger than side tabs”.
-      scale: selected ? 1.0 : 0.96,
+      // One size in both states. A selected bump pushes the rim through the
+      // bar's top rule; selection is the ring color instead.
+      scale: 1,
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOut,
       child: AnimatedOpacity(
@@ -40,7 +41,7 @@ class TeremokNavIcon extends StatelessWidget {
             height: size,
             fit: BoxFit.contain,
             filterQuality: FilterQuality.high,
-            semanticLabel: 'VPN',
+            semanticLabel: 'DOM',
             errorBuilder: (_, __, ___) => AppIcon(
               selected ? AppIcons.houseFill : AppIcons.house,
               size: size * 0.72,

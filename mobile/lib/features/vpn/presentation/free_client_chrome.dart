@@ -128,7 +128,7 @@ class FreeClientEmptyState extends StatelessWidget {
   }
 }
 
-/// Structured connection facts. Not a paragraph under the house.
+/// Structured connection facts with notebook-style dots and ruled rows.
 class ConnectionStatusPanel extends StatelessWidget {
   const ConnectionStatusPanel({
     super.key,
@@ -149,58 +149,178 @@ class ConnectionStatusPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = AppL10n.of(context);
     final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    final rule = AppBrand.paperMargin.withValues(alpha: dark ? 0.55 : 0.72);
+    final mute = theme.colorScheme.onSurfaceVariant;
+
+    final rows = <({
+      String label,
+      String value,
+      bool underline,
+      bool emphasize,
+      Color? valueColor,
+    })>[
+      (
+        label: l.freeStatus,
+        value: status,
+        underline: true,
+        emphasize: true,
+        valueColor: accent,
+      ),
+      (
+        label: l.freeProfile,
+        value: profile,
+        underline: true,
+        emphasize: false,
+        valueColor: null,
+      ),
+      (
+        label: l.freeProtocol,
+        value: protocol,
+        underline: true,
+        emphasize: false,
+        valueColor: null,
+      ),
+      if (uptime != null)
+        (
+          label: l.freeUptime,
+          value: uptime!,
+          underline: false,
+          emphasize: false,
+          valueColor: accent,
+        ),
+    ];
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(AppBrand.radiusCard),
         border: Border.all(color: theme.colorScheme.outline),
       ),
-      child: Column(
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: Column(
+                children: [
+                  for (final row in rows)
+                    _NotebookHalf(
+                      text: row.label,
+                      align: TextAlign.start,
+                      underline: row.underline,
+                      rule: rule,
+                      leadingDot: true,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: mute,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Container(
+              width: 1.2,
+              margin: const EdgeInsets.symmetric(vertical: 2),
+              color: rule,
+            ),
+            Expanded(
+              child: Column(
+                children: [
+                  for (final row in rows)
+                    _NotebookHalf(
+                      text: row.value,
+                      align: TextAlign.end,
+                      underline: row.underline,
+                      rule: rule,
+                      trailingDot: true,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight:
+                            row.emphasize ? FontWeight.w800 : FontWeight.w700,
+                        color: row.valueColor,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NotebookHalf extends StatelessWidget {
+  const _NotebookHalf({
+    required this.text,
+    required this.align,
+    required this.underline,
+    required this.rule,
+    required this.style,
+    this.leadingDot = false,
+    this.trailingDot = false,
+  });
+
+  final String text;
+  final TextAlign align;
+  final bool underline;
+  final Color rule;
+  final TextStyle? style;
+  final bool leadingDot;
+  final bool trailingDot;
+
+  @override
+  Widget build(BuildContext context) {
+    final mute = Theme.of(context).colorScheme.onSurfaceVariant;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+      decoration: underline
+          ? BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: rule, width: 1.2),
+              ),
+            )
+          : null,
+      child: Row(
         children: [
-          _row(theme, l.freeStatus, status, emphasize: true, valueColor: accent),
-          _row(theme, l.freeProfile, profile),
-          _row(theme, l.freeProtocol, protocol),
-          if (uptime != null)
-            _row(theme, l.freeUptime, uptime!, valueColor: accent),
+          if (leadingDot) ...[
+            _NotebookDot(color: mute),
+            const SizedBox(width: 6),
+          ],
+          Expanded(
+            child: Text(
+              text,
+              textAlign: align,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: style,
+            ),
+          ),
+          if (trailingDot) ...[
+            const SizedBox(width: 6),
+            _NotebookDot(color: mute),
+          ],
         ],
       ),
     );
   }
+}
 
-  Widget _row(
-    ThemeData theme,
-    String label,
-    String value, {
-    bool emphasize = false,
-    Color? valueColor,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-          Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.end,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: emphasize ? FontWeight.w800 : FontWeight.w700,
-                color: valueColor,
-              ),
-            ),
-          ),
-        ],
+class _NotebookDot extends StatelessWidget {
+  const _NotebookDot({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 5,
+      height: 5,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.85),
+        shape: BoxShape.circle,
       ),
     );
   }

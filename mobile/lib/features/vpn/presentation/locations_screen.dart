@@ -144,12 +144,21 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
 
   Future<void> _load() async {
     if (freeKeyClient) {
+      // Paint the saved list before the subscription fetch. A 10s timeout
+      // on a saved URL must not hide paste behind the spinner.
       try {
-        await Hy2ImportStore.instance.refreshSavedUrl();
-      } on FormatException {
-        // Keep the last good list when the network fails.
+        await paintImportedServers(
+          readLocal: () => Hy2ImportStore.instance.load(),
+          refresh: () => Hy2ImportStore.instance.refreshSavedUrl(),
+          paint: (links) async {
+            if (!mounted) return;
+            await _applyImported(links);
+          },
+        );
+      } catch (_) {
+        if (!mounted) return;
+        setState(() => _loading = false);
       }
-      await _applyImported(await Hy2ImportStore.instance.load());
       return;
     }
     setState(() {
@@ -467,8 +476,9 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     }
   }
 
-  Future<void> _openPoolSheet(ShareCatalog catalog) async {
-    final theme = Theme.of(context);
+  ({List<int> premium, List<int> general}) _catalogLineIndexes(
+    ShareCatalog catalog,
+  ) {
     final premium = <int>[];
     final general = <int>[];
     for (final raw in catalog.lines) {
@@ -481,30 +491,20 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
         general.add(index);
       }
     }
-    await showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (sheetContext) {
-        final l = AppL10n.of(sheetContext);
-        return SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            children: [
-              if (premium.isNotEmpty) ...[
-                Text(l.freePoolMarked, style: theme.textTheme.titleSmall),
-                const SizedBox(height: 8),
-                for (final index in premium) _poolRow(index),
-                const SizedBox(height: 16),
-              ],
-              if (general.isNotEmpty) ...[
-                Text(l.freePoolGeneral, style: theme.textTheme.titleSmall),
-                const SizedBox(height: 8),
-                for (final index in general) _poolRow(index),
-              ],
-            ],
-          ),
-        );
-      },
+    return (premium: premium, general: general);
+  }
+
+  Widget _poolSection(ThemeData theme, String title, List<int> indexes) {
+    if (indexes.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: Text(title, style: theme.textTheme.titleSmall),
+        ),
+        for (final index in indexes) _poolRow(index),
+      ],
     );
   }
 
@@ -517,10 +517,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       title: Text(label.title),
       subtitle: Text(label.subtitle.isEmpty ? link.endpoint : label.subtitle),
       selected: selected,
-      onTap: () async {
-        Navigator.of(context).pop();
-        await _chooseImported(index);
-      },
+      onTap: () => _chooseImported(index),
     );
   }
 
@@ -545,6 +542,8 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
 
   Widget _catalogCard(ThemeData theme, AppL10n l, ShareCatalog catalog) {
     final title = catalog.title.trim().isEmpty ? l.freeServers : catalog.title;
+    final lines = _catalogLineIndexes(catalog);
+    final hasLines = lines.premium.isNotEmpty || lines.general.isNotEmpty;
     return Material(
       color: theme.colorScheme.surfaceContainerHighest,
       clipBehavior: Clip.antiAlias,
@@ -552,79 +551,91 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
         borderRadius: BorderRadius.circular(AppBrand.radiusCard),
         side: BorderSide(color: theme.colorScheme.outline),
       ),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: InkWell(
-                onTap: () => _openPoolSheet(catalog),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      catalog.lines.length > 1
-                          ? '$title · ${catalog.lines.length}'
-                          : title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        catalog.lines.length > 1
+                            ? '$title · ${catalog.lines.length}'
+                            : title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
+                VerticalDivider(
+                  width: 1,
+                  thickness: 1,
+                  color: theme.colorScheme.outline,
+                ),
+                _catalogIconButton(
+                  tooltip: l.freeSharePool,
+                  onTap: () => _shareCatalog(catalog),
+                  icon: const AppIcon(AppIcons.qrCode, size: 20),
+                ),
+                if (catalog.url != null && catalog.url!.isNotEmpty) ...[
+                  VerticalDivider(
+                    width: 1,
+                    thickness: 1,
+                    color: theme.colorScheme.outline,
+                  ),
+                  _catalogIconButton(
+                    tooltip: l.freeRefresh,
+                    onTap: _refreshing.contains(catalog.id)
+                        ? null
+                        : () => _refreshCatalog(catalog),
+                    icon: _refreshing.contains(catalog.id)
+                        ? SizedBox.square(
+                            dimension: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: theme.colorScheme.primary,
+                              constraints: const BoxConstraints.tightFor(
+                                width: 20,
+                                height: 20,
+                              ),
+                            ),
+                          )
+                        : const AppIcon(AppIcons.refresh, size: 20),
+                  ),
+                ],
+                VerticalDivider(
+                  width: 1,
+                  thickness: 1,
+                  color: theme.colorScheme.outline,
+                ),
+                _catalogIconButton(
+                  tooltip: l.freeDelete,
+                  onTap: () => _deleteProfile(catalog.id),
+                  icon: const AppIcon(AppIcons.trash, size: 20),
+                ),
+              ],
             ),
-            VerticalDivider(
-              width: 1,
+          ),
+          if (hasLines) ...[
+            Divider(
+              height: 1,
               thickness: 1,
               color: theme.colorScheme.outline,
             ),
-            _catalogIconButton(
-              tooltip: l.freeSharePool,
-              onTap: () => _shareCatalog(catalog),
-              icon: const AppIcon(AppIcons.qrCode, size: 20),
-            ),
-            if (catalog.url != null && catalog.url!.isNotEmpty) ...[
-              VerticalDivider(
-                width: 1,
-                thickness: 1,
-                color: theme.colorScheme.outline,
-              ),
-              _catalogIconButton(
-                tooltip: l.freeRefresh,
-                onTap: _refreshing.contains(catalog.id)
-                    ? null
-                    : () => _refreshCatalog(catalog),
-                icon: _refreshing.contains(catalog.id)
-                    ? SizedBox.square(
-                        dimension: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: theme.colorScheme.primary,
-                          constraints: const BoxConstraints.tightFor(
-                            width: 20,
-                            height: 20,
-                          ),
-                        ),
-                      )
-                    : const AppIcon(AppIcons.refresh, size: 20),
-              ),
-            ],
-            VerticalDivider(
-              width: 1,
-              thickness: 1,
-              color: theme.colorScheme.outline,
-            ),
-            _catalogIconButton(
-              tooltip: l.freeDelete,
-              onTap: () => _deleteProfile(catalog.id),
-              icon: const AppIcon(AppIcons.trash, size: 20),
-            ),
+            _poolSection(theme, l.freePoolMarked, lines.premium),
+            _poolSection(theme, l.freePoolGeneral, lines.general),
+            const SizedBox(height: 8),
           ],
-        ),
+        ],
       ),
     );
   }

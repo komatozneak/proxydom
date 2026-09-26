@@ -981,3 +981,33 @@ String? _text(Object? raw) {
   if (raw is! String || raw.trim().isEmpty) return null;
   return raw.trim();
 }
+
+/// Show saved servers before refreshing their documents.
+///
+/// The Servers tab must paint [readLocal] before [refresh]. A refresh that
+/// hangs or throws leaves that paint in place, so paste stays reachable
+/// while a saved URL times out.
+Future<void> paintImportedServers({
+  required Future<List<ParsedShareLink>> Function() readLocal,
+  required Future<void> Function() refresh,
+  required Future<void> Function(List<ParsedShareLink> links) paint,
+}) async {
+  List<ParsedShareLink> local;
+  try {
+    local = await readLocal();
+  } catch (_) {
+    await paint(const []);
+    return;
+  }
+  await paint(local);
+  try {
+    await refresh();
+  } catch (_) {
+    return;
+  }
+  try {
+    await paint(await readLocal());
+  } catch (_) {
+    // The first paint already cleared the spinner.
+  }
+}

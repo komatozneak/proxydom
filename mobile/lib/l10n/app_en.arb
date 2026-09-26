@@ -55,7 +55,7 @@
       "limit": {"type": "String"}
     }
   },
-  "homeNoVpnRow": "What works without VPN?",
+  "homeNoVpnRow": "Allowlists",
   "@homeNoVpnRow": {},
   "premiumHeadline": "More locations",
   "@premiumHeadline": {},
@@ -79,9 +79,9 @@
   "@locationsPremiumLocked": {},
   "locationsPremiumUnavailable": "Available with Premium",
   "@locationsPremiumUnavailable": {},
-  "settingsNoVpn": "What works without VPN?",
+  "settingsNoVpn": "Allowlists",
   "@settingsNoVpn": {},
-  "settingsNoVpnHint": "Sites that skip the VPN",
+  "settingsNoVpnHint": "Apps and sites that go around",
   "@settingsNoVpnHint": {},
   "modesTitle": "Mode",
   "modesSubtitle": "How VPN works",
