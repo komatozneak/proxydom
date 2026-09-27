@@ -141,7 +141,6 @@ class _MainShellState extends ConsumerState<MainShell> {
           backgroundColor: freeKeyClient ? paper : theme.colorScheme.surface,
           body: freeKeyClient
               ? _PaperStatusScrim(
-                  paper: paper,
                   dark: theme.brightness == Brightness.dark,
                   child: NotebookPaper(child: widget.navigationShell),
                 )
@@ -189,26 +188,20 @@ class _MainShellState extends ConsumerState<MainShell> {
   }
 }
 
-/// Darker band behind the system status icons so they do not melt into the sheet.
+/// Status band. Same sheet as the bar under Сервера / Home / Настройки.
+/// The margin rule sits on the bottom edge, facing the page.
 class _PaperStatusScrim extends StatelessWidget {
   const _PaperStatusScrim({
-    required this.paper,
     required this.dark,
     required this.child,
   });
 
-  final Color paper;
   final bool dark;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
     final top = MediaQuery.paddingOf(context).top;
-    // Same honey as the mid ring behind the house, not a dark slab.
-    final scrim = Color.alphaBlend(
-      AppBrand.flame.withValues(alpha: dark ? 0.22 : 0.16),
-      paper,
-    );
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
@@ -224,7 +217,20 @@ class _PaperStatusScrim extends StatelessWidget {
               left: 0,
               right: 0,
               height: top,
-              child: ColoredBox(color: scrim),
+              child: NotebookPaper(
+                emphasized: true,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(
+                        color: AppBrand.paperMargin.withValues(alpha: 0.72),
+                        width: _navBarRuleWidth,
+                      ),
+                    ),
+                  ),
+                  child: const SizedBox.expand(),
+                ),
+              ),
             ),
         ],
       ),
