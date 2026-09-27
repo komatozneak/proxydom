@@ -79,11 +79,11 @@ jobs:
           debug = "${{ github.event.inputs.debug_build }}" == "true"
           variant = "debug" if debug else "release"
           expected = (
-              "com.teremok.connect.teremok_connect.debug"
+              "com.proxy.dom.debug"
               if debug
-              else "com.teremok.connect.teremok_connect.ci"
+              else "com.proxy.dom.ci"
           )
-          forbidden = "com.teremok.connect.teremok_connect"
+          forbidden = "com.proxy.dom"
           candidates = list(pathlib.Path("build/app/outputs").rglob("output-metadata.json"))
           matches = [p for p in candidates if variant in p.parts]
           meta_path = matches[0] if matches else (candidates[0] if candidates else None)

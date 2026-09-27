@@ -5,7 +5,7 @@
 #   .\build-sideload.ps1
 
 $ErrorActionPreference = "Stop"
-$ProductionPackage = "com.teremok.connect.teremok_connect"
+$ProductionPackage = "com.proxy.dom"
 $RequiredAbis = @("arm64-v8a", "armeabi-v7a", "x86_64")
 
 $androidDir = $PSScriptRoot
