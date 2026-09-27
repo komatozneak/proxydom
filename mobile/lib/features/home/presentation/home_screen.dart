@@ -31,6 +31,7 @@ import '../../vpn/domain/vpn_connect_error.dart';
 import '../../vpn/presentation/free_client_chrome.dart';
 import '../../vpn/presentation/vpn_disclosure_dialog.dart';
 import '../../vpn/presentation/vpn_platform_copy.dart';
+import '../../vpn/presentation/windows_share_qr.dart';
 import '../data/battery_prompt_prefs.dart';
 import '../application/vpn_provider.dart';
 import '../application/vpn_status.dart';
@@ -167,8 +168,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   /// iOS: one-shot enable all Sites «Основные» (NoVPN UI is hidden).
   Future<void> _refreshNoVpnCounter() async {
     if (kIsWeb) return;
-    if (iosAppsSplitUnsupported) {
-      await SplitTunnelPrefs.ensureIosSitesAllEnabledIfNeeded();
+    if (iosAppsSplitUnsupported || windowsDesktop) {
+      if (iosAppsSplitUnsupported) {
+        await SplitTunnelPrefs.ensureIosSitesAllEnabledIfNeeded();
+      }
       return;
     }
     try {
@@ -744,6 +747,8 @@ class _FreeClientHome extends StatelessWidget {
         l.homeVpnConflictTitle,
       VpnError(:final code) when code == kVpnProbeFailedErrorCode =>
         l.homeVpnProbeFailedTitle,
+      VpnError(:final code, :final message) when code == 'windows_notice' =>
+        message,
       VpnError() => l.homeError,
       VpnDisconnected() => l.homeDisconnected,
     };
@@ -758,6 +763,7 @@ class _FreeClientHome extends StatelessWidget {
         l.homeVpnProbeFailedHint(
           message.isNotEmpty ? message : l.homeRegion,
         ),
+      VpnError(:final code) when code == 'windows_notice' => null,
       VpnError(:final code) when code == 'permission_denied' =>
         homeVpnPermissionHintForPlatform(l),
       VpnError(:final code) when code == kVpnPathIncompatibleErrorCode =>
@@ -869,7 +875,7 @@ class _FreeClientHome extends StatelessWidget {
           },
           onScan: () {
             UiLog.action('home', 'scan');
-            context.push('/scan');
+            openFreeClientCapture(context);
           },
         ),
       ],

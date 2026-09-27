@@ -1,0 +1,55 @@
+#pragma once
+
+#include <cstdint>
+#include <string>
+#include <vector>
+
+// Share-line to sing-box config for ADR 029. No Win32 types in this header.
+
+constexpr std::uint32_t kFrameMaxBody = 4096;
+
+struct ShareLine {
+  std::string scheme;
+  std::string host;
+  std::string password;
+  std::string uuid;
+  std::string obfs;
+  std::string obfs_password;
+  std::string sni;
+  std::string server_ports;
+  std::string hop_interval;
+  std::string flow;
+  std::string security;
+  std::string public_key;
+  std::string short_id;
+  std::string fingerprint;
+  int port = 443;
+  bool insecure = false;
+};
+
+struct ClientCommand {
+  std::string command;
+  std::string uri;
+  std::string message;
+  int protocol_version = 0;
+  std::int64_t generation = 0;
+  std::vector<std::string> direct_domains;
+};
+
+std::string encode_frame(const std::string& json);
+// Pulls one frame from [buffer]. Returns false on a hard framing error.
+bool take_frame(std::string& buffer, std::string& json, std::string& error);
+
+bool parse_command(const std::string& json, ClientCommand& out, std::string& error);
+bool parse_share_line(const std::string& uri, ShareLine& out, std::string& error);
+bool own_adapter_name(const std::wstring& name);
+bool domain_allowed(const std::string& host);
+
+// [server_ip] is the IPv4 pinned before the adapter comes up. Empty rejects.
+std::string build_singbox_config(const ShareLine& line,
+                                 const std::string& server_ip,
+                                 const std::vector<std::string>& domains);
+
+std::string state_event(std::int64_t generation,
+                        const std::string& state,
+                        const std::string* message);

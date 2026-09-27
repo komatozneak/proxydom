@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:ui' show AppExitResponse;
 
 import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/app_locale.dart';
+import 'core/ios_store_gates.dart';
 import 'core/router.dart';
 import 'core/theme.dart';
 import 'core/updates/update_check_service.dart';
@@ -12,6 +14,7 @@ import 'features/settings/application/locale_provider.dart';
 import 'features/settings/application/theme_mode_provider.dart';
 import 'features/vpn/data/hy2_link_parser.dart';
 import 'features/vpn/data/subscription_link_inbox.dart';
+import 'features/vpn/data/windows_tunnel.dart';
 import 'l10n/app_localizations.dart';
 
 export 'core/app_locale.dart' show AppLocale;
@@ -26,7 +29,7 @@ class TeremokApp extends ConsumerWidget {
     final locale = ref.watch(localeProvider).valueOrNull ?? AppLocale.current;
 
     return MaterialApp.router(
-      title: 'Teremok Connect',
+      title: windowsDesktop ? 'Прокси Дом' : 'Teremok Connect',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
@@ -36,7 +39,10 @@ class TeremokApp extends ConsumerWidget {
       localizationsDelegates: AppL10n.localizationsDelegates,
       routerConfig: AppRouter.config,
       builder: (context, child) {
-        return _UpdateCheckHost(child: child ?? const SizedBox.shrink());
+        final page = child ?? const SizedBox.shrink();
+        return _UpdateCheckHost(
+          child: windowsDesktop ? _WindowsExit(child: page) : page,
+        );
       },
     );
   }
@@ -94,6 +100,34 @@ class _UpdateCheckHostState extends State<_UpdateCheckHost> {
   @override
   void dispose() {
     _links?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
+/// Closing the window disconnects. Minimizing does not (ADR 029).
+class _WindowsExit extends StatefulWidget {
+  const _WindowsExit({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_WindowsExit> createState() => _WindowsExitState();
+}
+
+class _WindowsExitState extends State<_WindowsExit> {
+  late final AppLifecycleListener _listener = AppLifecycleListener(
+    onExitRequested: () async {
+      await WindowsTunnel.instance.disconnect();
+      return AppExitResponse.exit;
+    },
+  );
+
+  @override
+  void dispose() {
+    _listener.dispose();
     super.dispose();
   }
 

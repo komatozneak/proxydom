@@ -17,6 +17,7 @@ import '../../../core/widgets/location_flag_icon.dart';
 import '../../../core/widgets/teremok_snackbar.dart';
 import '../../../l10n/app_localizations.dart';
 import 'vpn_platform_copy.dart';
+import 'windows_share_qr.dart';
 import '../../home/application/vpn_provider.dart';
 import '../../home/application/vpn_status.dart';
 import '../application/imported_profiles_provider.dart';
@@ -671,7 +672,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
               },
               onScan: () {
                 UiLog.action('locations', 'scan');
-                context.push('/scan');
+                openFreeClientCapture(context);
               },
             ),
           ),
@@ -743,7 +744,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
             },
             onScan: () {
               UiLog.action('locations', 'scan');
-              context.push('/scan');
+              openFreeClientCapture(context);
             },
           ),
         ),

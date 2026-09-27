@@ -12,6 +12,7 @@ import 'subscription_device.dart';
 import 'subscription_label.dart';
 import 'subscription_notice.dart';
 import 'subscription_traffic.dart';
+import '../../../core/ios_store_gates.dart';
 
 const _prefsKey = 'hy2_import_v1';
 
@@ -646,7 +647,25 @@ class Hy2ImportStore {
     }
   }
 
+  Future<File> _windowsDocumentsFile() async {
+    final root = Platform.environment['LOCALAPPDATA'];
+    final dir = Directory('${root ?? '.'}${Platform.pathSeparator}ProxyDom${Platform.pathSeparator}storage');
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+    return File('${dir.path}${Platform.pathSeparator}documents.json');
+  }
+
   Future<_Blob> _read() async {
+    if (windowsDesktop) {
+      final file = await _windowsDocumentsFile();
+      if (!await file.exists()) return const _Blob();
+      final raw = await file.readAsString();
+      if (raw.isEmpty) return const _Blob();
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return const _Blob();
+      return _Blob.fromJson(decoded);
+    }
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_prefsKey);
     if (raw == null || raw.isEmpty) return const _Blob();
@@ -656,18 +675,28 @@ class Hy2ImportStore {
   }
 
   Future<void> _write(_Blob blob) async {
-    final prefs = await SharedPreferences.getInstance();
     final catalogs = [
       for (final catalog in blob.catalogs)
         if (catalog.lines.isNotEmpty) catalog,
     ];
-    if (catalogs.isEmpty) {
+    final encoded = catalogs.isEmpty
+        ? null
+        : jsonEncode(blob.copyWith(catalogs: catalogs).toJson());
+    if (windowsDesktop) {
+      final file = await _windowsDocumentsFile();
+      if (encoded == null) {
+        if (await file.exists()) await file.delete();
+      } else {
+        await file.writeAsString(encoded);
+      }
+      _changed();
+      return;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    if (encoded == null) {
       await prefs.remove(_prefsKey);
     } else {
-      await prefs.setString(
-        _prefsKey,
-        jsonEncode(blob.copyWith(catalogs: catalogs).toJson()),
-      );
+      await prefs.setString(_prefsKey, encoded);
     }
     _changed();
   }

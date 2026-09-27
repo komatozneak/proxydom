@@ -14,6 +14,10 @@ class AutoReconnectPrefs {
   /// Account client: default ON. Imported-profile clients delegate recovery to
   /// their native VPN session engine.
   static Future<bool> isEnabled() async {
+    if (windowsDesktop) {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getBool(_key) ?? false;
+    }
     // Imported-profile clients let the native session engine own recovery.
     // A second Flutter reconnect races native dead-tunnel restore.
     if (freeKeyClient) return false;

@@ -15,6 +15,7 @@ import '../../vpn/data/subscription_device.dart';
 import '../../vpn/data/subscription_label.dart';
 import '../../vpn/data/vpn_config.dart';
 import '../../vpn/data/vpn_controller.dart';
+import '../../vpn/data/windows_tunnel.dart';
 import '../../vpn/data/vpn_nodes_repository.dart';
 import '../../vpn/data/vpn_service_config.dart';
 import '../../vpn/data/vpn_session_meta.dart';
@@ -447,6 +448,12 @@ class VpnNotifier extends Notifier<VpnStatus> {
 
   /// When [VpnController.start] returns false — often establish blocked by another VPN.
   Future<VpnError> _errorForStartFailure() async {
+    if (windowsDesktop) {
+      final notice = VpnController.instance.windowsNotice;
+      if (notice != null && notice.isNotEmpty) {
+        return VpnError(message: notice, code: 'windows_notice');
+      }
+    }
     final conflict = await VpnController.instance.queryVpnConflict();
     if (conflict.foreignAlwaysOn) {
       return _vpnErrorFromConflict(conflict);
@@ -901,6 +908,14 @@ class VpnNotifier extends Notifier<VpnStatus> {
   }) async {
     // Deduplicate concurrent connect() (auto-reconnect + nest tap).
     _suppressAutoReconnect = false;
+    if (windowsDesktop) {
+      WindowsTunnel.instance.onLinkLost = () {
+        if (_suppressAutoReconnect) return;
+        unawaited(AutoReconnectPrefs.isEnabled().then((enabled) {
+          if (enabled) unawaited(connect());
+        }));
+      };
+    }
     if (!wifiRetry) {
       _cancelWifiRetry();
       _wifiAutoRetryUsed = false;
@@ -1103,11 +1118,15 @@ class VpnNotifier extends Notifier<VpnStatus> {
           final dial = _dialGen == 0 ? ++_dialGen : _dialGen;
           _handshakeHost = imported.endpoint;
           _nativeGenFloor = _lastNativeGen;
-          final raw = await VpnController.instance.startHysteria(
-            profile,
-            displayLabel: shown.title,
-          );
+          final raw = windowsDesktop
+              ? await VpnController.instance.startWindowsShare(imported.raw)
+              : await VpnController.instance.startHysteria(
+                  profile,
+                  displayLabel: shown.title,
+                );
           started = raw && _dialGen == dial;
+        } else if (windowsDesktop && windowsDialScheme(imported.scheme)) {
+          started = await VpnController.instance.startWindowsShare(imported.raw);
         } else if (canDialScheme(imported.scheme, ios: false) &&
             defaultTargetPlatform == TargetPlatform.android) {
           final xrayJson = buildXraySocksConfig(imported);
@@ -1124,6 +1143,13 @@ class VpnNotifier extends Notifier<VpnStatus> {
             xrayJson,
             displayLabel: shown.title,
           );
+        } else if (windowsDesktop) {
+          SessionTrace.mark('fail', {'code': 'share_unsupported'});
+          state = const VpnError(
+            message: 'share_unsupported',
+            code: 'share_unsupported',
+          );
+          return;
         } else {
           SessionTrace.mark('fail', {'code': 'share_ios_hy2_only'});
           state = const VpnError(
@@ -1136,6 +1162,14 @@ class VpnNotifier extends Notifier<VpnStatus> {
         if (!started) {
           SessionTrace.mark('fail', {'code': 'start'});
           state = await _errorForStartFailure();
+          return;
+        }
+        if (windowsDesktop) {
+          state = VpnConnected(
+            serverName: shown.title,
+            protocol: imported.scheme,
+            connectedSince: DateTime.now(),
+          );
           return;
         }
         SessionTrace.mark('vpn_service');

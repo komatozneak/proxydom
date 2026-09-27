@@ -38,8 +38,8 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
   bool _osnovnyeExpanded = true;
   bool _lockdownOn = false;
 
-  /// Apps tab is Android-only (see [iosAppsSplitUnsupported]).
-  bool get _sitesOnly => iosAppsSplitUnsupported;
+  /// Apps tab is Android-only (ADR 025, ADR 029).
+  bool get _sitesOnly => sitesOnlySplit;
 
   Map<String, bool> _osnovnye = {
     for (final c in kOsnovnyeCategories) c.id: c.defaultEnabled,

@@ -15,4 +15,14 @@ void main() {
     expect(masked, contains('vpn.phase'));
     expect(masked, contains('core.xray'));
   });
+
+  test('export masks a share secret and keeps the host', () {
+    const raw = 'dial hysteria2://secret+pass@cdn.example:443 '
+        'vless://11111111-2222-3333-4444-555555555555@edge.example:443';
+    final masked = redactTunnelLog(raw);
+    expect(masked.contains('secret+pass'), isFalse);
+    expect(masked.contains('11111111-2222-3333-4444-555555555555'), isFalse);
+    expect(masked, contains('hysteria2://***@cdn.example:443'));
+    expect(masked, contains('vless://***@edge.example:443'));
+  });
 }

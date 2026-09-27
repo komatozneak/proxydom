@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+  <Package
+      Name="Прокси Дом"
+      Manufacturer="Proxy Dom"
+      Version="$(var.ProductVersion)"
+      UpgradeCode="7C2A1B4E-6D3F-4A91-9E2B-1F6C8A0D4E27"
+      Scope="perMachine"
+      Language="1049"
+      Codepage="1251">
+    <MajorUpgrade DowngradeErrorMessage="Уже установлена более новая версия." />
+    <MediaTemplate EmbedCab="yes" />
+    <Icon Id="AppIcon" SourceFile="$(var.PayloadDir)\proxy_dom.exe" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Запустить Прокси Дом" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(var.InstallerDir)\license.rtf" />
+
+    <Feature Id="Main" Title="Прокси Дом" Level="1">
+      <ComponentGroupRef Id="AppFiles" />
+      <ComponentRef Id="ServiceComponent" />
+      <ComponentRef Id="StartMenuComponent" />
+    </Feature>
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Proxy Dom" />
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ProgramMenuDir" Name="Прокси Дом" />
+    </StandardDirectory>
+
+    <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
+      <Files Include="$(var.PayloadDir)\**">
+        <Exclude Files="$(var.PayloadDir)\ProxyDomTunnelService.exe" />
+      </Files>
+    </ComponentGroup>
+
+    <Component Id="ServiceComponent" Directory="INSTALLFOLDER" Guid="A7E3C1D2-4B58-4F0A-9C21-6D8E5B0A11F4">
+      <File Id="ServiceExe" Source="$(var.PayloadDir)\ProxyDomTunnelService.exe" KeyPath="yes" />
+      <ServiceInstall
+          Id="ProxyDomTunnelServiceInstall"
+          Name="ProxyDomTunnelService"
+          DisplayName="Прокси Дом"
+          Description="Локальный туннель Прокси Дом"
+          Start="auto"
+          Type="ownProcess"
+          Account="LocalSystem"
+          ErrorControl="normal"
+          Vital="yes" />
+      <ServiceControl
+          Id="ProxyDomTunnelServiceControl"
+          Name="ProxyDomTunnelService"
+          Start="install"
+          Stop="both"
+          Remove="uninstall"
+          Wait="yes" />
+    </Component>
+
+    <Component Id="StartMenuComponent" Directory="ProgramMenuDir" Guid="B8F4D2E3-5C69-401B-8D32-7E9F6C1B22A5">
+      <Shortcut
+          Id="StartMenuShortcut"
+          Name="Прокси Дом"
+          Description="Прокси Дом"
+          Target="[INSTALLFOLDER]proxy_dom.exe"
+          WorkingDirectory="INSTALLFOLDER" />
+      <RemoveFolder Id="RemoveProgramMenuDir" On="uninstall" />
+      <RegistryValue
+          Root="HKLM"
+          Key="Software\Proxy Dom"
+          Name="Installed"
+          Type="integer"
+          Value="1"
+          KeyPath="yes" />
+    </Component>
+
+    <util:CloseApplication
+        Id="CloseProxyDom"
+        Target="proxy_dom.exe"
+        Description="Прокси Дом"
+        CloseMessage="yes"
+        EndSessionMessage="yes"
+        RebootPrompt="no"
+        TerminateProcess="1" />
+
+    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+    <UI>
+      <Publish
+          Dialog="ExitDialog"
+          Control="Finish"
+          Event="DoAction"
+          Value="LaunchApplication"
+          Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 and NOT Installed" />
+    </UI>
+    <CustomAction
+        Id="LaunchApplication"
+        Directory="INSTALLFOLDER"
+        ExeCommand="&quot;[INSTALLFOLDER]proxy_dom.exe&quot;"
+        Execute="immediate"
+        Impersonate="yes"
+        Return="asyncNoWait" />
+  </Package>
+</Wix>

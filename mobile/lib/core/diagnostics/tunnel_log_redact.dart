@@ -10,5 +10,15 @@ String maskTunnelIpv4(String text) {
   });
 }
 
+final _shareSecret = RegExp(
+  r'(hysteria2|hy2|vless)://[^@\s/]+@',
+  caseSensitive: false,
+);
+
 /// Copy and export use the same mask as the buffer. Already-masked text is stable.
-String redactTunnelLog(String text) => maskTunnelIpv4(text);
+String redactTunnelLog(String text) {
+  final secrets = text.replaceAllMapped(_shareSecret, (match) {
+    return '${match.group(1)}://***@';
+  });
+  return maskTunnelIpv4(secrets);
+}

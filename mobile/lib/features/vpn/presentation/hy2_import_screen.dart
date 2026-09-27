@@ -19,6 +19,7 @@ import '../data/subscription_device.dart';
 import '../data/subscription_label.dart';
 import '../data/subscription_link_inbox.dart';
 import 'free_client_chrome.dart';
+import 'windows_share_qr.dart';
 import 'pool_server_mark.dart';
 
 /// Add a link or key, preview the profiles, then save or connect.
@@ -297,7 +298,7 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
                         onPaste: _pasteClipboard,
                         onScan: () {
                           UiLog.action('import', 'scan');
-                          context.push('/scan');
+                          openFreeClientCapture(context);
                         },
                       ),
                       if (_loadingPreview) ...[
