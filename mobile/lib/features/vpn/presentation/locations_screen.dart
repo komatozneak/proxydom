@@ -23,8 +23,10 @@ import '../application/imported_profiles_provider.dart';
 import '../data/hy2_import_store.dart';
 import '../data/route_document.dart';
 import '../data/subscription_label.dart';
+import '../data/subscription_notice.dart';
 import 'free_client_chrome.dart';
 import 'pool_server_mark.dart';
+import 'subscription_notice_view.dart';
 import '../data/share_link_parser.dart';
 import '../data/node_auto_selector.dart';
 import '../data/node_display.dart';
@@ -497,11 +499,6 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       subtitle: Text(label.subtitle.isEmpty ? link.endpoint : label.subtitle),
       selected: selected,
       onTap: () => _chooseImported(index),
-      trailing: IconButton(
-        tooltip: AppL10n.of(context).freeDelete,
-        onPressed: () => _removeImported(index),
-        icon: const AppIcon(AppIcons.trash, size: 20),
-      ),
     );
   }
 
@@ -528,6 +525,13 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     final title = catalog.title.trim().isEmpty ? l.freeServers : catalog.title;
     final lines = _catalogLineIndexes(catalog);
     final hasLines = lines.premium.isNotEmpty || lines.general.isNotEmpty;
+    final notice = profileNotice(
+      announce: catalog.announce,
+      supportUrl: catalog.supportUrl,
+      announceFrame: catalog.announceFrame,
+      documentUrl: catalog.url,
+      trafficMeta: catalog.trafficMeta,
+    );
     return Material(
       color: theme.colorScheme.surfaceContainerHighest,
       clipBehavior: Clip.antiAlias,
@@ -609,6 +613,15 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
               ],
             ),
           ),
+          if (notice.visible)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 4, 12),
+              child: SubscriptionNoticeView(
+                text: notice.text,
+                planeUrl: notice.planeUrl,
+                frame: notice.frame,
+              ),
+            ),
           if (hasLines) ...[
             Divider(
               height: 1,

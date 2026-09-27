@@ -10,6 +10,7 @@ import 'route_document.dart';
 import 'share_link_parser.dart';
 import 'subscription_device.dart';
 import 'subscription_label.dart';
+import 'subscription_notice.dart';
 import 'subscription_traffic.dart';
 
 const _prefsKey = 'hy2_import_v1';
@@ -30,6 +31,7 @@ class ShareCatalog {
     this.webPageUrl,
     this.supportUrl,
     this.announce,
+    this.announceFrame = false,
   });
 
   final String id;
@@ -57,6 +59,10 @@ class ShareCatalog {
   final String? supportUrl;
   final String? announce;
 
+  /// Rounded border around [announce]. A saved list from before this field
+  /// still frames the text: that is how Happ draws every announcement.
+  final bool announceFrame;
+
   ShareCatalog copyWith({
     String? title,
     List<String>? lines,
@@ -70,6 +76,7 @@ class ShareCatalog {
     Object? webPageUrl = _keep,
     Object? supportUrl = _keep,
     Object? announce = _keep,
+    Object? announceFrame = _keep,
   }) {
     return ShareCatalog(
       id: id,
@@ -98,6 +105,9 @@ class ShareCatalog {
           : supportUrl as String?,
       announce:
           identical(announce, _keep) ? this.announce : announce as String?,
+      announceFrame: identical(announceFrame, _keep)
+          ? this.announceFrame
+          : announceFrame as bool,
     );
   }
 }
@@ -172,6 +182,7 @@ class Hy2ImportStore {
               webPageUrl: catalog.webPageUrl,
               supportUrl: catalog.supportUrl,
               announce: catalog.announce,
+              announceFrame: catalog.announceFrame,
               url: catalog.url,
             ),
           );
@@ -398,12 +409,14 @@ class Hy2ImportStore {
     final String? etag;
     final String? trafficMeta;
     final String? hwidMaxDevices;
+    final SubscriptionNotice notice;
     if (target == null) {
       body = text;
       profileTitle = null;
       etag = null;
       trafficMeta = subscriptionTrafficMeta(body: text);
       hwidMaxDevices = null;
+      notice = subscriptionNotice(body: text);
     } else {
       final fetched = await _fetch(target.url);
       body = fetched.body;
@@ -414,6 +427,7 @@ class Hy2ImportStore {
         header: fetched.userInfo,
         body: fetched.body,
       );
+      notice = fetched.notice;
     }
     final links = _linesToKeep(
       parseShareSubscription(body),
@@ -445,6 +459,9 @@ class Hy2ImportStore {
             saved: previous.trafficMeta,
           ),
           lastUpdated: DateTime.now().toUtc().toIso8601String(),
+          supportUrl: notice.planeUrl,
+          announce: notice.text,
+          announceFrame: notice.frame,
         );
       } else {
         catalogs.add(
@@ -457,6 +474,9 @@ class Hy2ImportStore {
             fallbackTitle: target.title,
             trafficMeta: keptTrafficMeta(observed: trafficMeta),
             lastUpdated: DateTime.now().toUtc().toIso8601String(),
+            supportUrl: notice.planeUrl,
+            announce: notice.text,
+            announceFrame: notice.frame,
           ),
         );
       }
@@ -476,6 +496,9 @@ class Hy2ImportStore {
           title: title,
           lines: incoming,
           trafficMeta: trafficMeta,
+          supportUrl: notice.planeUrl,
+          announce: notice.text,
+          announceFrame: notice.frame,
         ),
       );
     }
@@ -576,6 +599,12 @@ class Hy2ImportStore {
       );
       final redirect = response.headers.value('new-url') ??
           response.headers.value('fallback-url');
+      final notice = subscriptionNotice(
+        announceHeader: response.headers.value('announce'),
+        supportHeader: response.headers.value('support-url'),
+        frameHeader: response.headers.value('announce-frame'),
+        body: body,
+      );
       return _Fetched(
         body: body,
         profileTitle:
@@ -588,8 +617,10 @@ class Hy2ImportStore {
           response.headers.value('profile-update-interval'),
         ),
         webPageUrl: response.headers.value('profile-web-page-url'),
-        supportUrl: response.headers.value('support-url'),
-        announce: response.headers.value('announce'),
+        supportUrl: notice.planeUrl,
+        announce: notice.text,
+        announceFrame: notice.frame,
+        notice: notice,
         redirectUrl: redirect,
       );
     } on SocketException catch (e) {
@@ -668,6 +699,8 @@ class _Fetched {
     this.webPageUrl,
     this.supportUrl,
     this.announce,
+    this.announceFrame = false,
+    this.notice = const SubscriptionNotice(),
     this.redirectUrl,
   });
 
@@ -681,6 +714,8 @@ class _Fetched {
   final String? webPageUrl;
   final String? supportUrl;
   final String? announce;
+  final bool announceFrame;
+  final SubscriptionNotice notice;
   final String? redirectUrl;
 }
 
@@ -696,6 +731,7 @@ class _Pulled {
     this.webPageUrl,
     this.supportUrl,
     this.announce,
+    this.announceFrame = false,
   });
 
   factory _Pulled.fromCatalog(ShareCatalog catalog) {
@@ -710,6 +746,7 @@ class _Pulled {
       webPageUrl: catalog.webPageUrl,
       supportUrl: catalog.supportUrl,
       announce: catalog.announce,
+      announceFrame: catalog.announceFrame,
     );
   }
 
@@ -723,6 +760,7 @@ class _Pulled {
   final String? webPageUrl;
   final String? supportUrl;
   final String? announce;
+  final bool announceFrame;
 }
 
 Future<_Pulled?> _pull(ShareCatalog catalog, {bool followed = false}) async {
@@ -786,6 +824,7 @@ Future<_Pulled?> _pull(ShareCatalog catalog, {bool followed = false}) async {
     webPageUrl: fetched.webPageUrl,
     supportUrl: fetched.supportUrl,
     announce: fetched.announce,
+    announceFrame: fetched.announceFrame,
   );
 }
 
@@ -808,6 +847,7 @@ List<ShareCatalog> _replaceCatalog(
           webPageUrl: pulled.webPageUrl,
           supportUrl: pulled.supportUrl,
           announce: pulled.announce,
+          announceFrame: pulled.announceFrame,
         )
       else
         item,
@@ -1016,6 +1056,8 @@ class _Blob {
               if (catalog.webPageUrl != null) 'webPageUrl': catalog.webPageUrl,
               if (catalog.supportUrl != null) 'supportUrl': catalog.supportUrl,
               if (catalog.announce != null) 'announce': catalog.announce,
+              if (catalog.announce != null)
+                'announceFrame': catalog.announceFrame,
             },
         ],
         'selected': selected,
@@ -1045,7 +1087,10 @@ ShareCatalog _catalogFromJson(Map<dynamic, dynamic> json) {
     lastUpdated: _text(json['lastUpdated']),
     webPageUrl: _text(json['webPageUrl']),
     supportUrl: _text(json['supportUrl']),
-    announce: _text(json['announce']),
+    announce: _storedAnnounce(_text(json['announce'])),
+    announceFrame: json.containsKey('announceFrame')
+        ? json['announceFrame'] == true
+        : _text(json['announce']) != null,
   );
 }
 
@@ -1060,6 +1105,12 @@ List<String> _strings(Object? raw) {
 String? _text(Object? raw) {
   if (raw is! String || raw.trim().isEmpty) return null;
   return raw.trim();
+}
+
+/// A list saved before announcements were decoded may still hold `base64:`.
+String? _storedAnnounce(String? raw) {
+  if (raw == null) return null;
+  return subscriptionNotice(announceHeader: raw).text;
 }
 
 /// Show saved servers before refreshing their documents.
