@@ -134,16 +134,20 @@ class ConnectionStatusPanel extends StatelessWidget {
     super.key,
     required this.status,
     required this.profile,
-    required this.protocol,
+    required this.traffic,
     required this.accent,
     this.uptime,
+    this.trafficColor,
   });
 
   final String status;
   final String profile;
-  final String protocol;
+  final String traffic;
   final Color accent;
+
+  /// How long this connection has been up. Absent when there is no session.
   final String? uptime;
+  final Color? trafficColor;
 
   @override
   Widget build(BuildContext context) {
@@ -152,6 +156,7 @@ class ConnectionStatusPanel extends StatelessWidget {
     final dark = theme.brightness == Brightness.dark;
     final rule = AppBrand.paperMargin.withValues(alpha: dark ? 0.55 : 0.72);
     final mute = theme.colorScheme.onSurfaceVariant;
+    final sessionColor = dark ? AppBrand.accentOnDark : AppBrand.inkLight;
 
     final rows = <({
       String label,
@@ -175,11 +180,11 @@ class ConnectionStatusPanel extends StatelessWidget {
         valueColor: null,
       ),
       (
-        label: l.freeProtocol,
-        value: protocol,
-        underline: true,
+        label: l.freeTrafficLeft,
+        value: traffic,
+        underline: uptime != null,
         emphasize: false,
-        valueColor: null,
+        valueColor: trafficColor,
       ),
       if (uptime != null)
         (
@@ -187,7 +192,7 @@ class ConnectionStatusPanel extends StatelessWidget {
           value: uptime!,
           underline: false,
           emphasize: false,
-          valueColor: accent,
+          valueColor: sessionColor,
         ),
     ];
 

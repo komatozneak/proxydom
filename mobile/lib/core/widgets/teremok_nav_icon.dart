@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 
 import 'app_icon.dart';
 
-/// Center bottom-nav mark: monochrome Living House circle with «DOM» cutout.
+/// Center bottom-nav mark. Dark uses the plain house. Light uses the same
+/// house with a charcoal contour so it does not disappear into the sheet.
 ///
-/// Asset is already charcoal/white — do not [ColorFilter] it (would crush tones).
-/// Selected: full opacity + slight scale; idle: muted.
+/// Do not [ColorFilter] the asset (would crush tones).
+/// Selected: full opacity; idle: muted. The selection ring lives on the button.
 class TeremokNavIcon extends StatelessWidget {
   const TeremokNavIcon({
     super.key,
@@ -18,10 +19,13 @@ class TeremokNavIcon extends StatelessWidget {
   final double size;
 
   static const _asset = 'assets/icon/logo_mark_nav.png';
+  static const _assetLight = 'assets/icon/logo_mark_nav_light.png';
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final light = theme.brightness == Brightness.light;
+    final asset = light ? _assetLight : _asset;
 
     return AnimatedScale(
       // One size in both states. A selected bump pushes the rim through the
@@ -36,7 +40,7 @@ class TeremokNavIcon extends StatelessWidget {
           width: size,
           height: size,
           child: Image.asset(
-            _asset,
+            asset,
             width: size,
             height: size,
             fit: BoxFit.contain,

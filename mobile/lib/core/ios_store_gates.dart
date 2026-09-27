@@ -23,6 +23,21 @@ bool get iosAppsSplitUnsupported {
   return defaultTargetPlatform == TargetPlatform.iOS;
 }
 
+/// Windows desktop utility (ADR 029). Same screens as the phone.
+bool get windowsDesktop {
+  if (kIsWeb) return false;
+  return defaultTargetPlatform == TargetPlatform.windows;
+}
+
+/// Apps tab stays on Android. iOS and Windows show sites only.
+bool get sitesOnlySplit => iosAppsSplitUnsupported || windowsDesktop;
+
+/// Hysteria2 and VLESS. Trojan, Shadowsocks, and VMess stay out of Windows.
+bool windowsDialScheme(String scheme) {
+  final name = scheme.toLowerCase();
+  return name == 'hysteria2' || name == 'hy2' || name == 'vless';
+}
+
 /// `teremokconnect://ref` landing. Free clients ignore the link.
 String get referralLandingPath {
   if (freeKeyClient) return '/home';

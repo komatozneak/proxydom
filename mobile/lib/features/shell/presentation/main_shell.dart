@@ -40,6 +40,23 @@ const double _navBarRuleWidth = 2.5;
 /// DOM mark, larger than the nav band and centered on Сервера / Настройки.
 const double _domButtonSize = 62;
 
+/// Selection ring, same width as a chosen side tab. Size of the circle stays put.
+const double _domRingWidth = 1.6;
+
+/// `logo_mark_nav.png` is 1024px. Reach is the distance from the center to
+/// the farthest house pixel (420.4px, 440.13px once the light stroke is on).
+/// The bitmap is only a little larger than the ring: that pixel lands on the
+/// inside of the selection circle, and the circle itself stays 62.
+const double _navMarkPx = 1024;
+const double _houseReachPx = 420.4;
+const double _houseReachLightPx = 440.13;
+
+double _domHouseExtent(bool light) {
+  final reach = light ? _houseReachLightPx : _houseReachPx;
+  final innerRadius = (_domButtonSize - _domRingWidth * 2) / 2;
+  return innerRadius * _navMarkPx / reach;
+}
+
 /// How far the DOM circle rises above the nav band. The top rule moves up with it.
 const double _domAboveBar = (_domButtonSize - _navBarHeight) / 2;
 
@@ -141,7 +158,6 @@ class _MainShellState extends ConsumerState<MainShell> {
           backgroundColor: freeKeyClient ? paper : theme.colorScheme.surface,
           body: freeKeyClient
               ? _PaperStatusScrim(
-                  paper: paper,
                   dark: theme.brightness == Brightness.dark,
                   child: NotebookPaper(child: widget.navigationShell),
                 )
@@ -189,26 +205,20 @@ class _MainShellState extends ConsumerState<MainShell> {
   }
 }
 
-/// Darker band behind the system status icons so they do not melt into the sheet.
+/// Status band. Same sheet as the bar under Сервера / Home / Настройки.
+/// The margin rule sits on the bottom edge, facing the page.
 class _PaperStatusScrim extends StatelessWidget {
   const _PaperStatusScrim({
-    required this.paper,
     required this.dark,
     required this.child,
   });
 
-  final Color paper;
   final bool dark;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
     final top = MediaQuery.paddingOf(context).top;
-    // Same honey as the mid ring behind the house, not a dark slab.
-    final scrim = Color.alphaBlend(
-      AppBrand.flame.withValues(alpha: dark ? 0.22 : 0.16),
-      paper,
-    );
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
@@ -224,7 +234,20 @@ class _PaperStatusScrim extends StatelessWidget {
               left: 0,
               right: 0,
               height: top,
-              child: ColoredBox(color: scrim),
+              child: NotebookPaper(
+                emphasized: true,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(
+                        color: AppBrand.paperMargin.withValues(alpha: 0.72),
+                        width: _navBarRuleWidth,
+                      ),
+                    ),
+                  ),
+                  child: const SizedBox.expand(),
+                ),
+              ),
             ),
         ],
       ),
@@ -307,6 +330,9 @@ class _CenterNavMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final light = theme.brightness == Brightness.light;
+    final house = _domHouseExtent(light);
     return SizedBox(
       width: _domButtonSize,
       height: _domButtonSize,
@@ -327,15 +353,18 @@ class _CenterNavMark extends StatelessWidget {
                 border: selected
                     ? Border.all(
                         color: AppBrand.paperMargin,
-                        width: 1.6,
+                        width: _domRingWidth,
                       )
                     : null,
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(3),
-                child: TeremokNavIcon(
-                  selected: selected,
-                  size: _domButtonSize - 6,
+              child: ClipOval(
+                child: OverflowBox(
+                  maxWidth: house,
+                  maxHeight: house,
+                  child: TeremokNavIcon(
+                    selected: selected,
+                    size: house,
+                  ),
                 ),
               ),
             ),

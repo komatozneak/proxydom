@@ -8,7 +8,11 @@ import 'document_fetch_log.dart';
 import 'hy2_link_parser.dart';
 import 'route_document.dart';
 import 'share_link_parser.dart';
+import 'subscription_device.dart';
 import 'subscription_label.dart';
+import 'subscription_notice.dart';
+import 'subscription_traffic.dart';
+import '../../../core/ios_store_gates.dart';
 
 const _prefsKey = 'hy2_import_v1';
 
@@ -28,6 +32,7 @@ class ShareCatalog {
     this.webPageUrl,
     this.supportUrl,
     this.announce,
+    this.announceFrame = false,
   });
 
   final String id;
@@ -44,13 +49,20 @@ class ShareCatalog {
   /// True after a person renames the list. Refresh must not overwrite it.
   final bool titleIsCustom;
 
-  /// Raw `subscription-userinfo` from the remote document, when present.
+  /// Last `subscription-userinfo` snapshot from this document.
+  ///
+  /// A display hint for the whole document, not a Teremok account balance.
+  /// A failed refresh keeps it. The document drop is what clears it.
   final String? trafficMeta;
   final int? updateIntervalHours;
   final String? lastUpdated;
   final String? webPageUrl;
   final String? supportUrl;
   final String? announce;
+
+  /// Rounded border around [announce]. A saved list from before this field
+  /// still frames the text: that is how Happ draws every announcement.
+  final bool announceFrame;
 
   ShareCatalog copyWith({
     String? title,
@@ -65,6 +77,7 @@ class ShareCatalog {
     Object? webPageUrl = _keep,
     Object? supportUrl = _keep,
     Object? announce = _keep,
+    Object? announceFrame = _keep,
   }) {
     return ShareCatalog(
       id: id,
@@ -93,6 +106,9 @@ class ShareCatalog {
           : supportUrl as String?,
       announce:
           identical(announce, _keep) ? this.announce : announce as String?,
+      announceFrame: identical(announceFrame, _keep)
+          ? this.announceFrame
+          : announceFrame as bool,
     );
   }
 }
@@ -167,6 +183,7 @@ class Hy2ImportStore {
               webPageUrl: catalog.webPageUrl,
               supportUrl: catalog.supportUrl,
               announce: catalog.announce,
+              announceFrame: catalog.announceFrame,
               url: catalog.url,
             ),
           );
@@ -175,6 +192,8 @@ class Hy2ImportStore {
         }
         catalogs = _replaceCatalog(catalogs, catalog.id, pulled);
         changed = true;
+      } on SubscriptionDocumentException {
+        continue;
       } on DocumentSyncException catch (e) {
         if (e.decision != DocumentSyncDecision.drop) continue;
         catalogs = [
@@ -286,6 +305,20 @@ class Hy2ImportStore {
     return title.isEmpty ? null : title;
   }
 
+  /// Catalog that owns the selected line.
+  Future<ShareCatalog?> selectedCatalog() async {
+    final blob = await _read();
+    if (blob.catalogs.isEmpty) return null;
+    return _catalogAt(blob, blob.selected);
+  }
+
+  /// `subscription-userinfo` of the catalog that owns the selected line.
+  Future<String?> selectedTrafficMeta() async {
+    final blob = await _read();
+    if (blob.catalogs.isEmpty) return null;
+    return _catalogAt(blob, blob.selected)?.trafficMeta;
+  }
+
   Future<ParsedShareLink?> selected() async {
     final links = await load();
     if (links.isEmpty) return null;
@@ -375,17 +408,32 @@ class Hy2ImportStore {
     final String body;
     final String? profileTitle;
     final String? etag;
+    final String? trafficMeta;
+    final String? hwidMaxDevices;
+    final SubscriptionNotice notice;
     if (target == null) {
       body = text;
       profileTitle = null;
       etag = null;
+      trafficMeta = subscriptionTrafficMeta(body: text);
+      hwidMaxDevices = null;
+      notice = subscriptionNotice(body: text);
     } else {
       final fetched = await _fetch(target.url);
       body = fetched.body;
       profileTitle = fetched.profileTitle;
       etag = fetched.etag;
+      hwidMaxDevices = fetched.hwidMaxDevices;
+      trafficMeta = subscriptionTrafficMeta(
+        header: fetched.userInfo,
+        body: fetched.body,
+      );
+      notice = fetched.notice;
     }
-    final links = parseShareSubscription(body);
+    final links = _linesToKeep(
+      parseShareSubscription(body),
+      hwidMaxDevices: hwidMaxDevices,
+    );
     if (links.isEmpty) {
       throw const FormatException('no links');
     }
@@ -407,6 +455,14 @@ class Hy2ImportStore {
           lines: incoming,
           etag: etag,
           fallbackTitle: target.title,
+          trafficMeta: keptTrafficMeta(
+            observed: trafficMeta,
+            saved: previous.trafficMeta,
+          ),
+          lastUpdated: DateTime.now().toUtc().toIso8601String(),
+          supportUrl: notice.planeUrl,
+          announce: notice.text,
+          announceFrame: notice.frame,
         );
       } else {
         catalogs.add(
@@ -417,6 +473,11 @@ class Hy2ImportStore {
             url: target.url,
             etag: etag,
             fallbackTitle: target.title,
+            trafficMeta: keptTrafficMeta(observed: trafficMeta),
+            lastUpdated: DateTime.now().toUtc().toIso8601String(),
+            supportUrl: notice.planeUrl,
+            announce: notice.text,
+            announceFrame: notice.frame,
           ),
         );
       }
@@ -431,7 +492,15 @@ class Hy2ImportStore {
     } else {
       selected = _lineCount(catalogs);
       catalogs.add(
-        ShareCatalog(id: _newId(), title: title, lines: incoming),
+        ShareCatalog(
+          id: _newId(),
+          title: title,
+          lines: incoming,
+          trafficMeta: trafficMeta,
+          supportUrl: notice.planeUrl,
+          announce: notice.text,
+          announceFrame: notice.frame,
+        ),
       );
     }
     final next = blob.copyWith(catalogs: catalogs, selected: selected);
@@ -446,7 +515,10 @@ class Hy2ImportStore {
     final target = subscriptionDocumentTarget(raw);
     if (target == null) throw const FormatException('subscription');
     final fetched = await _fetch(target.url);
-    final links = parseShareSubscription(fetched.body);
+    final links = _linesToKeep(
+      parseShareSubscription(fetched.body),
+      hwidMaxDevices: fetched.hwidMaxDevices,
+    );
     if (links.isEmpty) {
       logDocumentFetch(
         url: target.url,
@@ -479,6 +551,11 @@ class Hy2ImportStore {
           .getUrl(Uri.parse(url))
           .timeout(const Duration(seconds: 10));
       request.headers.set(HttpHeaders.userAgentHeader, 'ProxyDom/1.0');
+      final deviceHeaders = await subscriptionHeaderSource();
+      for (final entry in deviceHeaders.entries) {
+        if (entry.key.toLowerCase() == 'user-agent') continue;
+        request.headers.set(entry.key, entry.value);
+      }
       if (etag != null && etag.isNotEmpty) {
         request.headers.set(HttpHeaders.ifNoneMatchHeader, etag);
       }
@@ -523,6 +600,12 @@ class Hy2ImportStore {
       );
       final redirect = response.headers.value('new-url') ??
           response.headers.value('fallback-url');
+      final notice = subscriptionNotice(
+        announceHeader: response.headers.value('announce'),
+        supportHeader: response.headers.value('support-url'),
+        frameHeader: response.headers.value('announce-frame'),
+        body: body,
+      );
       return _Fetched(
         body: body,
         profileTitle:
@@ -530,12 +613,15 @@ class Hy2ImportStore {
         etag: response.headers.value('etag'),
         status: response.statusCode,
         userInfo: response.headers.value('subscription-userinfo'),
+        hwidMaxDevices: response.headers.value('x-hwid-max-devices-reached'),
         updateIntervalHours: parseUpdateIntervalHours(
           response.headers.value('profile-update-interval'),
         ),
         webPageUrl: response.headers.value('profile-web-page-url'),
-        supportUrl: response.headers.value('support-url'),
-        announce: response.headers.value('announce'),
+        supportUrl: notice.planeUrl,
+        announce: notice.text,
+        announceFrame: notice.frame,
+        notice: notice,
         redirectUrl: redirect,
       );
     } on SocketException catch (e) {
@@ -561,7 +647,25 @@ class Hy2ImportStore {
     }
   }
 
+  Future<File> _windowsDocumentsFile() async {
+    final root = Platform.environment['LOCALAPPDATA'];
+    final dir = Directory('${root ?? '.'}${Platform.pathSeparator}ProxyDom${Platform.pathSeparator}storage');
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+    return File('${dir.path}${Platform.pathSeparator}documents.json');
+  }
+
   Future<_Blob> _read() async {
+    if (windowsDesktop) {
+      final file = await _windowsDocumentsFile();
+      if (!await file.exists()) return const _Blob();
+      final raw = await file.readAsString();
+      if (raw.isEmpty) return const _Blob();
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return const _Blob();
+      return _Blob.fromJson(decoded);
+    }
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_prefsKey);
     if (raw == null || raw.isEmpty) return const _Blob();
@@ -571,18 +675,28 @@ class Hy2ImportStore {
   }
 
   Future<void> _write(_Blob blob) async {
-    final prefs = await SharedPreferences.getInstance();
     final catalogs = [
       for (final catalog in blob.catalogs)
         if (catalog.lines.isNotEmpty) catalog,
     ];
-    if (catalogs.isEmpty) {
+    final encoded = catalogs.isEmpty
+        ? null
+        : jsonEncode(blob.copyWith(catalogs: catalogs).toJson());
+    if (windowsDesktop) {
+      final file = await _windowsDocumentsFile();
+      if (encoded == null) {
+        if (await file.exists()) await file.delete();
+      } else {
+        await file.writeAsString(encoded);
+      }
+      _changed();
+      return;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    if (encoded == null) {
       await prefs.remove(_prefsKey);
     } else {
-      await prefs.setString(
-        _prefsKey,
-        jsonEncode(blob.copyWith(catalogs: catalogs).toJson()),
-      );
+      await prefs.setString(_prefsKey, encoded);
     }
     _changed();
   }
@@ -609,10 +723,13 @@ class _Fetched {
     this.profileTitle,
     this.etag,
     this.userInfo,
+    this.hwidMaxDevices,
     this.updateIntervalHours,
     this.webPageUrl,
     this.supportUrl,
     this.announce,
+    this.announceFrame = false,
+    this.notice = const SubscriptionNotice(),
     this.redirectUrl,
   });
 
@@ -621,10 +738,13 @@ class _Fetched {
   final String? profileTitle;
   final String? etag;
   final String? userInfo;
+  final String? hwidMaxDevices;
   final int? updateIntervalHours;
   final String? webPageUrl;
   final String? supportUrl;
   final String? announce;
+  final bool announceFrame;
+  final SubscriptionNotice notice;
   final String? redirectUrl;
 }
 
@@ -640,6 +760,7 @@ class _Pulled {
     this.webPageUrl,
     this.supportUrl,
     this.announce,
+    this.announceFrame = false,
   });
 
   factory _Pulled.fromCatalog(ShareCatalog catalog) {
@@ -654,6 +775,7 @@ class _Pulled {
       webPageUrl: catalog.webPageUrl,
       supportUrl: catalog.supportUrl,
       announce: catalog.announce,
+      announceFrame: catalog.announceFrame,
     );
   }
 
@@ -667,6 +789,7 @@ class _Pulled {
   final String? webPageUrl;
   final String? supportUrl;
   final String? announce;
+  final bool announceFrame;
 }
 
 Future<_Pulled?> _pull(ShareCatalog catalog, {bool followed = false}) async {
@@ -674,7 +797,10 @@ Future<_Pulled?> _pull(ShareCatalog catalog, {bool followed = false}) async {
   if (url == null || url.isEmpty) return null;
   final fetched = await Hy2ImportStore.instance._fetch(
     url,
-    etag: catalog.etag,
+    etag: etagUnlessTrafficUnknown(
+      etag: catalog.etag,
+      trafficKnown: hasTrafficSnapshot(catalog.trafficMeta),
+    ),
     localLinks: catalog.lines.length,
   );
   if (fetched.status == HttpStatus.notModified) return null;
@@ -682,7 +808,10 @@ Future<_Pulled?> _pull(ShareCatalog catalog, {bool followed = false}) async {
   if (!followed && nextUrl != null && nextUrl.isNotEmpty && nextUrl != url) {
     return _pull(catalog.copyWith(url: nextUrl), followed: true);
   }
-  final links = parseShareSubscription(fetched.body);
+  final links = _linesToKeep(
+    parseShareSubscription(fetched.body),
+    hwidMaxDevices: fetched.hwidMaxDevices,
+  );
   if (links.isEmpty) {
     logDocumentFetch(
       url: url,
@@ -712,12 +841,19 @@ Future<_Pulled?> _pull(ShareCatalog catalog, {bool followed = false}) async {
     lines: [for (final link in links) link.raw],
     etag: fetched.etag,
     url: catalog.url,
-    trafficMeta: fetched.userInfo,
+    trafficMeta: keptTrafficMeta(
+      observed: subscriptionTrafficMeta(
+        header: fetched.userInfo,
+        body: fetched.body,
+      ),
+      saved: catalog.trafficMeta,
+    ),
     updateIntervalHours: fetched.updateIntervalHours,
     lastUpdated: DateTime.now().toUtc().toIso8601String(),
     webPageUrl: fetched.webPageUrl,
     supportUrl: fetched.supportUrl,
     announce: fetched.announce,
+    announceFrame: fetched.announceFrame,
   );
 }
 
@@ -740,6 +876,7 @@ List<ShareCatalog> _replaceCatalog(
           webPageUrl: pulled.webPageUrl,
           supportUrl: pulled.supportUrl,
           announce: pulled.announce,
+          announceFrame: pulled.announceFrame,
         )
       else
         item,
@@ -809,6 +946,18 @@ String shareServerKey(String raw) {
   } on FormatException {
     return raw.trim();
   }
+}
+
+List<ParsedShareLink> _linesToKeep(
+  List<ParsedShareLink> links, {
+  String? hwidMaxDevices,
+}) {
+  final problem = subscriptionDocumentProblem(
+    hwidMaxDevices: hwidMaxDevices,
+    links: links,
+  );
+  if (problem != null) throw SubscriptionDocumentException(problem);
+  return dialableShareLinks(links);
 }
 
 String _titleFor(String? explicit, List<ParsedShareLink> links) {
@@ -936,6 +1085,8 @@ class _Blob {
               if (catalog.webPageUrl != null) 'webPageUrl': catalog.webPageUrl,
               if (catalog.supportUrl != null) 'supportUrl': catalog.supportUrl,
               if (catalog.announce != null) 'announce': catalog.announce,
+              if (catalog.announce != null)
+                'announceFrame': catalog.announceFrame,
             },
         ],
         'selected': selected,
@@ -965,7 +1116,10 @@ ShareCatalog _catalogFromJson(Map<dynamic, dynamic> json) {
     lastUpdated: _text(json['lastUpdated']),
     webPageUrl: _text(json['webPageUrl']),
     supportUrl: _text(json['supportUrl']),
-    announce: _text(json['announce']),
+    announce: _storedAnnounce(_text(json['announce'])),
+    announceFrame: json.containsKey('announceFrame')
+        ? json['announceFrame'] == true
+        : _text(json['announce']) != null,
   );
 }
 
@@ -980,6 +1134,12 @@ List<String> _strings(Object? raw) {
 String? _text(Object? raw) {
   if (raw is! String || raw.trim().isEmpty) return null;
   return raw.trim();
+}
+
+/// A list saved before announcements were decoded may still hold `base64:`.
+String? _storedAnnounce(String? raw) {
+  if (raw == null) return null;
+  return subscriptionNotice(announceHeader: raw).text;
 }
 
 /// Show saved servers before refreshing their documents.

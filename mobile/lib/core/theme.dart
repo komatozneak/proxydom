@@ -70,6 +70,12 @@ class AppBrand {
   /// Margin rule: living-house mustard mixed toward [destructive].
   static const Color paperMargin = Color(0xFFD4682E);
 
+  /// Sky band behind refresh and the Telegram plane on a profile card.
+  static const Color noticeBand = Color(0xFFC5EAF8);
+
+  /// Same band on the dark sheet, deep enough for light icons.
+  static const Color noticeBandDark = Color(0xFF1B4E63);
+
   /// Dark elevated cards — enough lift off [surfaceDark] so numbers read.
   static const Color surfaceVariantDark = Color(0xFF2C2C32);
 

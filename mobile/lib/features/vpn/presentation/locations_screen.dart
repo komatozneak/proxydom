@@ -3,10 +3,9 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:qr_flutter/qr_flutter.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../core/busy/busy_overlay.dart';
 import '../../../core/diagnostics/product_log.dart';
@@ -18,14 +17,17 @@ import '../../../core/widgets/location_flag_icon.dart';
 import '../../../core/widgets/teremok_snackbar.dart';
 import '../../../l10n/app_localizations.dart';
 import 'vpn_platform_copy.dart';
+import 'windows_share_qr.dart';
 import '../../home/application/vpn_provider.dart';
 import '../../home/application/vpn_status.dart';
 import '../application/imported_profiles_provider.dart';
 import '../data/hy2_import_store.dart';
 import '../data/route_document.dart';
 import '../data/subscription_label.dart';
+import '../data/subscription_notice.dart';
 import 'free_client_chrome.dart';
 import 'pool_server_mark.dart';
+import 'subscription_notice_view.dart';
 import '../data/share_link_parser.dart';
 import '../data/node_auto_selector.dart';
 import '../data/node_display.dart';
@@ -335,7 +337,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       await ref.read(vpnProvider.notifier).disconnect();
     }
     await Hy2ImportStore.instance.removeAt(index);
-    await _load();
+    await _reloadLocal();
   }
 
   Future<void> _deleteProfile(String id) async {
@@ -352,48 +354,28 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       await ref.read(vpnProvider.notifier).disconnect();
     }
     await Hy2ImportStore.instance.removeCatalog(id);
+    await _reloadLocal();
+  }
+
+  /// Local delete must not refresh every saved URL. A 404 on one document
+  /// would otherwise drop the others in the same pass.
+  Future<void> _reloadLocal() async {
+    final links = await Hy2ImportStore.instance.load();
     if (!mounted) return;
-    setState(() {
-      _catalogs = [
-        for (final catalog in _catalogs)
-          if (catalog.id != id) catalog,
-      ];
-      if (_catalogs.isEmpty) {
-        _imported = const [];
-        _selectedId = null;
-      }
-    });
-    await _load();
+    await _applyImported(links);
   }
 
   Future<void> _shareCatalog(ShareCatalog catalog) async {
-    final l = AppL10n.of(context);
     final text = catalog.lines.join('\n');
-    if (!mounted) return;
-    await showDialog<void>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text(catalog.title),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (text.length <= 800) QrImageView(data: text, size: 180),
-              if (text.length <= 800) const SizedBox(height: 12),
-              SelectableText(text),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: text));
-                Navigator.of(context).pop();
-              },
-              child: Text(l.freeSharePool),
-            ),
-          ],
-        );
-      },
+    if (text.isEmpty || !mounted) return;
+    final box = context.findRenderObject();
+    final origin = box is RenderBox && box.hasSize
+        ? box.localToGlobal(Offset.zero) & box.size
+        : null;
+    await Share.share(
+      text,
+      subject: catalog.title,
+      sharePositionOrigin: origin,
     );
   }
 
@@ -521,21 +503,20 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     );
   }
 
-  /// Fixed slot. A progress indicator in a stretched row otherwise grows into
+  /// Fixed square. A progress indicator in a stretched row otherwise grows into
   /// a wide ellipse and the refresh cell no longer matches the icon buttons.
   Widget _catalogIconButton({
+    Key? key,
     required String tooltip,
     required VoidCallback? onTap,
     required Widget icon,
   }) {
     return Tooltip(
+      key: key,
       message: tooltip,
       child: InkWell(
         onTap: onTap,
-        child: SizedBox(
-          width: 48,
-          child: Center(child: icon),
-        ),
+        child: Center(child: icon),
       ),
     );
   }
@@ -544,6 +525,20 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     final title = catalog.title.trim().isEmpty ? l.freeServers : catalog.title;
     final lines = _catalogLineIndexes(catalog);
     final hasLines = lines.premium.isNotEmpty || lines.general.isNotEmpty;
+    final notice = profileNotice(
+      announce: catalog.announce,
+      supportUrl: catalog.supportUrl,
+      announceFrame: catalog.announceFrame,
+      documentUrl: catalog.url,
+      trafficMeta: catalog.trafficMeta,
+    );
+    final dark = theme.brightness == Brightness.dark;
+    final showRefresh = catalog.url != null && catalog.url!.isNotEmpty;
+    final planeUrl = notice.planeUrl?.trim() ?? '';
+    final parkPlane = showRefresh && notice.visible && planeUrl.isNotEmpty;
+    final onFill = dark ? AppBrand.inkDark : AppBrand.inkLight;
+    final band = dark ? AppBrand.noticeBandDark : AppBrand.noticeBand;
+    final noticeBody = notice.text?.trim() ?? '';
     return Material(
       color: theme.colorScheme.surfaceContainerHighest,
       clipBehavior: Clip.antiAlias,
@@ -554,45 +549,22 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        catalog.lines.length > 1
-                            ? '$title · ${catalog.lines.length}'
-                            : title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                VerticalDivider(
-                  width: 1,
-                  thickness: 1,
-                  color: theme.colorScheme.outline,
-                ),
-                _catalogIconButton(
-                  tooltip: l.freeSharePool,
-                  onTap: () => _shareCatalog(catalog),
-                  icon: const AppIcon(AppIcons.qrCode, size: 20),
-                ),
-                if (catalog.url != null && catalog.url!.isNotEmpty) ...[
-                  VerticalDivider(
-                    width: 1,
-                    thickness: 1,
-                    color: theme.colorScheme.outline,
-                  ),
-                  _catalogIconButton(
+          CatalogProfileChrome(
+            title: Text(
+              catalog.lines.length > 1 ? '$title · ${catalog.lines.length}' : title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            share: _catalogIconButton(
+              tooltip: l.freeSharePool,
+              onTap: () => _shareCatalog(catalog),
+              icon: const AppIcon(AppIcons.share, size: 20),
+            ),
+            refresh: showRefresh
+                ? _catalogIconButton(
                     tooltip: l.freeRefresh,
                     onTap: _refreshing.contains(catalog.id)
                         ? null
@@ -602,28 +574,54 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
                             dimension: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: theme.colorScheme.primary,
+                              color: onFill,
                               constraints: const BoxConstraints.tightFor(
                                 width: 20,
                                 height: 20,
                               ),
                             ),
                           )
-                        : const AppIcon(AppIcons.refresh, size: 20),
-                  ),
-                ],
-                VerticalDivider(
-                  width: 1,
-                  thickness: 1,
-                  color: theme.colorScheme.outline,
-                ),
-                _catalogIconButton(
-                  tooltip: l.freeDelete,
-                  onTap: () => _deleteProfile(catalog.id),
-                  icon: const AppIcon(AppIcons.trash, size: 20),
-                ),
-              ],
+                        : AppIcon(AppIcons.refresh, size: 20, color: onFill),
+                  )
+                : null,
+            plane: parkPlane
+                ? _catalogIconButton(
+                    key: kSubscriptionNoticePlaneKey,
+                    tooltip: subscriptionPlaneIsTelegram(planeUrl)
+                        ? 'Telegram'
+                        : 'Link',
+                    onTap: () => openSubscriptionPlane(planeUrl),
+                    icon: AppIcon(
+                      subscriptionPlaneIsTelegram(planeUrl)
+                          ? AppIcons.paperPlane
+                          : AppIcons.link,
+                      size: 22,
+                      color: onFill,
+                    ),
+                  )
+                : null,
+            trash: _catalogIconButton(
+              tooltip: l.freeDelete,
+              onTap: () => _deleteProfile(catalog.id),
+              icon: AppIcon(AppIcons.trash, size: 20, color: onFill),
             ),
+            band: band,
+            trashFill: catalogTrashFill(
+              theme.colorScheme.surfaceContainerHighest,
+              dark: dark,
+            ),
+            seamColor: theme.colorScheme.outline,
+            notice: noticeBody.isEmpty
+                ? null
+                : Padding(
+                    padding: EdgeInsets.fromLTRB(12, 0, parkPlane ? 8 : 4, 12),
+                    child: SubscriptionNoticeView(
+                      text: notice.text,
+                      planeUrl: notice.planeUrl,
+                      frame: notice.frame,
+                      showPlane: !parkPlane,
+                    ),
+                  ),
           ),
           if (hasLines) ...[
             Divider(
@@ -674,7 +672,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
               },
               onScan: () {
                 UiLog.action('locations', 'scan');
-                context.push('/scan');
+                openFreeClientCapture(context);
               },
             ),
           ),
@@ -746,7 +744,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
             },
             onScan: () {
               UiLog.action('locations', 'scan');
-              context.push('/scan');
+              openFreeClientCapture(context);
             },
           ),
         ),

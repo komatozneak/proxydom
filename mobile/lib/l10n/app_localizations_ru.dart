@@ -1718,6 +1718,9 @@ class AppL10nRu extends AppL10n {
   String get freeProtocol => 'Протокол';
 
   @override
+  String get freeTrafficLeft => 'Остаток';
+
+  @override
   String get freeUptime => 'Время';
 
   @override
@@ -1747,6 +1750,17 @@ class AppL10nRu extends AppL10n {
   @override
   String get freeSubscriptionLoadFail =>
       'Подписка не загрузилась. Адрес документа не ответил.';
+
+  @override
+  String get freeSubscriptionMissing => 'По этому адресу документа нет.';
+
+  @override
+  String get freeSubscriptionDeviceLimit =>
+      'В этом документе кончились места для устройств. Освободите одно и обновите список.';
+
+  @override
+  String get freeSubscriptionClientRefused =>
+      'Документ прислал заглушку вместо сервера.';
 
   @override
   String get freeSharePool => 'Поделиться';

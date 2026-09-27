@@ -16,10 +16,14 @@ import 'core/internet_permission.dart';
 import 'core/ios_store_gates.dart';
 import 'core/legacy_account_cache.dart';
 import 'core/router.dart';
+import 'features/vpn/data/windows_tunnel.dart';
 
 void main() async {
   // Required before flutter_secure_storage / path_provider on cold start.
   WidgetsFlutterBinding.ensureInitialized();
+  if (io.Platform.isWindows && !WindowsTunnel.acquireSingleInstance()) {
+    return;
+  }
   final boot = Stopwatch()..start();
 
   // Level before the first line, then the file, so «Выключены» drops boot too.

@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
 import 'diagnostics/ui_log.dart';
+import 'ios_store_gates.dart';
 
 import '../features/home/presentation/home_screen.dart';
 import '../features/onboarding/data/onboarding_prefs.dart';
@@ -42,6 +43,8 @@ class AppRouter {
       final String? next;
       if (!introDone && !goingToOnboarding) {
         next = '/onboarding';
+      } else if (windowsDesktop && goingToScan) {
+        next = '/home';
       } else if (inShell || goingToImport || goingToOnboarding || goingToScan) {
         next = null;
       } else {

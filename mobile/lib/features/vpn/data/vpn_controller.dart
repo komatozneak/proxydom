@@ -6,10 +6,12 @@ import 'package:flutter/services.dart';
 
 import '../../settings/data/installed_apps_channel.dart';
 import '../../settings/data/split_tunnel_prefs.dart';
+import '../../../core/ios_store_gates.dart';
 import 'vpn_config.dart';
 import 'vpn_route_policy.dart';
 import 'vpn_service_config.dart';
 import 'vpn_session_snapshot.dart';
+import 'windows_tunnel.dart';
 
 bool get _isIosSplit => !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
 
@@ -33,6 +35,20 @@ class VpnController {
   Stream<VpnSessionSnapshot>? _sessionStream;
   Stream<VpnTrafficStats>? _trafficStream;
   Stream<int?>? _pingStream;
+  String? windowsNotice;
+
+  /// One share line through the Windows service (ADR 029).
+  Future<bool> startWindowsShare(String uri) async {
+    final domains = stripForceProxySuffixes(
+      await SplitTunnelPrefs.enabledDomainSuffixes(),
+    );
+    final result = await WindowsTunnel.instance.connect(
+      uri,
+      directDomains: domains,
+    );
+    windowsNotice = result.notice;
+    return result.ok;
+  }
 
   /// Build MethodChannel params for one minted Hy2 config.
   Future<String> buildStartParamsJson(
@@ -286,6 +302,10 @@ class VpnController {
   }
 
   Future<bool> stop({String reason = 'user_tap'}) async {
+    if (windowsDesktop) {
+      await WindowsTunnel.instance.disconnect();
+      return true;
+    }
     try {
       final result = await _methodChannel.invokeMethod<bool>(
         'stop',
@@ -310,6 +330,7 @@ class VpnController {
   /// session params (dataplane passwords) so the QS tile / Always-on restart
   /// cannot resurrect the previous account's VPN.
   Future<bool> wipeSession({String reason = 'logout'}) async {
+    if (windowsDesktop) return stop(reason: reason);
     try {
       final result = await _methodChannel.invokeMethod<bool>(
         'wipeSession',
@@ -335,6 +356,14 @@ class VpnController {
   }
 
   Future<VpnNativeStatus> getStatus() async {
+    if (windowsDesktop) {
+      return switch (WindowsTunnel.instance.phase) {
+        'connecting' => VpnNativeStatus.connecting,
+        'connected' => VpnNativeStatus.connected,
+        'disconnecting' => VpnNativeStatus.disconnecting,
+        _ => VpnNativeStatus.idle,
+      };
+    }
     try {
       final result = await _methodChannel.invokeMethod<String>('getStatus');
       return parseVpnNativeStatus(result);
@@ -346,6 +375,10 @@ class VpnController {
   }
 
   Future<bool> hasActiveSession() async {
+    if (windowsDesktop) {
+      final phase = WindowsTunnel.instance.phase;
+      return phase == 'connected' || phase == 'connecting';
+    }
     try {
       final result =
           await _methodChannel.invokeMethod<bool>('hasActiveSession');

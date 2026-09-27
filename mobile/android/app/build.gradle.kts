@@ -34,7 +34,7 @@ fun looksLikeKeystorePlaceholder(value: String?): Boolean {
 // Production sideload / Play: real key.properties + JKS. CI and accidental
 // `flutter build apk --release` without a keystore must NOT reuse the store
 // package id — that caused INSTALL_FAILED_UPDATE_INCOMPATIBLE («Приложение
-// не установлено») when a debug build occupied com.teremok.connect.teremok_connect.
+// не установлено») when a debug build occupied com.proxy.dom.
 val releaseStoreFileRel = keystoreProperties.getProperty("storeFile").orEmpty()
 val hasUsableReleaseKeystore =
     !looksLikeKeystorePlaceholder(keystoreProperties.getProperty("keyAlias")) &&
@@ -47,7 +47,7 @@ val hasUsableReleaseKeystore =
 // may rewrite the literal in defaultConfig back to flutter.minSdkVersion, so
 // the real enforcement is finalizeDsl below.
 val requiredMinSdk = 26
-val productionApplicationId = "com.teremok.connect.teremok_connect"
+val productionApplicationId = "com.proxy.dom"
 
 android {
     namespace = "com.teremok.connect.teremok_connect"

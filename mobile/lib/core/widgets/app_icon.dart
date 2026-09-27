@@ -50,6 +50,8 @@ abstract final class AppIcons {
   static const IconData backBold = PhosphorIconsBold.arrowLeft;
   static const IconData download = PhosphorIconsRegular.cloudArrowDown;
   static const IconData share = PhosphorIconsRegular.shareNetwork;
+  static const IconData paperPlane = PhosphorIconsRegular.paperPlaneTilt;
+  static const IconData link = PhosphorIconsRegular.link;
   static const IconData upload = PhosphorIconsRegular.cloudArrowUp;
   static const IconData globe = PhosphorIconsRegular.globe;
   static const IconData globeHemisphereWest =
@@ -98,6 +100,7 @@ abstract final class AppIcons {
   static const IconData siteTelegram = PhosphorIconsRegular.telegramLogo;
   static const IconData siteDiscord = PhosphorIconsRegular.discordLogo;
   static const IconData siteChatgpt = PhosphorIconsRegular.sparkle;
+
   /// Prefer [siteClaudeAsset] in Modes UI — Phosphor robot was a stand-in.
   static const IconData siteClaude = PhosphorIconsRegular.sparkle;
   static const String siteClaudeAsset = 'assets/brand/sites/claude.png';

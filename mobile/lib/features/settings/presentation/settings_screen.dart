@@ -216,8 +216,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final l = AppL10n.of(context);
     final theme = Theme.of(context);
     final showNotif = VpnNotificationPrefs.isSupported;
-    final showAutoReconnect = !hideInAppPlategaCheckout;
-    final showNoVpn = androidPerAppSplit;
+    final showAutoReconnect =
+        windowsDesktop || !hideInAppPlategaCheckout;
+    final showNoVpn = androidPerAppSplit || windowsDesktop;
     final notifOn = _notifEnabled ?? true;
     final autoOn = _autoReconnect ?? false;
     final themeMode =

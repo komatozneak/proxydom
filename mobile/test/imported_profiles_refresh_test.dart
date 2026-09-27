@@ -39,4 +39,23 @@ void main() {
     expect(catalogs, hasLength(2));
     expect(catalogs.last.title, 'Alpha');
   });
+
+  test('deleting one key leaves the other profile', () async {
+    SharedPreferences.setMockInitialValues({});
+    final store = Hy2ImportStore.instance;
+    await store.saveInput(
+      'hysteria2://user:pass@203.0.113.12:443/?sni=c.example#Charlie',
+    );
+    await store.saveInput(
+      'hysteria2://user:pass@203.0.113.13:443/?sni=d.example#Delta',
+    );
+    await store.removeAt(0);
+    final links = await store.load();
+    expect(links, hasLength(1));
+    expect(links.single.endpoint, contains('203.0.113.13'));
+    final catalogs = await store.catalogs();
+    expect(catalogs, hasLength(1));
+    await store.removeCatalog(catalogs.single.id);
+    expect(await store.load(), isEmpty);
+  });
 }

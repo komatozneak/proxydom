@@ -83,7 +83,8 @@ ParsedShareLink _parseUserHost(String scheme, String text) {
   final host = uri.host.trim();
   if (host.isEmpty) throw const FormatException('missing host');
   final port = uri.hasPort ? uri.port : 443;
-  final fragment = uri.fragment.trim();
+  // `Uri.fragment` leaves a `%D0…` remark encoded. Read the raw tail.
+  final fragment = decodedShareFragment(text);
   return ParsedShareLink(
     scheme: scheme,
     name: fragment.isEmpty ? host : fragment,
@@ -101,7 +102,7 @@ ParsedShareLink _parseVmess(String text) {
   final host = '${decoded['add'] ?? ''}'.trim();
   if (host.isEmpty) throw const FormatException('vmess host');
   final port = int.tryParse('${decoded['port'] ?? ''}') ?? 443;
-  final name = '${decoded['ps'] ?? ''}'.trim();
+  final name = decodeUserFacingToken('${decoded['ps'] ?? ''}');
   return ParsedShareLink(
     scheme: 'vmess',
     name: name.isEmpty ? host : name,
@@ -116,7 +117,7 @@ ParsedShareLink _parseSs(String text) {
   if (body.contains('@')) {
     final uri = Uri.parse(text);
     final port = uri.hasPort ? uri.port : 8388;
-    final fragment = uri.fragment.trim();
+    final fragment = decodedShareFragment(text);
     return ParsedShareLink(
       scheme: 'ss',
       name: fragment.isEmpty ? uri.host : fragment,
@@ -132,7 +133,7 @@ ParsedShareLink _parseSs(String text) {
   final at = decoded.lastIndexOf('@');
   final hostPort = decoded.substring(at + 1).trim();
   if (!hostPort.contains(':')) throw const FormatException('ss host');
-  final name = Uri.parse(text).fragment.trim();
+  final name = decodedShareFragment(text);
   final host = hostPort.split(':').first;
   return ParsedShareLink(
     scheme: 'ss',

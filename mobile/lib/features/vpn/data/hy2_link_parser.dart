@@ -66,16 +66,22 @@ ParsedHy2Link parseHy2Link(String raw) {
   );
 }
 
-/// Fragment after `#`, decoded once. `Uri.fragment` leaves `%D0…` on this scheme.
+/// Percent-decoded remark. `Uri.fragment` leaves `%D0…` in the string.
+String decodeUserFacingToken(String raw) {
+  final text = raw.trim();
+  if (!text.contains('%')) return text;
+  try {
+    return Uri.decodeComponent(text);
+  } on ArgumentError {
+    return text;
+  }
+}
+
+/// Fragment after `#`, decoded once.
 String decodedShareFragment(String raw) {
   final hash = raw.indexOf('#');
   if (hash < 0 || hash + 1 >= raw.length) return '';
-  final tail = raw.substring(hash + 1).trim();
-  try {
-    return Uri.decodeComponent(tail);
-  } on ArgumentError {
-    return tail;
-  }
+  return decodeUserFacingToken(raw.substring(hash + 1));
 }
 
 /// Title before ` · `. Falls back to [fallback] when the remark is empty.

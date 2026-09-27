@@ -3211,6 +3211,12 @@ abstract class AppL10n {
   /// **'Protocol'**
   String get freeProtocol;
 
+  /// No description provided for @freeTrafficLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Remaining'**
+  String get freeTrafficLeft;
+
   /// No description provided for @freeUptime.
   ///
   /// In en, this message translates to:
@@ -3270,6 +3276,24 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'The subscription did not load. The document host did not answer.'**
   String get freeSubscriptionLoadFail;
+
+  /// No description provided for @freeSubscriptionMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'That address has no document.'**
+  String get freeSubscriptionMissing;
+
+  /// No description provided for @freeSubscriptionDeviceLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'This document has no free device slots. Free one and refresh the list.'**
+  String get freeSubscriptionDeviceLimit;
+
+  /// No description provided for @freeSubscriptionClientRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'The document sent a placeholder instead of a server.'**
+  String get freeSubscriptionClientRefused;
 
   /// No description provided for @freeSharePool.
   ///
