@@ -53,6 +53,7 @@ flutter:
     - assets/icon/mono_teremok.png
     - assets/icon/nav_vpn_teremok.png
     - assets/icon/logo_mark_nav.png
+    - assets/icon/logo_mark_nav_light.png
     - assets/rive/signal_nest_connect.riv
     - assets/flags/
     - assets/flags/LICENSE
