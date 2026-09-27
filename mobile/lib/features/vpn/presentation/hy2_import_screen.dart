@@ -13,9 +13,11 @@ import '../../../l10n/app_localizations.dart';
 import '../../home/application/vpn_provider.dart';
 import '../../home/application/vpn_status.dart';
 import '../data/hy2_import_store.dart';
+import '../data/route_document.dart';
 import '../data/share_link_parser.dart';
-import '../data/subscription_link_inbox.dart';
+import '../data/subscription_device.dart';
 import '../data/subscription_label.dart';
+import '../data/subscription_link_inbox.dart';
 import 'free_client_chrome.dart';
 import 'pool_server_mark.dart';
 
@@ -119,7 +121,13 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
           _loadingPreview = false;
           _preview = const [];
           _previewTitle = null;
-          _error = 'load';
+          _error = switch (error) {
+            SubscriptionDocumentException(:final code) => code,
+            DocumentSyncException(:final decision)
+                when decision == DocumentSyncDecision.drop =>
+              'missing',
+            _ => 'load',
+          };
         });
       });
       return;
@@ -181,6 +189,13 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
       }
       if (!mounted) return;
       context.go('/locations');
+    } on SubscriptionDocumentException catch (error) {
+      if (!mounted) return;
+      UiLog.action('import', 'save', result: 'bad', reason: error.code);
+      setState(() {
+        _busy = false;
+        _error = error.code;
+      });
     } on FormatException {
       if (!mounted) return;
       UiLog.action('import', 'save', result: 'bad');
@@ -294,7 +309,13 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
                         Text(
                           _error == 'load'
                               ? l.freeSubscriptionLoadFail
-                              : l.freeLinkInvalid,
+                              : _error == 'missing'
+                                  ? l.freeSubscriptionMissing
+                                  : _error == 'device_limit'
+                                  ? l.freeSubscriptionDeviceLimit
+                                  : _error == 'client_refused'
+                                      ? l.freeSubscriptionClientRefused
+                                      : l.freeLinkInvalid,
                           style: TextStyle(color: theme.colorScheme.error),
                         ),
                       ],

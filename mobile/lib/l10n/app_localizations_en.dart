@@ -1713,6 +1713,9 @@ class AppL10nEn extends AppL10n {
   String get freeProtocol => 'Protocol';
 
   @override
+  String get freeTrafficLeft => 'Remaining';
+
+  @override
   String get freeUptime => 'Uptime';
 
   @override
@@ -1742,6 +1745,17 @@ class AppL10nEn extends AppL10n {
   @override
   String get freeSubscriptionLoadFail =>
       'The subscription did not load. The document host did not answer.';
+
+  @override
+  String get freeSubscriptionMissing => 'That address has no document.';
+
+  @override
+  String get freeSubscriptionDeviceLimit =>
+      'This document has no free device slots. Free one and refresh the list.';
+
+  @override
+  String get freeSubscriptionClientRefused =>
+      'The document sent a placeholder instead of a server.';
 
   @override
   String get freeSharePool => 'Share';

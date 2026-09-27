@@ -3,10 +3,9 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:qr_flutter/qr_flutter.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../core/busy/busy_overlay.dart';
 import '../../../core/diagnostics/product_log.dart';
@@ -335,7 +334,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       await ref.read(vpnProvider.notifier).disconnect();
     }
     await Hy2ImportStore.instance.removeAt(index);
-    await _load();
+    await _reloadLocal();
   }
 
   Future<void> _deleteProfile(String id) async {
@@ -352,48 +351,28 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       await ref.read(vpnProvider.notifier).disconnect();
     }
     await Hy2ImportStore.instance.removeCatalog(id);
+    await _reloadLocal();
+  }
+
+  /// Local delete must not refresh every saved URL. A 404 on one document
+  /// would otherwise drop the others in the same pass.
+  Future<void> _reloadLocal() async {
+    final links = await Hy2ImportStore.instance.load();
     if (!mounted) return;
-    setState(() {
-      _catalogs = [
-        for (final catalog in _catalogs)
-          if (catalog.id != id) catalog,
-      ];
-      if (_catalogs.isEmpty) {
-        _imported = const [];
-        _selectedId = null;
-      }
-    });
-    await _load();
+    await _applyImported(links);
   }
 
   Future<void> _shareCatalog(ShareCatalog catalog) async {
-    final l = AppL10n.of(context);
     final text = catalog.lines.join('\n');
-    if (!mounted) return;
-    await showDialog<void>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text(catalog.title),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (text.length <= 800) QrImageView(data: text, size: 180),
-              if (text.length <= 800) const SizedBox(height: 12),
-              SelectableText(text),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: text));
-                Navigator.of(context).pop();
-              },
-              child: Text(l.freeSharePool),
-            ),
-          ],
-        );
-      },
+    if (text.isEmpty || !mounted) return;
+    final box = context.findRenderObject();
+    final origin = box is RenderBox && box.hasSize
+        ? box.localToGlobal(Offset.zero) & box.size
+        : null;
+    await Share.share(
+      text,
+      subject: catalog.title,
+      sharePositionOrigin: origin,
     );
   }
 
@@ -518,6 +497,11 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       subtitle: Text(label.subtitle.isEmpty ? link.endpoint : label.subtitle),
       selected: selected,
       onTap: () => _chooseImported(index),
+      trailing: IconButton(
+        tooltip: AppL10n.of(context).freeDelete,
+        onPressed: () => _removeImported(index),
+        icon: const AppIcon(AppIcons.trash, size: 20),
+      ),
     );
   }
 
@@ -584,7 +568,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
                 _catalogIconButton(
                   tooltip: l.freeSharePool,
                   onTap: () => _shareCatalog(catalog),
-                  icon: const AppIcon(AppIcons.qrCode, size: 20),
+                  icon: const AppIcon(AppIcons.share, size: 20),
                 ),
                 if (catalog.url != null && catalog.url!.isNotEmpty) ...[
                   VerticalDivider(

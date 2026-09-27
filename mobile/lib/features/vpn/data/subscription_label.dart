@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'hy2_link_parser.dart';
 import 'node_display.dart';
 import 'share_link_parser.dart';
 
@@ -21,17 +22,24 @@ class PoolServerLabel {
   final String flag;
 }
 
-/// Profile name from a `profile-title` header. Happ sends it as base64.
+/// Profile name from a `profile-title` header.
+///
+/// The value is plain text or base64. Remnawave prefixes the payload with
+/// `base64:`. A prefixed value that does not decode is dropped so the raw
+/// header is not shown as the list name.
 String? decodeProfileTitle(String? header) {
   final raw = header?.trim();
   if (raw == null || raw.isEmpty) return null;
+  final prefixed = raw.toLowerCase().startsWith('base64:');
+  final payload = prefixed ? raw.substring(raw.indexOf(':') + 1).trim() : raw;
+  if (payload.isEmpty) return prefixed ? null : raw;
   try {
-    final decoded = utf8.decode(base64.decode(raw));
+    final decoded = utf8.decode(base64.decode(payload));
     if (decoded.trim().isNotEmpty) return decoded.trim();
   } on FormatException {
-    // Plain text title.
+    if (prefixed) return null;
   }
-  return raw;
+  return prefixed ? null : raw;
 }
 
 /// First `# Teremok VPN 🏠` comment in a subscription body.
@@ -59,15 +67,8 @@ PoolServerLabel labelForShareLink(ParsedShareLink link) {
 }
 
 String _remark(ParsedShareLink link) {
-  final hash = link.raw.indexOf('#');
-  if (hash >= 0 && hash + 1 < link.raw.length) {
-    final tail = link.raw.substring(hash + 1).trim();
-    try {
-      return Uri.decodeComponent(tail);
-    } on ArgumentError {
-      return tail;
-    }
-  }
+  final decoded = decodedShareFragment(link.raw);
+  if (decoded.isNotEmpty) return decoded;
   return link.name;
 }
 

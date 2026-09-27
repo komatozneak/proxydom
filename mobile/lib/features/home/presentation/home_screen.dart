@@ -21,7 +21,8 @@ import '../../settings/data/installed_apps_channel.dart';
 import '../../settings/data/split_tunnel_prefs.dart';
 import '../../vpn/application/imported_profiles_provider.dart';
 import '../../vpn/data/hy2_import_store.dart';
-import '../../vpn/data/vpn_service_config.dart';
+import '../../vpn/data/subscription_label.dart';
+import '../../vpn/data/subscription_traffic.dart';
 import '../../vpn/data/node_auto_selector.dart';
 import '../../vpn/data/node_display.dart';
 import '../../vpn/data/vpn_controller.dart';
@@ -51,6 +52,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   String _serverTitle = '…';
   String _serverSubtitle = '';
   String? _importedScheme;
+  String? _trafficMeta;
   String _serverFlag = kFlagGlobe;
   bool _selectionIsAuto = true;
   List<String> _autoPoolFlags = const [kFlagGlobe];
@@ -201,22 +203,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Future<void> _refreshServerCardBody() async {
     if (freeKeyClient) {
       final selected = await Hy2ImportStore.instance.selected();
+      final trafficMeta = await Hy2ImportStore.instance.selectedTrafficMeta();
       if (!mounted) return;
       final ru = Localizations.localeOf(context).languageCode == 'ru';
       setState(() {
         _selectionIsAuto = false;
         _autoPoolFlags = const [];
         _placeStickyKey = selected?.name ?? 'import:empty';
+        _trafficMeta = selected == null ? null : trafficMeta;
         if (selected == null) {
           _serverTitle = ru ? 'Нет ссылки' : 'No link';
           _serverSubtitle = ru ? 'Вставьте ключ' : 'Paste a key';
           _importedScheme = null;
           _serverFlag = kFlagGlobe;
         } else {
-          _serverTitle = selected.name;
-          _serverSubtitle = selected.endpoint;
+          final label = labelForShareLink(selected);
+          _serverTitle = label.title;
+          _serverSubtitle =
+              label.subtitle.isEmpty ? selected.endpoint : label.subtitle;
           _importedScheme = selected.scheme;
-          _serverFlag = kFlagGlobe;
+          _serverFlag = label.flag.isEmpty ? kFlagGlobe : label.flag;
         }
       });
       return;
@@ -521,7 +527,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                         ? l.regionAutoSubtitle
                         : l.homeStatServer)
                     : _serverSubtitle,
-                importedScheme: _importedScheme,
+                trafficMeta: _trafficMeta,
                 serverFlag: _serverFlag,
                 selectionIsAuto: _selectionIsAuto,
                 autoPoolFlags: _autoPoolFlags,
@@ -555,7 +561,7 @@ class _DashboardBody extends ConsumerStatefulWidget {
     required this.maxHeight,
     required this.serverTitle,
     required this.serverSubtitle,
-    this.importedScheme,
+    this.trafficMeta,
     required this.serverFlag,
     required this.selectionIsAuto,
     required this.autoPoolFlags,
@@ -572,7 +578,7 @@ class _DashboardBody extends ConsumerStatefulWidget {
   final double maxHeight;
   final String serverTitle;
   final String serverSubtitle;
-  final String? importedScheme;
+  final String? trafficMeta;
   final String serverFlag;
   final bool selectionIsAuto;
   final List<String> autoPoolFlags;
@@ -673,7 +679,7 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
       treeState: treeState,
       status: status,
       serverTitle: widget.serverTitle,
-      importedScheme: widget.importedScheme,
+      trafficMeta: widget.trafficMeta,
       onNestTap: widget.onNestTap,
       showVpnSettingsCta: showVpnSettingsCta,
       noVpnEnabled: widget.noVpnEnabled,
@@ -689,7 +695,7 @@ class _FreeClientHome extends StatelessWidget {
     required this.treeState,
     required this.status,
     required this.serverTitle,
-    this.importedScheme,
+    this.trafficMeta,
     required this.onNestTap,
     required this.showVpnSettingsCta,
     required this.noVpnEnabled,
@@ -701,7 +707,7 @@ class _FreeClientHome extends StatelessWidget {
   final TreeState treeState;
   final VpnStatus status;
   final String serverTitle;
-  final String? importedScheme;
+  final String? trafficMeta;
   final Future<void> Function() onNestTap;
   final bool showVpnSettingsCta;
   final int noVpnEnabled;
@@ -715,19 +721,21 @@ class _FreeClientHome extends StatelessWidget {
     final empty = serverTitle == '…' ||
         serverTitle == 'Нет ссылки' ||
         serverTitle == 'No link';
+    final parsedTraffic = parseSubscriptionTraffic(trafficMeta);
+    final traffic = formatSubscriptionTraffic(
+      parsedTraffic,
+      russian: Localizations.localeOf(context).languageCode == 'ru',
+    );
+    final trafficColor = switch (trafficRemainderBand(parsedTraffic)) {
+      TrafficRemainderBand.above20 => AppBrand.success,
+      TrafficRemainderBand.from5to20 => AppBrand.flame,
+      TrafficRemainderBand.below5 => AppBrand.destructive,
+      TrafficRemainderBand.none => null,
+    };
     final current = status;
-    final String protocol;
-    final String? uptime;
-    if (current is VpnConnected) {
-      protocol = current.protocol;
-      uptime = _formatUptime(current.connectedSince);
-    } else {
-      final scheme = importedScheme;
-      protocol = scheme == null || scheme.isEmpty
-          ? '—'
-          : friendlyProtocolLabel(scheme);
-      uptime = null;
-    }
+    final uptime = current is VpnConnected
+        ? _formatUptime(current.connectedSince)
+        : null;
     final profile = empty ? l.freeNoProfile : serverTitle;
     final statusText = switch (status) {
       VpnConnecting() => l.homeConnecting,
@@ -756,6 +764,10 @@ class _FreeClientHome extends StatelessWidget {
         l.homePathIncompatibleHint,
       VpnError(:final code) when code == 'share_ios_hy2_only' =>
         l.freeIosHy2Only,
+      VpnError(:final code) when code == 'device_limit' =>
+        l.freeSubscriptionDeviceLimit,
+      VpnError(:final code) when code == 'client_refused' =>
+        l.freeSubscriptionClientRefused,
       VpnError() => l.homeErrorFriendly,
       _ => null,
     };
@@ -771,7 +783,8 @@ class _FreeClientHome extends StatelessWidget {
         ConnectionStatusPanel(
           status: statusText,
           profile: profile,
-          protocol: protocol,
+          traffic: traffic,
+          trafficColor: trafficColor,
           uptime: uptime,
           accent: accent,
         ),
@@ -874,11 +887,12 @@ class _FreeClientHome extends StatelessWidget {
   }
 
   String _formatUptime(DateTime since) {
-    final d = DateTime.now().difference(since);
-    final h = d.inHours.toString().padLeft(2, '0');
-    final m = (d.inMinutes % 60).toString().padLeft(2, '0');
-    final s = (d.inSeconds % 60).toString().padLeft(2, '0');
-    return '$h:$m:$s';
+    final elapsed = DateTime.now().difference(since);
+    String two(int value) => value.toString().padLeft(2, '0');
+    final hours = two(elapsed.inHours);
+    final minutes = two(elapsed.inMinutes % 60);
+    final seconds = two(elapsed.inSeconds % 60);
+    return '$hours:$minutes:$seconds';
   }
 }
 

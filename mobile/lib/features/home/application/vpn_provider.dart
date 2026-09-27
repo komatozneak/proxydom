@@ -11,6 +11,7 @@ import '../../../core/ios_store_gates.dart';
 import '../../vpn/data/hy2_import_store.dart';
 import '../../vpn/data/route_document.dart';
 import '../../vpn/data/share_session_log.dart';
+import '../../vpn/data/subscription_device.dart';
 import '../../vpn/data/subscription_label.dart';
 import '../../vpn/data/vpn_config.dart';
 import '../../vpn/data/vpn_controller.dart';
@@ -1040,12 +1041,33 @@ class VpnNotifier extends Notifier<VpnStatus> {
 
       if (hideInAppPlategaCheckout) {
         // ADR 026: pasted profile only. Do not call GET /vpn/config.
-        final imported = await Hy2ImportStore.instance.selected();
+        var imported = await Hy2ImportStore.instance.selected();
         if (await _abortStaleConnect(gen)) return;
+        if (imported != null && isUnspecifiedShareHost(imported.endpoint)) {
+          final catalog = await Hy2ImportStore.instance.selectedCatalog();
+          final url = catalog?.url?.trim() ?? '';
+          if (url.isNotEmpty) {
+            try {
+              await Hy2ImportStore.instance.refreshCatalog(catalog!.id);
+            } on SubscriptionDocumentException catch (error) {
+              state = VpnError(message: error.code, code: error.code);
+              return;
+            }
+            if (await _abortStaleConnect(gen)) return;
+            imported = await Hy2ImportStore.instance.selected();
+          }
+        }
         if (imported == null) {
           state = const VpnError(
             message: 'hy2_import_required',
             code: 'hy2_import_required',
+          );
+          return;
+        }
+        if (isUnspecifiedShareHost(imported.endpoint)) {
+          state = const VpnError(
+            message: 'client_refused',
+            code: 'client_refused',
           );
           return;
         }

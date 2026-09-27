@@ -8,7 +8,9 @@ import 'document_fetch_log.dart';
 import 'hy2_link_parser.dart';
 import 'route_document.dart';
 import 'share_link_parser.dart';
+import 'subscription_device.dart';
 import 'subscription_label.dart';
+import 'subscription_traffic.dart';
 
 const _prefsKey = 'hy2_import_v1';
 
@@ -44,7 +46,10 @@ class ShareCatalog {
   /// True after a person renames the list. Refresh must not overwrite it.
   final bool titleIsCustom;
 
-  /// Raw `subscription-userinfo` from the remote document, when present.
+  /// Last `subscription-userinfo` snapshot from this document.
+  ///
+  /// A display hint for the whole document, not a Teremok account balance.
+  /// A failed refresh keeps it. The document drop is what clears it.
   final String? trafficMeta;
   final int? updateIntervalHours;
   final String? lastUpdated;
@@ -175,6 +180,8 @@ class Hy2ImportStore {
         }
         catalogs = _replaceCatalog(catalogs, catalog.id, pulled);
         changed = true;
+      } on SubscriptionDocumentException {
+        continue;
       } on DocumentSyncException catch (e) {
         if (e.decision != DocumentSyncDecision.drop) continue;
         catalogs = [
@@ -286,6 +293,20 @@ class Hy2ImportStore {
     return title.isEmpty ? null : title;
   }
 
+  /// Catalog that owns the selected line.
+  Future<ShareCatalog?> selectedCatalog() async {
+    final blob = await _read();
+    if (blob.catalogs.isEmpty) return null;
+    return _catalogAt(blob, blob.selected);
+  }
+
+  /// `subscription-userinfo` of the catalog that owns the selected line.
+  Future<String?> selectedTrafficMeta() async {
+    final blob = await _read();
+    if (blob.catalogs.isEmpty) return null;
+    return _catalogAt(blob, blob.selected)?.trafficMeta;
+  }
+
   Future<ParsedShareLink?> selected() async {
     final links = await load();
     if (links.isEmpty) return null;
@@ -375,17 +396,29 @@ class Hy2ImportStore {
     final String body;
     final String? profileTitle;
     final String? etag;
+    final String? trafficMeta;
+    final String? hwidMaxDevices;
     if (target == null) {
       body = text;
       profileTitle = null;
       etag = null;
+      trafficMeta = subscriptionTrafficMeta(body: text);
+      hwidMaxDevices = null;
     } else {
       final fetched = await _fetch(target.url);
       body = fetched.body;
       profileTitle = fetched.profileTitle;
       etag = fetched.etag;
+      hwidMaxDevices = fetched.hwidMaxDevices;
+      trafficMeta = subscriptionTrafficMeta(
+        header: fetched.userInfo,
+        body: fetched.body,
+      );
     }
-    final links = parseShareSubscription(body);
+    final links = _linesToKeep(
+      parseShareSubscription(body),
+      hwidMaxDevices: hwidMaxDevices,
+    );
     if (links.isEmpty) {
       throw const FormatException('no links');
     }
@@ -407,6 +440,11 @@ class Hy2ImportStore {
           lines: incoming,
           etag: etag,
           fallbackTitle: target.title,
+          trafficMeta: keptTrafficMeta(
+            observed: trafficMeta,
+            saved: previous.trafficMeta,
+          ),
+          lastUpdated: DateTime.now().toUtc().toIso8601String(),
         );
       } else {
         catalogs.add(
@@ -417,6 +455,8 @@ class Hy2ImportStore {
             url: target.url,
             etag: etag,
             fallbackTitle: target.title,
+            trafficMeta: keptTrafficMeta(observed: trafficMeta),
+            lastUpdated: DateTime.now().toUtc().toIso8601String(),
           ),
         );
       }
@@ -431,7 +471,12 @@ class Hy2ImportStore {
     } else {
       selected = _lineCount(catalogs);
       catalogs.add(
-        ShareCatalog(id: _newId(), title: title, lines: incoming),
+        ShareCatalog(
+          id: _newId(),
+          title: title,
+          lines: incoming,
+          trafficMeta: trafficMeta,
+        ),
       );
     }
     final next = blob.copyWith(catalogs: catalogs, selected: selected);
@@ -446,7 +491,10 @@ class Hy2ImportStore {
     final target = subscriptionDocumentTarget(raw);
     if (target == null) throw const FormatException('subscription');
     final fetched = await _fetch(target.url);
-    final links = parseShareSubscription(fetched.body);
+    final links = _linesToKeep(
+      parseShareSubscription(fetched.body),
+      hwidMaxDevices: fetched.hwidMaxDevices,
+    );
     if (links.isEmpty) {
       logDocumentFetch(
         url: target.url,
@@ -479,6 +527,11 @@ class Hy2ImportStore {
           .getUrl(Uri.parse(url))
           .timeout(const Duration(seconds: 10));
       request.headers.set(HttpHeaders.userAgentHeader, 'ProxyDom/1.0');
+      final deviceHeaders = await subscriptionHeaderSource();
+      for (final entry in deviceHeaders.entries) {
+        if (entry.key.toLowerCase() == 'user-agent') continue;
+        request.headers.set(entry.key, entry.value);
+      }
       if (etag != null && etag.isNotEmpty) {
         request.headers.set(HttpHeaders.ifNoneMatchHeader, etag);
       }
@@ -530,6 +583,7 @@ class Hy2ImportStore {
         etag: response.headers.value('etag'),
         status: response.statusCode,
         userInfo: response.headers.value('subscription-userinfo'),
+        hwidMaxDevices: response.headers.value('x-hwid-max-devices-reached'),
         updateIntervalHours: parseUpdateIntervalHours(
           response.headers.value('profile-update-interval'),
         ),
@@ -609,6 +663,7 @@ class _Fetched {
     this.profileTitle,
     this.etag,
     this.userInfo,
+    this.hwidMaxDevices,
     this.updateIntervalHours,
     this.webPageUrl,
     this.supportUrl,
@@ -621,6 +676,7 @@ class _Fetched {
   final String? profileTitle;
   final String? etag;
   final String? userInfo;
+  final String? hwidMaxDevices;
   final int? updateIntervalHours;
   final String? webPageUrl;
   final String? supportUrl;
@@ -674,7 +730,10 @@ Future<_Pulled?> _pull(ShareCatalog catalog, {bool followed = false}) async {
   if (url == null || url.isEmpty) return null;
   final fetched = await Hy2ImportStore.instance._fetch(
     url,
-    etag: catalog.etag,
+    etag: etagUnlessTrafficUnknown(
+      etag: catalog.etag,
+      trafficKnown: hasTrafficSnapshot(catalog.trafficMeta),
+    ),
     localLinks: catalog.lines.length,
   );
   if (fetched.status == HttpStatus.notModified) return null;
@@ -682,7 +741,10 @@ Future<_Pulled?> _pull(ShareCatalog catalog, {bool followed = false}) async {
   if (!followed && nextUrl != null && nextUrl.isNotEmpty && nextUrl != url) {
     return _pull(catalog.copyWith(url: nextUrl), followed: true);
   }
-  final links = parseShareSubscription(fetched.body);
+  final links = _linesToKeep(
+    parseShareSubscription(fetched.body),
+    hwidMaxDevices: fetched.hwidMaxDevices,
+  );
   if (links.isEmpty) {
     logDocumentFetch(
       url: url,
@@ -712,7 +774,13 @@ Future<_Pulled?> _pull(ShareCatalog catalog, {bool followed = false}) async {
     lines: [for (final link in links) link.raw],
     etag: fetched.etag,
     url: catalog.url,
-    trafficMeta: fetched.userInfo,
+    trafficMeta: keptTrafficMeta(
+      observed: subscriptionTrafficMeta(
+        header: fetched.userInfo,
+        body: fetched.body,
+      ),
+      saved: catalog.trafficMeta,
+    ),
     updateIntervalHours: fetched.updateIntervalHours,
     lastUpdated: DateTime.now().toUtc().toIso8601String(),
     webPageUrl: fetched.webPageUrl,
@@ -809,6 +877,18 @@ String shareServerKey(String raw) {
   } on FormatException {
     return raw.trim();
   }
+}
+
+List<ParsedShareLink> _linesToKeep(
+  List<ParsedShareLink> links, {
+  String? hwidMaxDevices,
+}) {
+  final problem = subscriptionDocumentProblem(
+    hwidMaxDevices: hwidMaxDevices,
+    links: links,
+  );
+  if (problem != null) throw SubscriptionDocumentException(problem);
+  return dialableShareLinks(links);
 }
 
 String _titleFor(String? explicit, List<ParsedShareLink> links) {
