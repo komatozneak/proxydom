@@ -502,21 +502,20 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     );
   }
 
-  /// Fixed slot. A progress indicator in a stretched row otherwise grows into
+  /// Fixed square. A progress indicator in a stretched row otherwise grows into
   /// a wide ellipse and the refresh cell no longer matches the icon buttons.
   Widget _catalogIconButton({
+    Key? key,
     required String tooltip,
     required VoidCallback? onTap,
     required Widget icon,
   }) {
     return Tooltip(
+      key: key,
       message: tooltip,
       child: InkWell(
         onTap: onTap,
-        child: SizedBox(
-          width: 48,
-          child: Center(child: icon),
-        ),
+        child: Center(child: icon),
       ),
     );
   }
@@ -532,6 +531,13 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       documentUrl: catalog.url,
       trafficMeta: catalog.trafficMeta,
     );
+    final dark = theme.brightness == Brightness.dark;
+    final showRefresh = catalog.url != null && catalog.url!.isNotEmpty;
+    final planeUrl = notice.planeUrl?.trim() ?? '';
+    final parkPlane = showRefresh && notice.visible && planeUrl.isNotEmpty;
+    final onFill = dark ? AppBrand.inkDark : AppBrand.inkLight;
+    final band = dark ? AppBrand.noticeBandDark : AppBrand.noticeBand;
+    final noticeBody = notice.text?.trim() ?? '';
     return Material(
       color: theme.colorScheme.surfaceContainerHighest,
       clipBehavior: Clip.antiAlias,
@@ -542,45 +548,22 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        catalog.lines.length > 1
-                            ? '$title · ${catalog.lines.length}'
-                            : title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                VerticalDivider(
-                  width: 1,
-                  thickness: 1,
-                  color: theme.colorScheme.outline,
-                ),
-                _catalogIconButton(
-                  tooltip: l.freeSharePool,
-                  onTap: () => _shareCatalog(catalog),
-                  icon: const AppIcon(AppIcons.share, size: 20),
-                ),
-                if (catalog.url != null && catalog.url!.isNotEmpty) ...[
-                  VerticalDivider(
-                    width: 1,
-                    thickness: 1,
-                    color: theme.colorScheme.outline,
-                  ),
-                  _catalogIconButton(
+          CatalogProfileChrome(
+            title: Text(
+              catalog.lines.length > 1 ? '$title · ${catalog.lines.length}' : title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            share: _catalogIconButton(
+              tooltip: l.freeSharePool,
+              onTap: () => _shareCatalog(catalog),
+              icon: const AppIcon(AppIcons.share, size: 20),
+            ),
+            refresh: showRefresh
+                ? _catalogIconButton(
                     tooltip: l.freeRefresh,
                     onTap: _refreshing.contains(catalog.id)
                         ? null
@@ -590,38 +573,55 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
                             dimension: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: theme.colorScheme.primary,
+                              color: onFill,
                               constraints: const BoxConstraints.tightFor(
                                 width: 20,
                                 height: 20,
                               ),
                             ),
                           )
-                        : const AppIcon(AppIcons.refresh, size: 20),
+                        : AppIcon(AppIcons.refresh, size: 20, color: onFill),
+                  )
+                : null,
+            plane: parkPlane
+                ? _catalogIconButton(
+                    key: kSubscriptionNoticePlaneKey,
+                    tooltip: subscriptionPlaneIsTelegram(planeUrl)
+                        ? 'Telegram'
+                        : 'Link',
+                    onTap: () => openSubscriptionPlane(planeUrl),
+                    icon: AppIcon(
+                      subscriptionPlaneIsTelegram(planeUrl)
+                          ? AppIcons.paperPlane
+                          : AppIcons.link,
+                      size: 22,
+                      color: onFill,
+                    ),
+                  )
+                : null,
+            trash: _catalogIconButton(
+              tooltip: l.freeDelete,
+              onTap: () => _deleteProfile(catalog.id),
+              icon: AppIcon(AppIcons.trash, size: 20, color: onFill),
+            ),
+            band: band,
+            trashFill: catalogTrashFill(
+              theme.colorScheme.surfaceContainerHighest,
+              dark: dark,
+            ),
+            seamColor: theme.colorScheme.outline,
+            notice: noticeBody.isEmpty
+                ? null
+                : Padding(
+                    padding: EdgeInsets.fromLTRB(12, 0, parkPlane ? 8 : 4, 12),
+                    child: SubscriptionNoticeView(
+                      text: notice.text,
+                      planeUrl: notice.planeUrl,
+                      frame: notice.frame,
+                      showPlane: !parkPlane,
+                    ),
                   ),
-                ],
-                VerticalDivider(
-                  width: 1,
-                  thickness: 1,
-                  color: theme.colorScheme.outline,
-                ),
-                _catalogIconButton(
-                  tooltip: l.freeDelete,
-                  onTap: () => _deleteProfile(catalog.id),
-                  icon: const AppIcon(AppIcons.trash, size: 20),
-                ),
-              ],
-            ),
           ),
-          if (notice.visible)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 4, 12),
-              child: SubscriptionNoticeView(
-                text: notice.text,
-                planeUrl: notice.planeUrl,
-                frame: notice.frame,
-              ),
-            ),
           if (hasLines) ...[
             Divider(
               height: 1,
