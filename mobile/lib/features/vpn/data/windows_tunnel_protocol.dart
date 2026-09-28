@@ -1,64 +1,14 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
-/// Named-pipe frame from ADR 030. The body is at most 4096 bytes.
-const int kTunnelFrameMaxBody = 4096;
+/// Broker v3 commands are newline-delimited JSON between Flutter and the
+/// native controller. The controller owns the framed Windows named pipe.
+const int kTunnelProtocolVersion = 3;
 
-/// The service rejects older commands. Idle is authoritative only in version 2.
-const int kTunnelProtocolVersion = 2;
+/// Includes the no-route key probe, TUN readiness, and bound egress proof.
+const Duration kWindowsConnectWait = Duration(seconds: 45);
 
-/// Rights the service DACL grants Authenticated Users.
-///
-/// `GENERIC_READ | GENERIC_WRITE` asks for attribute and EA rights the pipe
-/// does not grant, so CreateFile fails and Connect never reaches the service.
-const int kTunnelPipeAccess = 0x0001 | 0x0002 | 0x00020000 | 0x00100000;
-
-/// Adapter wait plus the service probe. The probe itself is limited to 7s.
-const Duration kWindowsConnectWait = Duration(seconds: 30);
-
-/// Restore is local route and adapter cleanup, not another internet probe.
+/// Restore is verified locally and never waits for an internet request.
 const Duration kWindowsDisconnectWait = Duration(seconds: 15);
-
-Uint8List encodeTunnelFrame(Map<String, Object?> message) {
-  final body = utf8.encode(jsonEncode(message));
-  if (body.length > kTunnelFrameMaxBody) {
-    throw const FormatException('frame');
-  }
-  final out = Uint8List(4 + body.length);
-  final n = body.length;
-  out[0] = n & 0xff;
-  out[1] = (n >> 8) & 0xff;
-  out[2] = (n >> 16) & 0xff;
-  out[3] = (n >> 24) & 0xff;
-  out.setRange(4, out.length, body);
-  return out;
-}
-
-/// Pulls complete frames out of a byte stream.
-class TunnelFrameBuffer {
-  final BytesBuilder _bytes = BytesBuilder(copy: false);
-
-  void add(List<int> chunk) => _bytes.add(chunk);
-
-  /// The next JSON body, or null when more bytes are required.
-  ///
-  /// Throws [FormatException] when the length prefix is over the limit.
-  String? take() {
-    final data = _bytes.toBytes();
-    if (data.length < 4) return null;
-    final n = data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24);
-    if (n > kTunnelFrameMaxBody) {
-      throw const FormatException('frame');
-    }
-    if (data.length < 4 + n) return null;
-    final json = utf8.decode(data.sublist(4, 4 + n));
-    _bytes.clear();
-    if (data.length > 4 + n) {
-      _bytes.add(data.sublist(4 + n));
-    }
-    return json;
-  }
-}
 
 Map<String, Object?> tunnelHello() => const {
       'command': 'hello',
@@ -116,7 +66,7 @@ class TunnelStateEvent {
   final bool? accepted;
   final String? command;
 
-  /// Local arrival order. The service does not send it.
+  /// Local arrival order. The broker does not send it.
   final int seq;
 
   TunnelStateEvent withSeq(int value) {
@@ -134,7 +84,12 @@ class TunnelStateEvent {
   }
 
   static TunnelStateEvent? parse(String json) {
-    final decoded = jsonDecode(json);
+    Object? decoded;
+    try {
+      decoded = jsonDecode(json);
+    } on FormatException {
+      return null;
+    }
     if (decoded is! Map) return null;
     final event = decoded['event'];
     if (event is! String) return null;
@@ -152,23 +107,19 @@ class TunnelStateEvent {
       cleanupVerified: decoded['cleanup_verified'] is bool
           ? decoded['cleanup_verified'] as bool
           : null,
-      accepted: decoded['accepted'] is bool ? decoded['accepted'] as bool : null,
+      accepted:
+          decoded['accepted'] is bool ? decoded['accepted'] as bool : null,
       command: command is String ? command : null,
     );
   }
 }
 
-/// A connect attempt is finished only by the service generation it accepted.
 bool tunnelEventIsConnectTerminal(TunnelStateEvent event, int generation) {
   if (event.event != 'state' || event.generation != generation) return false;
   if (event.state == 'connected' || event.state == 'idle') return true;
   return event.state == 'disconnecting' && event.code == 'cleanup_failed';
 }
 
-/// Disconnect is finished by a verified idle or an explicit cleanup failure.
-///
-/// An idle event that omits [TunnelStateEvent.cleanupVerified] is not proof
-/// that the machine routes were restored.
 bool tunnelEventIsDisconnectTerminal(TunnelStateEvent event) {
   if (event.event != 'state') return false;
   if (event.state == 'idle' && event.cleanupVerified == true) return true;

@@ -29,3 +29,15 @@ class Win32Resolver : public NameResolver {
  public:
   bool resolve_ipv4(const std::string& host, std::string& ip) override;
 };
+
+class Win32ConnectivityProbe : public ConnectivityProbe {
+ public:
+  bool pick_loopback_port(unsigned short& port) override;
+  bool prove_socks(unsigned short port,
+                   const std::string& target_ip,
+                   const std::function<bool()>& cancelled) override;
+  unsigned long last_error() const override { return last_error_; }
+
+ private:
+  unsigned long last_error_ = 0;
+};

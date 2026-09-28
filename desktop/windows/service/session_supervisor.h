@@ -18,6 +18,7 @@ enum class TunnelCode {
   ForeignTunnel,
   RouteFailed,
   CoreStartFailed,
+  KeyProbeFailed,
   TunNotReady,
   EgressFailed,
   CleanupFailed,
@@ -28,6 +29,9 @@ enum class TunnelCode {
 enum class ConnectStep {
   Start,
   Resolved,
+  ProbeConfigWritten,
+  ProbeLaunched,
+  ProbePassed,
   Pinned,
   ConfigWritten,
   Launched,
@@ -151,6 +155,16 @@ class NameResolver {
   virtual bool resolve_ipv4(const std::string& host, std::string& ip) = 0;
 };
 
+class ConnectivityProbe {
+ public:
+  virtual ~ConnectivityProbe() = default;
+  virtual bool pick_loopback_port(unsigned short& port) = 0;
+  virtual bool prove_socks(unsigned short port,
+                           const std::string& target_ip,
+                           const std::function<bool()>& cancelled) = 0;
+  virtual unsigned long last_error() const = 0;
+};
+
 class SessionFiles {
  public:
   virtual ~SessionFiles() = default;
@@ -195,6 +209,7 @@ class TunnelSupervisor {
   TunnelSupervisor(RouteTable& routes,
                    EngineHost& engine,
                    NameResolver& names,
+                   ConnectivityProbe& probe,
                    SessionFiles& files,
                    TunnelLog& log,
                    Sleeper& sleeper);
@@ -213,6 +228,7 @@ class TunnelSupervisor {
 
  private:
   bool stop_requested(ConnectStep step, CancelFlag& cancel);
+  bool stop_engine_only();
   bool restore_resources();
   TunnelSnapshot finish(TunnelCode code, const std::string& message, bool quiet);
   TunnelSnapshot publish(TunnelCode code, const std::string& message, bool cleanup_verified);
@@ -221,6 +237,7 @@ class TunnelSupervisor {
   RouteTable& routes_;
   EngineHost& engine_;
   NameResolver& names_;
+  ConnectivityProbe& probe_;
   SessionFiles& files_;
   TunnelLog& log_;
   Sleeper& sleeper_;

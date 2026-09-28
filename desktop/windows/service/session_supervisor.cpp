@@ -76,6 +76,8 @@ const char* code_name(TunnelCode code) {
       return "route_failed";
     case TunnelCode::CoreStartFailed:
       return "core_start_failed";
+    case TunnelCode::KeyProbeFailed:
+      return "key_probe_failed";
     case TunnelCode::TunNotReady:
       return "tun_not_ready";
     case TunnelCode::EgressFailed:
@@ -102,6 +104,8 @@ std::string user_message(TunnelCode code, const std::string& extra) {
       return "Не удалось подготовить маршрут к серверу";
     case TunnelCode::CoreStartFailed:
       return "Не удалось запустить локальный туннель";
+    case TunnelCode::KeyProbeFailed:
+      return "Ключ не прошёл проверку: сервер или авторизация недоступны";
     case TunnelCode::TunNotReady:
       return "Локальный туннель не поднялся";
     case TunnelCode::EgressFailed:
@@ -246,12 +250,14 @@ bool decode_ledger(const std::string& text, Ledger& ledger) {
 TunnelSupervisor::TunnelSupervisor(RouteTable& routes,
                                    EngineHost& engine,
                                    NameResolver& names,
+                                   ConnectivityProbe& probe,
                                    SessionFiles& files,
                                    TunnelLog& log,
                                    Sleeper& sleeper)
     : routes_(routes),
       engine_(engine),
       names_(names),
+      probe_(probe),
       files_(files),
       log_(log),
       sleeper_(sleeper) {
@@ -304,6 +310,21 @@ TunnelSnapshot TunnelSupervisor::publish(TunnelCode code,
 bool TunnelSupervisor::stop_requested(ConnectStep step, CancelFlag& cancel) {
   if (hook_) hook_(step);
   return cancel.requested();
+}
+
+bool TunnelSupervisor::stop_engine_only() {
+  if (engine_.alive()) {
+    const bool signaled = engine_.request_stop();
+    if (signaled) {
+      for (int i = 0; i < 20 && engine_.alive(); ++i) sleeper_.sleep_ms(100);
+    }
+    if (engine_.alive()) engine_.kill();
+    for (int i = 0; i < 50 && engine_.alive(); ++i) sleeper_.sleep_ms(100);
+  }
+  const bool stopped = !engine_.alive();
+  engine_.release();
+  if (stopped) remember([&] { ledger_.pid = 0; });
+  return stopped;
 }
 
 bool TunnelSupervisor::restore_resources() {
@@ -453,6 +474,48 @@ TunnelSnapshot TunnelSupervisor::run_connect(const ConnectRequest& request, Canc
   }
   if (stop_requested(ConnectStep::Resolved, cancel)) return finish(TunnelCode::None, {}, true);
 
+  unsigned short probe_port = 0;
+  if (!probe_.pick_loopback_port(probe_port)) {
+    return finish(TunnelCode::KeyProbeFailed, {}, false);
+  }
+  const std::string probe_config = build_singbox_probe_config(line, server_ip, probe_port);
+  if (probe_config.empty() || !files_.write_config(probe_config)) {
+    return finish(TunnelCode::CoreStartFailed, {}, false);
+  }
+  remember([&] { ledger_.config_written = true; });
+  if (stop_requested(ConnectStep::ProbeConfigWritten, cancel)) {
+    return finish(TunnelCode::None, {}, true);
+  }
+
+  unsigned long pid = 0;
+  if (!engine_.launch_suspended(pid)) return finish(TunnelCode::CoreStartFailed, {}, false);
+  remember([&] { ledger_.pid = pid; });
+  if (!engine_.assign_job()) {
+    engine_.kill();
+    engine_.release();
+    remember([&] { ledger_.pid = 0; });
+    return finish(TunnelCode::CoreStartFailed, {}, false);
+  }
+  if (!engine_.resume()) return finish(TunnelCode::CoreStartFailed, {}, false);
+  if (stop_requested(ConnectStep::ProbeLaunched, cancel)) {
+    return finish(TunnelCode::None, {}, true);
+  }
+
+  if (!names_.resolve_ipv4("cp.cloudflare.com", probe_ip)) {
+    return finish(TunnelCode::ResolveFailed, {}, false);
+  }
+  const bool key_ok =
+      probe_.prove_socks(probe_port, probe_ip, [&] { return cancel.requested(); });
+  if (cancel.requested()) return finish(TunnelCode::None, {}, true);
+  if (!key_ok || !stop_engine_only()) {
+    return finish(TunnelCode::KeyProbeFailed, {}, false);
+  }
+  if (stop_requested(ConnectStep::ProbePassed, cancel)) {
+    return finish(TunnelCode::None, {}, true);
+  }
+
+  // The no-route probe can take several seconds. Re-check the competing-tunnel
+  // gate immediately before the first system route mutation.
   if (!routes_.list_defaults(defaults)) return finish(TunnelCode::RouteFailed, {}, false);
   const std::string foreign_again = active_foreign_tunnel(defaults);
   if (!foreign_again.empty()) {
@@ -471,10 +534,9 @@ TunnelSnapshot TunnelSupervisor::run_connect(const ConnectRequest& request, Canc
   if (!names_.resolve_ipv4("cp.cloudflare.com", probe_ip)) return finish(TunnelCode::ResolveFailed, {}, false);
   const std::string config = build_singbox_config(line, server_ip, request.direct_domains);
   if (config.empty() || !files_.write_config(config)) return finish(TunnelCode::CoreStartFailed, {}, false);
-  remember([&] { ledger_.config_written = true; });
   if (stop_requested(ConnectStep::ConfigWritten, cancel)) return finish(TunnelCode::None, {}, true);
 
-  unsigned long pid = 0;
+  pid = 0;
   if (!engine_.launch_suspended(pid)) return finish(TunnelCode::CoreStartFailed, {}, false);
   remember([&] { ledger_.pid = pid; });
   if (stop_requested(ConnectStep::Launched, cancel)) return finish(TunnelCode::None, {}, true);

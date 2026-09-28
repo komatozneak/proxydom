@@ -491,3 +491,130 @@ bool Win32Resolver::resolve_ipv4(const std::string& host, std::string& ip) {
   ip = text;
   return !ip.empty();
 }
+
+bool Win32ConnectivityProbe::pick_loopback_port(unsigned short& port) {
+  ensure_wsa();
+  SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+  if (sock == INVALID_SOCKET) {
+    last_error_ = WSAGetLastError();
+    return false;
+  }
+  sockaddr_in local{};
+  local.sin_family = AF_INET;
+  local.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+  local.sin_port = 0;
+  if (bind(sock, reinterpret_cast<sockaddr*>(&local), sizeof(local)) != 0) {
+    last_error_ = WSAGetLastError();
+    closesocket(sock);
+    return false;
+  }
+  int size = sizeof(local);
+  if (getsockname(sock, reinterpret_cast<sockaddr*>(&local), &size) != 0) {
+    last_error_ = WSAGetLastError();
+    closesocket(sock);
+    return false;
+  }
+  port = ntohs(local.sin_port);
+  closesocket(sock);
+  last_error_ = port == 0 ? ERROR_INVALID_DATA : 0;
+  return port != 0;
+}
+
+bool Win32ConnectivityProbe::prove_socks(
+    unsigned short port,
+    const std::string& target_ip,
+    const std::function<bool()>& cancelled) {
+  ensure_wsa();
+  IN_ADDR target{};
+  if (port == 0 || inet_pton(AF_INET, target_ip.c_str(), &target) != 1) {
+    last_error_ = ERROR_INVALID_PARAMETER;
+    return false;
+  }
+
+  SOCKET sock = INVALID_SOCKET;
+  for (int attempt = 0; attempt < 50 && sock == INVALID_SOCKET; ++attempt) {
+    if (cancelled && cancelled()) return false;
+    SOCKET candidate = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (candidate == INVALID_SOCKET) break;
+    sockaddr_in local{};
+    local.sin_family = AF_INET;
+    local.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    local.sin_port = htons(port);
+    if (connect(candidate, reinterpret_cast<sockaddr*>(&local), sizeof(local)) == 0) {
+      sock = candidate;
+      break;
+    }
+    last_error_ = WSAGetLastError();
+    closesocket(candidate);
+    Sleep(100);
+  }
+  if (sock == INVALID_SOCKET) {
+    if (last_error_ == 0) last_error_ = ERROR_TIMEOUT;
+    return false;
+  }
+
+  const DWORD timeout = 5000;
+  setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout));
+  setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout));
+  auto send_all = [&](const unsigned char* bytes, int count) {
+    int sent = 0;
+    while (sent < count) {
+      if (cancelled && cancelled()) return false;
+      const int n = send(sock, reinterpret_cast<const char*>(bytes + sent), count - sent, 0);
+      if (n <= 0) return false;
+      sent += n;
+    }
+    return true;
+  };
+  auto recv_all = [&](unsigned char* bytes, int count) {
+    int got = 0;
+    while (got < count) {
+      if (cancelled && cancelled()) return false;
+      const int n = recv(sock, reinterpret_cast<char*>(bytes + got), count - got, 0);
+      if (n <= 0) return false;
+      got += n;
+    }
+    return true;
+  };
+
+  const unsigned char greeting[] = {5, 1, 0};
+  unsigned char greeting_reply[2] = {};
+  if (!send_all(greeting, sizeof(greeting)) ||
+      !recv_all(greeting_reply, sizeof(greeting_reply)) ||
+      greeting_reply[0] != 5 || greeting_reply[1] != 0) {
+    last_error_ = ERROR_ACCESS_DENIED;
+    closesocket(sock);
+    return false;
+  }
+
+  unsigned char request[10] = {5, 1, 0, 1};
+  std::memcpy(request + 4, &target.S_un.S_addr, 4);
+  request[8] = 0;
+  request[9] = 80;
+  unsigned char reply[10] = {};
+  if (!send_all(request, sizeof(request)) ||
+      !recv_all(reply, sizeof(reply)) ||
+      reply[0] != 5 || reply[1] != 0) {
+    last_error_ = ERROR_CONNECTION_REFUSED;
+    closesocket(sock);
+    return false;
+  }
+
+  const char* http =
+      "GET /generate_204 HTTP/1.1\r\nHost: cp.cloudflare.com\r\nConnection: close\r\n\r\n";
+  if (!send_all(reinterpret_cast<const unsigned char*>(http), static_cast<int>(std::strlen(http)))) {
+    last_error_ = WSAGetLastError();
+    closesocket(sock);
+    return false;
+  }
+  char response[1024] = {};
+  const int got = recv(sock, response, sizeof(response) - 1, 0);
+  closesocket(sock);
+  if (got <= 0) {
+    last_error_ = WSAGetLastError();
+    return false;
+  }
+  const bool ok = std::string(response, got).find(" 204") != std::string::npos;
+  last_error_ = ok ? 0 : ERROR_INVALID_DATA;
+  return ok;
+}

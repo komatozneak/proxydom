@@ -36,8 +36,9 @@ class VpnController {
   Stream<VpnTrafficStats>? _trafficStream;
   Stream<int?>? _pingStream;
   String? windowsNotice;
+  String? windowsCode;
 
-  /// One share line through the Windows service (ADR 029).
+  /// One share line through the Windows broker (ADR 031).
   Future<bool> startWindowsShare(String uri) async {
     final domains = stripForceProxySuffixes(
       await SplitTunnelPrefs.enabledDomainSuffixes(),
@@ -47,6 +48,7 @@ class VpnController {
       directDomains: domains,
     );
     windowsNotice = result.notice;
+    windowsCode = result.code;
     return result.ok;
   }
 

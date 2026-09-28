@@ -9,6 +9,7 @@
 #include <ws2tcpip.h>
 #include <windows.h>
 #include <aclapi.h>
+#include <sddl.h>
 #include <shellapi.h>
 #include <winsvc.h>
 
@@ -24,8 +25,8 @@
 
 namespace {
 
-const wchar_t* kServiceName = L"ProxyDomTunnelService";
-const wchar_t* kPipeName = L"\\\\.\\pipe\\ProxyDomServicePipe";
+const wchar_t* kServiceName = L"ProxyDomBroker";
+const wchar_t* kPipeName = L"\\\\.\\pipe\\ProxyDomBrokerV3";
 
 SERVICE_STATUS_HANDLE g_status_handle = nullptr;
 SERVICE_STATUS g_status{};
@@ -41,9 +42,11 @@ std::wstring exe_dir() {
   return text.substr(0, slash);
 }
 
-std::wstring installed_ui_path() { return L"C:\\Program Files\\Proxy Dom\\proxy_dom.exe"; }
+std::wstring installed_controller_path() {
+  return L"C:\\Program Files\\Proxy Dom\\ProxyDomCtl.exe";
+}
 
-std::wstring sibling_ui_path() { return exe_dir() + L"\\proxy_dom.exe"; }
+std::wstring sibling_controller_path() { return exe_dir() + L"\\ProxyDomCtl.exe"; }
 
 std::wstring normalize_path(const std::wstring& path) {
   wchar_t full[MAX_PATH] = {};
@@ -56,7 +59,7 @@ bool same_path(const std::wstring& left, const std::wstring& right) {
          CSTR_EQUAL;
 }
 
-bool client_is_window(HANDLE pipe) {
+bool client_is_controller(HANDLE pipe) {
   ULONG pid = 0;
   if (!GetNamedPipeClientProcessId(pipe, &pid)) return false;
   HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
@@ -66,7 +69,8 @@ bool client_is_window(HANDLE pipe) {
   const BOOL ok = QueryFullProcessImageNameW(process, 0, image, &size);
   CloseHandle(process);
   if (!ok) return false;
-  return same_path(image, installed_ui_path()) || same_path(image, sibling_ui_path());
+  return same_path(image, installed_controller_path()) ||
+         same_path(image, sibling_controller_path());
 }
 
 void set_state(DWORD state, DWORD hint) {
@@ -83,6 +87,7 @@ struct App {
   Win32RouteTable routes;
   Win32Engine engine;
   Win32Resolver resolver;
+  Win32ConnectivityProbe probe;
   Win32SessionFiles files;
   Win32TunnelLog log;
   Win32Sleeper sleeper;
@@ -99,7 +104,7 @@ struct App {
 
   App()
       : engine(exe_dir() + L"\\sing-box.exe", proxy_dom_engine_config_path()),
-        supervisor(routes, engine, resolver, files, log, sleeper) {}
+        supervisor(routes, engine, resolver, probe, files, log, sleeper) {}
 
   void emit(const TunnelSnapshot& snap) {
     std::lock_guard<std::mutex> lock(pipe_mu);
@@ -191,21 +196,16 @@ struct App {
   }
 
   bool read_frame(HANDLE target, std::string& json) {
-    std::string buffer;
-    while (g_stop == nullptr || WaitForSingleObject(g_stop, 50) != WAIT_OBJECT_0) {
-      DWORD available = 0;
-      if (!PeekNamedPipe(target, nullptr, 0, nullptr, &available, nullptr)) return false;
-      if (available == 0) continue;
-      char chunk[512];
-      DWORD got = 0;
-      const DWORD take = available > sizeof(chunk) ? static_cast<DWORD>(sizeof(chunk)) : available;
-      if (!pipe_transfer(target, false, chunk, take, &got) || got == 0) return false;
-      buffer.append(chunk, got);
-      std::string error;
-      if (take_frame(buffer, json, error)) return error.empty();
-      if (!error.empty()) return false;
+    // Protocol frames are capped at 4100 bytes, so one message-mode read is
+    // complete and cannot be confused with bytes from the next command.
+    char frame[kFrameMaxBody + 4] = {};
+    DWORD got = 0;
+    if (!pipe_transfer(target, false, frame, sizeof(frame), &got) || got == 0) {
+      return false;
     }
-    return false;
+    std::string buffer(frame, got);
+    std::string error;
+    return take_frame(buffer, json, error) && error.empty() && buffer.empty();
   }
 
   void ack(const std::string& command, bool accepted, std::int64_t generation, const std::string& code,
@@ -238,6 +238,11 @@ struct App {
         ack("connect", false, supervisor.snapshot().generation, "protocol", user_message(TunnelCode::Protocol, {}));
         continue;
       }
+      if (command.protocol_version != 3) {
+        ack(command.command, false, supervisor.snapshot().generation, "protocol",
+            user_message(TunnelCode::Protocol, {}));
+        continue;
+      }
       if (command.command == "hello") {
         emit(supervisor.snapshot());
         continue;
@@ -254,10 +259,6 @@ struct App {
         continue;
       }
       if (command.command != "connect") continue;
-      if (command.protocol_version != 2) {
-        ack("connect", false, supervisor.snapshot().generation, "protocol", user_message(TunnelCode::Protocol, {}));
-        continue;
-      }
       const auto now = supervisor.snapshot();
       if (now.phase != TunnelPhase::Idle || !now.cleanup_verified) {
         const char* code = now.phase == TunnelPhase::Disconnecting || !now.cleanup_verified ? "cleanup_failed" : "busy";
@@ -278,9 +279,12 @@ struct App {
       post([this, request] { supervisor.run_connect(request, cancel); });
       ack("connect", true, begin.snap.generation, {}, {});
     }
-    cancel.request();
-    post([this] { supervisor.disconnect(cancel); });
-    wait_until_settled();
+    const auto leftover = supervisor.snapshot();
+    if (leftover.phase != TunnelPhase::Idle || !leftover.cleanup_verified) {
+      cancel.request();
+      post([this] { supervisor.disconnect(cancel); });
+      wait_until_settled();
+    }
     std::lock_guard<std::mutex> lock(pipe_mu);
     pipe = nullptr;
   }
@@ -304,28 +308,23 @@ DWORD WINAPI control_handler(DWORD control, DWORD, LPVOID, LPVOID) {
 }
 
 void run_pipe(App& app) {
-  EXPLICIT_ACCESS_W access{};
-  access.grfAccessPermissions = FILE_READ_DATA | FILE_WRITE_DATA | READ_CONTROL | SYNCHRONIZE;
-  access.grfAccessMode = SET_ACCESS;
-  access.grfInheritance = NO_INHERITANCE;
-  access.Trustee.TrusteeForm = TRUSTEE_IS_SID;
-  access.Trustee.TrusteeType = TRUSTEE_IS_WELL_KNOWN_GROUP;
-  SID_IDENTIFIER_AUTHORITY nt = SECURITY_NT_AUTHORITY;
-  PSID users = nullptr;
-  AllocateAndInitializeSid(&nt, 1, SECURITY_AUTHENTICATED_USER_RID, 0, 0, 0, 0, 0, 0, 0, &users);
-  access.Trustee.ptstrName = reinterpret_cast<LPWSTR>(users);
-  PACL acl = nullptr;
-  SetEntriesInAclW(1, &access, nullptr, &acl);
-  SECURITY_DESCRIPTOR sd{};
-  InitializeSecurityDescriptor(&sd, SECURITY_DESCRIPTOR_REVISION);
-  SetSecurityDescriptorDacl(&sd, TRUE, acl, FALSE);
+  PSECURITY_DESCRIPTOR sd = nullptr;
+  if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(
+          L"D:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;0x120003;;;AU)",
+          SDDL_REVISION_1, &sd, nullptr)) {
+    app.log.write(0, "pipe_acl", "sddl", GetLastError());
+    return;
+  }
   SECURITY_ATTRIBUTES sa{};
   sa.nLength = sizeof(sa);
-  sa.lpSecurityDescriptor = &sd;
+  sa.lpSecurityDescriptor = sd;
 
   while (WaitForSingleObject(g_stop, 0) != WAIT_OBJECT_0) {
-    HANDLE pipe = CreateNamedPipeW(kPipeName, PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
-                                   PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT, 1, 8192, 8192, 0, &sa);
+    HANDLE pipe = CreateNamedPipeW(
+        kPipeName, PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
+        PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT |
+            PIPE_REJECT_REMOTE_CLIENTS,
+        1, 8192, 8192, 0, &sa);
     if (pipe == INVALID_HANDLE_VALUE) {
       if (WaitForSingleObject(g_stop, 200) == WAIT_OBJECT_0) break;
       continue;
@@ -351,7 +350,7 @@ void run_pipe(App& app) {
       }
       CloseHandle(overlapped.hEvent);
     }
-    if (!ready || !client_is_window(pipe)) {
+    if (!ready || !client_is_controller(pipe)) {
       DisconnectNamedPipe(pipe);
       CloseHandle(pipe);
       continue;
@@ -360,8 +359,7 @@ void run_pipe(App& app) {
     DisconnectNamedPipe(pipe);
     CloseHandle(pipe);
   }
-  if (users != nullptr) FreeSid(users);
-  if (acl != nullptr) LocalFree(acl);
+  LocalFree(sd);
 }
 
 void WINAPI service_main(DWORD, LPWSTR*) {
@@ -414,10 +412,11 @@ int reconcile_standalone() {
   Win32RouteTable routes;
   Win32Engine engine(exe_dir() + L"\\sing-box.exe", proxy_dom_engine_config_path());
   Win32Resolver resolver;
+  Win32ConnectivityProbe probe;
   Win32SessionFiles files;
   Win32TunnelLog log;
   Win32Sleeper sleeper;
-  TunnelSupervisor supervisor(routes, engine, resolver, files, log, sleeper);
+  TunnelSupervisor supervisor(routes, engine, resolver, probe, files, log, sleeper);
   CancelFlag cancel;
   const TunnelSnapshot snap = supervisor.reconcile(cancel);
   WSACleanup();

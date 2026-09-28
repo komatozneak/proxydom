@@ -50,6 +50,12 @@ std::string build_singbox_config(const ShareLine& line,
                                  const std::string& server_ip,
                                  const std::vector<std::string>& domains);
 
+// First prove the key through a loopback SOCKS endpoint. This config has no
+// TUN inbound, auto_route, DNS hijack, or other system-network mutation.
+std::string build_singbox_probe_config(const ShareLine& line,
+                                       const std::string& server_ip,
+                                       unsigned short listen_port);
+
 std::string state_event(std::int64_t generation,
                         const std::string& state,
                         const std::string* message);

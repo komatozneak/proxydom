@@ -453,7 +453,10 @@ class VpnNotifier extends Notifier<VpnStatus> {
     if (windowsDesktop) {
       final notice = VpnController.instance.windowsNotice;
       if (notice != null && notice.isNotEmpty) {
-        return VpnError(message: notice, code: 'windows_notice');
+        return VpnError(
+          message: notice,
+          code: VpnController.instance.windowsCode ?? 'windows_broker',
+        );
       }
     }
     final conflict = await VpnController.instance.queryVpnConflict();
@@ -1141,7 +1144,8 @@ class VpnNotifier extends Notifier<VpnStatus> {
                 );
           started = raw && _dialGen == dial;
         } else if (windowsDesktop && windowsDialScheme(imported.scheme)) {
-          started = await VpnController.instance.startWindowsShare(imported.raw);
+          started =
+              await VpnController.instance.startWindowsShare(imported.raw);
         } else if (canDialScheme(imported.scheme, ios: false) &&
             defaultTargetPlatform == TargetPlatform.android) {
           final xrayJson = buildXraySocksConfig(imported);
@@ -1175,8 +1179,17 @@ class VpnNotifier extends Notifier<VpnStatus> {
         }
         if (await _abortStaleConnect(gen)) return;
         if (!started) {
-          SessionTrace.mark('fail', {'code': 'start'});
-          state = await _errorForStartFailure();
+          final startError = await _errorForStartFailure();
+          SessionTrace.mark('fail', {'code': startError.code});
+          ProductLog.event(
+            'vpn.connect_fail',
+            level: ProductLogLevel.error,
+            fields: {
+              'code': startError.code,
+              if (windowsDesktop) 'source': 'windows_broker',
+            },
+          );
+          state = startError;
           return;
         }
         if (windowsDesktop) {
@@ -1343,8 +1356,9 @@ class VpnNotifier extends Notifier<VpnStatus> {
     // If stop() hangs, don't leave Nest spinning forever.
     _cancelDisconnectWatchdog();
     _disconnectWatchdog = Timer(
-      windowsDesktop ? const Duration(seconds: 20) : const Duration(seconds: 10),
-      () async {
+        windowsDesktop
+            ? const Duration(seconds: 20)
+            : const Duration(seconds: 10), () async {
       ProductLog.event(
         'vpn.disconnect',
         level: ProductLogLevel.warn,
@@ -1376,7 +1390,9 @@ class VpnNotifier extends Notifier<VpnStatus> {
           ? VpnController.instance.wipeSession(reason: reason)
           : VpnController.instance.stop(reason: reason);
       restored = await stop.timeout(
-        windowsDesktop ? const Duration(seconds: 20) : const Duration(seconds: 10),
+        windowsDesktop
+            ? const Duration(seconds: 20)
+            : const Duration(seconds: 10),
       );
     } on TimeoutException catch (e) {
       restored = false;
@@ -1419,7 +1435,8 @@ class VpnNotifier extends Notifier<VpnStatus> {
               'Сеть не восстановлена. Повторите отключение',
           code: 'windows_notice',
         );
-      } else if (after == VpnNativeStatus.connected && !_suppressAutoReconnect) {
+      } else if (after == VpnNativeStatus.connected &&
+          !_suppressAutoReconnect) {
         // stop did not tear down — stay honest with native.
         await _enterConnected(freshSession: false);
       } else {

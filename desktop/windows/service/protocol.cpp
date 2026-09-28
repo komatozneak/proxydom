@@ -443,9 +443,9 @@ std::string state_event(std::int64_t generation, const std::string& state, const
   return out.str();
 }
 
-std::string build_singbox_config(const ShareLine& line,
-                                 const std::string& server_ip,
-                                 const std::vector<std::string>& domains) {
+namespace {
+
+std::string proxy_outbound(const ShareLine& line, const std::string& server_ip) {
   if (server_ip.empty() || server_ip.find(':') != std::string::npos) return {};
   std::ostringstream outbound;
   if (line.scheme == "hysteria2") {
@@ -481,6 +481,33 @@ std::string build_singbox_config(const ShareLine& line,
     }
     outbound << "}}";
   }
+  return outbound.str();
+}
+
+}  // namespace
+
+std::string build_singbox_probe_config(const ShareLine& line,
+                                       const std::string& server_ip,
+                                       unsigned short listen_port) {
+  if (listen_port == 0) return {};
+  const std::string outbound = proxy_outbound(line, server_ip);
+  if (outbound.empty()) return {};
+  std::ostringstream config;
+  config << "{"
+         << "\"log\":{\"level\":\"warn\"},"
+         << "\"inbounds\":[{\"type\":\"mixed\",\"tag\":\"probe-in\",\"listen\":\"127.0.0.1\","
+         << "\"listen_port\":" << listen_port << "}],"
+         << "\"outbounds\":[" << outbound << "],"
+         << "\"route\":{\"final\":\"proxy\"}"
+         << "}";
+  return config.str();
+}
+
+std::string build_singbox_config(const ShareLine& line,
+                                 const std::string& server_ip,
+                                 const std::vector<std::string>& domains) {
+  const std::string outbound = proxy_outbound(line, server_ip);
+  if (outbound.empty()) return {};
 
   std::ostringstream rules;
   rules << "{\"action\":\"sniff\"},{\"protocol\":\"dns\",\"action\":\"hijack-dns\"},"
@@ -502,7 +529,7 @@ std::string build_singbox_config(const ShareLine& line,
          << "\"route_address\":[\"0.0.0.0/1\",\"128.0.0.0/1\"],"
          << "\"route_exclude_address\":[\"10.0.0.0/8\",\"172.16.0.0/12\",\"192.168.0.0/16\","
          << "\"127.0.0.0/8\",\"fc00::/7\",\"fe80::/10\"]}],"
-         << "\"outbounds\":[" << outbound.str() << ",{\"type\":\"direct\",\"tag\":\"direct\"}],"
+         << "\"outbounds\":[" << outbound << ",{\"type\":\"direct\",\"tag\":\"direct\"}],"
          << "\"route\":{\"auto_detect_interface\":true,\"final\":\"proxy\",\"rules\":[" << rules.str() << "]}"
          << "}";
   return config.str();

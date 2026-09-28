@@ -16,7 +16,7 @@ void expect(bool ok, const char* label) {
 }  // namespace
 
 int main() {
-  const std::string hello = "{\"command\":\"hello\",\"protocol_version\":1}";
+  const std::string hello = "{\"command\":\"hello\",\"protocol_version\":3}";
   const auto framed = encode_frame(hello);
   expect(framed.size() == 4 + hello.size(), "frame size");
   std::string buffer = framed + framed;
@@ -36,7 +36,7 @@ int main() {
   ClientCommand command;
   error.clear();
   expect(parse_command(hello, command, error), "parse hello");
-  expect(command.command == "hello" && command.protocol_version == 1, "hello fields");
+  expect(command.command == "hello" && command.protocol_version == 3, "hello fields");
 
   error.clear();
   expect(!parse_command("{\"command\":\"connect\",\"outbounds\":[]}", command, error), "reject outbounds");
@@ -69,6 +69,12 @@ int main() {
   expect(config.find("secret+pass") != std::string::npos, "password reaches the engine config");
   expect(config.find("172.19.0.1") == std::string::npos, "tun prefix stays outside 172.16/12");
   expect(build_singbox_config(line, "2001:db8::1", {}).empty(), "refuse ipv6 pin");
+  const auto probe = build_singbox_probe_config(line, "203.0.113.10", 17890);
+  expect(probe.find("\"type\":\"mixed\"") != std::string::npos, "probe has loopback proxy");
+  expect(probe.find("\"listen\":\"127.0.0.1\"") != std::string::npos, "probe is loopback only");
+  expect(probe.find("\"listen_port\":17890") != std::string::npos, "probe port");
+  expect(probe.find("\"type\":\"tun\"") == std::string::npos, "probe has no tun");
+  expect(probe.find("auto_route") == std::string::npos, "probe changes no routes");
 
   ShareLine vless;
   error.clear();

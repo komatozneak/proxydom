@@ -22,7 +22,7 @@
 
     <Feature Id="Main" Title="Прокси Дом" Level="1">
       <ComponentGroupRef Id="AppFiles" />
-      <ComponentRef Id="ServiceComponent" />
+      <ComponentRef Id="BrokerComponent" />
       <ComponentRef Id="StartMenuComponent" />
       <ComponentRef Id="DesktopShortcutComponent" />
     </Feature>
@@ -37,15 +37,15 @@
 
     <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
       <Files Include="$(var.PayloadDir)\**">
-        <Exclude Files="$(var.PayloadDir)\ProxyDomTunnelService.exe" />
+        <Exclude Files="$(var.PayloadDir)\ProxyDomBroker.exe" />
       </Files>
     </ComponentGroup>
 
-    <Component Id="ServiceComponent" Directory="INSTALLFOLDER" Guid="A7E3C1D2-4B58-4F0A-9C21-6D8E5B0A11F4">
-      <File Id="ServiceExe" Source="$(var.PayloadDir)\ProxyDomTunnelService.exe" KeyPath="yes" />
+    <Component Id="BrokerComponent" Directory="INSTALLFOLDER" Guid="D4C7168B-5E2A-4D9F-A3B1-7C8E926F1045">
+      <File Id="ServiceExe" Source="$(var.PayloadDir)\ProxyDomBroker.exe" KeyPath="yes" />
       <ServiceInstall
-          Id="ProxyDomTunnelServiceInstall"
-          Name="ProxyDomTunnelService"
+          Id="ProxyDomBrokerInstall"
+          Name="ProxyDomBroker"
           DisplayName="Прокси Дом"
           Description="Локальный туннель Прокси Дом"
           Start="auto"
@@ -55,15 +55,15 @@
           Vital="yes" />
       <!-- A killed service comes back and reconciles its own routes before the next connect. -->
       <util:ServiceConfig
-          ServiceName="ProxyDomTunnelService"
+          ServiceName="ProxyDomBroker"
           FirstFailureActionType="restart"
           SecondFailureActionType="restart"
           ThirdFailureActionType="restart"
           RestartServiceDelayInSeconds="5"
           ResetPeriodInDays="1" />
       <ServiceControl
-          Id="ProxyDomTunnelServiceControl"
-          Name="ProxyDomTunnelService"
+          Id="ProxyDomBrokerControl"
+          Name="ProxyDomBroker"
           Start="install"
           Stop="both"
           Remove="uninstall"

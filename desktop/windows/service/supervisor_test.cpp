@@ -132,6 +132,7 @@ class FakeEngine : public EngineHost {
  public:
   bool running = false;
   bool job_ok = true;
+  int fail_assign_on = 0;
   bool graceful = false;
   bool unkillable = false;
   int kill_calls = 0;
@@ -147,7 +148,7 @@ class FakeEngine : public EngineHost {
   }
   bool assign_job() override {
     ++assign_calls;
-    return job_ok;
+    return job_ok && assign_calls != fail_assign_on;
   }
   bool resume() override {
     ++resume_calls;
@@ -178,6 +179,27 @@ class FakeNames : public NameResolver {
     ip = host == "cp.cloudflare.com" ? "1.1.1.1" : "203.0.113.10";
     return true;
   }
+};
+
+class FakeProbe : public ConnectivityProbe {
+ public:
+  bool ok = true;
+  int calls = 0;
+  CancelFlag* cancel = nullptr;
+  bool cancel_during = false;
+
+  bool pick_loopback_port(unsigned short& port) override {
+    port = 17890;
+    return true;
+  }
+  bool prove_socks(unsigned short,
+                   const std::string&,
+                   const std::function<bool()>& cancelled) override {
+    ++calls;
+    if (cancel_during && cancel != nullptr) cancel->request();
+    return ok && (!cancelled || !cancelled());
+  }
+  unsigned long last_error() const override { return 0; }
 };
 
 class FakeFiles : public SessionFiles {
@@ -234,13 +256,17 @@ struct Harness {
   FakeRoutes routes;
   FakeEngine engine;
   FakeNames names;
+  FakeProbe probe;
   FakeFiles files;
   FakeLog log;
   FakeSleep sleeper;
   TunnelSupervisor supervisor;
   CancelFlag cancel;
 
-  Harness() : supervisor(routes, engine, names, files, log, sleeper) { routes.cancel = &cancel; }
+  Harness() : supervisor(routes, engine, names, probe, files, log, sleeper) {
+    routes.cancel = &cancel;
+    probe.cancel = &cancel;
+  }
 
   ConnectRequest request() const {
     ConnectRequest req;
@@ -296,6 +322,27 @@ void test_radmin_allows_connect() {
   expect(encode_ledger(harness.supervisor.ledger_copy()).find("hide") == std::string::npos, "ledger has no obfs secret");
 }
 
+void test_bad_key_never_mutates_routes() {
+  Harness harness;
+  harness.probe.ok = false;
+  const auto snap = harness.connect();
+  expect(snap.code == TunnelCode::KeyProbeFailed, "bad key has probe code");
+  expect(snap.phase == TunnelPhase::Idle && snap.cleanup_verified, "bad key restores");
+  expect(harness.probe.calls == 1, "bad key was probed");
+  expect(harness.routes.add_calls == 0, "bad key adds no route");
+  expect(!harness.routes.pin_present && !harness.files.config, "bad key leaves no resources");
+}
+
+void test_cancel_during_key_probe_never_mutates_routes() {
+  Harness harness;
+  harness.probe.cancel_during = true;
+  const auto snap = harness.connect();
+  expect(snap.code == TunnelCode::None, "probe cancel is not key failure");
+  expect(snap.phase == TunnelPhase::Idle && snap.cleanup_verified, "probe cancel restores");
+  expect(harness.routes.add_calls == 0, "probe cancel adds no route");
+  expect(!harness.engine.running && !harness.files.config, "probe cancel removes process and config");
+}
+
 void test_cancel_before_and_after_pin() {
   Harness early;
   early.supervisor.set_hook([&](ConnectStep step) {
@@ -327,6 +374,17 @@ void test_job_assignment_is_mandatory() {
   expect(harness.engine.kill_calls >= 1, "untracked process is killed");
   expect(!harness.engine.running, "process is gone");
   expect(!harness.routes.pin_present, "pin removed after job failure");
+}
+
+void test_tun_job_failure_restores_pin() {
+  Harness harness;
+  harness.engine.fail_assign_on = 2;
+  const auto snap = harness.connect();
+  expect(snap.code == TunnelCode::CoreStartFailed, "tun job failure code");
+  expect(snap.phase == TunnelPhase::Idle && snap.cleanup_verified, "tun job failure restores");
+  expect(harness.routes.add_calls == 1, "tun job failure happened after pin");
+  expect(!harness.routes.pin_present, "tun job failure removes pin");
+  expect(harness.engine.resume_calls == 1, "untracked tun process never resumes");
 }
 
 void test_engine_death_and_probe_failure() {
@@ -472,8 +530,11 @@ int main() {
   test_route_policy();
   test_foreign_blocks_before_pin();
   test_radmin_allows_connect();
+  test_bad_key_never_mutates_routes();
+  test_cancel_during_key_probe_never_mutates_routes();
   test_cancel_before_and_after_pin();
   test_job_assignment_is_mandatory();
+  test_tun_job_failure_restores_pin();
   test_engine_death_and_probe_failure();
   test_cleanup_failure_is_not_idle();
   test_reconcile_dirty_ledger();
