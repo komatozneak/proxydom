@@ -62,6 +62,10 @@ int main() {
   expect(config.find("198.18.0.2") != std::string::npos, "dns address");
   expect(config.find("salamander") != std::string::npos, "obfs in config");
   expect(config.find("lan.example") != std::string::npos, "direct domain");
+  expect(config.find("1000:2000") != std::string::npos, "hop range uses a colon");
+  expect(config.find("1000-2000") == std::string::npos, "hop range is not a hyphen");
+  expect(config.find("\"action\":\"hijack-dns\"") != std::string::npos, "dns hijack rule");
+  expect(config.find("\"server\":\"1.1.1.1\"") != std::string::npos, "dns server");
   expect(config.find("secret+pass") != std::string::npos, "password reaches the engine config");
   expect(config.find("172.19.0.1") == std::string::npos, "tun prefix stays outside 172.16/12");
   expect(build_singbox_config(line, "2001:db8::1", {}).empty(), "refuse ipv6 pin");
@@ -75,6 +79,17 @@ int main() {
   expect(vless_config.find("\"public_key\":\"pub\"") != std::string::npos, "reality public key");
   expect(vless_config.find("private_key") == std::string::npos, "no server private key");
   expect(vless_config.find("xtls-rprx-vision") != std::string::npos, "flow");
+
+  const auto restored = state_event_v2(7, "idle", "", "", true);
+  expect(restored.find("\"cleanup_verified\":true") != std::string::npos, "verified idle flag");
+  expect(restored.find("\"code\":null") != std::string::npos, "empty code is null");
+  const auto failed = state_event_v2(7, "disconnecting", "cleanup_failed", "Сеть не восстановлена", false);
+  expect(failed.find("\"cleanup_verified\":false") != std::string::npos, "unverified cleanup flag");
+  expect(failed.find("cleanup_failed") != std::string::npos, "cleanup code");
+  const auto ack = ack_event("connect", false, 7, "foreign_tunnel", "Уже включён другой туннель");
+  expect(ack.find("\"event\":\"ack\"") != std::string::npos, "ack event");
+  expect(ack.find("\"accepted\":false") != std::string::npos, "ack rejected");
+  expect(ack.find("foreign_tunnel") != std::string::npos, "ack code");
 
   expect(own_adapter_name(L"ProxyDomTun"), "own tun");
   expect(own_adapter_name(L"teremokhy2"), "legacy tun");

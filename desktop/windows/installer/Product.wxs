@@ -11,6 +11,8 @@
       Language="1049"
       Codepage="1251">
     <MajorUpgrade DowngradeErrorMessage="Уже установлена более новая версия." />
+    <!-- Flutter keeps FileVersion 1.0.0+N. Equal versions would leave the old window in place. -->
+    <Property Id="REINSTALLMODE" Value="amus" />
     <MediaTemplate EmbedCab="yes" />
     <Icon Id="AppIcon" SourceFile="$(var.PayloadDir)\proxy_dom.exe" />
     <Property Id="ARPPRODUCTICON" Value="AppIcon" />
@@ -22,6 +24,7 @@
       <ComponentGroupRef Id="AppFiles" />
       <ComponentRef Id="ServiceComponent" />
       <ComponentRef Id="StartMenuComponent" />
+      <ComponentRef Id="DesktopShortcutComponent" />
     </Feature>
 
     <StandardDirectory Id="ProgramFiles64Folder">
@@ -30,6 +33,7 @@
     <StandardDirectory Id="ProgramMenuFolder">
       <Directory Id="ProgramMenuDir" Name="Прокси Дом" />
     </StandardDirectory>
+    <StandardDirectory Id="DesktopFolder" />
 
     <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
       <Files Include="$(var.PayloadDir)\**">
@@ -49,6 +53,14 @@
           Account="LocalSystem"
           ErrorControl="normal"
           Vital="yes" />
+      <!-- A killed service comes back and reconciles its own routes before the next connect. -->
+      <util:ServiceConfig
+          ServiceName="ProxyDomTunnelService"
+          FirstFailureActionType="restart"
+          SecondFailureActionType="restart"
+          ThirdFailureActionType="restart"
+          RestartServiceDelayInSeconds="5"
+          ResetPeriodInDays="1" />
       <ServiceControl
           Id="ProxyDomTunnelServiceControl"
           Name="ProxyDomTunnelService"
@@ -70,6 +82,23 @@
           Root="HKLM"
           Key="Software\Proxy Dom"
           Name="Installed"
+          Type="integer"
+          Value="1"
+          KeyPath="yes" />
+    </Component>
+
+    <Component Id="DesktopShortcutComponent" Directory="DesktopFolder" Guid="C9A5E3F4-6D70-412C-9E43-8F0A7D2C33B6">
+      <Shortcut
+          Id="DesktopShortcut"
+          Name="Прокси Дом"
+          Description="Прокси Дом"
+          Target="[INSTALLFOLDER]proxy_dom.exe"
+          WorkingDirectory="INSTALLFOLDER"
+          Icon="AppIcon" />
+      <RegistryValue
+          Root="HKLM"
+          Key="Software\Proxy Dom"
+          Name="DesktopShortcut"
           Type="integer"
           Value="1"
           KeyPath="yes" />
@@ -100,5 +129,18 @@
         Execute="immediate"
         Impersonate="yes"
         Return="asyncNoWait" />
+    <CustomAction
+        Id="ReconcileProxyDomTunnel"
+        FileRef="ServiceExe"
+        ExeCommand="--reconcile"
+        Execute="deferred"
+        Impersonate="no"
+        Return="check" />
+    <InstallExecuteSequence>
+      <Custom
+          Action="ReconcileProxyDomTunnel"
+          Before="StopServices"
+          Condition="REMOVE=&quot;ALL&quot; OR UPGRADINGPRODUCTCODE" />
+    </InstallExecuteSequence>
   </Package>
 </Wix>

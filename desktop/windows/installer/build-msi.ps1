@@ -66,7 +66,7 @@ New-Item -ItemType Directory -Force -Path $Payload | Out-Null
 $serviceOut = Join-Path $Payload "ProxyDomTunnelService.exe"
 Push-Location $Service
 try {
-    cmd /c "call `"$vcvars`" >nul && cl /nologo /std:c++17 /EHsc /W3 /DUNICODE /D_UNICODE /Fe:`"$serviceOut`" service.cpp protocol.cpp cleanup.cpp /link /SUBSYSTEM:WINDOWS ws2_32.lib iphlpapi.lib setupapi.lib advapi32.lib"
+    cmd /c "call `"$vcvars`" >nul && cl /nologo /std:c++17 /EHsc /W3 /utf-8 /DUNICODE /D_UNICODE /Fe:`"$serviceOut`" service.cpp protocol.cpp session_supervisor.cpp network_owner.cpp process_host.cpp session_store.cpp /link /SUBSYSTEM:WINDOWS ws2_32.lib iphlpapi.lib setupapi.lib advapi32.lib shell32.lib"
     if ($LASTEXITCODE -ne 0) { throw "Service compile failed." }
 } finally {
     Pop-Location

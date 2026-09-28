@@ -16,6 +16,7 @@ import '../../vpn/data/subscription_label.dart';
 import '../../vpn/data/vpn_config.dart';
 import '../../vpn/data/vpn_controller.dart';
 import '../../vpn/data/windows_tunnel.dart';
+import '../../vpn/data/windows_tunnel_protocol.dart';
 import '../../vpn/data/vpn_nodes_repository.dart';
 import '../../vpn/data/vpn_service_config.dart';
 import '../../vpn/data/vpn_session_meta.dart';
@@ -205,6 +206,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
 
   StreamSubscription<VpnNativeStatus>? _statusSubscription;
   StreamSubscription<VpnSessionSnapshot>? _sessionSubscription;
+  StreamSubscription<TunnelStateEvent>? _windowsSub;
   Timer? _reconnectTimer;
   Timer? _connectingPoll;
   Timer? _disconnectWatchdog;
@@ -702,6 +704,11 @@ class VpnNotifier extends Notifier<VpnStatus> {
 
   Future<void> _syncFromNativeBody() async {
     try {
+      if (windowsDesktop) {
+        try {
+          await WindowsTunnel.instance.refresh();
+        } catch (_) {}
+      }
       // Always-on restore races: service may briefly report preparing/idle.
       VpnNativeStatus? native;
       for (var attempt = 0; attempt < 5; attempt++) {
@@ -730,6 +737,14 @@ class VpnNotifier extends Notifier<VpnStatus> {
           return;
         }
         await _enterConnected(freshSession: false);
+        return;
+      }
+      if (windowsDesktop && native == VpnNativeStatus.disconnecting) {
+        state = VpnError(
+          message: WindowsTunnel.instance.notice ??
+              'Сеть не восстановлена. Повторите отключение',
+          code: 'windows_notice',
+        );
         return;
       }
       if (native == VpnNativeStatus.connecting ||
@@ -1327,7 +1342,9 @@ class VpnNotifier extends Notifier<VpnStatus> {
 
     // If stop() hangs, don't leave Nest spinning forever.
     _cancelDisconnectWatchdog();
-    _disconnectWatchdog = Timer(const Duration(seconds: 10), () async {
+    _disconnectWatchdog = Timer(
+      windowsDesktop ? const Duration(seconds: 20) : const Duration(seconds: 10),
+      () async {
       ProductLog.event(
         'vpn.disconnect',
         level: ProductLogLevel.warn,
@@ -1335,6 +1352,14 @@ class VpnNotifier extends Notifier<VpnStatus> {
       );
       _vpnLog('[VPN] disconnect watchdog fired ui=$state');
       _connectInFlight = null;
+      if (windowsDesktop && !WindowsTunnel.instance.cleanupVerified) {
+        state = VpnError(
+          message: WindowsTunnel.instance.notice ??
+              'Сеть не восстановлена. Повторите отключение',
+          code: 'windows_notice',
+        );
+        return;
+      }
       final still = await VpnController.instance.getStatus();
       if (still == VpnNativeStatus.connected && !_suppressAutoReconnect) {
         await _enterConnected(freshSession: false);
@@ -1345,12 +1370,16 @@ class VpnNotifier extends Notifier<VpnStatus> {
       }
     });
 
+    var restored = true;
     try {
       final stop = wipeNativeSession
           ? VpnController.instance.wipeSession(reason: reason)
           : VpnController.instance.stop(reason: reason);
-      await stop.timeout(const Duration(seconds: 10));
+      restored = await stop.timeout(
+        windowsDesktop ? const Duration(seconds: 20) : const Duration(seconds: 10),
+      );
     } on TimeoutException catch (e) {
+      restored = false;
       ProductLog.event(
         'vpn.disconnect',
         level: ProductLogLevel.warn,
@@ -1359,6 +1388,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
       _vpnLog('[VPN] disconnect stop timeout: $e');
       if (wipeNativeSession) rethrow;
     } catch (e) {
+      restored = false;
       ProductLog.event(
         'vpn.disconnect',
         level: ProductLogLevel.error,
@@ -1379,7 +1409,17 @@ class VpnNotifier extends Notifier<VpnStatus> {
       _autoReconnectArmed = false;
       _connectInFlight = null;
       _subscribeToStatus();
-      if (after == VpnNativeStatus.connected && !_suppressAutoReconnect) {
+      if (windowsDesktop &&
+          (!restored ||
+              after == VpnNativeStatus.disconnecting ||
+              !WindowsTunnel.instance.cleanupVerified)) {
+        state = VpnError(
+          message: VpnController.instance.windowsNotice ??
+              WindowsTunnel.instance.notice ??
+              'Сеть не восстановлена. Повторите отключение',
+          code: 'windows_notice',
+        );
+      } else if (after == VpnNativeStatus.connected && !_suppressAutoReconnect) {
         // stop did not tear down — stay honest with native.
         await _enterConnected(freshSession: false);
       } else {
@@ -1457,9 +1497,41 @@ class VpnNotifier extends Notifier<VpnStatus> {
     _statusSubscription = null;
     _sessionSubscription?.cancel();
     _sessionSubscription = null;
+    _windowsSub?.cancel();
+    _windowsSub = null;
+  }
+
+  void _onWindowsState(TunnelStateEvent event) {
+    if (event.event != 'state') return;
+    if (event.code == 'cleanup_failed') {
+      state = VpnError(
+        message: event.message ?? 'Сеть не восстановлена. Повторите отключение',
+        code: 'windows_notice',
+      );
+      return;
+    }
+    if (_connectInFlight != null) return;
+    if (event.state != 'idle' || event.cleanupVerified != true) return;
+    if (event.code != null && event.code!.isNotEmpty) {
+      state = VpnError(message: event.message ?? '', code: 'windows_notice');
+      return;
+    }
+    if (event.message != null &&
+        event.message!.isNotEmpty &&
+        event.message != 'Соединение прервано') {
+      state = VpnError(message: event.message!, code: 'windows_notice');
+      return;
+    }
+    if (state is VpnConnected || state is VpnConnecting) {
+      state = const VpnDisconnected();
+    }
   }
 
   void _subscribeToStatus() {
+    if (windowsDesktop) {
+      _windowsSub ??= WindowsTunnel.instance.states.listen(_onWindowsState);
+      return;
+    }
     _statusSubscription ??= VpnController.instance.statusStream.listen(
       _onNativeStatus,
       onError: (Object e) {

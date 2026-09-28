@@ -404,6 +404,35 @@ bool parse_share_line(const std::string& raw, ShareLine& out, std::string& error
   return true;
 }
 
+std::string json_or_null(const std::string& text) {
+  if (text.empty()) return "null";
+  return "\"" + json_escape(text) + "\"";
+}
+
+std::string state_event_v2(std::int64_t generation,
+                           const std::string& state,
+                           const std::string& code,
+                           const std::string& message,
+                           bool cleanup_verified) {
+  std::ostringstream out;
+  out << "{\"event\":\"state\",\"generation\":" << generation << ",\"state\":\"" << json_escape(state)
+      << "\",\"code\":" << json_or_null(code) << ",\"message\":" << json_or_null(message)
+      << ",\"cleanup_verified\":" << (cleanup_verified ? "true" : "false") << "}";
+  return out.str();
+}
+
+std::string ack_event(const std::string& command,
+                      bool accepted,
+                      std::int64_t generation,
+                      const std::string& code,
+                      const std::string& message) {
+  std::ostringstream out;
+  out << "{\"event\":\"ack\",\"command\":\"" << json_escape(command) << "\",\"accepted\":"
+      << (accepted ? "true" : "false") << ",\"generation\":" << generation << ",\"code\":" << json_or_null(code)
+      << ",\"message\":" << json_or_null(message) << "}";
+  return out.str();
+}
+
 std::string state_event(std::int64_t generation, const std::string& state, const std::string* message) {
   std::ostringstream out;
   out << "{\"event\":\"state\",\"generation\":" << generation << ",\"state\":\"" << json_escape(state)
@@ -423,7 +452,11 @@ std::string build_singbox_config(const ShareLine& line,
     outbound << "{\"type\":\"hysteria2\",\"tag\":\"proxy\",\"server\":\"" << json_escape(server_ip)
              << "\",\"server_port\":" << line.port;
     if (!line.server_ports.empty()) {
-      outbound << ",\"server_ports\":[\"" << json_escape(line.server_ports) << "\"]";
+      std::string ports = line.server_ports;
+      for (char& c : ports) {
+        if (c == '-') c = ':';
+      }
+      outbound << ",\"server_ports\":[\"" << json_escape(ports) << "\"]";
     }
     if (!line.hop_interval.empty()) {
       outbound << ",\"hop_interval\":\"" << json_escape(line.hop_interval) << "\"";
@@ -450,7 +483,8 @@ std::string build_singbox_config(const ShareLine& line,
   }
 
   std::ostringstream rules;
-  rules << "{\"ip_cidr\":[\"10.0.0.0/8\",\"172.16.0.0/12\",\"192.168.0.0/16\",\"127.0.0.0/8\","
+  rules << "{\"action\":\"sniff\"},{\"protocol\":\"dns\",\"action\":\"hijack-dns\"},"
+           "{\"ip_cidr\":[\"10.0.0.0/8\",\"172.16.0.0/12\",\"192.168.0.0/16\",\"127.0.0.0/8\","
            "\"fc00::/7\",\"fe80::/10\"],\"outbound\":\"direct\"}";
   for (const auto& domain : domains) {
     if (!domain_allowed(domain)) continue;
@@ -460,6 +494,8 @@ std::string build_singbox_config(const ShareLine& line,
   std::ostringstream config;
   config << "{"
          << "\"log\":{\"level\":\"info\"},"
+         << "\"dns\":{\"servers\":[{\"type\":\"udp\",\"tag\":\"remote\",\"server\":\"1.1.1.1\","
+         << "\"server_port\":53,\"detour\":\"proxy\"}],\"strategy\":\"ipv4_only\",\"final\":\"remote\"},"
          << "\"inbounds\":[{\"type\":\"tun\",\"tag\":\"tun-in\",\"interface_name\":\"ProxyDomTun\","
          << "\"address\":[\"198.18.0.1/30\"],\"auto_route\":true,\"strict_route\":true,"
          << "\"dns_mode\":\"hijack\",\"dns_address\":[\"198.18.0.2\"],"

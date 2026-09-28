@@ -303,8 +303,9 @@ class VpnController {
 
   Future<bool> stop({String reason = 'user_tap'}) async {
     if (windowsDesktop) {
-      await WindowsTunnel.instance.disconnect();
-      return true;
+      final restored = await WindowsTunnel.instance.disconnect();
+      windowsNotice = WindowsTunnel.instance.notice;
+      return restored;
     }
     try {
       final result = await _methodChannel.invokeMethod<bool>(

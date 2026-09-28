@@ -53,3 +53,16 @@ std::string build_singbox_config(const ShareLine& line,
 std::string state_event(std::int64_t generation,
                         const std::string& state,
                         const std::string* message);
+
+// Protocol 2. An empty code or message is JSON null. cleanup_verified is explicit
+// because a missing flag must not be treated as a restored network.
+std::string state_event_v2(std::int64_t generation,
+                           const std::string& state,
+                           const std::string& code,
+                           const std::string& message,
+                           bool cleanup_verified);
+std::string ack_event(const std::string& command,
+                      bool accepted,
+                      std::int64_t generation,
+                      const std::string& code,
+                      const std::string& message);
