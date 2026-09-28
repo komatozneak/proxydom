@@ -2,6 +2,7 @@
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <aclapi.h>
 #include <sddl.h>
 
 #include <atomic>
@@ -34,27 +35,6 @@ bool same_path(const std::wstring& left, const std::wstring& right) {
          CSTR_EQUAL;
 }
 
-bool process_is_local_system(HANDLE process) {
-  HANDLE token = nullptr;
-  if (!OpenProcessToken(process, TOKEN_QUERY, &token)) return false;
-  DWORD bytes = 0;
-  GetTokenInformation(token, TokenUser, nullptr, 0, &bytes);
-  std::vector<unsigned char> storage(bytes);
-  const bool read =
-      bytes != 0 &&
-      GetTokenInformation(token, TokenUser, storage.data(), bytes, &bytes);
-  CloseHandle(token);
-  if (!read) return false;
-
-  unsigned char local_system[SECURITY_MAX_SID_SIZE] = {};
-  DWORD sid_size = sizeof(local_system);
-  if (!CreateWellKnownSid(WinLocalSystemSid, nullptr, local_system, &sid_size)) {
-    return false;
-  }
-  const auto* user = reinterpret_cast<const TOKEN_USER*>(storage.data());
-  return EqualSid(user->User.Sid, local_system) == TRUE;
-}
-
 bool trusted_server(HANDLE pipe) {
   ULONG pid = 0;
   if (!GetNamedPipeServerProcessId(pipe, &pid) || pid == 0) return false;
@@ -65,11 +45,26 @@ bool trusted_server(HANDLE pipe) {
   DWORD size = MAX_PATH;
   const bool named =
       QueryFullProcessImageNameW(process, 0, image, &size) == TRUE;
-  const bool trusted =
-      named && process_is_local_system(process) &&
-      same_path(image, exe_dir() + L"\\ProxyDomBroker.exe");
   CloseHandle(process);
-  return trusted;
+  if (!named) return false;
+
+  PSID owner = nullptr;
+  PSECURITY_DESCRIPTOR sd = nullptr;
+  const DWORD rc =
+      GetSecurityInfo(pipe, SE_KERNEL_OBJECT, OWNER_SECURITY_INFORMATION,
+                      &owner, nullptr, nullptr, nullptr, &sd);
+  if (rc != ERROR_SUCCESS || owner == nullptr) {
+    if (sd != nullptr) LocalFree(sd);
+    return false;
+  }
+  unsigned char local_system[SECURITY_MAX_SID_SIZE] = {};
+  DWORD sid_size = sizeof(local_system);
+  const bool system =
+      CreateWellKnownSid(WinLocalSystemSid, nullptr, local_system, &sid_size) ==
+          TRUE &&
+      EqualSid(owner, local_system) == TRUE;
+  LocalFree(sd);
+  return system && same_path(image, exe_dir() + L"\\ProxyDomBroker.exe");
 }
 
 HANDLE open_broker() {

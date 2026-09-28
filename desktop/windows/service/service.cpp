@@ -309,8 +309,10 @@ DWORD WINAPI control_handler(DWORD control, DWORD, LPVOID, LPVOID) {
 
 void run_pipe(App& app) {
   PSECURITY_DESCRIPTOR sd = nullptr;
+  // LocalSystem pipes default to System integrity. A Medium window then gets
+  // ERROR_ACCESS_DENIED even when the DACL names Authenticated Users.
   if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(
-          L"D:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;0x120003;;;AU)",
+          L"D:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;AU)S:(ML;;NW;;;ME)",
           SDDL_REVISION_1, &sd, nullptr)) {
     app.log.write(0, "pipe_acl", "sddl", GetLastError());
     return;
@@ -326,6 +328,7 @@ void run_pipe(App& app) {
             PIPE_REJECT_REMOTE_CLIENTS,
         1, 8192, 8192, 0, &sa);
     if (pipe == INVALID_HANDLE_VALUE) {
+      app.log.write(0, "pipe_create", "win32", GetLastError());
       if (WaitForSingleObject(g_stop, 200) == WAIT_OBJECT_0) break;
       continue;
     }

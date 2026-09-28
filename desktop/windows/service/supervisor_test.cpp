@@ -467,6 +467,16 @@ void test_watchdog() {
   expect(moved.message.find("Сеть изменилась") != std::string::npos, "network change text");
 }
 
+void test_idle_watchdog_ignores_stale_cancel() {
+  Harness harness;
+  expect(harness.connect().phase == TunnelPhase::Connected, "idle watchdog setup");
+  expect(harness.supervisor.disconnect(harness.cancel).cleanup_verified, "restored");
+  harness.cancel.request();
+  const auto snap = harness.supervisor.watchdog(harness.cancel);
+  expect(snap.phase == TunnelPhase::Idle && snap.cleanup_verified, "stale cancel stays idle");
+  expect(harness.routes.add_calls == 1, "idle watchdog does not add routes");
+}
+
 void test_graceful_stop_skips_kill() {
   Harness harness;
   harness.engine.graceful = true;
@@ -539,6 +549,7 @@ int main() {
   test_cleanup_failure_is_not_idle();
   test_reconcile_dirty_ledger();
   test_watchdog();
+  test_idle_watchdog_ignores_stale_cancel();
   test_graceful_stop_skips_kill();
   test_ledger_roundtrip();
   test_resolve_and_route_table_failures();

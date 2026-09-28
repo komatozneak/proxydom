@@ -591,8 +591,9 @@ TunnelSnapshot TunnelSupervisor::disconnect(CancelFlag& cancel) {
 }
 
 TunnelSnapshot TunnelSupervisor::watchdog(CancelFlag& cancel) {
-  // Connected keeps cleanup_verified false because the tunnel still owns routes.
-  // Retry only a restore that did not finish, or an explicit cancel.
+  // Idle and verified means this process owns no routes. A stale cancel bit
+  // must not republish Idle every watchdog tick.
+  if (ledger_.phase == TunnelPhase::Idle && ledger_.cleanup_verified) return snapshot();
   const bool restore_pending = ledger_.phase == TunnelPhase::Disconnecting ||
                                (ledger_.phase == TunnelPhase::Idle && !ledger_.cleanup_verified);
   if (cancel.requested() || restore_pending) return finish(TunnelCode::None, {}, true);
