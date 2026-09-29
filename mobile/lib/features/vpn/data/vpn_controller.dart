@@ -36,8 +36,13 @@ class VpnController {
   Stream<VpnTrafficStats>? _trafficStream;
   Stream<int?>? _pingStream;
   String? windowsNotice;
+  String? windowsCode;
+  bool windowsAccepted = false;
+  int windowsGeneration = 0;
 
-  /// One share line through the Windows service (ADR 029).
+  bool get windowsNestLocked => WindowsTunnel.instance.nestLocked;
+
+  /// One share line through the Windows broker (ADR 031).
   Future<bool> startWindowsShare(String uri) async {
     final domains = stripForceProxySuffixes(
       await SplitTunnelPrefs.enabledDomainSuffixes(),
@@ -47,6 +52,9 @@ class VpnController {
       directDomains: domains,
     );
     windowsNotice = result.notice;
+    windowsCode = result.code;
+    windowsAccepted = result.accepted;
+    windowsGeneration = result.generation;
     return result.ok;
   }
 
@@ -303,8 +311,9 @@ class VpnController {
 
   Future<bool> stop({String reason = 'user_tap'}) async {
     if (windowsDesktop) {
-      await WindowsTunnel.instance.disconnect();
-      return true;
+      final restored = await WindowsTunnel.instance.disconnect();
+      windowsNotice = WindowsTunnel.instance.notice;
+      return restored;
     }
     try {
       final result = await _methodChannel.invokeMethod<bool>(

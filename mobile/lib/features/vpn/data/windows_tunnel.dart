@@ -1,103 +1,400 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
-import 'dart:isolate';
 
 import 'package:ffi/ffi.dart';
 
 import 'windows_tunnel_protocol.dart';
 
 const String kWindowsFailureText =
-    'Сервер не отвечает: выход через туннель не подтверждён';
+    'Связь через выбранную строку не подтверждена';
 const String kWindowsServiceMissing =
-    'Служба Прокси Дом не запущена. Переустановите приложение';
-const String kWindowsServiceStopped =
-    'Служба Прокси Дом остановлена. Запустите службу';
+    'Служба Прокси Дом недоступна. Переустановите приложение';
+const String kWindowsServiceStopped = 'Служба Прокси Дом остановлена';
 const String kWindowsAlreadyOpen = 'Приложение уже запущено';
 
 class WindowsConnectResult {
-  const WindowsConnectResult({required this.ok, this.notice, this.generation = 0});
+  const WindowsConnectResult({
+    required this.ok,
+    this.accepted = false,
+    this.notice,
+    this.code,
+    this.generation = 0,
+    this.cleanupVerified = true,
+  });
 
   final bool ok;
+  final bool accepted;
   final String? notice;
+  final String? code;
   final int generation;
+  final bool cleanupVerified;
 }
 
-/// Unelevated window side of `\\.\pipe\ProxyDomServicePipe` (ADR 029).
+/// Unprivileged window side of the Windows broker v3 contract (ADR 031).
+///
+/// Flutter never opens the LocalSystem named pipe. The sibling native
+/// controller owns Windows IPC and exchanges newline-delimited JSON over its
+/// standard streams. Closing the window closes that controller lease, which
+/// makes the broker restore its owned routes.
 class WindowsTunnel {
   WindowsTunnel._();
 
   static final WindowsTunnel instance = WindowsTunnel._();
 
-  SendPort? _commands;
+  Process? _controller;
+  IOSink? _commands;
+  Future<void>? _starting;
+  bool _connectPending = false;
+  DateTime? _brokerCooldownUntil;
+
+  /// True while a command is in flight, cleanup is unverified, or a failed
+  /// hello is still in its short lock. Connected stays tappable.
+  bool get nestLocked {
+    if (_connectPending) return true;
+    if ((phase == 'idle' || phase == 'disconnecting') && !cleanupVerified) {
+      return true;
+    }
+    final until = _brokerCooldownUntil;
+    return until != null && DateTime.now().isBefore(until);
+  }
+
+  void _coolBroker() {
+    _brokerCooldownUntil = DateTime.now().add(const Duration(seconds: 3));
+  }
+
   int generation = 0;
   String phase = 'idle';
   String? notice;
+  String? code;
+  bool cleanupVerified = true;
+
+  final _states = StreamController<TunnelStateEvent>.broadcast();
+  final List<TunnelStateEvent> _recent = [];
+  int _seq = 0;
+
+  Stream<TunnelStateEvent> get states => _states.stream;
 
   Future<void> _ensure() async {
-    if (_commands != null) return;
-    final ready = ReceivePort();
-    final port = Completer<SendPort>();
-    ready.listen((message) {
-      if (message is SendPort && !port.isCompleted) {
-        port.complete(message);
-        return;
-      }
-      if (message is Map) {
-        phase = message['state'] as String? ?? phase;
-        generation = message['generation'] as int? ?? generation;
-        notice = message['message'] as String?;
-        if (notice == kWindowsAlreadyOpen) exit(0);
-        final lost = notice == 'Соединение прервано';
-        if (phase == 'idle' && lost) onLinkLost?.call();
-      }
-    });
-    await Isolate.spawn(_pipeActor, ready.sendPort);
-    _commands = await port.future;
+    if (_controller != null && _commands != null) return;
+    final starting = _starting;
+    if (starting != null) return starting;
+    final future = _startController();
+    _starting = future;
+    try {
+      await future;
+    } finally {
+      _starting = null;
+    }
   }
 
-  /// Fired when the service drops a live tunnel. Network changes do not.
+  Future<void> _startController() async {
+    final stale = _controller;
+    _controller = null;
+    _commands = null;
+    stale?.kill();
+
+    final executable = File(Platform.resolvedExecutable);
+    final controller = File(
+      '${executable.parent.path}${Platform.pathSeparator}ProxyDomCtl.exe',
+    );
+    if (!controller.existsSync()) {
+      _remember(_localFailure('broker_unavailable', kWindowsServiceMissing));
+      throw StateError('ProxyDomCtl.exe is missing');
+    }
+
+    final process = await Process.start(
+      controller.path,
+      const ['session'],
+      mode: ProcessStartMode.normal,
+      runInShell: false,
+    );
+    _controller = process;
+    _commands = process.stdin;
+    process.stdout
+        .transform(utf8.decoder)
+        .transform(const LineSplitter())
+        .listen(_remember);
+    process.stderr
+        .transform(utf8.decoder)
+        .transform(const LineSplitter())
+        .listen((_) {});
+    unawaited(
+      process.exitCode.then((_) {
+        if (!identical(_controller, process)) return;
+        _controller = null;
+        _commands = null;
+        if (generation != 0 && !cleanupVerified) {
+          _remember(
+            _localFailure(
+              'cleanup_failed',
+              'Связь со службой потеряна; служба восстанавливает сеть',
+              restored: false,
+            ),
+          );
+        }
+      }),
+    );
+  }
+
+  String _localFailure(
+    String failureCode,
+    String message, {
+    bool restored = true,
+  }) {
+    return jsonEncode({
+      'event': 'state',
+      'generation': generation,
+      'state': restored ? 'idle' : 'disconnecting',
+      'code': failureCode,
+      'message': message,
+      'cleanup_verified': restored,
+    });
+  }
+
+  Future<void> _send(Map<String, Object?> command) async {
+    await _ensure();
+    final sink = _commands;
+    if (sink == null) throw StateError('controller stopped');
+    sink.writeln(jsonEncode(command));
+    await sink.flush().timeout(const Duration(seconds: 3));
+  }
+
+  void _remember(String json) {
+    final parsed = TunnelStateEvent.parse(json);
+    if (parsed == null) return;
+    if (parsed.event == 'broker_closed') {
+      _commands = null;
+      _controller?.kill();
+      _controller = null;
+      final unsafe = _connectPending || phase != 'idle' || !cleanupVerified;
+      _remember(
+        _localFailure(
+          unsafe ? 'cleanup_failed' : 'broker_unavailable',
+          unsafe
+              ? 'Связь со службой потеряна; служба восстанавливает сеть'
+              : kWindowsServiceMissing,
+          restored: !unsafe,
+        ),
+      );
+      return;
+    }
+    final event = parsed.withSeq(++_seq);
+    _recent.add(event);
+    if (_recent.length > 64) _recent.removeAt(0);
+    if (event.event == 'state') {
+      phase = event.state.isEmpty ? phase : event.state;
+      generation = event.generation;
+      notice = event.message;
+      code = event.code;
+      if (event.cleanupVerified != null) {
+        cleanupVerified = event.cleanupVerified!;
+      }
+      if (notice == kWindowsAlreadyOpen) exit(0);
+      if (phase == 'idle' && notice == 'Соединение прервано') {
+        onLinkLost?.call();
+      }
+    }
+    _states.add(event);
+  }
+
+  Future<TunnelStateEvent> _waitFor(
+    bool Function(TunnelStateEvent event) test, {
+    required int afterSeq,
+    required Duration timeout,
+  }) {
+    final completer = Completer<TunnelStateEvent>();
+    late StreamSubscription<TunnelStateEvent> sub;
+    sub = states.listen((event) {
+      if (event.seq <= afterSeq || !test(event) || completer.isCompleted) {
+        return;
+      }
+      completer.complete(event);
+      unawaited(sub.cancel());
+    });
+    for (final event in _recent) {
+      if (event.seq <= afterSeq || !test(event) || completer.isCompleted) {
+        continue;
+      }
+      completer.complete(event);
+      unawaited(sub.cancel());
+      break;
+    }
+    return completer.future.timeout(
+      timeout,
+      onTimeout: () {
+        unawaited(sub.cancel());
+        throw TimeoutException('windows broker', timeout);
+      },
+    );
+  }
+
+  /// Fired when the broker drops a live tunnel and confirms local restore.
   void Function()? onLinkLost;
 
   Future<WindowsConnectResult> connect(
     String uri, {
     required List<String> directDomains,
   }) async {
-    await _ensure();
-    final reply = ReceivePort();
-    _commands!.send({
-      'op': 'connect',
-      'uri': uri,
-      'domains': directDomains,
-      'port': reply.sendPort,
-    });
-    final message = await reply.first as Map;
-    reply.close();
-    phase = message['state'] as String? ?? 'idle';
-    generation = message['generation'] as int? ?? generation;
-    notice = message['message'] as String?;
-    if (notice == kWindowsAlreadyOpen) {
-      exit(0);
+    if (_connectPending || phase != 'idle' || !cleanupVerified) {
+      return WindowsConnectResult(
+        ok: false,
+        notice: 'Подключение уже идёт',
+        code: 'busy',
+        generation: generation,
+        cleanupVerified: cleanupVerified,
+      );
     }
-    return WindowsConnectResult(
-      ok: phase == 'connected',
-      notice: notice,
-      generation: generation,
-    );
+    _connectPending = true;
+    final started = _seq;
+    var accepted = false;
+    try {
+      await _send(tunnelHello());
+      await _send(tunnelConnect(uri: uri, directDomains: directDomains));
+      final ack = await _waitFor(
+        (event) =>
+            (event.event == 'ack' && event.command == 'connect') ||
+            tunnelEventIsClientReject(event) ||
+            (event.event == 'state' &&
+                (event.code == 'broker_unavailable' ||
+                    event.code == 'cleanup_failed')),
+        afterSeq: started,
+        timeout: const Duration(seconds: 5),
+      );
+      if (tunnelEventIsClientReject(ack)) {
+        notice = ack.message;
+        code = ack.code;
+        return WindowsConnectResult(
+          ok: false,
+          notice: ack.message,
+          code: ack.code,
+          generation: ack.generation,
+          cleanupVerified: ack.cleanupVerified ?? true,
+        );
+      }
+      if (ack.event == 'state' || ack.accepted != true) {
+        notice = ack.message;
+        code = ack.code;
+        if (ack.code == 'broker_unavailable') _coolBroker();
+        return WindowsConnectResult(
+          ok: false,
+          accepted: ack.accepted == true,
+          notice: ack.message,
+          code: ack.code,
+          generation: ack.generation,
+          cleanupVerified: ack.cleanupVerified ?? cleanupVerified,
+        );
+      }
+      accepted = true;
+      final terminal = await _waitFor(
+        (event) => tunnelEventIsConnectTerminal(event, ack.generation),
+        afterSeq: started,
+        timeout: kWindowsConnectWait,
+      );
+      return WindowsConnectResult(
+        ok: terminal.state == 'connected',
+        accepted: true,
+        notice: terminal.message,
+        code: terminal.code,
+        generation: terminal.generation,
+        cleanupVerified: terminal.cleanupVerified ?? false,
+      );
+    } on TimeoutException {
+      if (accepted) {
+        return WindowsConnectResult(
+          ok: false,
+          accepted: true,
+          notice: kWindowsConnectingTimeoutCaption,
+          code: 'connecting_timeout',
+          generation: generation,
+          cleanupVerified: cleanupVerified,
+        );
+      }
+      _controller?.kill();
+      _controller = null;
+      _commands = null;
+      _coolBroker();
+      return const WindowsConnectResult(
+        ok: false,
+        notice: kWindowsServiceMissing,
+        code: 'broker_unavailable',
+      );
+    } catch (_) {
+      if (accepted) {
+        return WindowsConnectResult(
+          ok: false,
+          accepted: true,
+          notice: kWindowsConnectingTimeoutCaption,
+          code: 'connecting_timeout',
+          generation: generation,
+          cleanupVerified: cleanupVerified,
+        );
+      }
+      _coolBroker();
+      return const WindowsConnectResult(
+        ok: false,
+        notice: kWindowsServiceMissing,
+        code: 'broker_unavailable',
+      );
+    } finally {
+      _connectPending = false;
+    }
   }
 
-  Future<void> disconnect() async {
-    if (_commands == null) return;
-    final reply = ReceivePort();
-    _commands!.send({
-      'op': 'disconnect',
-      'generation': generation,
-      'port': reply.sendPort,
-    });
-    final message = await reply.first as Map;
-    reply.close();
-    phase = message['state'] as String? ?? 'idle';
-    notice = message['message'] as String?;
+  Future<void> refresh() async {
+    final started = _seq;
+    try {
+      await _send(tunnelHello());
+      await _waitFor(
+        (event) => event.event == 'state',
+        afterSeq: started,
+        timeout: const Duration(seconds: 3),
+      );
+    } catch (_) {
+      return;
+    }
+  }
+
+  Future<bool> disconnect() async {
+    if (_commands == null) return cleanupVerified;
+    final started = _seq;
+    try {
+      await _send(tunnelDisconnect(generation));
+      final event = await _waitFor(
+        tunnelEventIsDisconnectTerminal,
+        afterSeq: started,
+        timeout: kWindowsDisconnectWait,
+      );
+      return tunnelCleanupSucceeded(event);
+    } catch (_) {
+      if (generation == 0) return true;
+      return _failClosed().cleanupVerified;
+    }
+  }
+
+  WindowsConnectResult _failClosed() {
+    cleanupVerified = false;
+    phase = 'disconnecting';
+    code = 'cleanup_failed';
+    notice = 'Сеть не восстановлена. Повторите отключение';
+    final event = TunnelStateEvent(
+      event: 'state',
+      generation: generation,
+      state: phase,
+      code: code,
+      message: notice,
+      cleanupVerified: false,
+    ).withSeq(++_seq);
+    _recent.add(event);
+    _states.add(event);
+    return WindowsConnectResult(
+      ok: false,
+      notice: notice,
+      code: code,
+      generation: generation,
+      cleanupVerified: false,
+    );
   }
 
   /// One Windows process. A second launch shows the notice and returns false.
@@ -135,272 +432,4 @@ void _messageBox(String text) {
   box(0, body, title, 0);
   malloc.free(body);
   malloc.free(title);
-}
-
-void _pipeActor(SendPort parent) {
-  final inbox = ReceivePort();
-  parent.send(inbox.sendPort);
-  final session = _PipeSession(parent);
-  final queue = <Map<dynamic, dynamic>>[];
-  inbox.listen((message) => queue.add(message as Map));
-  Timer.periodic(const Duration(milliseconds: 40), (_) {
-    if (queue.isEmpty) {
-      session.poll();
-      return;
-    }
-    final command = queue.removeAt(0);
-    final reply = command['port'] as SendPort;
-    final op = command['op'] as String;
-    if (op == 'connect') {
-      final result = session.connect(
-        command['uri'] as String,
-        (command['domains'] as List).cast<String>(),
-      );
-      reply.send(result);
-      return;
-    }
-    session.disconnect(command['generation'] as int? ?? 0);
-    reply.send({
-      'state': 'idle',
-      'generation': session.generation,
-      'message': null,
-    });
-  });
-}
-
-class _PipeSession {
-  _PipeSession(this._events);
-
-  final SendPort _events;
-  int? _handle;
-  int generation = 0;
-  final TunnelFrameBuffer _buffer = TunnelFrameBuffer();
-  final _kernel = DynamicLibrary.open('kernel32.dll');
-  final _advapi = DynamicLibrary.open('advapi32.dll');
-
-  late final int Function(Pointer<Utf16>, int, int, Pointer<Void>, int, int, int)
-      _createFile = _kernel.lookupFunction<
-          IntPtr Function(Pointer<Utf16>, Uint32, Uint32, Pointer<Void>, Uint32,
-              Uint32, IntPtr),
-          int Function(Pointer<Utf16>, int, int, Pointer<Void>, int, int, int)>(
-    'CreateFileW',
-  );
-  late final int Function(int, Pointer<Uint8>, int, Pointer<Uint32>, Pointer<Void>)
-      _readFile = _kernel.lookupFunction<
-          Int32 Function(IntPtr, Pointer<Uint8>, Uint32, Pointer<Uint32>, Pointer<Void>),
-          int Function(int, Pointer<Uint8>, int, Pointer<Uint32>, Pointer<Void>)>(
-    'ReadFile',
-  );
-  late final int Function(int, Pointer<Uint8>, int, Pointer<Uint32>, Pointer<Void>)
-      _writeFile = _kernel.lookupFunction<
-          Int32 Function(IntPtr, Pointer<Uint8>, Uint32, Pointer<Uint32>, Pointer<Void>),
-          int Function(int, Pointer<Uint8>, int, Pointer<Uint32>, Pointer<Void>)>(
-    'WriteFile',
-  );
-  late final int Function(int) _close = _kernel.lookupFunction<
-      Int32 Function(IntPtr), int Function(int)>('CloseHandle');
-
-  bool get isOpen => _handle != null && _handle != -1;
-
-  Map<String, Object?> connect(String uri, List<String> domains) {
-    final opened = _open();
-    if (opened != null) return opened;
-    _writeJson(tunnelHello());
-    _awaitState();
-    _writeJson(tunnelConnect(uri: uri, directDomains: domains));
-    final event = _awaitTerminal();
-    generation = event?.generation ?? generation;
-    return {
-      'state': event?.state ?? 'idle',
-      'generation': generation,
-      'message': event?.message,
-    };
-  }
-
-  void disconnect(int generation) {
-    if (!isOpen) return;
-    _writeJson(tunnelDisconnect(generation));
-    final deadline = DateTime.now().add(const Duration(seconds: 5));
-    while (DateTime.now().isBefore(deadline)) {
-      final event = _awaitState();
-      if (event == null || event.state == 'idle') break;
-    }
-    _closeHandle();
-  }
-
-  void poll() {
-    if (!isOpen) return;
-    _readAvailable();
-    final json = _buffer.take();
-    if (json == null) return;
-    final event = TunnelStateEvent.parse(json);
-    if (event == null) return;
-    generation = event.generation;
-    _events.send({
-      'state': event.state,
-      'generation': event.generation,
-      'message': event.message,
-    });
-  }
-
-  Map<String, Object?>? _open() {
-    if (isOpen) return null;
-    final name = r'\\.\pipe\ProxyDomServicePipe'.toNativeUtf16();
-    final handle = _createFile(name, 0x80000000 | 0x40000000, 0, nullptr, 3, 0, 0);
-    malloc.free(name);
-    if (handle == -1 || handle == 0) {
-      return {
-        'state': 'idle',
-        'generation': generation,
-        'message': _serviceNotice(),
-      };
-    }
-    if (!_ownerIsLocalSystem(handle)) {
-      _close(handle);
-      return {
-        'state': 'idle',
-        'generation': generation,
-        'message': kWindowsServiceMissing,
-      };
-    }
-    _handle = handle;
-    return null;
-  }
-
-  bool _ownerIsLocalSystem(int handle) {
-    final owner = calloc<IntPtr>();
-    final getSecurity = _advapi.lookupFunction<
-        Uint32 Function(IntPtr, Uint32, Uint32, Pointer<IntPtr>, Pointer<IntPtr>,
-            Pointer<IntPtr>, Pointer<IntPtr>, Pointer<IntPtr>),
-        int Function(int, int, int, Pointer<IntPtr>, Pointer<IntPtr>, Pointer<IntPtr>,
-            Pointer<IntPtr>, Pointer<IntPtr>)>('GetSecurityInfo');
-    final rc = getSecurity(handle, 1, 1, owner, nullptr, nullptr, nullptr, nullptr);
-    if (rc != 0) {
-      calloc.free(owner);
-      return false;
-    }
-    final local = calloc<Uint8>(68);
-    final size = calloc<Uint32>();
-    size.value = 68;
-    final createSid = _advapi.lookupFunction<
-        Int32 Function(Int32, Pointer<Void>, Pointer<Uint8>, Pointer<Uint32>),
-        int Function(int, Pointer<Void>, Pointer<Uint8>, Pointer<Uint32>)>(
-      'CreateWellKnownSid',
-    );
-    final equal = _advapi.lookupFunction<
-        Int32 Function(Pointer<Void>, Pointer<Void>),
-        int Function(Pointer<Void>, Pointer<Void>)>('EqualSid');
-    final made = createSid(22, nullptr, local, size);
-    final same = made != 0 && equal(Pointer.fromAddress(owner.value), local.cast()) != 0;
-    calloc.free(owner);
-    calloc.free(local);
-    calloc.free(size);
-    return same;
-  }
-
-  String _serviceNotice() {
-    final openScm = _advapi.lookupFunction<
-        IntPtr Function(Pointer<Utf16>, Pointer<Utf16>, Uint32),
-        int Function(Pointer<Utf16>, Pointer<Utf16>, int)>('OpenSCManagerW');
-    final openService = _advapi.lookupFunction<
-        IntPtr Function(IntPtr, Pointer<Utf16>, Uint32),
-        int Function(int, Pointer<Utf16>, int)>('OpenServiceW');
-    final query = _advapi.lookupFunction<
-        Int32 Function(IntPtr, Pointer<Uint32>),
-        int Function(int, Pointer<Uint32>)>('QueryServiceStatus');
-    final close = _advapi.lookupFunction<Int32 Function(IntPtr), int Function(int)>(
-      'CloseServiceHandle',
-    );
-    final scm = openScm(nullptr, nullptr, 1);
-    if (scm == 0) return kWindowsServiceMissing;
-    final name = 'ProxyDomTunnelService'.toNativeUtf16();
-    final service = openService(scm, name, 4);
-    malloc.free(name);
-    if (service == 0) {
-      close(scm);
-      return _lastWin32Error() == 1060
-          ? kWindowsServiceMissing
-          : kWindowsServiceStopped;
-    }
-    final status = calloc<Uint32>(8);
-    final ok = query(service, status);
-    final stopped = ok != 0 && status[1] == 1;
-    calloc.free(status);
-    close(service);
-    close(scm);
-    return stopped ? kWindowsServiceStopped : kWindowsServiceMissing;
-  }
-
-  void _writeJson(Map<String, Object?> message) {
-    final frame = encodeTunnelFrame(message);
-    final native = calloc<Uint8>(frame.length);
-    native.asTypedList(frame.length).setAll(0, frame);
-    final written = calloc<Uint32>();
-    _writeFile(_handle!, native, frame.length, written, nullptr);
-    calloc.free(native);
-    calloc.free(written);
-  }
-
-  void _readAvailable() {
-    if (!isOpen) return;
-    final peek = _kernel.lookupFunction<
-        Int32 Function(IntPtr, Pointer<Uint8>, Uint32, Pointer<Uint32>, Pointer<Uint32>,
-            Pointer<Uint32>),
-        int Function(int, Pointer<Uint8>, int, Pointer<Uint32>, Pointer<Uint32>,
-            Pointer<Uint32>)>('PeekNamedPipe');
-    final available = calloc<Uint32>();
-    final ok = peek(_handle!, nullptr, 0, nullptr, available, nullptr);
-    final count = ok == 0 ? 0 : available.value;
-    calloc.free(available);
-    if (count == 0) return;
-    final buf = calloc<Uint8>(count);
-    final got = calloc<Uint32>();
-    _readFile(_handle!, buf, count, got, nullptr);
-    if (got.value > 0) {
-      _buffer.add(buf.asTypedList(got.value));
-    }
-    calloc.free(buf);
-    calloc.free(got);
-  }
-
-  TunnelStateEvent? _awaitState() {
-    final deadline = DateTime.now().add(const Duration(seconds: 3));
-    while (DateTime.now().isBefore(deadline)) {
-      _readAvailable();
-      final json = _buffer.take();
-      if (json == null) {
-        sleep(const Duration(milliseconds: 30));
-        continue;
-      }
-      return TunnelStateEvent.parse(json);
-    }
-    return null;
-  }
-
-  TunnelStateEvent? _awaitTerminal() {
-    final deadline = DateTime.now().add(const Duration(seconds: 20));
-    while (DateTime.now().isBefore(deadline)) {
-      _readAvailable();
-      final json = _buffer.take();
-      if (json == null) {
-        sleep(const Duration(milliseconds: 30));
-        continue;
-      }
-      final event = TunnelStateEvent.parse(json);
-      if (event == null) continue;
-      generation = event.generation;
-      if (event.state == 'connected' || event.state == 'idle') return event;
-    }
-    return TunnelStateEvent(
-      generation: generation,
-      state: 'idle',
-      message: kWindowsFailureText,
-    );
-  }
-
-  void _closeHandle() {
-    if (!isOpen) return;
-    _close(_handle!);
-    _handle = null;
-  }
 }

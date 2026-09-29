@@ -179,14 +179,8 @@ bool extract_domains(const std::string& json, std::vector<std::string>& domains,
       return false;
     }
     ++i;
-    if (!domain_allowed(host)) {
-      error = "direct_domains";
-      return false;
-    }
-    if (domains.size() >= 64) {
-      error = "direct_domains";
-      return false;
-    }
+    if (!domain_allowed(host)) continue;
+    if (domains.size() >= 64) continue;
     domains.push_back(host);
   }
   return true;
@@ -279,9 +273,80 @@ bool parse_command(const std::string& json, ClientCommand& out, std::string& err
     return false;
   }
   out.generation = generation;
+  if (!extract_string_field(json, "message", out.message, present)) {
+    error = "message";
+    return false;
+  }
+  if (!present) out.message.clear();
   if (!extract_domains(json, out.direct_domains, error)) return false;
   return true;
 }
+
+namespace {
+
+std::string cut_port_spec(std::string text) {
+  const auto end = text.find_first_of("/?#");
+  if (end != std::string::npos) text.resize(end);
+  return text;
+}
+
+bool port_number(const std::string& text, int& port) {
+  if (text.empty() || text.size() > 5) return false;
+  if (text.find_first_not_of("0123456789") != std::string::npos) return false;
+  try {
+    const int value = std::stoi(text);
+    if (value < 1 || value > 65535) return false;
+    port = value;
+    return true;
+  } catch (...) {
+    return false;
+  }
+}
+
+bool apply_port_spec(const std::string& raw, ShareLine& out, std::string& error) {
+  const std::string spec = cut_port_spec(raw);
+  if (spec.empty()) {
+    out.port = 443;
+    out.server_ports.clear();
+    return true;
+  }
+  const auto dash = spec.find('-');
+  const auto colon = spec.find(':');
+  if (dash != std::string::npos && colon != std::string::npos) {
+    error = "port";
+    out.server_ports = spec.substr(0, 32);
+    return false;
+  }
+  const auto sep = dash != std::string::npos ? dash : colon;
+  if (sep != std::string::npos) {
+    if (spec.find(spec[sep], sep + 1) != std::string::npos) {
+      error = "port";
+      out.server_ports = spec.substr(0, 32);
+      return false;
+    }
+    int start = 0;
+    int end = 0;
+    if (!port_number(spec.substr(0, sep), start) || !port_number(spec.substr(sep + 1), end) || start > end) {
+      error = "port";
+      out.server_ports = spec.substr(0, 32);
+      return false;
+    }
+    out.port = start;
+    out.server_ports = std::to_string(start) + ":" + std::to_string(end);
+    return true;
+  }
+  int port = 0;
+  if (!port_number(spec, port)) {
+    error = "port";
+    out.server_ports = spec.substr(0, 32);
+    return false;
+  }
+  out.port = port;
+  out.server_ports.clear();
+  return true;
+}
+
+}  // namespace
 
 bool parse_share_line(const std::string& raw, ShareLine& out, std::string& error) {
   const std::string text = trim_copy(raw);
@@ -351,23 +416,14 @@ bool parse_share_line(const std::string& raw, ShareLine& out, std::string& error
   out.sni = query_value(query, "sni");
   if (out.sni.empty()) out.sni = host;
   out.insecure = query_value(query, "insecure") == "1" || query_value(query, "allowInsecure") == "1";
-  int port = 443;
-  if (!port_token.empty() && port_token.find_first_not_of("0123456789") == std::string::npos) {
-    port = std::stoi(port_token);
-  } else if (!port_token.empty()) {
-    out.server_ports = port_token;
-  }
+  std::string port_spec = port_token;
   const std::string mport = query_value(query, "mport");
-  if (!mport.empty()) out.server_ports = mport;
+  if (!mport.empty()) port_spec = mport;
+  if (!apply_port_spec(port_spec, out, error)) return false;
   const std::string hop = query_value(query, "mportHopInt");
   if (!hop.empty() && hop.find_first_not_of("0123456789") == std::string::npos) {
     out.hop_interval = hop + "s";
   }
-  if (port <= 0 || port > 65535) {
-    error = "port";
-    return false;
-  }
-  out.port = port;
   if (scheme == "hysteria2") {
     if (user.empty()) {
       error = "auth";
@@ -404,6 +460,42 @@ bool parse_share_line(const std::string& raw, ShareLine& out, std::string& error
   return true;
 }
 
+std::string json_or_null(const std::string& text) {
+  if (text.empty()) return "null";
+  return "\"" + json_escape(text) + "\"";
+}
+
+std::string state_event_v2(std::int64_t generation,
+                           const std::string& state,
+                           const std::string& code,
+                           const std::string& message,
+                           bool cleanup_verified) {
+  std::ostringstream out;
+  out << "{\"event\":\"state\",\"generation\":" << generation << ",\"state\":\"" << json_escape(state)
+      << "\",\"code\":" << json_or_null(code) << ",\"message\":" << json_or_null(message)
+      << ",\"cleanup_verified\":" << (cleanup_verified ? "true" : "false") << "}";
+  return out.str();
+}
+
+std::string ack_event(const std::string& command,
+                      bool accepted,
+                      std::int64_t generation,
+                      const std::string& code,
+                      const std::string& message) {
+  std::ostringstream out;
+  out << "{\"event\":\"ack\",\"command\":\"" << json_escape(command) << "\",\"accepted\":"
+      << (accepted ? "true" : "false") << ",\"generation\":" << generation << ",\"code\":" << json_or_null(code)
+      << ",\"message\":" << json_or_null(message) << "}";
+  return out.str();
+}
+
+std::string tun_ready_event(std::int64_t generation) {
+  std::ostringstream out;
+  out << "{\"event\":\"tun_ready\",\"generation\":" << generation
+      << ",\"state\":\"connecting\",\"code\":null,\"message\":null,\"cleanup_verified\":false}";
+  return out.str();
+}
+
 std::string state_event(std::int64_t generation, const std::string& state, const std::string* message) {
   std::ostringstream out;
   out << "{\"event\":\"state\",\"generation\":" << generation << ",\"state\":\"" << json_escape(state)
@@ -414,9 +506,9 @@ std::string state_event(std::int64_t generation, const std::string& state, const
   return out.str();
 }
 
-std::string build_singbox_config(const ShareLine& line,
-                                 const std::string& server_ip,
-                                 const std::vector<std::string>& domains) {
+namespace {
+
+std::string proxy_outbound(const ShareLine& line, const std::string& server_ip) {
   if (server_ip.empty() || server_ip.find(':') != std::string::npos) return {};
   std::ostringstream outbound;
   if (line.scheme == "hysteria2") {
@@ -448,9 +540,37 @@ std::string build_singbox_config(const ShareLine& line,
     }
     outbound << "}}";
   }
+  return outbound.str();
+}
+
+}  // namespace
+
+std::string build_singbox_probe_config(const ShareLine& line,
+                                       const std::string& server_ip,
+                                       unsigned short listen_port) {
+  if (listen_port == 0) return {};
+  const std::string outbound = proxy_outbound(line, server_ip);
+  if (outbound.empty()) return {};
+  std::ostringstream config;
+  config << "{"
+         << "\"log\":{\"level\":\"warn\"},"
+         << "\"inbounds\":[{\"type\":\"mixed\",\"tag\":\"probe-in\",\"listen\":\"127.0.0.1\","
+         << "\"listen_port\":" << listen_port << "}],"
+         << "\"outbounds\":[" << outbound << "],"
+         << "\"route\":{\"final\":\"proxy\"}"
+         << "}";
+  return config.str();
+}
+
+std::string build_singbox_config(const ShareLine& line,
+                                 const std::string& server_ip,
+                                 const std::vector<std::string>& domains) {
+  const std::string outbound = proxy_outbound(line, server_ip);
+  if (outbound.empty()) return {};
 
   std::ostringstream rules;
-  rules << "{\"ip_cidr\":[\"10.0.0.0/8\",\"172.16.0.0/12\",\"192.168.0.0/16\",\"127.0.0.0/8\","
+  rules << "{\"action\":\"sniff\"},{\"protocol\":\"dns\",\"action\":\"hijack-dns\"},"
+           "{\"ip_cidr\":[\"10.0.0.0/8\",\"172.16.0.0/12\",\"192.168.0.0/16\",\"127.0.0.0/8\","
            "\"fc00::/7\",\"fe80::/10\"],\"outbound\":\"direct\"}";
   for (const auto& domain : domains) {
     if (!domain_allowed(domain)) continue;
@@ -460,13 +580,12 @@ std::string build_singbox_config(const ShareLine& line,
   std::ostringstream config;
   config << "{"
          << "\"log\":{\"level\":\"info\"},"
+         << "\"dns\":{\"servers\":[{\"type\":\"udp\",\"tag\":\"remote\",\"server\":\"1.1.1.1\","
+         << "\"server_port\":53,\"detour\":\"proxy\"}],\"strategy\":\"ipv4_only\",\"final\":\"remote\"},"
          << "\"inbounds\":[{\"type\":\"tun\",\"tag\":\"tun-in\",\"interface_name\":\"ProxyDomTun\","
-         << "\"address\":[\"198.18.0.1/30\"],\"auto_route\":true,\"strict_route\":true,"
-         << "\"dns_mode\":\"hijack\",\"dns_address\":[\"198.18.0.2\"],"
-         << "\"route_address\":[\"0.0.0.0/1\",\"128.0.0.0/1\"],"
-         << "\"route_exclude_address\":[\"10.0.0.0/8\",\"172.16.0.0/12\",\"192.168.0.0/16\","
-         << "\"127.0.0.0/8\",\"fc00::/7\",\"fe80::/10\"]}],"
-         << "\"outbounds\":[" << outbound.str() << ",{\"type\":\"direct\",\"tag\":\"direct\"}],"
+         << "\"address\":[\"198.18.0.1/30\"],\"auto_route\":false,\"strict_route\":false,"
+         << "\"dns_mode\":\"hijack\",\"dns_address\":[\"198.18.0.2\"]}],"
+         << "\"outbounds\":[" << outbound << ",{\"type\":\"direct\",\"tag\":\"direct\"}],"
          << "\"route\":{\"auto_detect_interface\":true,\"final\":\"proxy\",\"rules\":[" << rules.str() << "]}"
          << "}";
   return config.str();

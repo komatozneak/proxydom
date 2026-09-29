@@ -60,14 +60,17 @@ function Ensure-ThirdParty {
     }
 }
 
-Write-Host "Building ProxyDomTunnelService"
+Write-Host "Building ProxyDomBroker and ProxyDomCtl"
 $vcvars = Find-VcVars
 New-Item -ItemType Directory -Force -Path $Payload | Out-Null
-$serviceOut = Join-Path $Payload "ProxyDomTunnelService.exe"
+$brokerOut = Join-Path $Payload "ProxyDomBroker.exe"
+$controllerOut = Join-Path $Payload "ProxyDomCtl.exe"
 Push-Location $Service
 try {
-    cmd /c "call `"$vcvars`" >nul && cl /nologo /std:c++17 /EHsc /W3 /DUNICODE /D_UNICODE /Fe:`"$serviceOut`" service.cpp protocol.cpp cleanup.cpp /link /SUBSYSTEM:WINDOWS ws2_32.lib iphlpapi.lib setupapi.lib advapi32.lib"
-    if ($LASTEXITCODE -ne 0) { throw "Service compile failed." }
+    cmd /c "call `"$vcvars`" >nul && cl /nologo /std:c++17 /EHsc /W3 /utf-8 /DUNICODE /D_UNICODE /Fe:`"$brokerOut`" service.cpp protocol.cpp session_supervisor.cpp network_owner.cpp process_host.cpp session_store.cpp log_sanitizer.cpp /link /SUBSYSTEM:WINDOWS ws2_32.lib iphlpapi.lib setupapi.lib advapi32.lib shell32.lib"
+    if ($LASTEXITCODE -ne 0) { throw "Broker compile failed." }
+    cmd /c "call `"$vcvars`" >nul && cl /nologo /std:c++17 /EHsc /W3 /utf-8 /DUNICODE /D_UNICODE /Fe:`"$controllerOut`" controller.cpp protocol.cpp /link advapi32.lib ws2_32.lib"
+    if ($LASTEXITCODE -ne 0) { throw "Controller compile failed." }
 } finally {
     Pop-Location
 }
@@ -85,7 +88,7 @@ if (-not (Test-Path (Join-Path $FlutterRelease "proxy_dom.exe"))) {
 }
 
 Write-Host "Staging payload"
-Get-ChildItem $Payload -Exclude "ProxyDomTunnelService.exe" | Remove-Item -Recurse -Force
+Get-ChildItem $Payload -Exclude "ProxyDomBroker.exe","ProxyDomCtl.exe" | Remove-Item -Recurse -Force
 Copy-Item (Join-Path $FlutterRelease "*") $Payload -Recurse -Force
 Ensure-ThirdParty
 Copy-Item (Join-Path $ThirdParty "sing-box.exe") $Payload -Force

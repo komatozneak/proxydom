@@ -1,0 +1,64 @@
+name: Windows Service
+
+on:
+  pull_request:
+    paths:
+      - "desktop/windows/**"
+      - ".github/workflows/windows-service.yml"
+  push:
+    branches: [main]
+    paths:
+      - "desktop/windows/**"
+      - ".github/workflows/windows-service.yml"
+
+concurrency:
+  group: windows-service-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  service-tests:
+    name: Service fault tests
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile and run fault tests
+        shell: pwsh
+        working-directory: desktop/windows/service
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $root = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $root) { throw "Visual Studio C++ tools were not found." }
+          $vcvars = Join-Path $root "VC\Auxiliary\Build\vcvars64.bat"
+          cmd /c "call `"$vcvars`" && cl /nologo /std:c++17 /EHsc /W3 /utf-8 /Fe:protocol_test.exe protocol_test.cpp protocol.cpp && protocol_test.exe && cl /nologo /std:c++17 /EHsc /W3 /utf-8 /Fe:supervisor_test.exe supervisor_test.cpp session_supervisor.cpp protocol.cpp log_sanitizer.cpp && supervisor_test.exe && cl /nologo /std:c++17 /EHsc /W3 /utf-8 /DUNICODE /D_UNICODE /Fe:controller_test.exe controller_test.cpp protocol.cpp /link advapi32.lib ws2_32.lib && controller_test.exe && cl /nologo /std:c++17 /EHsc /W3 /utf-8 /DUNICODE /D_UNICODE /Fe:ProxyDomBroker.exe service.cpp protocol.cpp session_supervisor.cpp network_owner.cpp process_host.cpp session_store.cpp log_sanitizer.cpp /link /SUBSYSTEM:WINDOWS ws2_32.lib iphlpapi.lib setupapi.lib advapi32.lib shell32.lib && cl /nologo /std:c++17 /EHsc /W3 /utf-8 /DUNICODE /D_UNICODE /Fe:ProxyDomCtl.exe controller.cpp protocol.cpp /link advapi32.lib ws2_32.lib && cl /nologo /std:c++17 /EHsc /W3 /utf-8 /DUNICODE /D_UNICODE /Fe:route_probe.exe route_probe.cpp network_owner.cpp protocol.cpp session_supervisor.cpp log_sanitizer.cpp /link ws2_32.lib iphlpapi.lib setupapi.lib advapi32.lib"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # Exit 2 means another full tunnel is active. That blocks Connect; it is not a dirty Proxy Dom route.
+          .\route_probe.exe
+          if ($LASTEXITCODE -eq 1) { exit 1 }
+          exit 0
+
+      - name: Prove controller to LocalSystem broker IPC
+        shell: pwsh
+        working-directory: desktop/windows/service
+        run: |
+          # sc.exe requires a space after "=". PowerShell 7 splits that argument.
+          $broker = (Resolve-Path ".\ProxyDomBroker.exe").Path
+          try {
+            cmd.exe /c "sc.exe create ProxyDomBroker binPath= `"$broker`" start= demand"
+            if ($LASTEXITCODE -ne 0) { throw "Service create failed." }
+            cmd.exe /c "sc.exe start ProxyDomBroker"
+            if ($LASTEXITCODE -ne 0) { throw "Service start failed." }
+            $json = & .\ProxyDomCtl.exe status
+            if ($LASTEXITCODE -ne 0) { throw "Controller could not reach broker." }
+            $state = $json | ConvertFrom-Json
+            if ($state.event -ne "state" -or
+                $state.state -ne "idle" -or
+                $state.cleanup_verified -ne $true) {
+              throw "Broker did not return a verified Idle snapshot: $json"
+            }
+          } finally {
+            & sc.exe stop ProxyDomBroker | Out-Null
+            Start-Sleep -Seconds 1
+            & sc.exe delete ProxyDomBroker | Out-Null
+          }

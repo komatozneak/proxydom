@@ -11,6 +11,8 @@
       Language="1049"
       Codepage="1251">
     <MajorUpgrade DowngradeErrorMessage="Уже установлена более новая версия." />
+    <!-- Flutter keeps FileVersion 1.0.0+N. Equal versions would leave the old window in place. -->
+    <Property Id="REINSTALLMODE" Value="amus" />
     <MediaTemplate EmbedCab="yes" />
     <Icon Id="AppIcon" SourceFile="$(var.PayloadDir)\proxy_dom.exe" />
     <Property Id="ARPPRODUCTICON" Value="AppIcon" />
@@ -20,8 +22,9 @@
 
     <Feature Id="Main" Title="Прокси Дом" Level="1">
       <ComponentGroupRef Id="AppFiles" />
-      <ComponentRef Id="ServiceComponent" />
+      <ComponentRef Id="BrokerComponent" />
       <ComponentRef Id="StartMenuComponent" />
+      <ComponentRef Id="DesktopShortcutComponent" />
     </Feature>
 
     <StandardDirectory Id="ProgramFiles64Folder">
@@ -30,18 +33,19 @@
     <StandardDirectory Id="ProgramMenuFolder">
       <Directory Id="ProgramMenuDir" Name="Прокси Дом" />
     </StandardDirectory>
+    <StandardDirectory Id="DesktopFolder" />
 
     <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
       <Files Include="$(var.PayloadDir)\**">
-        <Exclude Files="$(var.PayloadDir)\ProxyDomTunnelService.exe" />
+        <Exclude Files="$(var.PayloadDir)\ProxyDomBroker.exe" />
       </Files>
     </ComponentGroup>
 
-    <Component Id="ServiceComponent" Directory="INSTALLFOLDER" Guid="A7E3C1D2-4B58-4F0A-9C21-6D8E5B0A11F4">
-      <File Id="ServiceExe" Source="$(var.PayloadDir)\ProxyDomTunnelService.exe" KeyPath="yes" />
+    <Component Id="BrokerComponent" Directory="INSTALLFOLDER" Guid="D4C7168B-5E2A-4D9F-A3B1-7C8E926F1045">
+      <File Id="ServiceExe" Source="$(var.PayloadDir)\ProxyDomBroker.exe" KeyPath="yes" />
       <ServiceInstall
-          Id="ProxyDomTunnelServiceInstall"
-          Name="ProxyDomTunnelService"
+          Id="ProxyDomBrokerInstall"
+          Name="ProxyDomBroker"
           DisplayName="Прокси Дом"
           Description="Локальный туннель Прокси Дом"
           Start="auto"
@@ -49,9 +53,17 @@
           Account="LocalSystem"
           ErrorControl="normal"
           Vital="yes" />
+      <!-- A killed service comes back and reconciles its own routes before the next connect. -->
+      <util:ServiceConfig
+          ServiceName="ProxyDomBroker"
+          FirstFailureActionType="restart"
+          SecondFailureActionType="restart"
+          ThirdFailureActionType="restart"
+          RestartServiceDelayInSeconds="5"
+          ResetPeriodInDays="1" />
       <ServiceControl
-          Id="ProxyDomTunnelServiceControl"
-          Name="ProxyDomTunnelService"
+          Id="ProxyDomBrokerControl"
+          Name="ProxyDomBroker"
           Start="install"
           Stop="both"
           Remove="uninstall"
@@ -75,6 +87,23 @@
           KeyPath="yes" />
     </Component>
 
+    <Component Id="DesktopShortcutComponent" Directory="DesktopFolder" Guid="C9A5E3F4-6D70-412C-9E43-8F0A7D2C33B6">
+      <Shortcut
+          Id="DesktopShortcut"
+          Name="Прокси Дом"
+          Description="Прокси Дом"
+          Target="[INSTALLFOLDER]proxy_dom.exe"
+          WorkingDirectory="INSTALLFOLDER"
+          Icon="AppIcon" />
+      <RegistryValue
+          Root="HKLM"
+          Key="Software\Proxy Dom"
+          Name="DesktopShortcut"
+          Type="integer"
+          Value="1"
+          KeyPath="yes" />
+    </Component>
+
     <util:CloseApplication
         Id="CloseProxyDom"
         Target="proxy_dom.exe"
@@ -82,6 +111,7 @@
         CloseMessage="yes"
         EndSessionMessage="yes"
         RebootPrompt="no"
+        Timeout="5000"
         TerminateProcess="1" />
 
     <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
@@ -100,5 +130,28 @@
         Execute="immediate"
         Impersonate="yes"
         Return="asyncNoWait" />
+    <CustomAction
+        Id="StopBrokerBeforeValidate"
+        Directory="System64Folder"
+        ExeCommand="&quot;[System64Folder]sc.exe&quot; stop ProxyDomBroker"
+        Execute="immediate"
+        Return="ignore" />
+    <CustomAction
+        Id="ReconcileProxyDomTunnel"
+        FileRef="ServiceExe"
+        ExeCommand="--reconcile"
+        Execute="deferred"
+        Impersonate="no"
+        Return="check" />
+    <InstallExecuteSequence>
+      <Custom
+          Action="StopBrokerBeforeValidate"
+          Before="InstallValidate"
+          Condition="Installed AND (REMOVE=&quot;ALL&quot; OR UPGRADINGPRODUCTCODE OR WIX_UPGRADE_DETECTED)" />
+      <Custom
+          Action="ReconcileProxyDomTunnel"
+          Before="StopServices"
+          Condition="REMOVE=&quot;ALL&quot; OR UPGRADINGPRODUCTCODE" />
+    </InstallExecuteSequence>
   </Package>
 </Wix>

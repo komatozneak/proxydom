@@ -4,14 +4,40 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_executable(protocol_test protocol_test.cpp protocol.cpp)
+add_executable(supervisor_test supervisor_test.cpp session_supervisor.cpp protocol.cpp log_sanitizer.cpp)
 
 if (WIN32)
-  add_executable(ProxyDomTunnelService
+  add_executable(ProxyDomBroker
     service.cpp
     protocol.cpp
-    cleanup.cpp
+    session_supervisor.cpp
+    network_owner.cpp
+    process_host.cpp
+    session_store.cpp
+    log_sanitizer.cpp
   )
-  target_link_libraries(ProxyDomTunnelService PRIVATE ws2_32 iphlpapi setupapi advapi32)
-  target_compile_definitions(ProxyDomTunnelService PRIVATE UNICODE _UNICODE)
-  set_target_properties(ProxyDomTunnelService PROPERTIES WIN32_EXECUTABLE TRUE)
+  target_link_libraries(ProxyDomBroker PRIVATE ws2_32 iphlpapi setupapi advapi32 shell32)
+  target_compile_definitions(ProxyDomBroker PRIVATE UNICODE _UNICODE)
+  target_compile_options(ProxyDomBroker PRIVATE /utf-8)
+  set_target_properties(ProxyDomBroker PROPERTIES WIN32_EXECUTABLE TRUE)
+
+  add_executable(ProxyDomCtl controller.cpp protocol.cpp)
+  target_link_libraries(ProxyDomCtl PRIVATE advapi32 ws2_32)
+  target_compile_definitions(ProxyDomCtl PRIVATE UNICODE _UNICODE)
+  target_compile_options(ProxyDomCtl PRIVATE /utf-8)
+
+  add_executable(controller_test controller_test.cpp protocol.cpp)
+  target_link_libraries(controller_test PRIVATE advapi32)
+  target_compile_definitions(controller_test PRIVATE UNICODE _UNICODE)
+  target_compile_options(controller_test PRIVATE /utf-8)
+
+  add_executable(route_probe route_probe.cpp network_owner.cpp protocol.cpp session_supervisor.cpp log_sanitizer.cpp)
+  target_link_libraries(route_probe PRIVATE ws2_32 iphlpapi setupapi advapi32)
+  target_compile_definitions(route_probe PRIVATE UNICODE _UNICODE)
+  target_compile_options(route_probe PRIVATE /utf-8)
+endif()
+
+if (MSVC)
+  target_compile_options(protocol_test PRIVATE /utf-8)
+  target_compile_options(supervisor_test PRIVATE /utf-8)
 endif()

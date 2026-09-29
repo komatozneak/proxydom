@@ -1,5 +1,8 @@
-#include "cleanup.h"
+#include "network_owner.h"
+#include "process_host.h"
 #include "protocol.h"
+#include "session_store.h"
+#include "session_supervisor.h"
 
 #define WIN32_LEAN_AND_MEAN
 #include <winsock2.h>
@@ -7,19 +10,30 @@
 #include <windows.h>
 #include <aclapi.h>
 #include <sddl.h>
+#include <shellapi.h>
+#include <winsvc.h>
 
+#include <atomic>
+#include <chrono>
+#include <condition_variable>
+#include <deque>
+#include <functional>
+#include <mutex>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace {
 
-const wchar_t* kServiceName = L"ProxyDomTunnelService";
-const wchar_t* kPipeName = L"\\\\.\\pipe\\ProxyDomServicePipe";
-const wchar_t* kFailure = L"Сервер не отвечает: выход через туннель не подтверждён";
+const wchar_t* kServiceName = L"ProxyDomBroker";
+const wchar_t* kPipeName = L"\\\\.\\pipe\\ProxyDomBrokerV3";
+HANDLE g_io_thread = nullptr;
+HANDLE g_writer_thread = nullptr;
 
 SERVICE_STATUS_HANDLE g_status_handle = nullptr;
 SERVICE_STATUS g_status{};
 HANDLE g_stop = nullptr;
+HANDLE g_reconciled = nullptr;
 
 std::wstring exe_dir() {
   wchar_t path[MAX_PATH] = {};
@@ -30,11 +44,11 @@ std::wstring exe_dir() {
   return text.substr(0, slash);
 }
 
-std::wstring installed_ui_path() {
-  return L"C:\\Program Files\\Proxy Dom\\proxy_dom.exe";
+std::wstring installed_controller_path() {
+  return L"C:\\Program Files\\Proxy Dom\\ProxyDomCtl.exe";
 }
 
-std::wstring sibling_ui_path() { return exe_dir() + L"\\proxy_dom.exe"; }
+std::wstring sibling_controller_path() { return exe_dir() + L"\\ProxyDomCtl.exe"; }
 
 std::wstring normalize_path(const std::wstring& path) {
   wchar_t full[MAX_PATH] = {};
@@ -47,7 +61,7 @@ bool same_path(const std::wstring& left, const std::wstring& right) {
          CSTR_EQUAL;
 }
 
-bool client_is_window(HANDLE pipe) {
+bool client_is_controller(HANDLE pipe) {
   ULONG pid = 0;
   if (!GetNamedPipeClientProcessId(pipe, &pid)) return false;
   HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
@@ -57,296 +71,483 @@ bool client_is_window(HANDLE pipe) {
   const BOOL ok = QueryFullProcessImageNameW(process, 0, image, &size);
   CloseHandle(process);
   if (!ok) return false;
-  return same_path(image, installed_ui_path()) || same_path(image, sibling_ui_path());
+  return same_path(image, installed_controller_path()) ||
+         same_path(image, sibling_controller_path());
 }
 
-void set_state(DWORD state) {
+void set_state(DWORD state, DWORD hint) {
   g_status.dwCurrentState = state;
   g_status.dwWin32ExitCode = NO_ERROR;
-  g_status.dwControlsAccepted = state == SERVICE_START_PENDING ? 0 : SERVICE_ACCEPT_STOP;
+  const bool pending = state == SERVICE_START_PENDING || state == SERVICE_STOP_PENDING;
+  g_status.dwControlsAccepted =
+      pending ? 0 : (SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_POWEREVENT | SERVICE_ACCEPT_PRESHUTDOWN);
+  g_status.dwWaitHint = hint;
+  g_status.dwCheckPoint = pending ? 1 : 0;
   SetServiceStatus(g_status_handle, &g_status);
 }
 
-DWORD WINAPI control_handler(DWORD control, DWORD, LPVOID, LPVOID) {
-  if (control == SERVICE_CONTROL_STOP && g_stop != nullptr) SetEvent(g_stop);
-  set_state(control == SERVICE_CONTROL_STOP ? SERVICE_STOP_PENDING : g_status.dwCurrentState);
-  return NO_ERROR;
-}
+struct App {
+  Win32RouteTable routes;
+  Win32Engine engine;
+  Win32Resolver resolver;
+  Win32ConnectivityProbe probe;
+  Win32SessionFiles files;
+  Win32TunnelLog log;
+  Win32Sleeper sleeper;
+  TunnelSupervisor supervisor;
+  CancelFlag cancel;
+  std::mutex queue_mu;
+  std::condition_variable queue_cv;
+  std::deque<std::function<void()>> jobs;
+  std::atomic<bool> stop{false};
+  std::atomic<int> busy{0};
+  std::mutex pipe_mu;
+  HANDLE pipe = nullptr;
+  std::thread worker;
 
-bool write_frame(HANDLE pipe, const std::string& json) {
-  const std::string frame = encode_frame(json);
-  if (frame.empty()) return false;
-  DWORD written = 0;
-  return WriteFile(pipe, frame.data(), static_cast<DWORD>(frame.size()), &written, nullptr) &&
-         written == frame.size();
-}
+  App()
+      : engine(exe_dir() + L"\\sing-box.exe", proxy_dom_engine_config_path()),
+        supervisor(routes, engine, resolver, probe, files, log, sleeper) {}
 
-bool read_frame(HANDLE pipe, HANDLE stop, std::string& json) {
-  std::string buffer;
-  while (WaitForSingleObject(stop, 50) != WAIT_OBJECT_0) {
-    DWORD available = 0;
-    if (!PeekNamedPipe(pipe, nullptr, 0, nullptr, &available, nullptr)) return false;
-    if (available == 0) continue;
-    char chunk[512];
-    DWORD got = 0;
-    if (!ReadFile(pipe, chunk, sizeof(chunk), &got, nullptr) || got == 0) return false;
-    buffer.append(chunk, got);
-    std::string error;
-    if (take_frame(buffer, json, error)) return error.empty();
-    if (!error.empty()) return false;
+  void emit(const TunnelSnapshot& snap) {
+    enqueue(state_event_v2(snap.generation, phase_name(snap.phase), code_name(snap.code), snap.message,
+                           snap.cleanup_verified));
   }
-  return false;
-}
 
-std::string narrow(const wchar_t* text) {
-  if (text == nullptr) return {};
-  const int n = WideCharToMultiByte(CP_UTF8, 0, text, -1, nullptr, 0, nullptr, nullptr);
-  if (n <= 1) return {};
-  std::string out(static_cast<std::size_t>(n - 1), '\0');
-  WideCharToMultiByte(CP_UTF8, 0, text, -1, out.data(), n, nullptr, nullptr);
-  return out;
-}
-
-bool resolve_ipv4(const std::string& host, std::string& ip) {
-  ADDRINFOA hints{};
-  hints.ai_family = AF_INET;
-  hints.ai_socktype = SOCK_STREAM;
-  ADDRINFOA* result = nullptr;
-  if (getaddrinfo(host.c_str(), nullptr, &hints, &result) != 0 || result == nullptr) return false;
-  char text[INET_ADDRSTRLEN] = {};
-  const auto* addr = reinterpret_cast<sockaddr_in*>(result->ai_addr);
-  inet_ntop(AF_INET, &addr->sin_addr, text, sizeof(text));
-  freeaddrinfo(result);
-  ip = text;
-  return !ip.empty();
-}
-
-bool launch_core(const std::wstring& config, HANDLE* process, HANDLE* job) {
-  std::wstring sing = exe_dir() + L"\\sing-box.exe";
-  if (GetFileAttributesW(sing.c_str()) == INVALID_FILE_ATTRIBUTES) return false;
-  *job = CreateJobObjectW(nullptr, nullptr);
-  if (*job == nullptr) return false;
-  JOBOBJECT_EXTENDED_LIMIT_INFORMATION info{};
-  info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-  SetInformationJobObject(*job, JobObjectExtendedLimitInformation, &info, sizeof(info));
-  std::wstring command = L"\"" + sing + L"\" run -c \"" + config + L"\"";
-  STARTUPINFOW startup{};
-  startup.cb = sizeof(startup);
-  startup.dwFlags = STARTF_USESHOWWINDOW;
-  startup.wShowWindow = SW_HIDE;
-  PROCESS_INFORMATION pi{};
-  std::vector<wchar_t> mutable_command(command.begin(), command.end());
-  mutable_command.push_back(L'\0');
-  if (!CreateProcessW(sing.c_str(), mutable_command.data(), nullptr, nullptr, FALSE,
-                      CREATE_NO_WINDOW | CREATE_SUSPENDED, nullptr, exe_dir().c_str(), &startup, &pi)) {
-    CloseHandle(*job);
-    *job = nullptr;
-    return false;
+  void post(std::function<void()> job) {
+    {
+      std::lock_guard<std::mutex> lock(queue_mu);
+      jobs.push_back(std::move(job));
+    }
+    queue_cv.notify_all();
   }
-  if (!AssignProcessToJobObject(*job, pi.hProcess)) {
-    ResumeThread(pi.hThread);
-  } else {
-    ResumeThread(pi.hThread);
+
+  void loop() {
+    supervisor.reconcile(cancel);
+    if (g_reconciled != nullptr) SetEvent(g_reconciled);
+    while (!stop.load()) {
+      std::function<void()> job;
+      {
+        std::unique_lock<std::mutex> lock(queue_mu);
+        queue_cv.wait_for(lock, std::chrono::seconds(2), [&] { return stop.load() || !jobs.empty(); });
+        if (stop.load() && jobs.empty()) break;
+        if (jobs.empty()) {
+          job = [this] { supervisor.watchdog(cancel); };
+        } else {
+          job = std::move(jobs.front());
+          jobs.pop_front();
+        }
+      }
+      busy.fetch_add(1);
+      job();
+      busy.fetch_sub(1);
+      queue_cv.notify_all();
+    }
+    busy.fetch_add(1);
+    supervisor.disconnect(cancel);
+    busy.fetch_sub(1);
+    queue_cv.notify_all();
   }
-  CloseHandle(pi.hThread);
-  *process = pi.hProcess;
-  return true;
-}
 
-void stop_core(HANDLE& process, HANDLE& job) {
-  if (process != nullptr) {
-    TerminateProcess(process, 0);
-    WaitForSingleObject(process, 5000);
-    CloseHandle(process);
-    process = nullptr;
+  void start() {
+    supervisor.set_observer([this](const TunnelSnapshot& snap) { emit(snap); });
+    supervisor.set_ready_observer([this](std::int64_t generation) { enqueue(tun_ready_event(generation)); });
+    worker = std::thread([this] { loop(); });
   }
-  if (job != nullptr) {
-    CloseHandle(job);
-    job = nullptr;
+
+  void join() {
+    stop.store(true);
+    cancel.request();
+    queue_cv.notify_all();
+    if (worker.joinable()) worker.join();
   }
-  sweep_tunnel_leftovers();
-}
 
-void serve_client(HANDLE pipe) {
-  std::int64_t generation = 0;
-  bool busy = false;
-  HANDLE process = nullptr;
-  HANDLE job = nullptr;
-  unsigned long physical = 0;
-  std::string pinned_ip;
-  const std::string failure = narrow(kFailure);
+  std::mutex out_mu;
+  std::deque<std::string> outgoing;
+  HANDLE kick = nullptr;
 
-  auto fail = [&]() {
-    stop_core(process, job);
-    busy = false;
-    write_frame(pipe, state_event(generation, "idle", &failure));
-  };
+  void enqueue(const std::string& json) {
+    {
+      std::lock_guard<std::mutex> lock(out_mu);
+      outgoing.push_back(json);
+    }
+    if (kick != nullptr) SetEvent(kick);
+  }
 
-  while (WaitForSingleObject(g_stop, 0) != WAIT_OBJECT_0) {
-    std::string json;
-    if (!read_frame(pipe, g_stop, json)) break;
+  // Finish every reply before the next read. A read and a write outstanding
+  // together never delivered connect after hello.
+  bool write_one(HANDLE client, const std::string& json) {
+    const std::string frame = encode_frame(json);
+    if (frame.empty()) return false;
+    OVERLAPPED ov{};
+    ov.hEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+    if (ov.hEvent == nullptr) return false;
+    DWORD wrote = 0;
+    const BOOL started = WriteFile(client, frame.data(), static_cast<DWORD>(frame.size()), &wrote, &ov);
+    bool ok = started == TRUE;
+    if (!ok && GetLastError() == ERROR_IO_PENDING) {
+      ok = GetOverlappedResult(client, &ov, &wrote, TRUE) == TRUE;
+    }
+    CloseHandle(ov.hEvent);
+    if (ok) log.write(0, "pipe_tx", "ok", wrote);
+    return ok && wrote == frame.size();
+  }
+
+  bool exchange(HANDLE client) {
+    char chunk[4096];
+    std::string inbound;
+    OVERLAPPED read_ov{};
+    read_ov.hEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+    kick = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+    if (read_ov.hEvent == nullptr || kick == nullptr) return false;
+
+    auto close_events = [&] {
+      HANDLE local = kick;
+      kick = nullptr;
+      if (local != nullptr) CloseHandle(local);
+      CloseHandle(read_ov.hEvent);
+    };
+    auto drain = [&] {
+      for (;;) {
+        std::string json;
+        std::string error;
+        if (!take_frame(inbound, json, error)) return error.empty();
+        if (!handle_command(json)) return false;
+      }
+    };
+    auto flush = [&] {
+      for (;;) {
+        std::string json;
+        {
+          std::lock_guard<std::mutex> lock(out_mu);
+          if (outgoing.empty()) return true;
+          json = std::move(outgoing.front());
+          outgoing.pop_front();
+        }
+        if (!write_one(client, json)) return false;
+      }
+    };
+
+    while (!stop.load()) {
+      if (!flush()) {
+        close_events();
+        return false;
+      }
+      ResetEvent(read_ov.hEvent);
+      DWORD ignored = 0;
+      const BOOL started = ReadFile(client, chunk, sizeof(chunk), &ignored, &read_ov);
+      if (started) {
+        if (ignored == 0) {
+          close_events();
+          return false;
+        }
+        inbound.append(chunk, ignored);
+        if (!drain()) {
+          close_events();
+          return false;
+        }
+        continue;
+      }
+      if (GetLastError() != ERROR_IO_PENDING) {
+        close_events();
+        return false;
+      }
+      HANDLE waits[3] = {g_stop, read_ov.hEvent, kick};
+      const DWORD which = WaitForMultipleObjects(3, waits, FALSE, 200);
+      if (which == WAIT_OBJECT_0 || which == WAIT_FAILED) break;
+      if (which == WAIT_OBJECT_0 + 1) {
+        DWORD got = 0;
+        if (!GetOverlappedResult(client, &read_ov, &got, FALSE) || got == 0) {
+          close_events();
+          return false;
+        }
+        inbound.append(chunk, got);
+        if (!drain()) {
+          close_events();
+          return false;
+        }
+        continue;
+      }
+      CancelIoEx(client, &read_ov);
+      DWORD got = 0;
+      if (GetOverlappedResult(client, &read_ov, &got, TRUE) && got > 0) {
+        inbound.append(chunk, got);
+        if (!drain()) {
+          close_events();
+          return false;
+        }
+      }
+    }
+    close_events();
+    return !stop.load();
+  }
+
+  void ack(const std::string& command, bool accepted, std::int64_t generation, const std::string& code,
+           const std::string& message) {
+    enqueue(ack_event(command, accepted, generation, code, message));
+  }
+
+  bool handle_command(const std::string& json) {
     ClientCommand command;
     std::string error;
     if (!parse_command(json, command, error)) {
-      write_frame(pipe, state_event(generation, "idle", &failure));
-      continue;
+      log.write(0, "frame", "protocol", 0);
+      ack("connect", false, supervisor.snapshot().generation, "protocol", user_message(TunnelCode::Protocol, {}));
+      return true;
+    }
+    log.write(supervisor.snapshot().generation, command.command, "rx", 0);
+    if (command.protocol_version != 3) {
+      ack(command.command, false, supervisor.snapshot().generation, "protocol", user_message(TunnelCode::Protocol, {}));
+      return true;
     }
     if (command.command == "hello") {
-      const char* state = busy ? "connecting" : "idle";
-      write_frame(pipe, state_event(generation, state, nullptr));
-      continue;
+      emit(supervisor.snapshot());
+      return true;
+    }
+    if (command.command == "prove") {
+      const auto now = supervisor.snapshot();
+      if (command.generation != now.generation || now.phase != TunnelPhase::Connecting) {
+        ack("prove", false, now.generation, "generation", {});
+        return true;
+      }
+      supervisor.note_user_proof(command.message == "ok", command.generation);
+      ack("prove", true, command.generation, {}, {});
+      return true;
     }
     if (command.command == "disconnect") {
-      if (command.generation != 0 && command.generation != generation) continue;
-      write_frame(pipe, state_event(generation, "disconnecting", nullptr));
-      stop_core(process, job);
-      busy = false;
-      write_frame(pipe, state_event(generation, "idle", nullptr));
-      continue;
-    }
-    if (command.command != "connect") continue;
-    if (busy) {
-      const std::string text = "Подключение уже идёт";
-      write_frame(pipe, state_event(generation, "idle", &text));
-      continue;
-    }
-    ShareLine line;
-    if (!parse_share_line(command.uri, line, error)) {
-      write_frame(pipe, state_event(generation, "idle", &failure));
-      continue;
-    }
-    ++generation;
-    busy = true;
-    write_frame(pipe, state_event(generation, "connecting", nullptr));
-    std::string ip;
-    if (!resolve_ipv4(line.host, ip) || !pin_server_route(ip) ||
-        !physical_interface_for(ip, &physical)) {
-      fail();
-      continue;
-    }
-    pinned_ip = ip;
-    const std::string config = build_singbox_config(line, ip, command.direct_domains);
-    if (config.empty() || !write_session_file(config) || !launch_core(session_config_path(), &process, &job)) {
-      fail();
-      continue;
-    }
-    unsigned long tun_index = 0;
-    bool ready = false;
-    for (int i = 0; i < 50; ++i) {
-      if (WaitForSingleObject(process, 0) == WAIT_OBJECT_0) break;
-      if (tun_routes_ready(&tun_index)) {
-        ready = true;
-        break;
+      const auto now = supervisor.snapshot();
+      if (command.generation != 0 && command.generation != now.generation) {
+        ack("disconnect", false, now.generation, "generation", {});
+        return true;
       }
-      Sleep(100);
+      cancel.request();
+      post([this] { supervisor.disconnect(cancel); });
+      ack("disconnect", true, now.generation, {}, {});
+      return true;
     }
-    if (!ready || !prove_exit(tun_index)) {
-      fail();
-      continue;
+    if (command.command != "connect") return true;
+    const auto now = supervisor.snapshot();
+    if (now.phase != TunnelPhase::Idle || !now.cleanup_verified) {
+      const char* code = now.phase == TunnelPhase::Disconnecting || !now.cleanup_verified ? "cleanup_failed" : "busy";
+      ack("connect", false, now.generation, code,
+          user_message(code == std::string("busy") ? TunnelCode::Busy : TunnelCode::CleanupFailed, {}));
+      return true;
     }
-    write_frame(pipe, state_event(generation, "connected", nullptr));
-    while (WaitForSingleObject(g_stop, 0) != WAIT_OBJECT_0) {
-      if (process != nullptr && WaitForSingleObject(process, 0) == WAIT_OBJECT_0) {
-        const std::string lost = "Соединение прервано";
-        stop_core(process, job);
-        busy = false;
-        write_frame(pipe, state_event(generation, "idle", &lost));
-        break;
-      }
-      unsigned long now = 0;
-      if (!pinned_ip.empty() && physical_interface_for(pinned_ip, &now) && now != physical) {
-        const std::string changed = "Сеть изменилась. Подключение остановлено.";
-        stop_core(process, job);
-        busy = false;
-        write_frame(pipe, state_event(generation, "disconnecting", nullptr));
-        write_frame(pipe, state_event(generation, "idle", &changed));
-        break;
-      }
-      DWORD available = 0;
-      if (!PeekNamedPipe(pipe, nullptr, 0, nullptr, &available, nullptr)) break;
-      if (available == 0) {
-        Sleep(200);
-        continue;
-      }
-      std::string next;
-      if (!read_frame(pipe, g_stop, next)) break;
-      ClientCommand follow;
-      std::string follow_error;
-      if (!parse_command(next, follow, follow_error)) continue;
-      if (follow.command == "disconnect" &&
-          (follow.generation == 0 || follow.generation == generation)) {
-        write_frame(pipe, state_event(generation, "disconnecting", nullptr));
-        stop_core(process, job);
-        busy = false;
-        write_frame(pipe, state_event(generation, "idle", nullptr));
-        break;
-      }
+    cancel.reset();
+    const BeginResult begin = supervisor.begin_connect();
+    if (!begin.accepted) {
+      ack("connect", false, begin.snap.generation, code_name(begin.snap.code), begin.snap.message);
+      return true;
+    }
+    ConnectRequest request;
+    request.uri = command.uri;
+    request.direct_domains = command.direct_domains;
+    post([this, request] { supervisor.run_connect(request, cancel); });
+    ack("connect", true, begin.snap.generation, {}, {});
+    return true;
+  }
+
+  void wait_until_settled() {
+    std::unique_lock<std::mutex> lock(queue_mu);
+    queue_cv.wait_for(lock, std::chrono::seconds(20), [&] {
+      if (busy.load() != 0 || !jobs.empty()) return false;
+      const TunnelSnapshot snap = supervisor.snapshot();
+      return snap.cleanup_verified || snap.code == TunnelCode::CleanupFailed;
+    });
+  }
+
+  void serve(HANDLE client) {
+    {
+      std::lock_guard<std::mutex> lock(out_mu);
+      outgoing.clear();
+    }
+    {
+      std::lock_guard<std::mutex> lock(pipe_mu);
+      pipe = client;
+    }
+    log.write(0, "pipe_client", "ok", 0);
+    exchange(client);
+    log.write(supervisor.snapshot().generation, "pipe_end", "win32", GetLastError());
+    const auto leftover = supervisor.snapshot();
+    if (leftover.phase != TunnelPhase::Idle || !leftover.cleanup_verified) {
+      cancel.request();
+      post([this] { supervisor.disconnect(cancel); });
+      wait_until_settled();
+    }
+    {
+      std::lock_guard<std::mutex> lock(pipe_mu);
+      pipe = nullptr;
     }
   }
-  stop_core(process, job);
+
+};
+
+App* g_app = nullptr;
+
+DWORD WINAPI control_handler(DWORD control, DWORD event_type, LPVOID, LPVOID) {
+  if (control == SERVICE_CONTROL_POWEREVENT && event_type == PBT_APMSUSPEND && g_app != nullptr) {
+    // Sleep must not leave capture routes behind, and must not reconnect itself.
+    const auto snap = g_app->supervisor.snapshot();
+    if (snap.phase != TunnelPhase::Idle || !snap.cleanup_verified) {
+      g_app->cancel.request();
+      g_app->post([app = g_app] { app->supervisor.disconnect(app->cancel); });
+    }
+    return NO_ERROR;
+  }
+  if (control == SERVICE_CONTROL_STOP || control == SERVICE_CONTROL_PRESHUTDOWN) {
+    if (g_app != nullptr) {
+      g_app->stop.store(true);
+      g_app->cancel.request();
+      g_app->queue_cv.notify_all();
+    }
+    if (g_stop != nullptr) SetEvent(g_stop);
+    if (g_io_thread != nullptr) CancelSynchronousIo(g_io_thread);
+    if (g_writer_thread != nullptr) CancelSynchronousIo(g_writer_thread);
+    set_state(SERVICE_STOP_PENDING, 20000);
+    return NO_ERROR;
+  }
+  set_state(g_status.dwCurrentState, 0);
+  return NO_ERROR;
 }
 
-void run_pipe() {
-  EXPLICIT_ACCESS_W access{};
-  access.grfAccessPermissions = FILE_READ_DATA | FILE_WRITE_DATA | READ_CONTROL | SYNCHRONIZE;
-  access.grfAccessMode = SET_ACCESS;
-  access.grfInheritance = NO_INHERITANCE;
-  access.Trustee.TrusteeForm = TRUSTEE_IS_SID;
-  access.Trustee.TrusteeType = TRUSTEE_IS_WELL_KNOWN_GROUP;
-  access.Trustee.ptstrName = const_cast<LPWSTR>(L"AU");
-  SID_IDENTIFIER_AUTHORITY nt = SECURITY_NT_AUTHORITY;
-  PSID users = nullptr;
-  AllocateAndInitializeSid(&nt, 1, SECURITY_AUTHENTICATED_USER_RID, 0, 0, 0, 0, 0, 0, 0, &users);
-  access.Trustee.ptstrName = reinterpret_cast<LPWSTR>(users);
-  PACL acl = nullptr;
-  SetEntriesInAclW(1, &access, nullptr, &acl);
-  SECURITY_DESCRIPTOR sd{};
-  InitializeSecurityDescriptor(&sd, SECURITY_DESCRIPTOR_REVISION);
-  SetSecurityDescriptorDacl(&sd, TRUE, acl, FALSE);
+void run_pipe(App& app) {
+  if (g_io_thread != nullptr) CloseHandle(g_io_thread);
+  g_io_thread = OpenThread(THREAD_TERMINATE, FALSE, GetCurrentThreadId());
+  PSECURITY_DESCRIPTOR sd = nullptr;
+  // LocalSystem pipes default to System integrity. A Medium window then gets
+  // ERROR_ACCESS_DENIED even when the DACL names Authenticated Users.
+  if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(
+          L"D:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;AU)S:(ML;;NW;;;ME)",
+          SDDL_REVISION_1, &sd, nullptr)) {
+    app.log.write(0, "pipe_acl", "sddl", GetLastError());
+    return;
+  }
   SECURITY_ATTRIBUTES sa{};
   sa.nLength = sizeof(sa);
-  sa.lpSecurityDescriptor = &sd;
+  sa.lpSecurityDescriptor = sd;
 
   while (WaitForSingleObject(g_stop, 0) != WAIT_OBJECT_0) {
-    HANDLE pipe = CreateNamedPipeW(kPipeName, PIPE_ACCESS_DUPLEX, PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
-                                   1, 8192, 8192, 0, &sa);
+    HANDLE pipe = CreateNamedPipeW(
+        kPipeName, PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
+        PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT | PIPE_REJECT_REMOTE_CLIENTS,
+        1, 65536, 65536, 5000, &sa);
     if (pipe == INVALID_HANDLE_VALUE) {
-      Sleep(500);
+      app.log.write(0, "pipe_create", "win32", GetLastError());
+      if (WaitForSingleObject(g_stop, 200) == WAIT_OBJECT_0) break;
       continue;
     }
-    const BOOL connected = ConnectNamedPipe(pipe, nullptr) ? TRUE : (GetLastError() == ERROR_PIPE_CONNECTED);
-    if (!connected || !client_is_window(pipe)) {
+    OVERLAPPED connect_ov{};
+    connect_ov.hEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+    bool ready = false;
+    DWORD err = ERROR_INVALID_HANDLE;
+    if (connect_ov.hEvent != nullptr) {
+      const BOOL called = ConnectNamedPipe(pipe, &connect_ov);
+      err = GetLastError();
+      if (called || err == ERROR_PIPE_CONNECTED) {
+        ready = true;
+      } else if (err == ERROR_IO_PENDING) {
+        HANDLE waits[2] = {g_stop, connect_ov.hEvent};
+        const DWORD which = WaitForMultipleObjects(2, waits, FALSE, INFINITE);
+        if (which == WAIT_OBJECT_0 + 1) {
+          DWORD unused = 0;
+          ready = GetOverlappedResult(pipe, &connect_ov, &unused, FALSE) == TRUE;
+          if (!ready) err = GetLastError();
+        } else {
+          CancelIoEx(pipe, &connect_ov);
+          err = WAIT_TIMEOUT;
+        }
+      }
+      CloseHandle(connect_ov.hEvent);
+    }
+    if (!ready) {
+      app.log.write(0, "pipe_wait", "win32", err);
+      DisconnectNamedPipe(pipe);
+      CloseHandle(pipe);
+      if (WaitForSingleObject(g_stop, 0) == WAIT_OBJECT_0) break;
+      continue;
+    }
+    if (!client_is_controller(pipe)) {
+      if (ready) app.log.write(0, "reject_client", "image", GetLastError());
       DisconnectNamedPipe(pipe);
       CloseHandle(pipe);
       continue;
     }
-    serve_client(pipe);
+    app.serve(pipe);
     DisconnectNamedPipe(pipe);
     CloseHandle(pipe);
   }
-  if (users != nullptr) FreeSid(users);
-  if (acl != nullptr) LocalFree(acl);
+  LocalFree(sd);
 }
 
 void WINAPI service_main(DWORD, LPWSTR*) {
   g_status_handle = RegisterServiceCtrlHandlerExW(kServiceName, control_handler, nullptr);
   if (g_status_handle == nullptr) return;
   g_status.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
-  set_state(SERVICE_START_PENDING);
+  set_state(SERVICE_START_PENDING, 20000);
   WSADATA wsa{};
   WSAStartup(MAKEWORD(2, 2), &wsa);
   g_stop = CreateEventW(nullptr, TRUE, FALSE, nullptr);
-  sweep_tunnel_leftovers();
-  set_state(SERVICE_RUNNING);
-  run_pipe();
-  sweep_tunnel_leftovers();
+  g_reconciled = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+  App app;
+  g_app = &app;
+  app.start();
+  WaitForSingleObject(g_reconciled, 20000);
+  set_state(SERVICE_RUNNING, 0);
+  run_pipe(app);
+  set_state(SERVICE_STOP_PENDING, 20000);
+  app.join();
+  g_app = nullptr;
   WSACleanup();
-  set_state(SERVICE_STOPPED);
+  CloseHandle(g_reconciled);
+  CloseHandle(g_stop);
+  set_state(SERVICE_STOPPED, 0);
+}
+
+int reconcile_standalone() {
+  SC_HANDLE scm = OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT);
+  if (scm != nullptr) {
+    SC_HANDLE service = OpenServiceW(scm, kServiceName, SERVICE_STOP | SERVICE_QUERY_STATUS);
+    if (service != nullptr) {
+      SERVICE_STATUS status{};
+      ControlService(service, SERVICE_CONTROL_STOP, &status);
+      for (int i = 0; i < 40; ++i) {
+        SERVICE_STATUS_PROCESS process{};
+        DWORD needed = 0;
+        if (!QueryServiceStatusEx(service, SC_STATUS_PROCESS_INFO, reinterpret_cast<LPBYTE>(&process), sizeof(process),
+                                  &needed)) {
+          break;
+        }
+        if (process.dwCurrentState == SERVICE_STOPPED) break;
+        Sleep(500);
+      }
+      CloseServiceHandle(service);
+    }
+    CloseServiceHandle(scm);
+  }
+  WSADATA wsa{};
+  WSAStartup(MAKEWORD(2, 2), &wsa);
+  Win32RouteTable routes;
+  Win32Engine engine(exe_dir() + L"\\sing-box.exe", proxy_dom_engine_config_path());
+  Win32Resolver resolver;
+  Win32ConnectivityProbe probe;
+  Win32SessionFiles files;
+  Win32TunnelLog log;
+  Win32Sleeper sleeper;
+  TunnelSupervisor supervisor(routes, engine, resolver, probe, files, log, sleeper);
+  CancelFlag cancel;
+  const TunnelSnapshot snap = supervisor.reconcile(cancel);
+  WSACleanup();
+  return snap.phase == TunnelPhase::Idle && snap.cleanup_verified ? 0 : 1;
 }
 
 }  // namespace
 
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
+  int argc = 0;
+  LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+  const bool reconcile = argc >= 2 && argv != nullptr && wcscmp(argv[1], L"--reconcile") == 0;
+  if (argv != nullptr) LocalFree(argv);
+  if (reconcile) return reconcile_standalone();
   SERVICE_TABLE_ENTRYW table[] = {{const_cast<LPWSTR>(kServiceName), service_main}, {nullptr, nullptr}};
   StartServiceCtrlDispatcherW(table);
   return 0;
