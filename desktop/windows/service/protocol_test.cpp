@@ -87,6 +87,7 @@ int main() {
   expect(line.hop_interval == "30s", "hop interval");
 
   const auto config = build_singbox_config(line, "203.0.113.10", {"lan.example"});
+  expect(config.find("\"stack\":\"system\"") != std::string::npos, "windows tun uses the system adapter");
   expect(config.find("\"auto_route\":false") != std::string::npos, "engine does not own routes");
   expect(config.find("\"auto_route\":true") == std::string::npos, "auto_route stays off");
   expect(config.find("route_address") == std::string::npos, "engine installs no prefixes");
