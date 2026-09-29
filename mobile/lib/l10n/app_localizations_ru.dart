@@ -818,6 +818,11 @@ class AppL10nRu extends AppL10n {
   String get tunnelLogsCopied => 'Лог скопирован';
 
   @override
+  String tunnelLogsDebugFile(String path) {
+    return 'Файл для отправки: $path';
+  }
+
+  @override
   String get tunnelLogsEmpty => 'Записей нет';
 
   @override

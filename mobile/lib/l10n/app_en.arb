@@ -467,6 +467,12 @@
   "tunnelLogsExport": "Share",
   "tunnelLogsDelete": "Delete",
   "tunnelLogsCopied": "Log copied",
+  "tunnelLogsDebugFile": "File to send: {path}",
+  "@tunnelLogsDebugFile": {
+    "placeholders": {
+      "path": {"type": "String"}
+    }
+  },
   "tunnelLogsEmpty": "No entries",
   "settingsSendReportHint": "Copies diagnostics. Paste them into support yourself.",
   "settingsSendReportConfirm": "Send",

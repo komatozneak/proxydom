@@ -1591,6 +1591,12 @@ abstract class AppL10n {
   /// **'Log copied'**
   String get tunnelLogsCopied;
 
+  /// No description provided for @tunnelLogsDebugFile.
+  ///
+  /// In en, this message translates to:
+  /// **'File to send: {path}'**
+  String tunnelLogsDebugFile(String path);
+
   /// No description provided for @tunnelLogsEmpty.
   ///
   /// In en, this message translates to:

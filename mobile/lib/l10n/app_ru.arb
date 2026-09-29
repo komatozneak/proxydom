@@ -293,6 +293,12 @@
   "tunnelLogsExport": "Поделиться",
   "tunnelLogsDelete": "Удалить",
   "tunnelLogsCopied": "Лог скопирован",
+  "tunnelLogsDebugFile": "Файл для отправки: {path}",
+  "@tunnelLogsDebugFile": {
+    "placeholders": {
+      "path": {"type": "String"}
+    }
+  },
   "tunnelLogsEmpty": "Записей нет",
   "settingsSendReportHint": "Копирует диагностику. Вставьте её в поддержку сами.",
   "settingsSendReportConfirm": "Отправить",

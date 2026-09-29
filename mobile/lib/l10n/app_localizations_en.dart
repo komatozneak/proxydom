@@ -818,6 +818,11 @@ class AppL10nEn extends AppL10n {
   String get tunnelLogsCopied => 'Log copied';
 
   @override
+  String tunnelLogsDebugFile(String path) {
+    return 'File to send: $path';
+  }
+
+  @override
   String get tunnelLogsEmpty => 'No entries';
 
   @override

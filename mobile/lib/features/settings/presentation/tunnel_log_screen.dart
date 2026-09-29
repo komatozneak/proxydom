@@ -11,6 +11,8 @@ import '../../../core/diagnostics/tunnel_log_level.dart';
 import '../../../core/diagnostics/tunnel_log_prefs.dart';
 import '../../../core/diagnostics/tunnel_log_redact.dart';
 import '../../../core/diagnostics/ui_log.dart';
+import '../../../core/diagnostics/windows_service_log.dart';
+import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/teremok_snackbar.dart';
@@ -119,17 +121,29 @@ class _TunnelLogScreenState extends State<TunnelLogScreen> {
     return left.compareTo(right);
   }
 
+  Future<String> _bundle(List<String> lines) async {
+    final window = lines.join('\n');
+    if (!windowsDesktop) return redactTunnelLog(window);
+    return windowsDebugReport(window, await readWindowsServiceLog());
+  }
+
   Future<void> _copy(List<String> lines) async {
+    final source = windowsDesktop ? _lines : lines;
     UiLog.action(
       'logs',
       'copy',
       level: ProductLogLevel.info,
-      extra: {'lines': lines.length},
+      extra: {'lines': source.length},
     );
-    final text = lines.isEmpty ? '' : redactTunnelLog(lines.join('\n'));
+    final text = await _bundle(source);
+    final saved = windowsDesktop ? await writeWindowsDebugFile(text) : null;
     await Clipboard.setData(ClipboardData(text: text));
     if (!mounted) return;
-    showTeremokSnackBar(context, AppL10n.of(context).tunnelLogsCopied);
+    final l = AppL10n.of(context);
+    showTeremokSnackBar(
+      context,
+      saved == null ? l.tunnelLogsCopied : l.tunnelLogsDebugFile(saved),
+    );
   }
 
   Future<void> _shareAll() async {
@@ -141,7 +155,31 @@ class _TunnelLogScreenState extends State<TunnelLogScreen> {
       level: ProductLogLevel.info,
       extra: {'lines': lines.length},
     );
-    if (lines.isEmpty) {
+    if (lines.isEmpty && !windowsDesktop) {
+      showTeremokSnackBar(context, l.tunnelLogsEmpty);
+      return;
+    }
+    final text = await _bundle(lines);
+    final saved = windowsDesktop ? await writeWindowsDebugFile(text) : null;
+    if (!mounted) return;
+    if (saved != null) {
+      showTeremokSnackBar(context, l.tunnelLogsDebugFile(saved));
+      final box = context.findRenderObject();
+      final origin = box is RenderBox && box.hasSize
+          ? box.localToGlobal(Offset.zero) & box.size
+          : null;
+      try {
+        await Share.shareXFiles(
+          [XFile(saved)],
+          subject: l.tunnelLogsTitle,
+          sharePositionOrigin: origin,
+        );
+      } catch (_) {
+        // The file on disk is the handoff. A closed share sheet is not a failure.
+      }
+      return;
+    }
+    if (text.isEmpty) {
       showTeremokSnackBar(context, l.tunnelLogsEmpty);
       return;
     }
@@ -150,7 +188,7 @@ class _TunnelLogScreenState extends State<TunnelLogScreen> {
         ? box.localToGlobal(Offset.zero) & box.size
         : null;
     await Share.share(
-      redactTunnelLog(lines.join('\n')),
+      text,
       subject: l.tunnelLogsTitle,
       sharePositionOrigin: origin,
     );
