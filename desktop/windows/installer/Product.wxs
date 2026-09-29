@@ -10,7 +10,10 @@
       Scope="perMachine"
       Language="1049"
       Codepage="1251">
-    <MajorUpgrade DowngradeErrorMessage="Уже установлена более новая версия." />
+    <!-- RemoveExistingProducts runs after the new files exist. The cached 1.0.1.14
+         package still runs ProxyDomBroker.exe with reconcile from Program Files.
+         That path is empty until InstallFiles of this package. -->
+    <MajorUpgrade Schedule="afterInstallExecute" DowngradeErrorMessage="Уже установлена более новая версия." />
     <!-- Flutter keeps FileVersion 1.0.0+N. Equal versions would leave the old window in place. -->
     <Property Id="REINSTALLMODE" Value="amus" />
     <MediaTemplate EmbedCab="yes" />
@@ -136,13 +139,24 @@
         ExeCommand="&quot;[System64Folder]sc.exe&quot; stop ProxyDomBroker"
         Execute="immediate"
         Return="ignore" />
+    <!-- A missing exe or a non-zero reconcile must not roll back install or uninstall.
+         The file is the new package copy: schedule this after InstallFiles. -->
     <CustomAction
         Id="ReconcileProxyDomTunnel"
         FileRef="ServiceExe"
         ExeCommand="--reconcile"
         Execute="deferred"
         Impersonate="no"
-        Return="check" />
+        Return="ignore" />
+    <!-- Old product uninstall stops the service that StartServices just started.
+         Start again after that removal. Already-running is not a failed install. -->
+    <CustomAction
+        Id="StartBrokerAfterUpgrade"
+        Directory="System64Folder"
+        ExeCommand="sc.exe start ProxyDomBroker"
+        Execute="deferred"
+        Impersonate="no"
+        Return="ignore" />
     <InstallExecuteSequence>
       <Custom
           Action="StopBrokerBeforeValidate"
@@ -150,8 +164,12 @@
           Condition="Installed AND (REMOVE=&quot;ALL&quot; OR UPGRADINGPRODUCTCODE OR WIX_UPGRADE_DETECTED)" />
       <Custom
           Action="ReconcileProxyDomTunnel"
-          Before="StopServices"
+          After="InstallFiles"
           Condition="REMOVE=&quot;ALL&quot; OR UPGRADINGPRODUCTCODE" />
+      <Custom
+          Action="StartBrokerAfterUpgrade"
+          After="RemoveExistingProducts"
+          Condition="NOT REMOVE=&quot;ALL&quot;" />
     </InstallExecuteSequence>
   </Package>
 </Wix>

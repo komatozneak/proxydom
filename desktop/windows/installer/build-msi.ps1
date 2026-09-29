@@ -1,7 +1,7 @@
 # Visible per-machine MSI for Прокси Дом (ADR 023 / ADR 029).
 # Humans get the Russian WiX wizard. Pass -Quiet only for CI.
 param(
-    [string]$Version = "1.0.0.1",
+    [string]$Version = "1.0.7.0",
     [switch]$Quiet
 )
 
@@ -74,9 +74,15 @@ Write-Host "Building ProxyDomBroker and ProxyDomCtl"
 $vcvars = Find-VcVars
 $cmake = Find-Cmake
 New-Item -ItemType Directory -Force -Path $Payload | Out-Null
-$build = Join-Path $Service "build"
-# Same CMake invocation as Windows Service CI. The file list lives in CMakeLists.txt.
-cmd /c "call `"$vcvars`" >nul && `"$cmake`" -S `"$Service`" -B `"$build`" && `"$cmake`" --build `"$build`" --config Release --target ProxyDomBroker ProxyDomCtl"
+$build = Join-Path $Service "build-release"
+# A Debug cache links VCRUNTIME140D.dll. That DLL is not on another PC, so SCM cannot start the service.
+if (Test-Path (Join-Path $build "CMakeCache.txt")) {
+    $cache = Get-Content -LiteralPath (Join-Path $build "CMakeCache.txt") -Raw
+    if ($cache -notmatch "CMAKE_BUILD_TYPE:STRING=Release") {
+        Remove-Item -LiteralPath $build -Recurse -Force
+    }
+}
+cmd /c "call `"$vcvars`" >nul && `"$cmake`" -S `"$Service`" -B `"$build`" -DCMAKE_BUILD_TYPE=Release && `"$cmake`" --build `"$build`" --config Release --target ProxyDomBroker ProxyDomCtl"
 if ($LASTEXITCODE -ne 0) { throw "CMake build failed." }
 $bin = Join-Path $build "Release"
 if (-not (Test-Path (Join-Path $bin "ProxyDomBroker.exe"))) { $bin = $build }

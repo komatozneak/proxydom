@@ -20,11 +20,14 @@ if (WIN32)
   target_compile_definitions(ProxyDomBroker PRIVATE UNICODE _UNICODE)
   target_compile_options(ProxyDomBroker PRIVATE /utf-8)
   set_target_properties(ProxyDomBroker PROPERTIES WIN32_EXECUTABLE TRUE)
+  # Another PC has no VC redist. A dynamic CRT makes SCM report that the service failed to start.
+  set_property(TARGET ProxyDomBroker PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded")
 
   add_executable(ProxyDomCtl controller.cpp protocol.cpp)
   target_link_libraries(ProxyDomCtl PRIVATE advapi32 ws2_32)
   target_compile_definitions(ProxyDomCtl PRIVATE UNICODE _UNICODE)
   target_compile_options(ProxyDomCtl PRIVATE /utf-8)
+  set_property(TARGET ProxyDomCtl PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded")
 
   add_executable(controller_test controller_test.cpp protocol.cpp)
   target_link_libraries(controller_test PRIVATE advapi32 ws2_32)
