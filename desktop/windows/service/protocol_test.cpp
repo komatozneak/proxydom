@@ -29,7 +29,12 @@ int main() {
 
   std::string huge(kFrameMaxBody + 1, 'a');
   expect(encode_frame(huge).empty(), "reject oversize encode");
-  std::string bad = std::string("\x01\x10\x00\x00", 4);
+  std::string bad(4, '\0');
+  const auto over = kFrameMaxBody + 1;
+  bad[0] = static_cast<char>(over & 0xff);
+  bad[1] = static_cast<char>((over >> 8) & 0xff);
+  bad[2] = static_cast<char>((over >> 16) & 0xff);
+  bad[3] = static_cast<char>((over >> 24) & 0xff);
   error.clear();
   expect(!take_frame(bad, json, error) && error == "frame", "reject oversize length");
 
@@ -40,6 +45,31 @@ int main() {
 
   error.clear();
   expect(!parse_command("{\"command\":\"connect\",\"outbounds\":[]}", command, error), "reject outbounds");
+
+  const std::string short_connect =
+      "{\"command\":\"connect\",\"protocol_version\":3,"
+      "\"uri\":\"hy2://secret@cdn.example:443\","
+      "\"direct_domains\":[\"lan.example\",\"bad host\"]}";
+  error.clear();
+  expect(parse_command(short_connect, command, error), "short connect survives a bad name");
+  expect(command.command == "connect" && command.protocol_version == 3, "connect fields");
+  expect(command.uri == "hy2://secret@cdn.example:443", "connect keeps the share line");
+  expect(command.direct_domains.size() == 1 && command.direct_domains[0] == "lan.example",
+         "bad direct name is dropped");
+
+  std::string long_connect =
+      "{\"command\":\"connect\",\"protocol_version\":3,"
+      "\"uri\":\"hy2://secret@cdn.example:443\",\"direct_domains\":[";
+  for (int i = 0; i < 70; ++i) {
+    if (i != 0) long_connect += ',';
+    long_connect += "\"d" + std::to_string(i) + ".example\"";
+  }
+  long_connect += ",\"../x\"]}";
+  error.clear();
+  expect(parse_command(long_connect, command, error), "long connect is still a command");
+  expect(command.uri == "hy2://secret@cdn.example:443", "long connect keeps the share line");
+  expect(command.direct_domains.size() == 64, "direct names stop at 64");
+  expect(encode_frame(long_connect).size() == 4 + long_connect.size(), "long connect still frames");
 
   ShareLine line;
   error.clear();
@@ -52,17 +82,29 @@ int main() {
   expect(line.scheme == "hysteria2", "hy2 scheme");
   expect(line.password == "secret+pass", "hy2 password");
   expect(line.obfs == "salamander", "salamander");
-  expect(line.server_ports == "1000-2000", "hop ports");
+  expect(line.port == 1000, "hop starts at the low port");
+  expect(line.server_ports == "1000:2000", "hop ports");
   expect(line.hop_interval == "30s", "hop interval");
 
   const auto config = build_singbox_config(line, "203.0.113.10", {"lan.example"});
-  expect(config.find("\"route_address\":[\"0.0.0.0/1\",\"128.0.0.0/1\"]") != std::string::npos, "v4 routes");
+  expect(config.find("\"auto_route\":false") != std::string::npos, "engine does not own routes");
+  expect(config.find("\"auto_route\":true") == std::string::npos, "auto_route stays off");
+  expect(config.find("route_address") == std::string::npos, "engine installs no prefixes");
   expect(config.find("::/0") == std::string::npos, "no v6 default");
   expect(config.find("198.18.0.1/30") != std::string::npos, "tun prefix");
   expect(config.find("198.18.0.2") != std::string::npos, "dns address");
   expect(config.find("salamander") != std::string::npos, "obfs in config");
   expect(config.find("lan.example") != std::string::npos, "direct domain");
-  expect(config.find("1000:2000") != std::string::npos, "hop range uses a colon");
+  expect(config.find("\"server_ports\":[\"1000:2000\"]") != std::string::npos, "hop range uses a colon");
+
+  ShareLine slash;
+  error.clear();
+  expect(parse_share_line("hy2://secret@cdn.example:443/?sni=cdn.example", slash, error), "slash after port parses");
+  expect(slash.port == 443 && slash.server_ports.empty(), "slash is not a port range");
+  const auto slash_config = build_singbox_config(slash, "203.0.113.10", {});
+  expect(slash_config.find("server_ports") == std::string::npos, "plain port omits server_ports");
+  expect(!parse_share_line("hy2://secret@cdn.example:443abc", slash, error), "junk port is refused");
+  expect(error == "port", "junk port error");
   expect(config.find("1000-2000") == std::string::npos, "hop range is not a hyphen");
   expect(config.find("\"action\":\"hijack-dns\"") != std::string::npos, "dns hijack rule");
   expect(config.find("\"server\":\"1.1.1.1\"") != std::string::npos, "dns server");

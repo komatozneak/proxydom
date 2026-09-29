@@ -6,7 +6,7 @@
 
 // Share-line to sing-box config for ADR 029. No Win32 types in this header.
 
-constexpr std::uint32_t kFrameMaxBody = 4096;
+constexpr std::uint32_t kFrameMaxBody = 65536;
 
 struct ShareLine {
   std::string scheme;
@@ -67,6 +67,9 @@ std::string state_event_v2(std::int64_t generation,
                            const std::string& code,
                            const std::string& message,
                            bool cleanup_verified);
+// Gate 2 finished. Connected is still false until the controller proves ingress.
+std::string tun_ready_event(std::int64_t generation);
+
 std::string ack_event(const std::string& command,
                       bool accepted,
                       std::int64_t generation,
