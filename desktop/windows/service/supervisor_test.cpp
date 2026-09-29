@@ -31,6 +31,9 @@ class FakeRoutes : public RouteTable {
   std::vector<RouteView> defaults;
   bool defaults_ok = true;
   bool list_ok = true;
+  bool use_listed = false;
+  std::vector<OwnedAdapter> listed;
+  int list_calls = 0;
   bool pin_present = false;
   int add_calls = 0;
   int capture_calls = 0;
@@ -90,7 +93,14 @@ class FakeRoutes : public RouteTable {
   bool routes_absent(std::uint64_t) override { return !routes_present; }
   bool list_own_adapters(std::vector<OwnedAdapter>& out) override {
     out.clear();
+    ++list_calls;
     if (!list_ok) return false;
+    // The first read is the timeout diagnosis. Later reads are restore, which
+    // must see a clean list or the fake would turn a timeout into cleanup_failed.
+    if (use_listed && list_calls == 1) {
+      out = listed;
+      return true;
+    }
     if (!adapter_present) return true;
     OwnedAdapter adapter;
     adapter.name = "ProxyDomTun";
@@ -443,6 +453,11 @@ void test_radmin_allows_connect() {
   Harness harness;
   harness.routes.defaults = {route_view("Radmin VPN", false, 0, 9256), route_view("Ethernet", true, 0, 25)};
   const auto snap = harness.connect();
+  bool saw_timeout = false;
+  for (const auto& line : harness.log.lines) {
+    if (line.event == "tun_init_timeout") saw_timeout = true;
+  }
+  expect(!saw_timeout, "successful connect does not time out the adapter");
   expect(snap.phase == TunnelPhase::Connected, "radmin does not block");
   expect(harness.probe.calls == 0, "connect does not open a socks probe");
   expect(harness.routes.canary_calls == 1, "canary is installed before capture");
@@ -563,6 +578,12 @@ void test_engine_death_and_probe_failure() {
   expect(died.message == "Сбой сетевого адаптера туннеля", "adapter text");
   expect(died.phase == TunnelPhase::Idle && died.cleanup_verified, "missing adapter restores");
   expect(dead.routes.capture_calls == 0 && dead.routes.add_calls == 0, "missing adapter adds no routes");
+  expect(dead.log.index_of("tun_diag", "process_alive") >= 0, "timeout records a live process");
+  expect(dead.log.index_of("tun_adapter", "none") >= 0, "timeout records an empty adapter list");
+  expect(dead.log.index_of("tun_init_timeout", "adapter_not_found") >= 0, "missing name is not win32 0");
+  int not_found = dead.log.index_of("tun_init_timeout", "adapter_not_found");
+  expect(not_found >= 0 && dead.log.lines[static_cast<std::size_t>(not_found)].win32 == 0,
+         "absent name keeps win32 0 because no create call failed");
 
   Harness probe;
   probe.routes.fetch_ok = false;
@@ -717,6 +738,139 @@ void test_user_proof_refusal_restores_capture() {
   expect(harness.supervisor.ledger_copy().routes.size() == 4, "ledger keeps four capture prefixes");
 }
 
+OwnedAdapter tun_row(bool up, std::uint64_t luid, unsigned long index) {
+  OwnedAdapter adapter;
+  adapter.name = "ProxyDomTun";
+  adapter.guid = "{tun}";
+  adapter.luid = luid;
+  adapter.if_index = index;
+  adapter.up = up;
+  return adapter;
+}
+
+void test_classify_tun_wait() {
+  TunWaitView dead;
+  dead.process_alive = false;
+  dead.process_exit = 3;
+  const auto died = classify_tun_wait(dead);
+  expect(std::string(died.code) == "process_died" && died.win32 == 3, "dead process is not a timeout");
+
+  TunWaitView conflict;
+  conflict.process_alive = true;
+  conflict.list_ok = true;
+  conflict.adapters = {tun_row(true, 9, 1), tun_row(false, 8, 2)};
+  const auto names = classify_tun_wait(conflict);
+  expect(std::string(names.code) == "adapter_name_conflict", "two names are a conflict");
+
+  TunWaitView taken;
+  taken.process_alive = true;
+  taken.list_ok = true;
+  taken.engine_text = "Cannot create a file when that file already exists";
+  const auto text = classify_tun_wait(taken);
+  expect(std::string(text.code) == "adapter_name_conflict", "already exists is a name conflict");
+
+  TunWaitView down;
+  down.process_alive = true;
+  down.list_ok = true;
+  down.adapters = {tun_row(false, 77, 3)};
+  const auto state = classify_tun_wait(down);
+  expect(std::string(state.code) == "adapter_state_not_up", "down adapter is not missing");
+
+  TunWaitView created;
+  created.process_alive = true;
+  created.list_ok = true;
+  created.engine_text = "configure tun interface win32=5";
+  const auto win = classify_tun_wait(created);
+  expect(std::string(win.code) == "wintun_create_failed" && win.win32 == 5, "stderr win32 is the create error");
+
+  TunWaitView none;
+  none.process_alive = true;
+  none.list_ok = true;
+  const auto missing = classify_tun_wait(none);
+  expect(std::string(missing.code) == "adapter_not_found" && missing.win32 == 0, "empty list is not a win32");
+
+  TunWaitView unread;
+  unread.process_alive = true;
+  unread.list_ok = false;
+  unread.list_error = 122;
+  const auto list = classify_tun_wait(unread);
+  expect(std::string(list.code) == "adapter_not_found" && list.win32 == 122, "unreadable list keeps the api error");
+
+  TunWaitView up;
+  up.process_alive = true;
+  up.list_ok = true;
+  up.adapters = {tun_row(true, 99, 5)};
+  const auto ready = classify_tun_wait(up);
+  expect(std::string(ready.code) == "adapter_up", "an up adapter is not adapter_not_found");
+}
+
+void test_tun_timeout_log_names_the_adapter() {
+  Harness down;
+  down.routes.tun_misses = 100;
+  down.routes.use_listed = true;
+  down.routes.listed = {tun_row(false, 77, 3)};
+  const auto snap = down.connect();
+  expect(snap.code == TunnelCode::TunInitTimeout, "down adapter still times out");
+  expect(snap.message == "Сбой сетевого адаптера туннеля", "down adapter keeps the same caption");
+  expect(snap.phase == TunnelPhase::Idle && snap.cleanup_verified, "down adapter still restores");
+  expect(down.routes.add_calls == 0 && down.routes.capture_calls == 0, "diagnosis adds no routes");
+  expect(down.log.index_of("tun_init_timeout", "adapter_state_not_up") >= 0, "down adapter is named");
+  expect(down.log.index_of("tun_adapter", "ProxyDomTun,up=0,luid=77,if=3") >= 0, "snapshot has luid");
+
+  Harness engine_text;
+  engine_text.routes.tun_misses = 100;
+  engine_text.engine.tail = "configure tun interface win32=5 \"password\":\"secret-password\"";
+  const auto failed = engine_text.connect();
+  expect(failed.code == TunnelCode::TunInitTimeout, "create text still times out");
+  expect(failed.message == "Сбой сетевого адаптера туннеля", "create text keeps the caption");
+  int create = -1;
+  bool leaked = false;
+  for (int i = 0; i < static_cast<int>(engine_text.log.lines.size()); ++i) {
+    const auto& line = engine_text.log.lines[static_cast<std::size_t>(i)];
+    if (line.event == "tun_init_timeout" && line.code == "wintun_create_failed" && line.win32 == 5) create = i;
+    if (line.code.find("secret-password") != std::string::npos) leaked = true;
+  }
+  expect(create >= 0, "stderr win32 is logged");
+  expect(!leaked, "engine text in the service log is redacted");
+  bool kept = false;
+  for (const auto& line : engine_text.log.lines) {
+    if (line.event == "tun_stderr" &&
+        line.code.find("configure tun interface win32=5 \"password\":\"***\"") != std::string::npos) {
+      kept = true;
+    }
+  }
+  expect(kept, "redacted stderr is kept");
+}
+
+void test_stderr_after_info_is_not_cut() {
+  Harness harness;
+  harness.routes.tun_misses = 100;
+  std::string tail(300, 'I');
+  tail += " win32=9 \"password\":\"secret-password\" end-of-engine";
+  harness.engine.tail = tail;
+  const auto snap = harness.connect();
+  expect(snap.code == TunnelCode::TunInitTimeout, "late stderr still times out");
+  expect(snap.message == "Сбой сетевого адаптера туннеля", "late stderr keeps the caption");
+  expect(harness.routes.add_calls == 0, "late stderr adds no routes");
+  expect(harness.log.index_of("tun_init_timeout", "wintun_create_failed") >= 0,
+         "win32 after the info line is classified");
+  std::string joined;
+  bool leaked = false;
+  int parts = 0;
+  for (const auto& line : harness.log.lines) {
+    if (line.code.find("secret-password") != std::string::npos) leaked = true;
+    if (line.event != "tun_stderr") continue;
+    ++parts;
+    joined += line.code;
+    joined.push_back('\n');
+  }
+  expect(parts >= 2, "stderr longer than one line is split");
+  expect(joined.find("win32=9") != std::string::npos, "the error past 256 characters is logged");
+  expect(joined.find("end-of-engine") != std::string::npos, "the tail of the engine text is logged");
+  expect(joined.find("\"password\":\"***\"") != std::string::npos, "the secret is redacted in the chunks");
+  expect(!leaked, "the password is not in the service log");
+}
+
 void test_resolve_and_route_table_failures() {
   Harness names;
   names.names.fail = true;
@@ -752,6 +906,9 @@ int main() {
   test_graceful_stop_skips_kill();
   test_ledger_roundtrip();
   test_user_proof_refusal_restores_capture();
+  test_classify_tun_wait();
+  test_tun_timeout_log_names_the_adapter();
+  test_stderr_after_info_is_not_cut();
   test_resolve_and_route_table_failures();
   if (g_failed != 0) {
     std::cerr << g_failed << " failed\n";

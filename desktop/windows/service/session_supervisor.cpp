@@ -4,6 +4,7 @@
 #include "protocol.h"
 
 #include <algorithm>
+#include <cctype>
 #include <map>
 #include <sstream>
 
@@ -51,7 +52,70 @@ std::string scrub(std::string text) {
   return text;
 }
 
+std::string lower_copy(std::string text) {
+  for (char& ch : text) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+  return text;
+}
+
+unsigned long digits_after(const std::string& text, std::size_t at) {
+  if (at >= text.size() || text[at] < '0' || text[at] > '9') return 0;
+  unsigned long value = 0;
+  int count = 0;
+  while (at < text.size() && text[at] >= '0' && text[at] <= '9' && count < 6) {
+    value = value * 10u + static_cast<unsigned long>(text[at] - '0');
+    ++at;
+    ++count;
+  }
+  if (count == 0 || value == 0 || value > 65535ul) return 0;
+  return value;
+}
+
+unsigned long win32_in_text(const std::string& text) {
+  const std::string lower = lower_copy(text);
+  const char* keys[] = {"win32=", "winerror=", "errno="};
+  for (const char* key : keys) {
+    const auto at = lower.find(key);
+    if (at == std::string::npos) continue;
+    const auto value = digits_after(lower, at + std::char_traits<char>::length(key));
+    if (value != 0) return value;
+  }
+  const auto err = lower.find("error ");
+  if (err == std::string::npos) return 0;
+  return digits_after(lower, err + 6);
+}
+
+bool text_says_name_taken(const std::string& text) {
+  return lower_copy(text).find("already exists") != std::string::npos;
+}
+
+bool tun_name(const std::string& name) { return name == "ProxyDomTun"; }
+
+bool tun_usable(const OwnedAdapter& adapter) {
+  return tun_name(adapter.name) && adapter.up && adapter.luid != 0 && adapter.if_index != 0;
+}
+
 }  // namespace
+
+TunWaitClass classify_tun_wait(const TunWaitView& view) {
+  if (!view.process_alive) return {"process_died", view.process_exit};
+  int named = 0;
+  int usable = 0;
+  int not_up = 0;
+  for (const auto& adapter : view.adapters) {
+    if (!tun_name(adapter.name)) continue;
+    ++named;
+    if (tun_usable(adapter)) ++usable;
+    else ++not_up;
+  }
+  // A second ProxyDomTun, or sing-box saying the name is taken, is not "still down".
+  if (named > 1 || text_says_name_taken(view.engine_text)) return {"adapter_name_conflict", 0};
+  if (not_up > 0) return {"adapter_state_not_up", 0};
+  const unsigned long parsed = win32_in_text(view.engine_text);
+  if (parsed != 0 && usable == 0) return {"wintun_create_failed", parsed};
+  if (!view.list_ok) return {"adapter_not_found", view.list_error};
+  if (usable > 0) return {"adapter_up", 0};
+  return {"adapter_not_found", 0};
+}
 
 const char* phase_name(TunnelPhase phase) {
   switch (phase) {
@@ -496,6 +560,47 @@ BeginResult TunnelSupervisor::begin_connect() {
   return result;
 }
 
+void TunnelSupervisor::note_tun_timeout() {
+  TunWaitView view;
+  view.process_alive = engine_.alive();
+  view.process_exit = view.process_alive ? 0 : engine_.exit_code();
+  // The first 256 characters are only the gateway INFO. The create error is later in the same tail.
+  view.engine_text = sanitize_engine_output_full(engine_.output_tail());
+  view.list_ok = routes_.list_own_adapters(view.adapters);
+  view.list_error = view.list_ok ? 0 : routes_.last_error();
+
+  log_.write(ledger_.generation, "tun_diag", view.process_alive ? "process_alive" : "process_died",
+             view.process_alive ? 0 : view.process_exit);
+  // service.log lines are 512 bytes. A numbered chunk stays inside that line.
+  constexpr std::size_t kStderrChunk = 240;
+  int part = 1;
+  for (std::size_t at = 0; at < view.engine_text.size(); at += kStderrChunk, ++part) {
+    const std::size_t n = std::min(kStderrChunk, view.engine_text.size() - at);
+    std::string code = std::to_string(part);
+    code.push_back(' ');
+    code.append(view.engine_text, at, n);
+    log_.write(ledger_.generation, "tun_stderr", code, view.process_exit);
+  }
+  if (!view.list_ok) {
+    log_.write(ledger_.generation, "tun_adapter", "list_failed", view.list_error);
+  } else if (view.adapters.empty()) {
+    log_.write(ledger_.generation, "tun_adapter", "none", 0);
+  } else {
+    for (const auto& adapter : view.adapters) {
+      std::string name = adapter.name.empty() ? std::string("-") : adapter.name;
+      for (char& ch : name) {
+        if (ch == ' ' || ch == ',' || ch == '\r' || ch == '\n') ch = '_';
+      }
+      std::ostringstream code;
+      code << name << ",up=" << (adapter.up ? 1 : 0) << ",luid=" << adapter.luid
+           << ",if=" << adapter.if_index;
+      log_.write(ledger_.generation, "tun_adapter", code.str(), adapter.up ? 1ul : 0ul);
+    }
+  }
+  const TunWaitClass found = classify_tun_wait(view);
+  log_.write(ledger_.generation, "tun_init_timeout", found.code, found.win32);
+}
+
 void TunnelSupervisor::gate(const char* step, const char* outcome) {
   std::string code = step == nullptr ? std::string{} : step;
   if (outcome != nullptr && outcome[0] != '\0') {
@@ -598,7 +703,7 @@ TunnelSnapshot TunnelSupervisor::run_connect(const ConnectRequest& request, Canc
     sleeper_.sleep_ms(100);
   }
   if (!found) {
-    log_.write(ledger_.generation, "tun_init_timeout", "ProxyDomTun", 0);
+    note_tun_timeout();
     return finish(TunnelCode::TunInitTimeout, {}, false);
   }
   gate("core", "ok");
@@ -674,7 +779,7 @@ TunnelSnapshot TunnelSupervisor::run_connect(const ConnectRequest& request, Canc
   OwnedAdapter seen;
   std::vector<OwnedRoute> halves;
   if (!routes_.tun_ready(seen, halves)) {
-    log_.write(ledger_.generation, "tun_init_timeout", "ProxyDomTun", 0);
+    note_tun_timeout();
     return finish(TunnelCode::TunInitTimeout, {}, false);
   }
   log_.write(ledger_.generation, "routes", "capture_installed", static_cast<unsigned long>(capture.size()));

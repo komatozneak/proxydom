@@ -50,7 +50,7 @@ std::string lower_copy(std::string text) {
 
 }  // namespace
 
-std::string sanitize_engine_output(const std::string& text) {
+std::string sanitize_engine_output_full(const std::string& text) {
   std::string out = text.size() > 4096 ? text.substr(text.size() - 4096) : text;
   redact_quoted_key(out, "obfs-password");
   redact_quoted_key(out, "password");
@@ -59,6 +59,12 @@ std::string sanitize_engine_output(const std::string& text) {
   for (char& ch : out) {
     if (ch == '\r' || ch == '\n') ch = ' ';
   }
+  return out;
+}
+
+std::string sanitize_engine_output(const std::string& text) {
+  std::string out = sanitize_engine_output_full(text);
+  // One service.log line is 512 bytes. Callers that write a single line stay inside it.
   if (out.size() > 256) out.resize(256);
   return out;
 }

@@ -219,6 +219,25 @@ const char* phase_name(TunnelPhase phase);
 const char* code_name(TunnelCode code);
 std::string user_message(TunnelCode code, const std::string& extra);
 
+// What the adapter wait can actually see. It is not a Win32 from WintunCreateAdapter:
+// sing-box creates the interface, and this process only observes the name afterward.
+struct TunWaitView {
+  bool process_alive = false;
+  unsigned long process_exit = 0;
+  std::string engine_text;
+  bool list_ok = false;
+  unsigned long list_error = 0;
+  std::vector<OwnedAdapter> adapters;
+};
+
+struct TunWaitClass {
+  const char* code = "adapter_not_found";
+  unsigned long win32 = 0;
+};
+
+// One service-log code for the blind tun_init_timeout line. Does not decide Connect.
+TunWaitClass classify_tun_wait(const TunWaitView& view);
+
 // Empty when Connect may proceed. The name is the blocking adapter.
 std::string active_foreign_tunnel(const std::vector<RouteView>& routes);
 
@@ -262,6 +281,8 @@ class TunnelSupervisor {
   void remember(const std::function<void()>& change);
   // outcome nullptr starts the step. "ok" closes it. A start without ok is the hang.
   void gate(const char* step, const char* outcome);
+  // Names the adapter wait in the service log. Connect still ends as tun_init_timeout.
+  void note_tun_timeout();
 
   RouteTable& routes_;
   EngineHost& engine_;
