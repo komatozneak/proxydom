@@ -8,7 +8,7 @@ import 'package:ffi/ffi.dart';
 import 'windows_tunnel_protocol.dart';
 
 const String kWindowsFailureText =
-    'Сервер не отвечает: выход через туннель не подтверждён';
+    'Связь через выбранную строку не подтверждена';
 const String kWindowsServiceMissing =
     'Служба Прокси Дом недоступна. Переустановите приложение';
 const String kWindowsServiceStopped = 'Служба Прокси Дом остановлена';
@@ -17,6 +17,7 @@ const String kWindowsAlreadyOpen = 'Приложение уже запущено
 class WindowsConnectResult {
   const WindowsConnectResult({
     required this.ok,
+    this.accepted = false,
     this.notice,
     this.code,
     this.generation = 0,
@@ -24,6 +25,7 @@ class WindowsConnectResult {
   });
 
   final bool ok;
+  final bool accepted;
   final String? notice;
   final String? code;
   final int generation;
@@ -45,6 +47,22 @@ class WindowsTunnel {
   IOSink? _commands;
   Future<void>? _starting;
   bool _connectPending = false;
+  DateTime? _brokerCooldownUntil;
+
+  /// True while a command is in flight, cleanup is unverified, or a failed
+  /// hello is still in its short lock. Connected stays tappable.
+  bool get nestLocked {
+    if (_connectPending) return true;
+    if ((phase == 'idle' || phase == 'disconnecting') && !cleanupVerified) {
+      return true;
+    }
+    final until = _brokerCooldownUntil;
+    return until != null && DateTime.now().isBefore(until);
+  }
+
+  void _coolBroker() {
+    _brokerCooldownUntil = DateTime.now().add(const Duration(seconds: 3));
+  }
 
   int generation = 0;
   String phase = 'idle';
@@ -140,7 +158,7 @@ class WindowsTunnel {
     final sink = _commands;
     if (sink == null) throw StateError('controller stopped');
     sink.writeln(jsonEncode(command));
-    await sink.flush();
+    await sink.flush().timeout(const Duration(seconds: 3));
   }
 
   void _remember(String json) {
@@ -230,19 +248,21 @@ class WindowsTunnel {
     }
     _connectPending = true;
     final started = _seq;
+    var accepted = false;
     try {
       await _send(tunnelHello());
       await _send(tunnelConnect(uri: uri, directDomains: directDomains));
       final ack = await _waitFor(
         (event) =>
             (event.event == 'ack' && event.command == 'connect') ||
+            tunnelEventIsClientReject(event) ||
             (event.event == 'state' &&
                 (event.code == 'broker_unavailable' ||
                     event.code == 'cleanup_failed')),
         afterSeq: started,
         timeout: const Duration(seconds: 5),
       );
-      if (ack.event == 'state' || ack.accepted != true) {
+      if (tunnelEventIsClientReject(ack)) {
         notice = ack.message;
         code = ack.code;
         return WindowsConnectResult(
@@ -250,9 +270,23 @@ class WindowsTunnel {
           notice: ack.message,
           code: ack.code,
           generation: ack.generation,
+          cleanupVerified: ack.cleanupVerified ?? true,
+        );
+      }
+      if (ack.event == 'state' || ack.accepted != true) {
+        notice = ack.message;
+        code = ack.code;
+        if (ack.code == 'broker_unavailable') _coolBroker();
+        return WindowsConnectResult(
+          ok: false,
+          accepted: ack.accepted == true,
+          notice: ack.message,
+          code: ack.code,
+          generation: ack.generation,
           cleanupVerified: ack.cleanupVerified ?? cleanupVerified,
         );
       }
+      accepted = true;
       final terminal = await _waitFor(
         (event) => tunnelEventIsConnectTerminal(event, ack.generation),
         afterSeq: started,
@@ -260,21 +294,44 @@ class WindowsTunnel {
       );
       return WindowsConnectResult(
         ok: terminal.state == 'connected',
+        accepted: true,
         notice: terminal.message,
         code: terminal.code,
         generation: terminal.generation,
         cleanupVerified: terminal.cleanupVerified ?? false,
       );
     } on TimeoutException {
-      if (_controller == null) {
-        return const WindowsConnectResult(
+      if (accepted) {
+        return WindowsConnectResult(
           ok: false,
-          notice: kWindowsServiceMissing,
-          code: 'broker_unavailable',
+          accepted: true,
+          notice: kWindowsConnectingTimeoutCaption,
+          code: 'connecting_timeout',
+          generation: generation,
+          cleanupVerified: cleanupVerified,
         );
       }
-      return _failClosed();
+      _controller?.kill();
+      _controller = null;
+      _commands = null;
+      _coolBroker();
+      return const WindowsConnectResult(
+        ok: false,
+        notice: kWindowsServiceMissing,
+        code: 'broker_unavailable',
+      );
     } catch (_) {
+      if (accepted) {
+        return WindowsConnectResult(
+          ok: false,
+          accepted: true,
+          notice: kWindowsConnectingTimeoutCaption,
+          code: 'connecting_timeout',
+          generation: generation,
+          cleanupVerified: cleanupVerified,
+        );
+      }
+      _coolBroker();
       return const WindowsConnectResult(
         ok: false,
         notice: kWindowsServiceMissing,

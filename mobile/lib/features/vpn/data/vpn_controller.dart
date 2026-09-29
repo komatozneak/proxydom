@@ -37,6 +37,10 @@ class VpnController {
   Stream<int?>? _pingStream;
   String? windowsNotice;
   String? windowsCode;
+  bool windowsAccepted = false;
+  int windowsGeneration = 0;
+
+  bool get windowsNestLocked => WindowsTunnel.instance.nestLocked;
 
   /// One share line through the Windows broker (ADR 031).
   Future<bool> startWindowsShare(String uri) async {
@@ -49,6 +53,8 @@ class VpnController {
     );
     windowsNotice = result.notice;
     windowsCode = result.code;
+    windowsAccepted = result.accepted;
+    windowsGeneration = result.generation;
     return result.ok;
   }
 

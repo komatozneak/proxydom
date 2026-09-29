@@ -26,6 +26,7 @@ import '../../vpn/data/subscription_traffic.dart';
 import '../../vpn/data/node_auto_selector.dart';
 import '../../vpn/data/node_display.dart';
 import '../../vpn/data/vpn_controller.dart';
+import '../../vpn/data/windows_tunnel_protocol.dart';
 import '../../vpn/data/vpn_node.dart';
 import '../../vpn/domain/vpn_connect_error.dart';
 import '../../vpn/presentation/free_client_chrome.dart';
@@ -416,6 +417,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Future<void> _onNestTap() async {
+    if (windowsDesktop && VpnController.instance.windowsNestLocked) {
+      UiLog.action(
+        'home',
+        'nest',
+        level: ProductLogLevel.warn,
+        result: 'rejected',
+        reason: 'broker_cooldown',
+      );
+      return;
+    }
     // Region switch owns the shell busy overlay — don't fight it.
     if (ref.read(busyOverlayProvider).isBusy) {
       final connecting = ref.read(vpnProvider) is VpnConnecting ||
@@ -747,8 +758,9 @@ class _FreeClientHome extends StatelessWidget {
         l.homeVpnConflictTitle,
       VpnError(:final code) when code == kVpnProbeFailedErrorCode =>
         l.homeVpnProbeFailedTitle,
-      VpnError(:final code, :final message) when code == 'windows_notice' =>
-        message,
+      VpnError(:final code, :final message)
+          when windowsBrokerOwnsCaption(code) =>
+        windowsGateCaption(code, message, l.homeError),
       VpnError() => l.homeError,
       VpnDisconnected() => l.homeDisconnected,
     };
@@ -763,7 +775,7 @@ class _FreeClientHome extends StatelessWidget {
         l.homeVpnProbeFailedHint(
           message.isNotEmpty ? message : l.homeRegion,
         ),
-      VpnError(:final code) when code == 'windows_notice' => null,
+      VpnError(:final code) when windowsBrokerOwnsCaption(code) => null,
       VpnError(:final code) when code == 'permission_denied' =>
         homeVpnPermissionHintForPlatform(l),
       VpnError(:final code) when code == kVpnPathIncompatibleErrorCode =>

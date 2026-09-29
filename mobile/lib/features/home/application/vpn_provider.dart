@@ -376,6 +376,9 @@ class VpnNotifier extends Notifier<VpnStatus> {
 
   /// Poll native while UI is connecting. Never force-stops (ADR 014 / 015).
   void _armConnectingPoll() {
+    // Windows connect waits on the broker. The Android 18s poll paints
+    // connect_timeout while that call is still the owner of the session.
+    if (windowsDesktop) return;
     _cancelConnectingWatchdog();
     _connectingUiStartedAt = DateTime.now();
     _connectingPoll = Timer.periodic(const Duration(milliseconds: 1500), (_) {
@@ -927,6 +930,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
     // Deduplicate concurrent connect() (auto-reconnect + nest tap).
     _suppressAutoReconnect = false;
     if (windowsDesktop) {
+      if (VpnController.instance.windowsNestLocked) return;
       WindowsTunnel.instance.onLinkLost = () {
         if (_suppressAutoReconnect) return;
         unawaited(AutoReconnectPrefs.isEnabled().then((enabled) {
@@ -1114,13 +1118,23 @@ class VpnNotifier extends Notifier<VpnStatus> {
         _sid = ShareSessionLog.nextSid();
         _coreStartLogged = false;
         _sessionFields = ShareSessionLog.fieldsFor(imported);
-        ShareSessionLog.emit(
-          'vpn.connect_begin',
-          level: ProductLogLevel.info,
-          sid: _sid,
-          fields: _sessionFields,
-          extra: {'gen': gen},
-        );
+        if (windowsDesktop) {
+          ShareSessionLog.emit(
+            'ui.click',
+            level: ProductLogLevel.info,
+            sid: _sid,
+            fields: _sessionFields,
+            extra: {'nest': 'connect'},
+          );
+        } else {
+          ShareSessionLog.emit(
+            'vpn.connect_begin',
+            level: ProductLogLevel.info,
+            sid: _sid,
+            fields: _sessionFields,
+            extra: {'gen': gen},
+          );
+        }
         SessionTrace.begin(_sid);
         await VpnSessionMeta.clear();
         final blocked = await SplitTunnelPrefs.loadDisallowedPackages();
@@ -1179,6 +1193,17 @@ class VpnNotifier extends Notifier<VpnStatus> {
         }
         if (await _abortStaleConnect(gen)) return;
         if (!started) {
+          if (windowsDesktop &&
+              VpnController.instance.windowsAccepted &&
+              VpnController.instance.windowsGeneration > 0) {
+            ShareSessionLog.emit(
+              'vpn.connect_begin',
+              level: ProductLogLevel.info,
+              sid: _sid,
+              fields: _sessionFields,
+              extra: {'gen': VpnController.instance.windowsGeneration},
+            );
+          }
           final startError = await _errorForStartFailure();
           SessionTrace.mark('fail', {'code': startError.code});
           ProductLog.event(
@@ -1193,6 +1218,16 @@ class VpnNotifier extends Notifier<VpnStatus> {
           return;
         }
         if (windowsDesktop) {
+          if (VpnController.instance.windowsAccepted &&
+              VpnController.instance.windowsGeneration > 0) {
+            ShareSessionLog.emit(
+              'vpn.connect_begin',
+              level: ProductLogLevel.info,
+              sid: _sid,
+              fields: _sessionFields,
+              extra: {'gen': VpnController.instance.windowsGeneration},
+            );
+          }
           state = VpnConnected(
             serverName: shown.title,
             protocol: imported.scheme,

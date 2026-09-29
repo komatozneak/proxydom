@@ -7,6 +7,63 @@ const int kTunnelProtocolVersion = 3;
 /// Includes the no-route key probe, TUN readiness, and bound egress proof.
 const Duration kWindowsConnectWait = Duration(seconds: 45);
 
+/// Shown for any foreign full tunnel. The adapter name stays in the service log.
+const String kWindowsForeignTunnelCaption = 'Обнаружен активный туннель';
+
+/// The window's wait ended before the accepted generation published a result.
+const String kWindowsConnectingTimeoutCaption =
+    'Служба не завершила этап подключения';
+
+/// Broker codes that replace the generic connection error on the home screen.
+bool windowsBrokerOwnsCaption(String? code) {
+  switch (code) {
+    case 'foreign_tunnel':
+    case 'key_probe_failed':
+    case 'resolve_failed':
+    case 'connecting_timeout':
+    case 'route_failed':
+    case 'core_start_failed':
+    case 'core_exited':
+    case 'tun_not_ready':
+    case 'tun_init_timeout':
+    case 'egress_failed':
+    case 'egress_timeout':
+    case 'auth_rejected':
+    case 'invalid_profile':
+    case 'cleanup_failed':
+    case 'busy':
+    case 'broker_unavailable':
+    case 'windows_notice':
+      return true;
+    default:
+      return false;
+  }
+}
+
+/// Human line for a broker code. Unknown codes keep [fallback].
+String windowsGateCaption(String? code, String? message, String fallback) {
+  if (code == 'foreign_tunnel') return kWindowsForeignTunnelCaption;
+  if (code == 'connecting_timeout') return kWindowsConnectingTimeoutCaption;
+  if (code == 'core_exited' || code == 'core_start_failed') {
+    return 'Сбой локальной службы туннеля';
+  }
+  if (code == 'tun_init_timeout') return 'Сбой сетевого адаптера туннеля';
+  if (code == 'auth_rejected') return 'Ключ не принят сервером';
+  if (code == 'invalid_profile') return 'Неверный порт сервера';
+  if (code == 'egress_timeout') return 'Узел недоступен';
+  if (code == 'resolve_failed') return 'Не удалось определить адрес сервера';
+  if (code == 'route_failed') {
+    final text = message?.trim() ?? '';
+    if (text.isNotEmpty) return text;
+    return 'Сбой сетевого стека';
+  }
+  if (windowsBrokerOwnsCaption(code)) {
+    final text = message?.trim() ?? '';
+    if (text.isNotEmpty) return text;
+  }
+  return fallback;
+}
+
 /// Restore is verified locally and never waits for an internet request.
 const Duration kWindowsDisconnectWait = Duration(seconds: 15);
 
@@ -112,6 +169,23 @@ class TunnelStateEvent {
       command: command is String ? command : null,
     );
   }
+}
+
+/// Broker ack is the only signal that a generation exists.
+bool windowsConnectBeginAllowed(TunnelStateEvent ack) {
+  return ack.event == 'ack' &&
+      ack.command == 'connect' &&
+      ack.accepted == true &&
+      ack.generation > 0;
+}
+
+/// A rejected payload must end the wait. It is not a missing broker.
+bool tunnelEventIsClientReject(TunnelStateEvent event) {
+  final code = event.code;
+  return event.event == 'client_error' &&
+      code != null &&
+      code.isNotEmpty &&
+      code != 'broker_unavailable';
 }
 
 bool tunnelEventIsConnectTerminal(TunnelStateEvent event, int generation) {
