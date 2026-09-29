@@ -123,10 +123,12 @@ bool Win32SessionFiles::store(const Ledger& ledger) { return write_replace(ledge
 bool Win32SessionFiles::clear() { return DeleteFileW(ledger_path().c_str()) || GetLastError() == ERROR_FILE_NOT_FOUND; }
 
 bool Win32SessionFiles::write_config(const std::string& json) {
+  last_error_ = 0;
   ensure_dir(run_dir());
   PSECURITY_DESCRIPTOR sd = nullptr;
   if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(L"D:P(A;;FA;;;SY)(A;;FA;;;BA)", SDDL_REVISION_1, &sd,
                                                             nullptr)) {
+    last_error_ = GetLastError();
     return false;
   }
   SECURITY_ATTRIBUTES sa{};
@@ -134,12 +136,21 @@ bool Win32SessionFiles::write_config(const std::string& json) {
   sa.lpSecurityDescriptor = sd;
   HANDLE file = CreateFileW(config_path().c_str(), GENERIC_WRITE, 0, &sa, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL,
                             nullptr);
+  const DWORD create_error = file == INVALID_HANDLE_VALUE ? GetLastError() : 0;
   LocalFree(sd);
-  if (file == INVALID_HANDLE_VALUE) return false;
+  if (file == INVALID_HANDLE_VALUE) {
+    last_error_ = create_error;
+    return false;
+  }
   DWORD written = 0;
   const BOOL ok = WriteFile(file, json.data(), static_cast<DWORD>(json.size()), &written, nullptr);
+  const DWORD write_error = ok ? 0 : GetLastError();
   CloseHandle(file);
-  return ok && written == json.size();
+  if (!ok || written != json.size()) {
+    last_error_ = write_error == 0 ? ERROR_WRITE_FAULT : write_error;
+    return false;
+  }
+  return true;
 }
 
 bool Win32SessionFiles::erase_config() {

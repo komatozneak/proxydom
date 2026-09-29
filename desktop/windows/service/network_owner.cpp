@@ -13,6 +13,8 @@
 #include <devguid.h>
 
 #include <cstring>
+#include <memory>
+#include <thread>
 #include <vector>
 
 #pragma comment(lib, "iphlpapi.lib")
@@ -295,6 +297,218 @@ bool Win32RouteTable::list_own_adapters(std::vector<OwnedAdapter>& out) {
   return true;
 }
 
+bool Win32RouteTable::find_own_adapter(OwnedAdapter& adapter) {
+  std::vector<OwnedAdapter> owned;
+  if (!list_own_adapters(owned)) return false;
+  for (const auto& item : owned) {
+    if (item.name == "ProxyDomTun" && item.up && item.luid != 0 && item.if_index != 0) {
+      adapter = item;
+      return true;
+    }
+  }
+  last_error_ = ERROR_NOT_FOUND;
+  return false;
+}
+
+bool Win32RouteTable::add_on_link(int family, const OwnedAdapter& adapter, const char* destination,
+                                  int prefix, OwnedRoute& route) {
+  MIB_IPFORWARD_ROW2 row{};
+  InitializeIpForwardEntry(&row);
+  row.InterfaceLuid.Value = adapter.luid;
+  row.InterfaceIndex = adapter.if_index;
+  row.DestinationPrefix.PrefixLength = static_cast<UINT8>(prefix);
+  row.Metric = 1;
+  row.Protocol = MIB_IPPROTO_NETMGMT;
+  if (family == AF_INET) {
+    row.DestinationPrefix.Prefix.si_family = AF_INET;
+    row.DestinationPrefix.Prefix.Ipv4.sin_family = AF_INET;
+    if (inet_pton(AF_INET, destination, &row.DestinationPrefix.Prefix.Ipv4.sin_addr) != 1) {
+      last_error_ = ERROR_INVALID_PARAMETER;
+      return false;
+    }
+    row.NextHop.si_family = AF_INET;
+    row.NextHop.Ipv4.sin_family = AF_INET;
+  } else {
+    row.DestinationPrefix.Prefix.si_family = AF_INET6;
+    row.DestinationPrefix.Prefix.Ipv6.sin6_family = AF_INET6;
+    if (inet_pton(AF_INET6, destination, &row.DestinationPrefix.Prefix.Ipv6.sin6_addr) != 1) {
+      last_error_ = ERROR_INVALID_PARAMETER;
+      return false;
+    }
+    row.NextHop.si_family = AF_INET6;
+    row.NextHop.Ipv6.sin6_family = AF_INET6;
+  }
+  const auto created = CreateIpForwardEntry2(&row);
+  if (created != NO_ERROR && created != ERROR_OBJECT_ALREADY_EXISTS) {
+    last_error_ = created;
+    return false;
+  }
+  route.destination = destination;
+  route.prefix_length = prefix;
+  route.interface_luid = adapter.luid;
+  route.interface_index = adapter.if_index;
+  last_error_ = 0;
+  return true;
+}
+
+bool Win32RouteTable::add_canary(const OwnedAdapter& adapter, const std::string& ip, OwnedRoute& route) {
+  if (adapter.luid == 0 || adapter.if_index == 0 || ip.empty()) {
+    last_error_ = ERROR_INVALID_PARAMETER;
+    return false;
+  }
+  return add_on_link(AF_INET, adapter, ip.c_str(), 32, route);
+}
+
+bool Win32RouteTable::delete_canary(const OwnedRoute& route) {
+  if (route.interface_luid == 0 || route.prefix_length != 32) {
+    last_error_ = ERROR_INVALID_PARAMETER;
+    return false;
+  }
+  IN_ADDR want{};
+  if (inet_pton(AF_INET, route.destination.c_str(), &want) != 1) {
+    last_error_ = ERROR_INVALID_PARAMETER;
+    return false;
+  }
+  PMIB_IPFORWARD_TABLE2 table = nullptr;
+  const auto rc = GetIpForwardTable2(AF_INET, &table);
+  if (rc != NO_ERROR || table == nullptr) {
+    last_error_ = rc == NO_ERROR ? ERROR_NOT_FOUND : rc;
+    return false;
+  }
+  bool ok = true;
+  for (ULONG i = 0; i < table->NumEntries; ++i) {
+    const auto& row = table->Table[i];
+    if (row.InterfaceLuid.Value != route.interface_luid) continue;
+    if (row.DestinationPrefix.Prefix.si_family != AF_INET) continue;
+    if (row.DestinationPrefix.PrefixLength != 32) continue;
+    if (row.DestinationPrefix.Prefix.Ipv4.sin_addr.S_un.S_addr != want.S_un.S_addr) continue;
+    auto copy = row;
+    const auto deleted = DeleteIpForwardEntry2(&copy);
+    if (deleted != NO_ERROR && deleted != ERROR_NOT_FOUND) {
+      last_error_ = deleted;
+      ok = false;
+      break;
+    }
+  }
+  FreeMibTable(table);
+  if (ok) last_error_ = 0;
+  return ok;
+}
+
+bool Win32RouteTable::fetch_canary(const std::string& ip, const std::function<bool()>& cancelled) {
+  ensure_wsa();
+  IN_ADDR addr{};
+  if (inet_pton(AF_INET, ip.c_str(), &addr) != 1) {
+    last_error_ = ERROR_INVALID_PARAMETER;
+    return false;
+  }
+  SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+  if (sock == INVALID_SOCKET) {
+    last_error_ = WSAGetLastError();
+    return false;
+  }
+  u_long nb = 1;
+  ioctlsocket(sock, FIONBIO, &nb);
+  sockaddr_in dest{};
+  dest.sin_family = AF_INET;
+  dest.sin_port = htons(80);
+  dest.sin_addr = addr;
+  const ULONGLONG deadline = GetTickCount64() + 3500;
+  const int rc = connect(sock, reinterpret_cast<sockaddr*>(&dest), sizeof(dest));
+  if (rc != 0 && WSAGetLastError() != WSAEWOULDBLOCK) {
+    last_error_ = WSAGetLastError();
+    closesocket(sock);
+    return false;
+  }
+  if (rc != 0) {
+    fd_set wr;
+    fd_set ex;
+    FD_ZERO(&wr);
+    FD_ZERO(&ex);
+    FD_SET(sock, &wr);
+    FD_SET(sock, &ex);
+    const ULONGLONG now = GetTickCount64();
+    const DWORD left = now >= deadline ? 0 : static_cast<DWORD>(deadline - now);
+    timeval tv{};
+    tv.tv_sec = static_cast<long>(left / 1000);
+    tv.tv_usec = static_cast<long>((left % 1000) * 1000);
+    if (select(0, nullptr, &wr, &ex, &tv) <= 0) {
+      last_error_ = ERROR_TIMEOUT;
+      closesocket(sock);
+      return false;
+    }
+    int so_error = 0;
+    int so_len = sizeof(so_error);
+    getsockopt(sock, SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&so_error), &so_len);
+    if (so_error != 0) {
+      last_error_ = static_cast<unsigned long>(so_error);
+      closesocket(sock);
+      return false;
+    }
+  }
+  u_long block = 0;
+  ioctlsocket(sock, FIONBIO, &block);
+  const ULONGLONG now = GetTickCount64();
+  DWORD timeout = now >= deadline ? 1 : static_cast<DWORD>(deadline - now);
+  if (timeout < 1) timeout = 1;
+  setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout));
+  setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout));
+  const char* request =
+      "GET /generate_204 HTTP/1.1\r\nHost: cp.cloudflare.com\r\nConnection: close\r\n\r\n";
+  if (send(sock, request, static_cast<int>(std::strlen(request)), 0) <= 0) {
+    last_error_ = WSAGetLastError();
+    closesocket(sock);
+    return false;
+  }
+  std::string response;
+  char buf[512];
+  for (;;) {
+    if (cancelled && cancelled()) {
+      closesocket(sock);
+      return false;
+    }
+    if (GetTickCount64() >= deadline) {
+      last_error_ = ERROR_TIMEOUT;
+      closesocket(sock);
+      return false;
+    }
+    const int got = recv(sock, buf, sizeof(buf), 0);
+    if (got < 0) {
+      last_error_ = WSAGetLastError();
+      closesocket(sock);
+      return false;
+    }
+    if (got == 0) break;
+    response.append(buf, got);
+    if (response.find(" 204") != std::string::npos) {
+      closesocket(sock);
+      last_error_ = 0;
+      return true;
+    }
+    if (response.size() > 8192) break;
+  }
+  closesocket(sock);
+  last_error_ = ERROR_INVALID_DATA;
+  return false;
+}
+
+bool Win32RouteTable::install_capture(const OwnedAdapter& adapter, std::vector<OwnedRoute>& routes) {
+  ensure_wsa();
+  routes.clear();
+  if (adapter.luid == 0 || adapter.if_index == 0) {
+    last_error_ = ERROR_INVALID_PARAMETER;
+    return false;
+  }
+  const char* destinations[] = {"0.0.0.0", "128.0.0.0", "::", "8000::"};
+  const int families[] = {AF_INET, AF_INET, AF_INET6, AF_INET6};
+  for (int i = 0; i < 4; ++i) {
+    OwnedRoute route;
+    if (!add_on_link(families[i], adapter, destinations[i], 1, route)) return false;
+    routes.push_back(route);
+  }
+  return true;
+}
+
 bool Win32RouteTable::remove_adapter(const OwnedAdapter& adapter) {
   const std::wstring guid = wide_from_utf8(adapter.guid);
   if (guid.empty()) {
@@ -476,27 +690,56 @@ bool Win32RouteTable::prove_exit(unsigned long if_index,
   return ok;
 }
 
-bool Win32Resolver::resolve_ipv4(const std::string& host, std::string& ip) {
-  ensure_wsa();
+struct ResolveJob {
+  std::string host;
+  std::string ip;
+  bool ok = false;
+  HANDLE done = nullptr;
+
+  ~ResolveJob() {
+    if (done != nullptr) CloseHandle(done);
+  }
+};
+
+void resolve_worker(const std::shared_ptr<ResolveJob>& job) {
   ADDRINFOA hints{};
   hints.ai_family = AF_INET;
   hints.ai_socktype = SOCK_STREAM;
   ADDRINFOA* result = nullptr;
-  if (getaddrinfo(host.c_str(), nullptr, &hints, &result) != 0 || result == nullptr) return false;
-  char text[INET_ADDRSTRLEN] = {};
-  const auto* addr = reinterpret_cast<sockaddr_in*>(result->ai_addr);
-  const bool ok = inet_ntop(AF_INET, &addr->sin_addr, text, sizeof(text)) != nullptr;
-  freeaddrinfo(result);
-  if (!ok) return false;
-  ip = text;
-  return !ip.empty();
+  if (getaddrinfo(job->host.c_str(), nullptr, &hints, &result) == 0 && result != nullptr) {
+    char text[INET_ADDRSTRLEN] = {};
+    const auto* addr = reinterpret_cast<sockaddr_in*>(result->ai_addr);
+    if (inet_ntop(AF_INET, &addr->sin_addr, text, sizeof(text)) != nullptr) {
+      job->ip = text;
+      job->ok = !job->ip.empty();
+    }
+    freeaddrinfo(result);
+  }
+  if (job->done != nullptr) SetEvent(job->done);
+}
+
+bool Win32Resolver::resolve_ipv4(const std::string& host, std::string& ip) {
+  ensure_wsa();
+  if (host.empty()) return false;
+  auto job = std::make_shared<ResolveJob>();
+  job->host = host;
+  job->done = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+  if (job->done == nullptr) return false;
+  // getaddrinfo has no cancel. The worker keeps the job alive after this wait.
+  std::thread(resolve_worker, job).detach();
+  if (WaitForSingleObject(job->done, 8000) != WAIT_OBJECT_0) return false;
+  if (!job->ok) return false;
+  ip = job->ip;
+  return true;
 }
 
 bool Win32ConnectivityProbe::pick_loopback_port(unsigned short& port) {
   ensure_wsa();
+  stage_ = "";
   SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
   if (sock == INVALID_SOCKET) {
     last_error_ = WSAGetLastError();
+    stage_ = "bind_failed";
     return false;
   }
   sockaddr_in local{};
@@ -505,19 +748,26 @@ bool Win32ConnectivityProbe::pick_loopback_port(unsigned short& port) {
   local.sin_port = 0;
   if (bind(sock, reinterpret_cast<sockaddr*>(&local), sizeof(local)) != 0) {
     last_error_ = WSAGetLastError();
+    stage_ = "bind_failed";
     closesocket(sock);
     return false;
   }
   int size = sizeof(local);
   if (getsockname(sock, reinterpret_cast<sockaddr*>(&local), &size) != 0) {
     last_error_ = WSAGetLastError();
+    stage_ = "bind_failed";
     closesocket(sock);
     return false;
   }
   port = ntohs(local.sin_port);
   closesocket(sock);
-  last_error_ = port == 0 ? ERROR_INVALID_DATA : 0;
-  return port != 0;
+  if (port == 0) {
+    last_error_ = ERROR_INVALID_DATA;
+    stage_ = "bind_failed";
+    return false;
+  }
+  last_error_ = 0;
+  return true;
 }
 
 bool Win32ConnectivityProbe::prove_socks(
@@ -525,43 +775,104 @@ bool Win32ConnectivityProbe::prove_socks(
     const std::string& target_ip,
     const std::function<bool()>& cancelled) {
   ensure_wsa();
+  stage_ = "";
+  last_error_ = 0;
   IN_ADDR target{};
   if (port == 0 || inet_pton(AF_INET, target_ip.c_str(), &target) != 1) {
     last_error_ = ERROR_INVALID_PARAMETER;
+    stage_ = "socks_unreachable";
     return false;
   }
 
+  const ULONGLONG deadline = GetTickCount64() + 12000;
+  auto expired = [&]() { return GetTickCount64() >= deadline; };
+  auto keep_error = [&](unsigned long fallback) {
+    if (last_error_ == 0) last_error_ = fallback;
+  };
   SOCKET sock = INVALID_SOCKET;
-  for (int attempt = 0; attempt < 50 && sock == INVALID_SOCKET; ++attempt) {
-    if (cancelled && cancelled()) return false;
+  while (sock == INVALID_SOCKET) {
+    if (expired() || (cancelled && cancelled())) {
+      keep_error(ERROR_TIMEOUT);
+      stage_ = "socks_unreachable";
+      return false;
+    }
     SOCKET candidate = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (candidate == INVALID_SOCKET) break;
+    if (candidate == INVALID_SOCKET) {
+      keep_error(WSAGetLastError());
+      break;
+    }
+    u_long nonblocking = 1;
+    ioctlsocket(candidate, FIONBIO, &nonblocking);
     sockaddr_in local{};
     local.sin_family = AF_INET;
     local.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
     local.sin_port = htons(port);
-    if (connect(candidate, reinterpret_cast<sockaddr*>(&local), sizeof(local)) == 0) {
-      sock = candidate;
-      break;
+    const int connected = connect(candidate, reinterpret_cast<sockaddr*>(&local), sizeof(local));
+    if (connected != 0 && WSAGetLastError() != WSAEWOULDBLOCK) {
+      last_error_ = WSAGetLastError();
+      closesocket(candidate);
+      Sleep(100);
+      continue;
     }
-    last_error_ = WSAGetLastError();
-    closesocket(candidate);
-    Sleep(100);
+    if (connected != 0) {
+      fd_set ready;
+      FD_ZERO(&ready);
+      FD_SET(candidate, &ready);
+      timeval wait{0, 250000};
+      if (select(0, nullptr, &ready, nullptr, &wait) <= 0) {
+        keep_error(ERROR_TIMEOUT);
+        closesocket(candidate);
+        Sleep(100);
+        continue;
+      }
+      int so_error = 0;
+      int so_len = sizeof(so_error);
+      getsockopt(candidate, SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&so_error), &so_len);
+      if (so_error != 0) {
+        last_error_ = static_cast<unsigned long>(so_error);
+        closesocket(candidate);
+        Sleep(100);
+        continue;
+      }
+    }
+    u_long blocking = 0;
+    ioctlsocket(candidate, FIONBIO, &blocking);
+    sock = candidate;
+    last_error_ = 0;
+    break;
   }
   if (sock == INVALID_SOCKET) {
-    if (last_error_ == 0) last_error_ = ERROR_TIMEOUT;
+    keep_error(ERROR_TIMEOUT);
+    stage_ = "socks_unreachable";
+    return false;
+  }
+  if (expired()) {
+    closesocket(sock);
+    keep_error(ERROR_TIMEOUT);
+    stage_ = "socks_handshake";
     return false;
   }
 
-  const DWORD timeout = 5000;
+  DWORD timeout = 5000;
+  const ULONGLONG now = GetTickCount64();
+  if (now < deadline && deadline - now < timeout) {
+    timeout = static_cast<DWORD>(deadline - now);
+    if (timeout < 1000) timeout = 1000;
+  }
   setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout));
   setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout));
   auto send_all = [&](const unsigned char* bytes, int count) {
     int sent = 0;
     while (sent < count) {
-      if (cancelled && cancelled()) return false;
+      if (expired() || (cancelled && cancelled())) {
+        keep_error(ERROR_TIMEOUT);
+        return false;
+      }
       const int n = send(sock, reinterpret_cast<const char*>(bytes + sent), count - sent, 0);
-      if (n <= 0) return false;
+      if (n <= 0) {
+        keep_error(WSAGetLastError());
+        return false;
+      }
       sent += n;
     }
     return true;
@@ -569,9 +880,15 @@ bool Win32ConnectivityProbe::prove_socks(
   auto recv_all = [&](unsigned char* bytes, int count) {
     int got = 0;
     while (got < count) {
-      if (cancelled && cancelled()) return false;
+      if (expired() || (cancelled && cancelled())) {
+        keep_error(ERROR_TIMEOUT);
+        return false;
+      }
       const int n = recv(sock, reinterpret_cast<char*>(bytes + got), count - got, 0);
-      if (n <= 0) return false;
+      if (n <= 0) {
+        keep_error(WSAGetLastError());
+        return false;
+      }
       got += n;
     }
     return true;
@@ -582,7 +899,8 @@ bool Win32ConnectivityProbe::prove_socks(
   if (!send_all(greeting, sizeof(greeting)) ||
       !recv_all(greeting_reply, sizeof(greeting_reply)) ||
       greeting_reply[0] != 5 || greeting_reply[1] != 0) {
-    last_error_ = ERROR_ACCESS_DENIED;
+    keep_error(ERROR_ACCESS_DENIED);
+    stage_ = "socks_handshake";
     closesocket(sock);
     return false;
   }
@@ -595,7 +913,8 @@ bool Win32ConnectivityProbe::prove_socks(
   if (!send_all(request, sizeof(request)) ||
       !recv_all(reply, sizeof(reply)) ||
       reply[0] != 5 || reply[1] != 0) {
-    last_error_ = ERROR_CONNECTION_REFUSED;
+    keep_error(ERROR_CONNECTION_REFUSED);
+    stage_ = "socks_refused";
     closesocket(sock);
     return false;
   }
@@ -603,7 +922,8 @@ bool Win32ConnectivityProbe::prove_socks(
   const char* http =
       "GET /generate_204 HTTP/1.1\r\nHost: cp.cloudflare.com\r\nConnection: close\r\n\r\n";
   if (!send_all(reinterpret_cast<const unsigned char*>(http), static_cast<int>(std::strlen(http)))) {
-    last_error_ = WSAGetLastError();
+    keep_error(ERROR_TIMEOUT);
+    stage_ = "http_timeout";
     closesocket(sock);
     return false;
   }
@@ -611,10 +931,18 @@ bool Win32ConnectivityProbe::prove_socks(
   const int got = recv(sock, response, sizeof(response) - 1, 0);
   closesocket(sock);
   if (got <= 0) {
-    last_error_ = WSAGetLastError();
+    const int err = WSAGetLastError();
+    if (err != 0) last_error_ = static_cast<unsigned long>(err);
+    keep_error(ERROR_TIMEOUT);
+    stage_ = "http_timeout";
     return false;
   }
-  const bool ok = std::string(response, got).find(" 204") != std::string::npos;
-  last_error_ = ok ? 0 : ERROR_INVALID_DATA;
-  return ok;
+  if (std::string(response, got).find(" 204") == std::string::npos) {
+    last_error_ = ERROR_INVALID_DATA;
+    stage_ = "http_bad_status";
+    return false;
+  }
+  last_error_ = 0;
+  stage_ = "";
+  return true;
 }

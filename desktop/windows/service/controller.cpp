@@ -1,101 +1,144 @@
 #include "protocol.h"
 
 #define WIN32_LEAN_AND_MEAN
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #include <windows.h>
-#include <aclapi.h>
-#include <sddl.h>
+#include <winsvc.h>
 
 #include <atomic>
+#include <cctype>
+#include <cstring>
+#include <deque>
 #include <iostream>
+#include <mutex>
 #include <string>
 #include <thread>
-#include <vector>
+
+#pragma comment(lib, "ws2_32.lib")
 
 namespace {
 
 const wchar_t* kPipeName = L"\\\\.\\pipe\\ProxyDomBrokerV3";
-
-std::wstring exe_dir() {
-  wchar_t path[MAX_PATH] = {};
-  GetModuleFileNameW(nullptr, path, MAX_PATH);
-  std::wstring text(path);
-  const auto slash = text.find_last_of(L"\\/");
-  return slash == std::wstring::npos ? L"." : text.substr(0, slash);
-}
-
-std::wstring normalize_path(const std::wstring& path) {
-  wchar_t full[MAX_PATH] = {};
-  if (GetFullPathNameW(path.c_str(), MAX_PATH, full, nullptr) == 0) return path;
-  return full;
-}
-
-bool same_path(const std::wstring& left, const std::wstring& right) {
-  return CompareStringOrdinal(normalize_path(left).c_str(), -1,
-                              normalize_path(right).c_str(), -1, TRUE) ==
-         CSTR_EQUAL;
-}
+const wchar_t* kServiceName = L"ProxyDomBroker";
 
 bool trusted_server(HANDLE pipe) {
   ULONG pid = 0;
   if (!GetNamedPipeServerProcessId(pipe, &pid) || pid == 0) return false;
-  HANDLE process =
-      OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
-  if (process == nullptr) return false;
-  wchar_t image[MAX_PATH] = {};
-  DWORD size = MAX_PATH;
-  const bool named =
-      QueryFullProcessImageNameW(process, 0, image, &size) == TRUE;
-  CloseHandle(process);
-  if (!named) return false;
-
-  PSID owner = nullptr;
-  PSECURITY_DESCRIPTOR sd = nullptr;
-  const DWORD rc =
-      GetSecurityInfo(pipe, SE_KERNEL_OBJECT, OWNER_SECURITY_INFORMATION,
-                      &owner, nullptr, nullptr, nullptr, &sd);
-  if (rc != ERROR_SUCCESS || owner == nullptr) {
-    if (sd != nullptr) LocalFree(sd);
+  SC_HANDLE scm = OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT);
+  if (scm == nullptr) return false;
+  SC_HANDLE service = OpenServiceW(scm, kServiceName, SERVICE_QUERY_STATUS);
+  if (service == nullptr) {
+    CloseServiceHandle(scm);
     return false;
   }
-  unsigned char local_system[SECURITY_MAX_SID_SIZE] = {};
-  DWORD sid_size = sizeof(local_system);
-  const bool system =
-      CreateWellKnownSid(WinLocalSystemSid, nullptr, local_system, &sid_size) ==
-          TRUE &&
-      EqualSid(owner, local_system) == TRUE;
-  LocalFree(sd);
-  return system && same_path(image, exe_dir() + L"\\ProxyDomBroker.exe");
+  SERVICE_STATUS_PROCESS info{};
+  DWORD needed = 0;
+  const bool ok =
+      QueryServiceStatusEx(service, SC_STATUS_PROCESS_INFO, reinterpret_cast<LPBYTE>(&info),
+                           sizeof(info), &needed) == TRUE;
+  CloseServiceHandle(service);
+  CloseServiceHandle(scm);
+  return ok && info.dwCurrentState == SERVICE_RUNNING && info.dwProcessId == pid;
 }
 
 HANDLE open_broker() {
   for (int attempt = 0; attempt < 30; ++attempt) {
     HANDLE pipe =
-        CreateFileW(kPipeName, FILE_READ_DATA | FILE_WRITE_DATA | READ_CONTROL | SYNCHRONIZE,
-                    0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+        CreateFileW(kPipeName, FILE_READ_DATA | FILE_WRITE_DATA | SYNCHRONIZE, 0, nullptr,
+                    OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (pipe != INVALID_HANDLE_VALUE) {
-      DWORD mode = PIPE_READMODE_MESSAGE;
-      if (SetNamedPipeHandleState(pipe, &mode, nullptr, nullptr) &&
-          trusted_server(pipe)) {
-        return pipe;
-      }
+      if (trusted_server(pipe)) return pipe;
       CloseHandle(pipe);
-      SetLastError(ERROR_ACCESS_DENIED);
+      SetLastError(ERROR_SERVICE_NOT_ACTIVE);
       return INVALID_HANDLE_VALUE;
     }
     const DWORD error = GetLastError();
-    if (error != ERROR_PIPE_BUSY && error != ERROR_FILE_NOT_FOUND) break;
+    if (error != ERROR_PIPE_BUSY && error != ERROR_FILE_NOT_FOUND && error != ERROR_SEM_TIMEOUT) break;
     WaitNamedPipeW(kPipeName, 100);
   }
   return INVALID_HANDLE_VALUE;
 }
 
+std::mutex g_write_mu;
+
 bool write_json(HANDLE pipe, const std::string& json) {
   const std::string frame = encode_frame(json);
   if (frame.empty()) return false;
+  std::lock_guard<std::mutex> lock(g_write_mu);
   DWORD written = 0;
   return WriteFile(pipe, frame.data(), static_cast<DWORD>(frame.size()),
                    &written, nullptr) &&
          written == frame.size();
+}
+
+std::int64_t generation_of(const std::string& json) {
+  const std::string key = "\"generation\":";
+  const auto at = json.find(key);
+  if (at == std::string::npos) return 0;
+  try {
+    return std::stoll(json.substr(at + key.size()));
+  } catch (...) {
+    return 0;
+  }
+}
+
+// Gate 3. No IP_UNICAST_IF: the route table must carry this socket.
+bool user_ingress_204() {
+  WSADATA wsa{};
+  if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) return false;
+  addrinfo hints{};
+  hints.ai_family = AF_INET;
+  hints.ai_socktype = SOCK_STREAM;
+  addrinfo* result = nullptr;
+  if (getaddrinfo("cp.cloudflare.com", "80", &hints, &result) != 0 || result == nullptr) {
+    WSACleanup();
+    return false;
+  }
+  SOCKET sock = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
+  if (sock == INVALID_SOCKET) {
+    freeaddrinfo(result);
+    WSACleanup();
+    return false;
+  }
+  u_long nb = 1;
+  ioctlsocket(sock, FIONBIO, &nb);
+  const int rc = connect(sock, result->ai_addr, static_cast<int>(result->ai_addrlen));
+  freeaddrinfo(result);
+  if (rc != 0 && WSAGetLastError() != WSAEWOULDBLOCK) {
+    closesocket(sock);
+    WSACleanup();
+    return false;
+  }
+  fd_set write_set;
+  FD_ZERO(&write_set);
+  FD_SET(sock, &write_set);
+  timeval tv{};
+  tv.tv_sec = 7;
+  if (select(0, nullptr, &write_set, nullptr, &tv) <= 0) {
+    closesocket(sock);
+    WSACleanup();
+    return false;
+  }
+  const char* request =
+      "GET /generate_204 HTTP/1.1\r\nHost: cp.cloudflare.com\r\nConnection: close\r\n\r\n";
+  send(sock, request, static_cast<int>(strlen(request)), 0);
+  std::string body;
+  char chunk[512];
+  for (int i = 0; i < 20 && body.find("\r\n") == std::string::npos; ++i) {
+    fd_set read_set;
+    FD_ZERO(&read_set);
+    FD_SET(sock, &read_set);
+    timeval wait{};
+    wait.tv_sec = 1;
+    if (select(0, &read_set, nullptr, nullptr, &wait) <= 0) break;
+    const int got = recv(sock, chunk, sizeof(chunk), 0);
+    if (got <= 0) break;
+    body.append(chunk, got);
+  }
+  closesocket(sock);
+  WSACleanup();
+  return body.find(" 204") != std::string::npos;
 }
 
 bool read_json(HANDLE pipe, std::string& json) {
@@ -111,6 +154,22 @@ bool read_json(HANDLE pipe, std::string& json) {
     if (take_frame(buffer, json, error)) return error.empty();
     if (!error.empty() || buffer.size() > kFrameMaxBody + 4) return false;
   }
+}
+
+void print_client_error(const std::string& code) {
+  std::string safe = "protocol";
+  bool token = !code.empty();
+  for (unsigned char c : code) {
+    if (!std::isalnum(c) && c != '_') token = false;
+  }
+  if (token) safe = code;
+  std::cout
+      << "{\"event\":\"client_error\",\"generation\":0,\"state\":\"\","
+         "\"code\":\""
+      << safe
+      << "\",\"message\":\"Команда подключения не передана\","
+         "\"cleanup_verified\":true}"
+      << std::endl;
 }
 
 void print_unavailable(DWORD error) {
@@ -135,38 +194,80 @@ int status_once(HANDLE pipe) {
 }
 
 int session(HANDLE pipe) {
-  std::atomic<bool> reading{true};
-  std::thread reader([&] {
-    std::string response;
-    while (read_json(pipe, response)) {
-      std::cout << response << std::endl;
+  // Stdin is queued on another thread. Every pipe read and write stays here.
+  // A blocking ReadFile beside WriteFile never delivered connect after hello.
+  std::mutex queue_mu;
+  std::deque<std::string> lines;
+  std::atomic<bool> stdin_open{true};
+  std::thread stdin_thread([&] {
+    std::string line;
+    while (std::getline(std::cin, line)) {
+      if (line.empty()) continue;
+      std::lock_guard<std::mutex> lock(queue_mu);
+      lines.push_back(std::move(line));
     }
-    std::cout
-        << "{\"event\":\"broker_closed\",\"generation\":0,\"state\":\"\","
-           "\"code\":\"broker_unavailable\",\"message\":null}"
-        << std::endl;
-    reading.store(false);
+    stdin_open.store(false);
   });
 
-  std::string line;
-  while (reading.load() && std::getline(std::cin, line)) {
-    if (line.empty()) continue;
-    ClientCommand command;
-    std::string error;
-    if (!parse_command(line, command, error) ||
-        command.protocol_version != 3) {
-      std::cout
-          << "{\"event\":\"client_error\",\"code\":\"protocol\","
-             "\"message\":\"Некорректная команда окна\"}"
-          << std::endl;
-      continue;
+  std::string inbound;
+  bool prove_sent = false;
+  while (stdin_open.load()) {
+    DWORD avail = 0;
+    if (!PeekNamedPipe(pipe, nullptr, 0, nullptr, &avail, nullptr)) break;
+    if (avail > 0) {
+      char bytes[8192];
+      DWORD got = 0;
+      const DWORD want = avail > sizeof(bytes) ? static_cast<DWORD>(sizeof(bytes)) : avail;
+      if (!ReadFile(pipe, bytes, want, &got, nullptr) || got == 0) break;
+      inbound.append(bytes, got);
+      for (;;) {
+        std::string response;
+        std::string error;
+        if (!take_frame(inbound, response, error)) {
+          if (!error.empty()) stdin_open.store(false);
+          break;
+        }
+        std::cout << response << std::endl;
+        if (prove_sent || response.find("\"event\":\"tun_ready\"") == std::string::npos) continue;
+        prove_sent = true;
+        const bool ok = user_ingress_204();
+        const auto generation = generation_of(response);
+        if (!write_json(pipe, std::string("{\"command\":\"prove\",\"protocol_version\":3,\"generation\":") +
+                                  std::to_string(generation) + ",\"message\":\"" + (ok ? "ok" : "fail") + "\"}")) {
+          stdin_open.store(false);
+          break;
+        }
+      }
     }
-    if (!write_json(pipe, line)) break;
+
+    std::string line;
+    {
+      std::lock_guard<std::mutex> lock(queue_mu);
+      if (!lines.empty()) {
+        line = std::move(lines.front());
+        lines.pop_front();
+      }
+    }
+    if (!line.empty()) {
+      ClientCommand command;
+      std::string error;
+      if (!parse_command(line, command, error) || command.protocol_version != 3) {
+        print_client_error(error.empty() ? "protocol" : error);
+      } else if (!write_json(pipe, line)) {
+        print_client_error("frame");
+        break;
+      }
+    } else if (avail == 0) {
+      Sleep(10);
+    }
   }
 
-  CancelIoEx(pipe, nullptr);
+  std::cout
+      << "{\"event\":\"broker_closed\",\"generation\":0,\"state\":\"\","
+         "\"code\":\"broker_unavailable\",\"message\":null}"
+      << std::endl;
   CloseHandle(pipe);
-  if (reader.joinable()) reader.join();
+  stdin_thread.detach();
   return 0;
 }
 

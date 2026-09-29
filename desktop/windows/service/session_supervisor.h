@@ -21,6 +21,11 @@ enum class TunnelCode {
   KeyProbeFailed,
   TunNotReady,
   EgressFailed,
+  CoreExited,
+  TunInitTimeout,
+  EgressTimeout,
+  AuthRejected,
+  InvalidProfile,
   CleanupFailed,
   Busy,
   Protocol,
@@ -128,6 +133,15 @@ class RouteTable {
   virtual bool routes_absent(std::uint64_t luid) = 0;
   virtual bool list_own_adapters(std::vector<OwnedAdapter>& out) = 0;
   virtual bool remove_adapter(const OwnedAdapter& adapter) = 0;
+  // Adapter is up. Capture routes are not required yet.
+  virtual bool find_own_adapter(OwnedAdapter& adapter) = 0;
+  // Broker-owned 0.0.0.0/1, 128.0.0.0/1, ::/1, and 8000::/1. Not sing-box.
+  virtual bool install_capture(const OwnedAdapter& adapter, std::vector<OwnedRoute>& routes) = 0;
+  // On-link /32 through the TUN. The default route is still untouched.
+  virtual bool add_canary(const OwnedAdapter& adapter, const std::string& ip, OwnedRoute& route) = 0;
+  virtual bool delete_canary(const OwnedRoute& route) = 0;
+  // Follows the routing table. No IP_UNICAST_IF bind.
+  virtual bool fetch_canary(const std::string& ip, const std::function<bool()>& cancelled) = 0;
   virtual bool tun_ready(OwnedAdapter& adapter, std::vector<OwnedRoute>& halves) = 0;
   virtual bool prove_exit(unsigned long if_index,
                           const std::string& probe_ip,
@@ -147,6 +161,10 @@ class EngineHost {
   virtual void release() = 0;
   virtual void stop_owned_processes() = 0;
   virtual unsigned long last_error() const = 0;
+  // Empty after a successful start. A failure name is safe to print.
+  virtual const char* start_stage() const = 0;
+  virtual unsigned long exit_code() const = 0;
+  virtual std::string output_tail() const = 0;
 };
 
 class NameResolver {
@@ -163,6 +181,8 @@ class ConnectivityProbe {
                            const std::string& target_ip,
                            const std::function<bool()>& cancelled) = 0;
   virtual unsigned long last_error() const = 0;
+  // Empty after success. A failure name is a literal the service log can print.
+  virtual const char* failure_stage() const = 0;
 };
 
 class SessionFiles {
@@ -177,6 +197,7 @@ class SessionFiles {
   virtual bool config_present() = 0;
   virtual std::string legacy_pin() = 0;
   virtual void clear_legacy_pin() = 0;
+  virtual unsigned long last_error() const { return 0; }
 };
 
 class TunnelLog {
@@ -215,7 +236,12 @@ class TunnelSupervisor {
                    Sleeper& sleeper);
 
   void set_observer(std::function<void(const TunnelSnapshot&)> observer);
+  void set_ready_observer(std::function<void(std::int64_t)> observer);
   void set_hook(std::function<void(ConnectStep)> hook);
+  // Medium controller reports gate 3. A mismatched generation is ignored.
+  void note_user_proof(bool ok, std::int64_t generation);
+  // Unit tests skip the real controller. Production leaves this false.
+  void accept_user_proof_for_tests(bool enabled);
 
   BeginResult begin_connect();
   TunnelSnapshot run_connect(const ConnectRequest& request, CancelFlag& cancel);
@@ -230,9 +256,12 @@ class TunnelSupervisor {
   bool stop_requested(ConnectStep step, CancelFlag& cancel);
   bool stop_engine_only();
   bool restore_resources();
+  bool wait_user_proof(std::int64_t generation, CancelFlag& cancel);
   TunnelSnapshot finish(TunnelCode code, const std::string& message, bool quiet);
   TunnelSnapshot publish(TunnelCode code, const std::string& message, bool cleanup_verified);
   void remember(const std::function<void()>& change);
+  // outcome nullptr starts the step. "ok" closes it. A start without ok is the hang.
+  void gate(const char* step, const char* outcome);
 
   RouteTable& routes_;
   EngineHost& engine_;
@@ -245,5 +274,9 @@ class TunnelSupervisor {
   Ledger ledger_;
   TunnelSnapshot published_;
   std::function<void(const TunnelSnapshot&)> observer_;
+  std::function<void(std::int64_t)> ready_observer_;
   std::function<void(ConnectStep)> hook_;
+  std::int64_t proof_generation_ = 0;
+  int proof_result_ = 0;
+  bool test_user_proof_ = false;
 };

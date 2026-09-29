@@ -67,9 +67,9 @@ $brokerOut = Join-Path $Payload "ProxyDomBroker.exe"
 $controllerOut = Join-Path $Payload "ProxyDomCtl.exe"
 Push-Location $Service
 try {
-    cmd /c "call `"$vcvars`" >nul && cl /nologo /std:c++17 /EHsc /W3 /utf-8 /DUNICODE /D_UNICODE /Fe:`"$brokerOut`" service.cpp protocol.cpp session_supervisor.cpp network_owner.cpp process_host.cpp session_store.cpp /link /SUBSYSTEM:WINDOWS ws2_32.lib iphlpapi.lib setupapi.lib advapi32.lib shell32.lib"
+    cmd /c "call `"$vcvars`" >nul && cl /nologo /std:c++17 /EHsc /W3 /utf-8 /DUNICODE /D_UNICODE /Fe:`"$brokerOut`" service.cpp protocol.cpp session_supervisor.cpp network_owner.cpp process_host.cpp session_store.cpp log_sanitizer.cpp /link /SUBSYSTEM:WINDOWS ws2_32.lib iphlpapi.lib setupapi.lib advapi32.lib shell32.lib"
     if ($LASTEXITCODE -ne 0) { throw "Broker compile failed." }
-    cmd /c "call `"$vcvars`" >nul && cl /nologo /std:c++17 /EHsc /W3 /utf-8 /DUNICODE /D_UNICODE /Fe:`"$controllerOut`" controller.cpp protocol.cpp /link advapi32.lib"
+    cmd /c "call `"$vcvars`" >nul && cl /nologo /std:c++17 /EHsc /W3 /utf-8 /DUNICODE /D_UNICODE /Fe:`"$controllerOut`" controller.cpp protocol.cpp /link advapi32.lib ws2_32.lib"
     if ($LASTEXITCODE -ne 0) { throw "Controller compile failed." }
 } finally {
     Pop-Location

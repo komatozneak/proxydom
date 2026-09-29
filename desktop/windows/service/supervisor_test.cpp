@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -32,6 +33,8 @@ class FakeRoutes : public RouteTable {
   bool list_ok = true;
   bool pin_present = false;
   int add_calls = 0;
+  int capture_calls = 0;
+  bool capture_ok = true;
   int delete_pin_failures = 0;
   bool adapter_present = false;
   bool routes_present = false;
@@ -40,6 +43,12 @@ class FakeRoutes : public RouteTable {
   int tun_misses = 0;
   bool prove_ok = true;
   int prove_calls = 0;
+  bool canary_ok = true;
+  int canary_calls = 0;
+  bool canary_present = false;
+  bool fetch_ok = true;
+  int fetch_calls = 0;
+  bool cancel_during_fetch = false;
   unsigned long hardware_index = 18;
   CancelFlag* cancel = nullptr;
   bool cancel_during_prove = false;
@@ -75,6 +84,7 @@ class FakeRoutes : public RouteTable {
   bool delete_routes_on_luid(std::uint64_t) override {
     if (!delete_routes_ok) return false;
     routes_present = false;
+    canary_present = false;
     return true;
   }
   bool routes_absent(std::uint64_t) override { return !routes_present; }
@@ -97,13 +107,57 @@ class FakeRoutes : public RouteTable {
     routes_present = false;
     return true;
   }
-  bool tun_ready(OwnedAdapter& adapter, std::vector<OwnedRoute>& halves) override {
+  bool find_own_adapter(OwnedAdapter& adapter) override {
     if (tun_misses > 0) {
       --tun_misses;
       return false;
     }
     adapter_present = true;
+    adapter.name = "ProxyDomTun";
+    adapter.guid = "{tun}";
+    adapter.luid = 99;
+    adapter.if_index = 5;
+    adapter.up = true;
+    return true;
+  }
+  bool add_canary(const OwnedAdapter& adapter, const std::string& ip, OwnedRoute& route) override {
+    ++canary_calls;
+    if (!canary_ok) return false;
+    canary_present = true;
+    route.destination = ip;
+    route.prefix_length = 32;
+    route.interface_luid = adapter.luid;
+    route.interface_index = adapter.if_index;
+    return true;
+  }
+  bool delete_canary(const OwnedRoute&) override {
+    canary_present = false;
+    return true;
+  }
+  bool fetch_canary(const std::string&, const std::function<bool()>& cancelled) override {
+    ++fetch_calls;
+    if (cancel_during_fetch && cancel != nullptr) cancel->request();
+    if (cancelled && cancelled()) return false;
+    return fetch_ok;
+  }
+  bool install_capture(const OwnedAdapter& adapter, std::vector<OwnedRoute>& routes) override {
+    ++capture_calls;
+    routes.clear();
+    if (!capture_ok) return false;
     routes_present = true;
+    const char* destinations[] = {"0.0.0.0", "128.0.0.0", "::", "8000::"};
+    for (const char* destination : destinations) {
+      OwnedRoute route;
+      route.destination = destination;
+      route.prefix_length = 1;
+      route.interface_luid = adapter.luid;
+      route.interface_index = adapter.if_index;
+      routes.push_back(route);
+    }
+    return true;
+  }
+  bool tun_ready(OwnedAdapter& adapter, std::vector<OwnedRoute>& halves) override {
+    if (!adapter_present || !routes_present) return false;
     adapter.name = "ProxyDomTun";
     adapter.guid = "{tun}";
     adapter.luid = 99;
@@ -139,19 +193,42 @@ class FakeEngine : public EngineHost {
   int resume_calls = 0;
   int assign_calls = 0;
   int launch_calls = 0;
+  bool die_after_resume = false;
+  bool fail_launch = false;
+  unsigned long launch_error = 87;
+  unsigned long exit_status = 0;
+  unsigned long last_err = 0;
+  const char* stage_name = "";
+  std::string tail;
 
   bool launch_suspended(unsigned long& pid) override {
     ++launch_calls;
+    if (fail_launch) {
+      last_err = launch_error;
+      stage_name = "core_create_process_failed";
+      return false;
+    }
     running = true;
     pid = 42;
+    last_err = 0;
+    stage_name = "";
     return true;
   }
   bool assign_job() override {
     ++assign_calls;
-    return job_ok && assign_calls != fail_assign_on;
+    if (!(job_ok && assign_calls != fail_assign_on)) {
+      last_err = 5;
+      stage_name = "core_job_assign_failed";
+      return false;
+    }
+    return true;
   }
   bool resume() override {
     ++resume_calls;
+    if (die_after_resume) {
+      running = false;
+      exit_status = 1;
+    }
     return true;
   }
   bool request_stop() override {
@@ -168,7 +245,10 @@ class FakeEngine : public EngineHost {
   void stop_owned_processes() override {
     if (!unkillable) running = false;
   }
-  unsigned long last_error() const override { return 0; }
+  unsigned long last_error() const override { return last_err; }
+  const char* start_stage() const override { return stage_name; }
+  unsigned long exit_code() const override { return exit_status; }
+  std::string output_tail() const override { return tail; }
 };
 
 class FakeNames : public NameResolver {
@@ -187,6 +267,8 @@ class FakeProbe : public ConnectivityProbe {
   int calls = 0;
   CancelFlag* cancel = nullptr;
   bool cancel_during = false;
+  const char* stage = "socks_unreachable";
+  unsigned long error = 10061;
 
   bool pick_loopback_port(unsigned short& port) override {
     port = 17890;
@@ -199,7 +281,8 @@ class FakeProbe : public ConnectivityProbe {
     if (cancel_during && cancel != nullptr) cancel->request();
     return ok && (!cancelled || !cancelled());
   }
-  unsigned long last_error() const override { return 0; }
+  unsigned long last_error() const override { return ok ? 0 : error; }
+  const char* failure_stage() const override { return ok ? "" : stage; }
 };
 
 class FakeFiles : public SessionFiles {
@@ -244,7 +327,24 @@ class FakeFiles : public SessionFiles {
 
 class FakeLog : public TunnelLog {
  public:
-  void write(std::int64_t, const std::string&, const std::string&, unsigned long) override {}
+  struct Line {
+    std::string event;
+    std::string code;
+    unsigned long win32 = 0;
+  };
+  std::vector<Line> lines;
+  void write(std::int64_t, const std::string& event, const std::string& code, unsigned long win32) override {
+    lines.push_back(Line{event, code, win32});
+  }
+  int index_of(const std::string& event, const std::string& code) const {
+    for (int i = 0; i < static_cast<int>(lines.size()); ++i) {
+      if (lines[static_cast<std::size_t>(i)].event == event &&
+          lines[static_cast<std::size_t>(i)].code == code) {
+        return i;
+      }
+    }
+    return -1;
+  }
 };
 
 class FakeSleep : public Sleeper {
@@ -266,6 +366,7 @@ struct Harness {
   Harness() : supervisor(routes, engine, names, probe, files, log, sleeper) {
     routes.cancel = &cancel;
     probe.cancel = &cancel;
+    supervisor.accept_user_proof_for_tests(true);
   }
 
   ConnectRequest request() const {
@@ -298,6 +399,26 @@ void test_route_policy() {
          "own halves are not foreign");
 }
 
+void test_slash_port_connects_and_junk_does_not_launch() {
+  Harness slash;
+  ConnectRequest req;
+  req.uri = "hy2://secret-password@cdn.example:443/?sni=cdn.example&obfs=salamander&obfs-password=hide";
+  expect(slash.supervisor.begin_connect().accepted, "slash begin");
+  const auto ok = slash.supervisor.run_connect(req, slash.cancel);
+  expect(ok.phase == TunnelPhase::Connected, "slash after port still connects");
+  expect(slash.files.config_body.find("server_ports") == std::string::npos, "slash config has no port range");
+
+  Harness junk;
+  ConnectRequest bad;
+  bad.uri = "hy2://secret-password@cdn.example:443abc?sni=cdn.example";
+  expect(junk.supervisor.begin_connect().accepted, "junk begin");
+  const auto snap = junk.supervisor.run_connect(bad, junk.cancel);
+  expect(snap.code == TunnelCode::InvalidProfile, "junk port code");
+  expect(snap.message == "Неверный порт сервера", "junk port text");
+  expect(junk.engine.launch_calls == 0, "junk port does not start the engine");
+  expect(junk.log.index_of("profile_parse_failed", "443abc") >= 0, "junk port is logged");
+}
+
 void test_foreign_blocks_before_pin() {
   Harness harness;
   harness.routes.defaults = {route_view("happ-xray", false, 0, 0), route_view("Ethernet", true, 0, 25)};
@@ -305,8 +426,16 @@ void test_foreign_blocks_before_pin() {
   expect(snap.phase == TunnelPhase::Idle, "foreign ends idle");
   expect(snap.code == TunnelCode::ForeignTunnel, "foreign code");
   expect(snap.cleanup_verified, "foreign did not need cleanup");
-  expect(snap.message.find("happ-xray") != std::string::npos, "foreign names the adapter");
+  expect(snap.message == "Обнаружен активный туннель", "foreign caption");
+  expect(snap.message.find("happ") == std::string::npos, "foreign caption has no program");
+  expect(snap.message.find("Happ") == std::string::npos, "foreign caption has no Happ");
+  const int gate = harness.log.index_of("gate", "foreign_tunnel");
+  const int idle = harness.log.index_of("idle", "foreign_tunnel");
+  expect(gate >= 0 && idle > gate, "foreign gate before idle");
+  expect(harness.log.index_of("foreign_adapter", "happ-xray") > gate, "adapter stays in the log");
+  expect(harness.log.index_of("gate", "foreign_tunnel=ok") < 0, "foreign refusal has no ok");
   expect(harness.routes.add_calls == 0, "foreign adds no pin");
+  expect(harness.routes.capture_calls == 0, "foreign installs no capture");
   expect(!harness.files.config, "foreign writes no config");
 }
 
@@ -315,6 +444,12 @@ void test_radmin_allows_connect() {
   harness.routes.defaults = {route_view("Radmin VPN", false, 0, 9256), route_view("Ethernet", true, 0, 25)};
   const auto snap = harness.connect();
   expect(snap.phase == TunnelPhase::Connected, "radmin does not block");
+  expect(harness.probe.calls == 0, "connect does not open a socks probe");
+  expect(harness.routes.canary_calls == 1, "canary is installed before capture");
+  expect(!harness.routes.canary_present, "canary is removed after proof");
+  expect(harness.routes.capture_calls == 1, "broker installs the capture routes");
+  expect(harness.files.config_body.find("\"auto_route\":false") != std::string::npos, "engine auto_route is off");
+  expect(harness.supervisor.ledger_copy().routes.size() == 4, "ledger records four capture prefixes");
   expect(snap.cleanup_verified == false, "connected is not a restore");
   expect(harness.files.config_body.find("secret-password") != std::string::npos, "engine config keeps the secret");
   expect(encode_ledger(harness.supervisor.ledger_copy()).find("secret-password") == std::string::npos,
@@ -324,23 +459,35 @@ void test_radmin_allows_connect() {
 
 void test_bad_key_never_mutates_routes() {
   Harness harness;
-  harness.probe.ok = false;
+  harness.engine.die_after_resume = true;
+  harness.engine.tail = "listen failed \"password\":\"secret-password\"";
   const auto snap = harness.connect();
-  expect(snap.code == TunnelCode::KeyProbeFailed, "bad key has probe code");
-  expect(snap.phase == TunnelPhase::Idle && snap.cleanup_verified, "bad key restores");
-  expect(harness.probe.calls == 1, "bad key was probed");
-  expect(harness.routes.add_calls == 0, "bad key adds no route");
-  expect(!harness.routes.pin_present && !harness.files.config, "bad key leaves no resources");
+  expect(snap.code == TunnelCode::CoreExited, "dead engine is core_exited");
+  expect(snap.message == "Сбой локальной службы туннеля", "dead engine text");
+  expect(snap.phase == TunnelPhase::Idle && snap.cleanup_verified, "dead engine restores");
+  expect(harness.probe.calls == 0, "dead engine does not open socks");
+  expect(harness.routes.add_calls == 0, "dead engine adds no pin");
+  expect(harness.routes.capture_calls == 0, "dead engine installs no capture");
+  bool leaked = false;
+  bool saw_exit = false;
+  for (const auto& line : harness.log.lines) {
+    if (line.code.find("secret-password") != std::string::npos) leaked = true;
+    if (line.event == "core_exited") saw_exit = true;
+  }
+  expect(saw_exit, "core exit is logged");
+  expect(!leaked, "engine log drops the password");
 }
 
 void test_cancel_during_key_probe_never_mutates_routes() {
   Harness harness;
-  harness.probe.cancel_during = true;
+  harness.routes.cancel_during_fetch = true;
   const auto snap = harness.connect();
-  expect(snap.code == TunnelCode::None, "probe cancel is not key failure");
-  expect(snap.phase == TunnelPhase::Idle && snap.cleanup_verified, "probe cancel restores");
-  expect(harness.routes.add_calls == 0, "probe cancel adds no route");
-  expect(!harness.engine.running && !harness.files.config, "probe cancel removes process and config");
+  expect(snap.code == TunnelCode::None, "canary cancel is not an egress failure");
+  expect(snap.phase == TunnelPhase::Idle && snap.cleanup_verified, "canary cancel restores");
+  expect(harness.routes.capture_calls == 0, "canary cancel installs no capture");
+  expect(!harness.routes.pin_present && !harness.routes.canary_present, "canary cancel removes narrow routes");
+  expect(harness.probe.calls == 0, "canary cancel does not open socks");
+  expect(!harness.engine.running && !harness.files.config, "canary cancel removes process and config");
 }
 
 void test_cancel_before_and_after_pin() {
@@ -364,6 +511,25 @@ void test_cancel_before_and_after_pin() {
   expect(!late.files.config, "config was removed");
 }
 
+void test_launch_failure_keeps_win32() {
+  Harness harness;
+  harness.engine.fail_launch = true;
+  harness.engine.launch_error = 87;
+  const auto snap = harness.connect();
+  expect(snap.code == TunnelCode::CoreStartFailed, "launch failure code");
+  expect(snap.message == "Сбой локальной службы туннеля", "launch failure text");
+  int failed = -1;
+  int idle = -1;
+  for (int i = 0; i < static_cast<int>(harness.log.lines.size()); ++i) {
+    const auto& line = harness.log.lines[static_cast<std::size_t>(i)];
+    if (line.event == "core_create_process_failed" && line.win32 == 87) failed = i;
+    if (line.event == "idle" && line.code == "core_start_failed") idle = i;
+  }
+  expect(failed >= 0 && idle > failed, "create-process win32 is logged before idle");
+  expect(harness.routes.add_calls == 0, "launch failure adds no pin");
+  expect(harness.engine.launch_calls == 1, "launch was attempted");
+}
+
 void test_job_assignment_is_mandatory() {
   Harness harness;
   harness.engine.job_ok = false;
@@ -378,30 +544,50 @@ void test_job_assignment_is_mandatory() {
 
 void test_tun_job_failure_restores_pin() {
   Harness harness;
-  harness.engine.fail_assign_on = 2;
+  harness.routes.canary_ok = false;
   const auto snap = harness.connect();
-  expect(snap.code == TunnelCode::CoreStartFailed, "tun job failure code");
-  expect(snap.phase == TunnelPhase::Idle && snap.cleanup_verified, "tun job failure restores");
-  expect(harness.routes.add_calls == 1, "tun job failure happened after pin");
-  expect(!harness.routes.pin_present, "tun job failure removes pin");
-  expect(harness.engine.resume_calls == 1, "untracked tun process never resumes");
+  expect(snap.code == TunnelCode::RouteFailed, "canary failure code");
+  expect(snap.message == "Сбой сетевого стека", "canary failure text");
+  expect(snap.phase == TunnelPhase::Idle && snap.cleanup_verified, "canary failure restores");
+  expect(harness.routes.add_calls == 1, "pin was created");
+  expect(!harness.routes.pin_present, "pin was removed");
+  expect(harness.routes.capture_calls == 0, "canary failure installs no capture");
+  expect(harness.log.index_of("routes", "canary_failed") >= 0, "canary failure is logged");
 }
 
 void test_engine_death_and_probe_failure() {
   Harness dead;
-  dead.engine.unkillable = false;
   dead.routes.tun_misses = 100;
   const auto died = dead.connect();
-  expect(died.code == TunnelCode::TunNotReady, "dead engine is tun_not_ready");
-  expect(died.phase == TunnelPhase::Idle && died.cleanup_verified, "dead engine restores");
+  expect(died.code == TunnelCode::TunInitTimeout, "missing adapter times out");
+  expect(died.message == "Сбой сетевого адаптера туннеля", "adapter text");
+  expect(died.phase == TunnelPhase::Idle && died.cleanup_verified, "missing adapter restores");
+  expect(dead.routes.capture_calls == 0 && dead.routes.add_calls == 0, "missing adapter adds no routes");
 
   Harness probe;
-  probe.routes.prove_ok = false;
+  probe.routes.fetch_ok = false;
   const auto failed = probe.connect();
-  expect(failed.code == TunnelCode::EgressFailed, "probe failure stays egress_failed");
-  expect(failed.phase == TunnelPhase::Idle && failed.cleanup_verified, "probe failure still restores");
-  expect(failed.message.find("Сервер не отвечает") != std::string::npos, "egress text");
-  expect(!probe.routes.pin_present && !probe.files.config, "probe failure leaves no owned resources");
+  expect(failed.code == TunnelCode::EgressTimeout, "canary timeout code");
+  expect(failed.message == "Узел недоступен", "canary timeout text");
+  expect(failed.phase == TunnelPhase::Idle && failed.cleanup_verified, "canary timeout restores");
+  expect(probe.routes.capture_calls == 0, "canary timeout installs no capture");
+  expect(!probe.routes.pin_present && !probe.routes.canary_present, "canary timeout removes narrow routes");
+  expect(probe.supervisor.ledger_copy().routes.empty() && !probe.supervisor.ledger_copy().pin_intended,
+         "ledger keeps neither pin nor canary");
+  expect(probe.probe.calls == 0, "canary timeout does not use socks");
+
+  Harness auth;
+  auth.routes.fetch_ok = false;
+  auth.engine.tail = "hysteria2: authentication failed \"password\":\"secret-password\"";
+  const auto rejected = auth.connect();
+  expect(rejected.code == TunnelCode::AuthRejected, "engine auth text is the key failure");
+  expect(rejected.message == "Ключ не принят сервером", "auth text");
+  expect(auth.routes.capture_calls == 0, "auth failure installs no capture");
+  bool leaked = false;
+  for (const auto& line : auth.log.lines) {
+    if (line.code.find("secret-password") != std::string::npos) leaked = true;
+  }
+  expect(!leaked, "auth log drops the password");
 }
 
 void test_cleanup_failure_is_not_idle() {
@@ -520,6 +706,17 @@ void test_ledger_roundtrip() {
   expect(!decode_ledger("nope", out), "reject a foreign ledger");
 }
 
+void test_user_proof_refusal_restores_capture() {
+  Harness harness;
+  harness.supervisor.accept_user_proof_for_tests(false);
+  harness.supervisor.note_user_proof(false, 1);
+  const auto snap = harness.connect();
+  expect(snap.phase == TunnelPhase::Connected, "window proof does not block Connected");
+  expect(harness.routes.capture_calls == 1, "capture is installed");
+  expect(harness.routes.routes_present && harness.routes.pin_present, "capture and pin stay");
+  expect(harness.supervisor.ledger_copy().routes.size() == 4, "ledger keeps four capture prefixes");
+}
+
 void test_resolve_and_route_table_failures() {
   Harness names;
   names.names.fail = true;
@@ -538,11 +735,13 @@ void test_resolve_and_route_table_failures() {
 
 int main() {
   test_route_policy();
+  test_slash_port_connects_and_junk_does_not_launch();
   test_foreign_blocks_before_pin();
   test_radmin_allows_connect();
   test_bad_key_never_mutates_routes();
   test_cancel_during_key_probe_never_mutates_routes();
   test_cancel_before_and_after_pin();
+  test_launch_failure_keeps_win32();
   test_job_assignment_is_mandatory();
   test_tun_job_failure_restores_pin();
   test_engine_death_and_probe_failure();
@@ -552,6 +751,7 @@ int main() {
   test_idle_watchdog_ignores_stale_cancel();
   test_graceful_stop_skips_kill();
   test_ledger_roundtrip();
+  test_user_proof_refusal_restores_capture();
   test_resolve_and_route_table_failures();
   if (g_failed != 0) {
     std::cerr << g_failed << " failed\n";

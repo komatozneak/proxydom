@@ -15,6 +15,11 @@ class Win32RouteTable : public RouteTable {
   bool routes_absent(std::uint64_t luid) override;
   bool list_own_adapters(std::vector<OwnedAdapter>& out) override;
   bool remove_adapter(const OwnedAdapter& adapter) override;
+  bool find_own_adapter(OwnedAdapter& adapter) override;
+  bool install_capture(const OwnedAdapter& adapter, std::vector<OwnedRoute>& routes) override;
+  bool add_canary(const OwnedAdapter& adapter, const std::string& ip, OwnedRoute& route) override;
+  bool delete_canary(const OwnedRoute& route) override;
+  bool fetch_canary(const std::string& ip, const std::function<bool()>& cancelled) override;
   bool tun_ready(OwnedAdapter& adapter, std::vector<OwnedRoute>& halves) override;
   bool prove_exit(unsigned long if_index,
                   const std::string& probe_ip,
@@ -22,6 +27,8 @@ class Win32RouteTable : public RouteTable {
   unsigned long last_error() const override { return last_error_; }
 
  private:
+  bool add_on_link(int family, const OwnedAdapter& adapter, const char* destination, int prefix,
+                   OwnedRoute& route);
   unsigned long last_error_ = 0;
 };
 
@@ -37,7 +44,9 @@ class Win32ConnectivityProbe : public ConnectivityProbe {
                    const std::string& target_ip,
                    const std::function<bool()>& cancelled) override;
   unsigned long last_error() const override { return last_error_; }
+  const char* failure_stage() const override { return stage_; }
 
  private:
   unsigned long last_error_ = 0;
+  const char* stage_ = "";
 };

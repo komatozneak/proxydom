@@ -111,6 +111,7 @@
         CloseMessage="yes"
         EndSessionMessage="yes"
         RebootPrompt="no"
+        Timeout="5000"
         TerminateProcess="1" />
 
     <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
@@ -130,6 +131,12 @@
         Impersonate="yes"
         Return="asyncNoWait" />
     <CustomAction
+        Id="StopBrokerBeforeValidate"
+        Directory="System64Folder"
+        ExeCommand="&quot;[System64Folder]sc.exe&quot; stop ProxyDomBroker"
+        Execute="immediate"
+        Return="ignore" />
+    <CustomAction
         Id="ReconcileProxyDomTunnel"
         FileRef="ServiceExe"
         ExeCommand="--reconcile"
@@ -137,6 +144,10 @@
         Impersonate="no"
         Return="check" />
     <InstallExecuteSequence>
+      <Custom
+          Action="StopBrokerBeforeValidate"
+          Before="InstallValidate"
+          Condition="Installed AND (REMOVE=&quot;ALL&quot; OR UPGRADINGPRODUCTCODE OR WIX_UPGRADE_DETECTED)" />
       <Custom
           Action="ReconcileProxyDomTunnel"
           Before="StopServices"

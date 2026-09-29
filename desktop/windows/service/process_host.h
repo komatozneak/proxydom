@@ -18,10 +18,14 @@ class Win32Engine : public EngineHost {
   void release() override;
   void stop_owned_processes() override;
   unsigned long last_error() const override;
+  const char* start_stage() const override;
+  unsigned long exit_code() const override;
+  std::string output_tail() const override;
 
  private:
   struct Impl;
   Impl* impl_;
+  void drain_output() const;
 };
 
 class Win32Sleeper : public Sleeper {

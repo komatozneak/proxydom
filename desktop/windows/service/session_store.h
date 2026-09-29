@@ -16,6 +16,10 @@ class Win32SessionFiles : public SessionFiles {
   bool config_present() override;
   std::string legacy_pin() override;
   void clear_legacy_pin() override;
+  unsigned long last_error() const override { return last_error_; }
+
+ private:
+  unsigned long last_error_ = 0;
 };
 
 class Win32TunnelLog : public TunnelLog {

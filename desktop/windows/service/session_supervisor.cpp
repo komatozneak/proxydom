@@ -1,5 +1,6 @@
 #include "session_supervisor.h"
 
+#include "log_sanitizer.h"
 #include "protocol.h"
 
 #include <algorithm>
@@ -82,6 +83,16 @@ const char* code_name(TunnelCode code) {
       return "tun_not_ready";
     case TunnelCode::EgressFailed:
       return "egress_failed";
+    case TunnelCode::CoreExited:
+      return "core_exited";
+    case TunnelCode::TunInitTimeout:
+      return "tun_init_timeout";
+    case TunnelCode::EgressTimeout:
+      return "egress_timeout";
+    case TunnelCode::AuthRejected:
+      return "auth_rejected";
+    case TunnelCode::InvalidProfile:
+      return "invalid_profile";
     case TunnelCode::CleanupFailed:
       return "cleanup_failed";
     case TunnelCode::Busy:
@@ -99,19 +110,29 @@ std::string user_message(TunnelCode code, const std::string& extra) {
     case TunnelCode::ResolveFailed:
       return "Не удалось определить адрес сервера";
     case TunnelCode::ForeignTunnel:
-      return extra.empty() ? "Уже включён другой туннель" : "Уже включён другой туннель: " + extra;
+      return "Обнаружен активный туннель";
     case TunnelCode::RouteFailed:
-      return "Не удалось подготовить маршрут к серверу";
+      return "Сбой сетевого стека";
     case TunnelCode::CoreStartFailed:
-      return "Не удалось запустить локальный туннель";
+      return "Сбой локальной службы туннеля";
+    case TunnelCode::CoreExited:
+      return "Сбой локальной службы туннеля";
+    case TunnelCode::TunInitTimeout:
+      return "Сбой сетевого адаптера туннеля";
+    case TunnelCode::EgressTimeout:
+      return "Узел недоступен";
+    case TunnelCode::AuthRejected:
+      return "Ключ не принят сервером";
+    case TunnelCode::InvalidProfile:
+      return "Неверный порт сервера";
     case TunnelCode::KeyProbeFailed:
-      return "Ключ не прошёл проверку: сервер или авторизация недоступны";
+      return "Ключ не принят сервером или узел недоступен";
     case TunnelCode::TunNotReady:
-      return "Локальный туннель не поднялся";
+      return "Виртуальный адаптер недоступен";
     case TunnelCode::EgressFailed:
-      return "Сервер не отвечает: выход через туннель не подтверждён";
+      return "Связь через выбранную строку не подтверждена";
     case TunnelCode::CleanupFailed:
-      return "Сеть не восстановлена. Повторите отключение";
+      return "Ошибка восстановления сети. Перезапустите службу";
     case TunnelCode::Busy:
       return "Подключение уже идёт";
     case TunnelCode::Protocol:
@@ -270,6 +291,32 @@ void TunnelSupervisor::set_observer(std::function<void(const TunnelSnapshot&)> o
 }
 
 void TunnelSupervisor::set_hook(std::function<void(ConnectStep)> hook) { hook_ = std::move(hook); }
+
+void TunnelSupervisor::set_ready_observer(std::function<void(std::int64_t)> observer) {
+  ready_observer_ = std::move(observer);
+}
+
+void TunnelSupervisor::note_user_proof(bool ok, std::int64_t generation) {
+  std::lock_guard<std::mutex> lock(ledger_mu_);
+  if (generation == 0 || generation != ledger_.generation) return;
+  proof_generation_ = generation;
+  proof_result_ = ok ? 1 : -1;
+}
+
+void TunnelSupervisor::accept_user_proof_for_tests(bool enabled) { test_user_proof_ = enabled; }
+
+bool TunnelSupervisor::wait_user_proof(std::int64_t generation, CancelFlag& cancel) {
+  for (int i = 0; i < 150; ++i) {
+    if (cancel.requested()) return false;
+    {
+      std::lock_guard<std::mutex> lock(ledger_mu_);
+      if (proof_generation_ == generation && proof_result_ == 1) return true;
+      if (proof_generation_ == generation && proof_result_ == -1) return false;
+    }
+    sleeper_.sleep_ms(100);
+  }
+  return false;
+}
 
 void TunnelSupervisor::remember(const std::function<void()>& change) {
   std::lock_guard<std::mutex> lock(ledger_mu_);
@@ -449,133 +496,190 @@ BeginResult TunnelSupervisor::begin_connect() {
   return result;
 }
 
+void TunnelSupervisor::gate(const char* step, const char* outcome) {
+  std::string code = step == nullptr ? std::string{} : step;
+  if (outcome != nullptr && outcome[0] != '\0') {
+    code.push_back('=');
+    code += outcome;
+  }
+  log_.write(ledger_.generation, "gate", code, 0);
+}
+
 TunnelSnapshot TunnelSupervisor::run_connect(const ConnectRequest& request, CancelFlag& cancel) {
   if (ledger_.phase != TunnelPhase::Connecting) return snapshot();
   publish(TunnelCode::None, {}, false);
   if (stop_requested(ConnectStep::Start, cancel)) return finish(TunnelCode::None, {}, true);
 
+  gate("foreign_tunnel", nullptr);
   std::vector<RouteView> defaults;
   if (!routes_.list_defaults(defaults)) return finish(TunnelCode::RouteFailed, {}, false);
   const std::string foreign = active_foreign_tunnel(defaults);
   if (!foreign.empty()) {
-    return finish(TunnelCode::ForeignTunnel, user_message(TunnelCode::ForeignTunnel, foreign), false);
+    log_.write(ledger_.generation, "foreign_adapter", foreign, 0);
+    return finish(TunnelCode::ForeignTunnel, user_message(TunnelCode::ForeignTunnel, {}), false);
   }
+  gate("foreign_tunnel", "ok");
 
+  gate("resolve", nullptr);
   ShareLine line;
   std::string error;
   std::string server_ip;
   std::string probe_ip;
   try {
-    if (!parse_share_line(request.uri, line, error) || !names_.resolve_ipv4(line.host, server_ip)) {
+    if (!parse_share_line(request.uri, line, error)) {
+      if (error == "port") {
+        std::string value = line.server_ports;
+        if (value.size() > 32) value.resize(32);
+        if (value.find('@') != std::string::npos) value = "port";
+        log_.write(ledger_.generation, "profile_parse_failed", value, 0);
+        return finish(TunnelCode::InvalidProfile, {}, false);
+      }
+      return finish(TunnelCode::ResolveFailed, {}, false);
+    }
+    if (!names_.resolve_ipv4(line.host, server_ip)) {
       return finish(TunnelCode::ResolveFailed, {}, false);
     }
   } catch (...) {
     return finish(TunnelCode::ResolveFailed, {}, false);
   }
+  gate("resolve", "ok");
   if (stop_requested(ConnectStep::Resolved, cancel)) return finish(TunnelCode::None, {}, true);
 
-  unsigned short probe_port = 0;
-  if (!probe_.pick_loopback_port(probe_port)) {
-    return finish(TunnelCode::KeyProbeFailed, {}, false);
-  }
-  const std::string probe_config = build_singbox_probe_config(line, server_ip, probe_port);
-  if (probe_config.empty() || !files_.write_config(probe_config)) {
+  gate("core", nullptr);
+  const std::string config = build_singbox_config(line, server_ip, request.direct_domains);
+  if (config.empty() || !files_.write_config(config)) {
+    const unsigned long win32 = config.empty() ? 13u : files_.last_error();
+    log_.write(ledger_.generation, "core_config_failed", "", win32);
     return finish(TunnelCode::CoreStartFailed, {}, false);
   }
   remember([&] { ledger_.config_written = true; });
-  if (stop_requested(ConnectStep::ProbeConfigWritten, cancel)) {
-    return finish(TunnelCode::None, {}, true);
-  }
-
-  unsigned long pid = 0;
-  if (!engine_.launch_suspended(pid)) return finish(TunnelCode::CoreStartFailed, {}, false);
-  remember([&] { ledger_.pid = pid; });
-  if (!engine_.assign_job()) {
-    engine_.kill();
-    engine_.release();
-    remember([&] { ledger_.pid = 0; });
-    return finish(TunnelCode::CoreStartFailed, {}, false);
-  }
-  if (!engine_.resume()) return finish(TunnelCode::CoreStartFailed, {}, false);
-  if (stop_requested(ConnectStep::ProbeLaunched, cancel)) {
-    return finish(TunnelCode::None, {}, true);
-  }
-
-  if (!names_.resolve_ipv4("cp.cloudflare.com", probe_ip)) {
-    return finish(TunnelCode::ResolveFailed, {}, false);
-  }
-  const bool key_ok =
-      probe_.prove_socks(probe_port, probe_ip, [&] { return cancel.requested(); });
-  if (cancel.requested()) return finish(TunnelCode::None, {}, true);
-  if (!key_ok || !stop_engine_only()) {
-    return finish(TunnelCode::KeyProbeFailed, {}, false);
-  }
-  if (stop_requested(ConnectStep::ProbePassed, cancel)) {
-    return finish(TunnelCode::None, {}, true);
-  }
-
-  // The no-route probe can take several seconds. Re-check the competing-tunnel
-  // gate immediately before the first system route mutation.
-  if (!routes_.list_defaults(defaults)) return finish(TunnelCode::RouteFailed, {}, false);
-  const std::string foreign_again = active_foreign_tunnel(defaults);
-  if (!foreign_again.empty()) {
-    return finish(TunnelCode::ForeignTunnel, user_message(TunnelCode::ForeignTunnel, foreign_again), false);
-  }
-
-  PinPlan pin;
-  if (!routes_.plan_hardware_pin(server_ip, pin)) return finish(TunnelCode::RouteFailed, {}, false);
-  remember([&] {
-    ledger_.pin_intended = true;
-    ledger_.pin = pin;
-  });
-  if (!routes_.add_pin(ledger_.pin)) return finish(TunnelCode::RouteFailed, {}, false);
-  if (stop_requested(ConnectStep::Pinned, cancel)) return finish(TunnelCode::None, {}, true);
-
-  if (!names_.resolve_ipv4("cp.cloudflare.com", probe_ip)) return finish(TunnelCode::ResolveFailed, {}, false);
-  const std::string config = build_singbox_config(line, server_ip, request.direct_domains);
-  if (config.empty() || !files_.write_config(config)) return finish(TunnelCode::CoreStartFailed, {}, false);
   if (stop_requested(ConnectStep::ConfigWritten, cancel)) return finish(TunnelCode::None, {}, true);
 
-  pid = 0;
-  if (!engine_.launch_suspended(pid)) return finish(TunnelCode::CoreStartFailed, {}, false);
+  auto log_start_failure = [&](const char* fallback) {
+    const char* stage = engine_.start_stage();
+    if (stage == nullptr || stage[0] == '\0') stage = fallback;
+    log_.write(ledger_.generation, stage, "", engine_.last_error());
+  };
+
+  unsigned long pid = 0;
+  if (!engine_.launch_suspended(pid)) {
+    log_start_failure("core_create_process_failed");
+    return finish(TunnelCode::CoreStartFailed, {}, false);
+  }
   remember([&] { ledger_.pid = pid; });
   if (stop_requested(ConnectStep::Launched, cancel)) return finish(TunnelCode::None, {}, true);
-
   if (!engine_.assign_job()) {
+    log_start_failure("core_job_assign_failed");
     engine_.kill();
     engine_.release();
     remember([&] { ledger_.pid = 0; });
     return finish(TunnelCode::CoreStartFailed, {}, false);
   }
   if (stop_requested(ConnectStep::JobAssigned, cancel)) return finish(TunnelCode::None, {}, true);
-  if (!engine_.resume()) return finish(TunnelCode::CoreStartFailed, {}, false);
+  if (!engine_.resume()) {
+    log_start_failure("core_resume_failed");
+    return finish(TunnelCode::CoreStartFailed, {}, false);
+  }
   if (stop_requested(ConnectStep::Resumed, cancel)) return finish(TunnelCode::None, {}, true);
 
   OwnedAdapter adapter;
-  std::vector<OwnedRoute> halves;
-  bool ready = false;
+  bool found = false;
   for (int i = 0; i < 50; ++i) {
     if (cancel.requested()) return finish(TunnelCode::None, {}, true);
-    if (!engine_.alive()) return finish(TunnelCode::TunNotReady, {}, false);
-    if (routes_.tun_ready(adapter, halves)) {
-      ready = true;
+    if (!engine_.alive()) {
+      const std::string stderr_text = sanitize_engine_output(engine_.output_tail());
+      log_.write(ledger_.generation, "core_exited", stderr_text, engine_.exit_code());
+      return finish(TunnelCode::CoreExited, {}, false);
+    }
+    if (routes_.find_own_adapter(adapter)) {
+      found = true;
       break;
     }
     sleeper_.sleep_ms(100);
   }
-  if (!ready) return finish(TunnelCode::TunNotReady, {}, false);
+  if (!found) {
+    log_.write(ledger_.generation, "tun_init_timeout", "ProxyDomTun", 0);
+    return finish(TunnelCode::TunInitTimeout, {}, false);
+  }
+  gate("core", "ok");
   remember([&] {
     ledger_.adapter_known = true;
     ledger_.adapter = adapter;
-    ledger_.routes = halves;
   });
-  if (stop_requested(ConnectStep::TunReady, cancel)) return finish(TunnelCode::None, {}, true);
 
-  const unsigned long if_index = adapter.if_index;
-  const bool proved = routes_.prove_exit(if_index, probe_ip, [&] { return cancel.requested(); });
+  // The adapter wait can take a few seconds. Re-check before the first route write.
+  gate("foreign_tunnel", nullptr);
+  if (!routes_.list_defaults(defaults)) {
+    log_.write(ledger_.generation, "routes", "pin_failed", routes_.last_error());
+    return finish(TunnelCode::RouteFailed, {}, false);
+  }
+  const std::string foreign_again = active_foreign_tunnel(defaults);
+  if (!foreign_again.empty()) {
+    log_.write(ledger_.generation, "foreign_adapter", foreign_again, 0);
+    return finish(TunnelCode::ForeignTunnel, user_message(TunnelCode::ForeignTunnel, {}), false);
+  }
+  gate("foreign_tunnel", "ok");
+
+  gate("routes", nullptr);
+  PinPlan pin;
+  if (!routes_.plan_hardware_pin(server_ip, pin)) {
+    log_.write(ledger_.generation, "routes", "pin_failed", routes_.last_error());
+    return finish(TunnelCode::RouteFailed, {}, false);
+  }
+  remember([&] {
+    ledger_.pin_intended = true;
+    ledger_.pin = pin;
+  });
+  if (!routes_.add_pin(ledger_.pin)) {
+    log_.write(ledger_.generation, "routes", "pin_failed", routes_.last_error());
+    return finish(TunnelCode::RouteFailed, {}, false);
+  }
+  if (stop_requested(ConnectStep::Pinned, cancel)) return finish(TunnelCode::None, {}, true);
+
+  gate("resolve", nullptr);
+  if (!names_.resolve_ipv4("cp.cloudflare.com", probe_ip)) return finish(TunnelCode::ResolveFailed, {}, false);
+  gate("resolve", "ok");
+  OwnedRoute canary;
+  if (!routes_.add_canary(adapter, probe_ip, canary)) {
+    log_.write(ledger_.generation, "routes", "canary_failed", routes_.last_error());
+    return finish(TunnelCode::RouteFailed, {}, false);
+  }
+  remember([&] { ledger_.routes = {canary}; });
+
+  gate("egress", nullptr);
+  const bool canary_ok = routes_.fetch_canary(probe_ip, [&] { return cancel.requested(); });
   if (cancel.requested()) return finish(TunnelCode::None, {}, true);
-  if (!proved) return finish(TunnelCode::EgressFailed, {}, false);
-  if (stop_requested(ConnectStep::Proven, cancel)) return finish(TunnelCode::None, {}, true);
+  if (!canary_ok) {
+    const std::string stderr_text = engine_.output_tail();
+    if (engine_reported_auth_failure(stderr_text)) {
+      log_.write(ledger_.generation, "egress", "auth_rejected", 0);
+      return finish(TunnelCode::AuthRejected, {}, false);
+    }
+    log_.write(ledger_.generation, "egress", "timeout", 3500);
+    return finish(TunnelCode::EgressTimeout, {}, false);
+  }
+  gate("egress", "ok");
+  if (!routes_.delete_canary(canary)) {
+    log_.write(ledger_.generation, "routes", "canary_failed", routes_.last_error());
+    return finish(TunnelCode::RouteFailed, {}, false);
+  }
+  remember([&] { ledger_.routes.clear(); });
+
+  std::vector<OwnedRoute> capture;
+  if (!routes_.install_capture(adapter, capture)) {
+    log_.write(ledger_.generation, "routes", "capture_failed", routes_.last_error());
+    return finish(TunnelCode::RouteFailed, "Сбой применения маршрутов", false);
+  }
+  remember([&] { ledger_.routes = capture; });
+  OwnedAdapter seen;
+  std::vector<OwnedRoute> halves;
+  if (!routes_.tun_ready(seen, halves)) {
+    log_.write(ledger_.generation, "tun_init_timeout", "ProxyDomTun", 0);
+    return finish(TunnelCode::TunInitTimeout, {}, false);
+  }
+  log_.write(ledger_.generation, "routes", "capture_installed", static_cast<unsigned long>(capture.size()));
+  gate("routes", "ok");
+  if (stop_requested(ConnectStep::TunReady, cancel)) return finish(TunnelCode::None, {}, true);
 
   {
     std::lock_guard<std::mutex> lock(ledger_mu_);
