@@ -27,7 +27,7 @@ if (WIN32)
   target_compile_options(ProxyDomCtl PRIVATE /utf-8)
 
   add_executable(controller_test controller_test.cpp protocol.cpp)
-  target_link_libraries(controller_test PRIVATE advapi32)
+  target_link_libraries(controller_test PRIVATE advapi32 ws2_32)
   target_compile_definitions(controller_test PRIVATE UNICODE _UNICODE)
   target_compile_options(controller_test PRIVATE /utf-8)
 

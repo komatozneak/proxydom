@@ -16,6 +16,16 @@ $Payload = Join-Path $Installer "payload"
 $OutDir = Join-Path $Installer "out"
 $FlutterRelease = Join-Path $Mobile "build\windows\x64\runner\Release"
 
+function Find-Cmake {
+    $cmd = Get-Command cmake -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
+    $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+    $root = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+    $bundled = Join-Path $root "Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe"
+    if (Test-Path $bundled) { return $bundled }
+    throw "cmake was not found. Install the Visual Studio CMake component."
+}
+
 function Find-VcVars {
     $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
     if (-not (Test-Path $vswhere)) { throw "Visual Studio Build Tools not found." }
@@ -62,19 +72,16 @@ function Ensure-ThirdParty {
 
 Write-Host "Building ProxyDomBroker and ProxyDomCtl"
 $vcvars = Find-VcVars
+$cmake = Find-Cmake
 New-Item -ItemType Directory -Force -Path $Payload | Out-Null
-$brokerOut = Join-Path $Payload "ProxyDomBroker.exe"
-$controllerOut = Join-Path $Payload "ProxyDomCtl.exe"
-Push-Location $Service
-try {
-    cmd /c "call `"$vcvars`" >nul && cl /nologo /std:c++17 /EHsc /W3 /utf-8 /DUNICODE /D_UNICODE /Fe:`"$brokerOut`" service.cpp protocol.cpp session_supervisor.cpp network_owner.cpp process_host.cpp session_store.cpp log_sanitizer.cpp /link /SUBSYSTEM:WINDOWS ws2_32.lib iphlpapi.lib setupapi.lib advapi32.lib shell32.lib"
-    if ($LASTEXITCODE -ne 0) { throw "Broker compile failed." }
-    cmd /c "call `"$vcvars`" >nul && cl /nologo /std:c++17 /EHsc /W3 /utf-8 /DUNICODE /D_UNICODE /Fe:`"$controllerOut`" controller.cpp protocol.cpp /link advapi32.lib ws2_32.lib"
-    if ($LASTEXITCODE -ne 0) { throw "Controller compile failed." }
-} finally {
-    Pop-Location
-}
-Get-ChildItem $Service -Include *.obj,*.pdb -File | Remove-Item -Force
+$build = Join-Path $Service "build"
+# Same CMake invocation as Windows Service CI. The file list lives in CMakeLists.txt.
+cmd /c "call `"$vcvars`" >nul && `"$cmake`" -S `"$Service`" -B `"$build`" && `"$cmake`" --build `"$build`" --config Release --target ProxyDomBroker ProxyDomCtl"
+if ($LASTEXITCODE -ne 0) { throw "CMake build failed." }
+$bin = Join-Path $build "Release"
+if (-not (Test-Path (Join-Path $bin "ProxyDomBroker.exe"))) { $bin = $build }
+Copy-Item (Join-Path $bin "ProxyDomBroker.exe") (Join-Path $Payload "ProxyDomBroker.exe") -Force
+Copy-Item (Join-Path $bin "ProxyDomCtl.exe") (Join-Path $Payload "ProxyDomCtl.exe") -Force
 
 if (-not (Test-Path (Join-Path $FlutterRelease "proxy_dom.exe"))) {
     Write-Host "Building Flutter window"
