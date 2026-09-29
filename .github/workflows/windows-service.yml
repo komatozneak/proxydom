@@ -42,13 +42,12 @@ jobs:
         shell: pwsh
         working-directory: desktop/windows/service
         run: |
-          # PowerShell 7 splits "start= demand" and sc.exe then rejects the field.
-          $PSNativeCommandArgumentPassing = "Legacy"
+          # sc.exe requires a space after "=". PowerShell 7 splits that argument.
           $broker = (Resolve-Path ".\ProxyDomBroker.exe").Path
           try {
-            & sc.exe create ProxyDomBroker "binPath= `"$broker`"" "start= demand"
+            cmd.exe /c "sc.exe create ProxyDomBroker binPath= `"$broker`" start= demand"
             if ($LASTEXITCODE -ne 0) { throw "Service create failed." }
-            & sc.exe start ProxyDomBroker
+            cmd.exe /c "sc.exe start ProxyDomBroker"
             if ($LASTEXITCODE -ne 0) { throw "Service start failed." }
             $json = & .\ProxyDomCtl.exe status
             if ($LASTEXITCODE -ne 0) { throw "Controller could not reach broker." }
