@@ -1,10 +1,7 @@
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:teremok_connect/features/settings/data/auto_reconnect_prefs.dart';
 import 'package:teremok_connect/features/vpn/data/vpn_controller.dart';
 
 void main() {
@@ -108,17 +105,6 @@ void main() {
       });
       expect(await VpnController.instance.openVpnSettings(), isFalse);
     });
-  });
-
-  test('AutoReconnectPrefs remains independent storage', () async {
-    SharedPreferences.setMockInitialValues({});
-    debugDefaultTargetPlatformOverride = TargetPlatform.android;
-    addTearDown(() => debugDefaultTargetPlatformOverride = null);
-    expect(await AutoReconnectPrefs.isEnabled(), isFalse);
-    await AutoReconnectPrefs.setEnabled(false);
-    expect(await AutoReconnectPrefs.isEnabled(), isFalse);
-    await AutoReconnectPrefs.setEnabled(true);
-    expect(await AutoReconnectPrefs.isEnabled(), isFalse);
   });
 
   test('Settings does not ship a kill-switch tile (ADR 020)', () {

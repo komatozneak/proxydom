@@ -9,7 +9,8 @@ enum TeremokVpnShared {
   static let statusKey = "vpn.status"
   static let lastErrorKey = "vpn.lastError"
   /// User wanted VPN on (parity with Android KEY_ACTIVE). Survives NEVPN idle
-  /// so Flutter can auto-reconnect after iOS tears the tunnel down.
+  /// so the Runner can tell an OS-torn tunnel from a user stop; the restore
+  /// itself belongs to the Packet Tunnel, not to Flutter (ADR 020).
   static let sessionActiveKey = "vpn.sessionActive"
   /// Bumped by Runner on each start so a late `stopTunnel` cannot wipe
   /// status / lastError from a newer connect (YouTube hot-switch race).

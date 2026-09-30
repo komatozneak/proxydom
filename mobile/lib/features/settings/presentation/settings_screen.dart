@@ -16,7 +16,6 @@ import '../../../core/widgets/teremok_snackbar.dart';
 import '../../../l10n/app_localizations.dart';
 import '../application/locale_provider.dart';
 import '../application/theme_mode_provider.dart';
-import '../data/auto_reconnect_prefs.dart';
 import '../data/vpn_notification_prefs.dart';
 import '../data/qs_tile_prefs.dart';
 
@@ -31,8 +30,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool? _notifEnabled;
   bool _notifLoading = false;
   bool _qsAdding = false;
-  bool? _autoReconnect;
-  bool _autoReconnectLoading = false;
   String _versionLabel = '';
   TunnelLogLevel _logLevel = TunnelLogLevel.info;
 
@@ -47,9 +44,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _loadVersion(),
       _loadLogLevel(),
     ];
-    if (!hideInAppPlategaCheckout) {
-      futures.add(_loadAutoReconnect());
-    }
     if (VpnNotificationPrefs.isSupported) {
       futures.add(_loadNotif());
     }
@@ -70,12 +64,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final enabled = await VpnNotificationPrefs.isEnabled();
     if (!mounted) return;
     setState(() => _notifEnabled = enabled);
-  }
-
-  Future<void> _loadAutoReconnect() async {
-    final enabled = await AutoReconnectPrefs.isEnabled();
-    if (!mounted) return;
-    setState(() => _autoReconnect = enabled);
   }
 
   Future<void> _onNotifChanged(bool value) async {
@@ -104,17 +92,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _ => l.settingsQsTileManual,
     };
     showTeremokSnackBar(context, message);
-  }
-
-  Future<void> _onAutoReconnectChanged(bool value) async {
-    setState(() {
-      _autoReconnectLoading = true;
-      _autoReconnect = value;
-    });
-    await AutoReconnectPrefs.setEnabled(value);
-    UiLog.action('settings', 'auto_reconnect', extra: {'on': value});
-    if (!mounted) return;
-    setState(() => _autoReconnectLoading = false);
   }
 
   Future<void> _loadLogLevel() async {
@@ -216,11 +193,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final l = AppL10n.of(context);
     final theme = Theme.of(context);
     final showNotif = VpnNotificationPrefs.isSupported;
-    final showAutoReconnect =
-        windowsDesktop || !hideInAppPlategaCheckout;
     final showNoVpn = androidPerAppSplit || windowsDesktop;
     final notifOn = _notifEnabled ?? true;
-    final autoOn = _autoReconnect ?? false;
     final themeMode =
         ref.watch(themeModeProvider).valueOrNull ?? ThemeMode.system;
     final locale = ref.watch(localeProvider).valueOrNull ??
@@ -243,10 +217,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             const SizedBox(height: 20),
             ..._settingsSections(
               l: l,
-              showAutoReconnect: showAutoReconnect,
               showNotif: showNotif,
               showNoVpn: showNoVpn,
-              autoOn: autoOn,
               notifOn: notifOn,
               localeLabel: localeLabel,
               themeMode: themeMode,
@@ -268,10 +240,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   List<Widget> _settingsSections({
     required AppL10n l,
-    required bool showAutoReconnect,
     required bool showNotif,
     required bool showNoVpn,
-    required bool autoOn,
     required bool notifOn,
     required String localeLabel,
     required ThemeMode themeMode,
@@ -304,18 +274,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               if (mounted) await _loadLogLevel();
             },
           ),
-          if (showAutoReconnect)
-            _SettingsRow(
-              icon: AppIcons.refresh,
-              title: l.settingsAutoReconnect,
-              subtitle: l.settingsAutoReconnectHint,
-              trailing: Switch(
-                value: autoOn,
-                onChanged: _autoReconnectLoading || _autoReconnect == null
-                    ? null
-                    : _onAutoReconnectChanged,
-              ),
-            ),
           if (showNotif)
             _SettingsRow(
               icon: AppIcons.notifications,

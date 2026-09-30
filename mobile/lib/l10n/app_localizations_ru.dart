@@ -439,12 +439,6 @@ class AppL10nRu extends AppL10n {
       'Не удалось открыть настройки VPN. Откройте Настройки → VPN.';
 
   @override
-  String get settingsAutoReconnect => 'Авто-переподключение';
-
-  @override
-  String get settingsAutoReconnectHint => 'Быстрое переподключение при обрыве';
-
-  @override
   String get settingsDevices => 'Устройства';
 
   @override

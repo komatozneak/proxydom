@@ -21,7 +21,6 @@ import '../../vpn/data/vpn_service_config.dart';
 import '../../vpn/data/vpn_session_meta.dart';
 import '../../vpn/data/vpn_session_snapshot.dart';
 import '../../vpn/domain/vpn_connect_error.dart';
-import '../../settings/data/auto_reconnect_prefs.dart';
 import '../../settings/data/split_tunnel_prefs.dart';
 import 'vpn_status.dart';
 import 'vpn_status_log.dart';
@@ -785,12 +784,11 @@ class VpnNotifier extends Notifier<VpnStatus> {
           return;
         }
         // Session marked active on disk but tunnel down (force-stop / OEM kill):
-        // honour Settings → Auto-reconnect. Never reconnect after intentional stop
-        // (native clears `active`).
+        // the platform engine owns the restore. Never reconnect after an
+        // intentional stop (native clears `active`).
         final sessionActive = await VpnController.instance.hasActiveSession();
-        final shouldReconnect = !_suppressAutoReconnect &&
-            sessionActive &&
-            await AutoReconnectPrefs.isEnabled();
+        final shouldReconnect =
+            !_suppressAutoReconnect && !nativeOwnsTunnelRecovery && sessionActive;
         if (shouldReconnect) {
           if (_connectInFlight != null || _autoReconnectArmed) {
             _vpnLog('[VPN] syncFromNative: auto-reconnect already in flight');
@@ -929,11 +927,11 @@ class VpnNotifier extends Notifier<VpnStatus> {
     _suppressAutoReconnect = false;
     if (windowsDesktop) {
       if (VpnController.instance.windowsNestLocked) return;
+      // Link loss recovery is not a setting: the Windows service drops the
+      // tunnel and never brings it back, so the app layer always re-dials.
       WindowsTunnel.instance.onLinkLost = () {
         if (_suppressAutoReconnect) return;
-        unawaited(AutoReconnectPrefs.isEnabled().then((enabled) {
-          if (enabled) unawaited(connect());
-        }));
+        unawaited(connect());
       };
     }
     if (!wifiRetry) {
@@ -1487,10 +1485,14 @@ class VpnNotifier extends Notifier<VpnStatus> {
     );
   }
 
-  /// Попытка автоматического переподключения через 5 сек (если включено в Settings).
+  /// Попытка автоматического переподключения через 5 сек.
+  ///
+  /// Recovery is unconditional where the app layer owns it: the Windows service
+  /// tears the tunnel down and never re-dials, Android / iOS restore on their
+  /// own, and a Flutter retry there would only race the native restore.
   void _scheduleReconnect() {
-    if (freeKeyClient) {
-      _vpnLog('[VPN] Flutter reconnect skipped; native owns free client');
+    if (nativeOwnsTunnelRecovery) {
+      _vpnLog('[VPN] Flutter reconnect skipped; native owns recovery');
       return;
     }
     if (_suppressAutoReconnect) {
@@ -1500,11 +1502,6 @@ class VpnNotifier extends Notifier<VpnStatus> {
     _reconnectTimer?.cancel();
     _reconnectTimer = Timer(const Duration(seconds: 5), () async {
       if (_suppressAutoReconnect) return;
-      final enabled = await AutoReconnectPrefs.isEnabled();
-      if (!enabled) {
-        _vpnLog('[VPN] auto-reconnect skipped (disabled in Settings)');
-        return;
-      }
       final sessionActive = await VpnController.instance.hasActiveSession();
       if (!sessionActive) {
         _vpnLog('[VPN] auto-reconnect skipped (session not active)');
@@ -1891,9 +1888,8 @@ class VpnNotifier extends Notifier<VpnStatus> {
   /// After unexpected native idle: if the user still wants VPN (sessionActive),
   /// start again. Intentional stop clears sessionActive on iOS/Android.
   Future<void> _reconnectIfSessionActive({required String reason}) async {
-    if (freeKeyClient) {
-      _vpnLog(
-          '[VPN] reconnect skipped; native owns free client reason=$reason');
+    if (nativeOwnsTunnelRecovery) {
+      _vpnLog('[VPN] reconnect skipped; native owns recovery reason=$reason');
       return;
     }
     if (_suppressAutoReconnect) return;
@@ -1908,10 +1904,6 @@ class VpnNotifier extends Notifier<VpnStatus> {
       if (state is! VpnConnected) {
         await _enterConnected(freshSession: false);
       }
-      return;
-    }
-    if (!await AutoReconnectPrefs.isEnabled()) {
-      _vpnLog('[VPN] reconnect skip disabled reason=$reason');
       return;
     }
     final sessionActive = await VpnController.instance.hasActiveSession();

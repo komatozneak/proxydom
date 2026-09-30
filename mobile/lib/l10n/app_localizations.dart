@@ -889,18 +889,6 @@ abstract class AppL10n {
   /// **'Couldn\'t open VPN settings. Open Settings → VPN.'**
   String get settingsKillSwitchOpenFailedIos;
 
-  /// No description provided for @settingsAutoReconnect.
-  ///
-  /// In en, this message translates to:
-  /// **'Auto-reconnect'**
-  String get settingsAutoReconnect;
-
-  /// No description provided for @settingsAutoReconnectHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Reconnect quickly if the tunnel drops'**
-  String get settingsAutoReconnectHint;
-
   /// No description provided for @settingsDevices.
   ///
   /// In en, this message translates to:

@@ -441,13 +441,6 @@ class AppL10nEn extends AppL10n {
       'Couldn\'t open VPN settings. Open Settings → VPN.';
 
   @override
-  String get settingsAutoReconnect => 'Auto-reconnect';
-
-  @override
-  String get settingsAutoReconnectHint =>
-      'Reconnect quickly if the tunnel drops';
-
-  @override
   String get settingsDevices => 'Devices';
 
   @override

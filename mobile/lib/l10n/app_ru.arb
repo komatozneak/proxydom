@@ -158,8 +158,6 @@
   "settingsKillSwitchOpenVpn": "Открыть настройки VPN",
   "settingsKillSwitchOpenFailed": "Не удалось открыть настройки VPN. Откройте Настройки → Сеть и интернет → VPN.",
   "settingsKillSwitchOpenFailedIos": "Не удалось открыть настройки VPN. Откройте Настройки → VPN.",
-  "settingsAutoReconnect": "Авто-переподключение",
-  "settingsAutoReconnectHint": "Быстрое переподключение при обрыве",
   "settingsDevices": "Устройства",
   "settingsDevicesHint": "Зарегистрированные установки и отзыв доступа",
   "devicesTitle": "Устройства",
