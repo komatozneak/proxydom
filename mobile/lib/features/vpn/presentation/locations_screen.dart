@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -708,23 +707,22 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
                     final index = filtered[i];
                     final link = _imported[index];
                     final selected = _selectedId == '$index';
-                    final iosBlocked = !kIsWeb &&
-                        defaultTargetPlatform == TargetPlatform.iOS &&
-                        !canDialScheme(link.scheme, ios: true);
+                    final schemeBlocked = !canDialScheme(link.scheme, ios: false);
                     return ImportedProfileCard(
                       name: link.name,
                       scheme: link.scheme,
                       endpoint: link.endpoint,
                       selected: selected,
                       connected: selected && connected,
+                      dialable: !schemeBlocked,
                       onDelete: () => _removeImported(index),
                       onTap: () async {
-                        if (iosBlocked) {
+                        if (schemeBlocked) {
                           UiLog.action(
                             'locations',
                             'pick',
                             result: 'blocked',
-                            reason: 'ios_scheme',
+                            reason: 'scheme',
                             extra: {'scheme': link.scheme},
                           );
                           return;

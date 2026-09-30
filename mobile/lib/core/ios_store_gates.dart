@@ -32,10 +32,11 @@ bool get windowsDesktop {
 /// Apps tab stays on Android. iOS and Windows show sites only.
 bool get sitesOnlySplit => iosAppsSplitUnsupported || windowsDesktop;
 
-/// Hysteria2 and VLESS. Trojan, Shadowsocks, and VMess stay out of Windows.
+/// Hysteria2 only (ADR 033). VLESS dial is parked; the Windows share
+/// path must not start a VLESS line.
 bool windowsDialScheme(String scheme) {
   final name = scheme.toLowerCase();
-  return name == 'hysteria2' || name == 'hy2' || name == 'vless';
+  return name == 'hysteria2' || name == 'hy2';
 }
 
 /// `teremokconnect://ref` landing. Free clients ignore the link.

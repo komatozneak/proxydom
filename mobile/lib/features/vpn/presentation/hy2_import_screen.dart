@@ -108,7 +108,16 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
           _loadingPreview = false;
           _preview = result.links;
           _previewTitle = result.title;
-          _error = result.links.isEmpty ? 'empty' : null;
+          _error = result.links.isEmpty
+              ? 'empty'
+              : switch (shareImportDial(
+                  result.links,
+                  fromDocument: true,
+                )) {
+                  ShareImportDial.noneHy2 => 'no_hy2',
+                  ShareImportDial.singleUnsupported => 'hy2_only',
+                  ShareImportDial.hasHy2 => null,
+                };
         });
       }).catchError((Object error) {
         if (!mounted || gen != _previewGen) return;
@@ -140,9 +149,18 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
     });
     try {
       final links = parseShareSubscription(text);
+      final dial = shareImportDial(links, fromDocument: false);
       setState(() {
         _preview = links;
-        _error = text.isEmpty || links.isNotEmpty ? null : 'empty';
+        _error = text.isEmpty
+            ? null
+            : links.isEmpty
+                ? 'empty'
+                : switch (dial) {
+                    ShareImportDial.singleUnsupported => 'hy2_only',
+                    ShareImportDial.noneHy2 => 'no_hy2',
+                    ShareImportDial.hasHy2 => null,
+                  };
       });
     } on FormatException {
       UiLog.action('import', 'preview', result: 'bad');
@@ -162,7 +180,7 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
   bool get _canSave =>
       !_busy &&
       !_loadingPreview &&
-      _error == null &&
+      (_error == null || _error == 'no_hy2') &&
       (_subscriptionUrl || _preview.isNotEmpty);
 
   Future<void> _save({required bool connect}) async {
@@ -185,7 +203,10 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
         if (!mounted) return;
         await _stopLiveTunnel(reason: 'import');
         if (!mounted) return;
-        context.go('/home');
+        final canStart = links.any(
+          (link) => canDialScheme(link.scheme, ios: false),
+        );
+        context.go(canStart ? '/home' : '/locations');
         return;
       }
       if (!mounted) return;
@@ -313,10 +334,14 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
                               : _error == 'missing'
                                   ? l.freeSubscriptionMissing
                                   : _error == 'device_limit'
-                                  ? l.freeSubscriptionDeviceLimit
-                                  : _error == 'client_refused'
-                                      ? l.freeSubscriptionClientRefused
-                                      : l.freeLinkInvalid,
+                                      ? l.freeSubscriptionDeviceLimit
+                                      : _error == 'client_refused'
+                                          ? l.freeSubscriptionClientRefused
+                                          : _error == 'hy2_only'
+                                              ? l.freeHy2OnlyAdd
+                                              : _error == 'no_hy2'
+                                                  ? l.freeNoHy2Lines
+                                                  : l.freeLinkInvalid,
                           style: TextStyle(color: theme.colorScheme.error),
                         ),
                       ],
@@ -340,7 +365,9 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
                         ),
                       if (_loadingPreview)
                         const SizedBox.shrink()
-                      else if (_error != null)
+                      else if (_error != null &&
+                          _error != 'no_hy2' &&
+                          _error != 'hy2_only')
                         const SizedBox.shrink()
                       else if (_preview.isEmpty)
                         const FreeClientEmptyState(compact: true)
@@ -350,13 +377,19 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
                           Builder(
                             builder: (context) {
                               final label = labelForShareLink(_preview[i]);
+                              final dialable = canDialScheme(
+                                _preview[i].scheme,
+                                ios: false,
+                              );
                               return ListTile(
                                 leading: PoolServerMark(label: label),
                                 title: Text(label.title),
                                 subtitle: Text(
-                                  label.subtitle.isEmpty
-                                      ? _preview[i].endpoint
-                                      : label.subtitle,
+                                  dialable
+                                      ? (label.subtitle.isEmpty
+                                          ? _preview[i].endpoint
+                                          : label.subtitle)
+                                      : l.freeSchemeParked,
                                 ),
                               );
                             },

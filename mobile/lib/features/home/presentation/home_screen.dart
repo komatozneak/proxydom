@@ -780,8 +780,9 @@ class _FreeClientHome extends StatelessWidget {
         homeVpnPermissionHintForPlatform(l),
       VpnError(:final code) when code == kVpnPathIncompatibleErrorCode =>
         l.homePathIncompatibleHint,
-      VpnError(:final code) when code == 'share_ios_hy2_only' =>
-        l.freeIosHy2Only,
+      VpnError(:final code) when code == 'share_ios_hy2_only' ||
+              code == 'share_unsupported' =>
+        l.freeSchemeParked,
       VpnError(:final code) when code == 'device_limit' =>
         l.freeSubscriptionDeviceLimit,
       VpnError(:final code) when code == 'client_refused' =>

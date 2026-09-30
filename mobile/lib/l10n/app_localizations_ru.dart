@@ -1771,6 +1771,9 @@ class AppL10nRu extends AppL10n {
   String get freeSharePool => 'Поделиться';
 
   @override
+  String get freeShareCopied => 'Ключ скопирован';
+
+  @override
   String get freeShareFail => 'Не удалось создать ссылку';
 
   @override
@@ -1817,7 +1820,19 @@ class AppL10nRu extends AppL10n {
   String get freePoolMarked => 'Особые';
 
   @override
-  String get freeIosHy2Only => 'На iPhone запускается только Hysteria2';
+  String get freeIosHy2Only =>
+      'Подключение недоступно (протокол не поддерживается клиентом).';
+
+  @override
+  String get freeHy2OnlyAdd =>
+      'Не удалось добавить узел: поддерживается только протокол Hysteria2.';
+
+  @override
+  String get freeNoHy2Lines => 'В источнике нет доступных линий Hysteria2.';
+
+  @override
+  String get freeSchemeParked =>
+      'Подключение недоступно (протокол не поддерживается клиентом).';
 
   @override
   String get freePoolGeneral => 'Общего назначения';

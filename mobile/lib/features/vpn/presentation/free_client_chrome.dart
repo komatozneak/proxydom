@@ -1,11 +1,11 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../l10n/app_localizations.dart';
 
-/// Paste and QR, the same size on Home, Servers, and Add.
+/// Paste, and on the phone a matching QR. Windows has no camera and no QR.
 class FreeClientActionBar extends StatelessWidget {
   const FreeClientActionBar({
     super.key,
@@ -24,20 +24,22 @@ class FreeClientActionBar extends StatelessWidget {
     );
     const pad = EdgeInsets.symmetric(horizontal: 12, vertical: 14);
     const barHeight = 52.0;
+    final paste = _action(
+      onPressed: onPaste,
+      icon: AppIcons.clipboard,
+      label: l.freePaste,
+      background: AppBrand.secondary,
+      foreground: AppBrand.surfaceElevatedLight,
+      shape: shape,
+      pad: pad,
+      height: barHeight,
+    );
+    if (windowsDesktop) {
+      return SizedBox(height: barHeight, width: double.infinity, child: paste);
+    }
     return Row(
       children: [
-        Expanded(
-          child: _action(
-            onPressed: onPaste,
-            icon: AppIcons.clipboard,
-            label: l.freePaste,
-            background: AppBrand.secondary,
-            foreground: AppBrand.surfaceElevatedLight,
-            shape: shape,
-            pad: pad,
-            height: barHeight,
-          ),
-        ),
+        Expanded(child: paste),
         const SizedBox(width: 8),
         Expanded(
           child: _action(
@@ -117,7 +119,7 @@ class FreeClientEmptyState extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          l.freeEmptyBody,
+          windowsDesktop ? l.freeAddHint : l.freeEmptyBody,
           textAlign: TextAlign.center,
           style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
@@ -339,6 +341,7 @@ class ImportedProfileCard extends StatelessWidget {
     required this.endpoint,
     required this.selected,
     this.connected = false,
+    this.dialable = true,
     this.onTap,
     this.onDelete,
   });
@@ -348,6 +351,7 @@ class ImportedProfileCard extends StatelessWidget {
   final String endpoint;
   final bool selected;
   final bool connected;
+  final bool dialable;
   final VoidCallback? onTap;
   final VoidCallback? onDelete;
 
@@ -379,11 +383,7 @@ class ImportedProfileCard extends StatelessWidget {
           ),
         ),
         subtitle: Text(
-          (!kIsWeb &&
-                  defaultTargetPlatform == TargetPlatform.iOS &&
-                  scheme != 'hysteria2')
-              ? l.freeIosHy2Only
-              : endpoint,
+          dialable ? endpoint : l.freeSchemeParked,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
         ),

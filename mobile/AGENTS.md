@@ -10,7 +10,7 @@ Name rule: `.cursor/rules/05-product-names.mdc`.
 
 ## Dial set
 
-Working lines only: Hysteria2, Hysteria2 `obfs=salamander`, VLESS, VLESS Reality. Trojan, Shadowsocks, and VMess are out of the product. Policy: `docs/product-policy.md`.
+**Hysteria2 only** — `hy2://` and `hysteria2://`, including `obfs=salamander` and port hop — on Android, iOS, and Windows. VLESS and VLESS Reality dial is **parked** on every platform (ADR 033): the parser still reads `vless://`, the dial gate does not admit it. Trojan, Shadowsocks, and VMess are out of the product. Engines: hy2bind active; `libXray.aar`, `libbox`, and hev stay in the tree as dormant — do not call them from the active connect path, do not delete them in an unrelated PR. Policy: `docs/product-policy.md`. Authority: `docs/decisions/033-client-hy2-only-dial-set.md`.
 
 ## Brand / palette
 

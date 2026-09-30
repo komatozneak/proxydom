@@ -47,7 +47,7 @@ void main() {
     expect(androidPerAppSplit, isFalse);
     expect(sitesOnlySplit, isTrue);
     expect(iosAppsSplitUnsupported, isFalse);
-    expect(windowsDialScheme('vless'), isTrue);
+    expect(windowsDialScheme('vless'), isFalse);
     expect(windowsDialScheme('hy2'), isTrue);
     expect(windowsDialScheme('trojan'), isFalse);
     expect(windowsDialScheme('ss'), isFalse);

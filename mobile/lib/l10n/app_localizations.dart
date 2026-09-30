@@ -3307,6 +3307,12 @@ abstract class AppL10n {
   /// **'Share'**
   String get freeSharePool;
 
+  /// No description provided for @freeShareCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Key copied'**
+  String get freeShareCopied;
+
   /// No description provided for @freeShareFail.
   ///
   /// In en, this message translates to:
@@ -3394,8 +3400,26 @@ abstract class AppL10n {
   /// No description provided for @freeIosHy2Only.
   ///
   /// In en, this message translates to:
-  /// **'iPhone starts Hysteria2 only'**
+  /// **'This protocol cannot start.'**
   String get freeIosHy2Only;
+
+  /// No description provided for @freeHy2OnlyAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not add the node: only Hysteria2 is supported.'**
+  String get freeHy2OnlyAdd;
+
+  /// No description provided for @freeNoHy2Lines.
+  ///
+  /// In en, this message translates to:
+  /// **'This source has no Hysteria2 lines.'**
+  String get freeNoHy2Lines;
+
+  /// No description provided for @freeSchemeParked.
+  ///
+  /// In en, this message translates to:
+  /// **'This protocol cannot start.'**
+  String get freeSchemeParked;
 
   /// No description provided for @freePoolGeneral.
   ///

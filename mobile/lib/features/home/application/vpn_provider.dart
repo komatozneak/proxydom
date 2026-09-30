@@ -9,7 +9,6 @@ import '../../../core/diagnostics/product_log.dart';
 import '../../../core/diagnostics/session_trace.dart';
 import '../../../core/ios_store_gates.dart';
 import '../../vpn/data/hy2_import_store.dart';
-import '../../vpn/data/route_document.dart';
 import '../../vpn/data/share_session_log.dart';
 import '../../vpn/data/subscription_device.dart';
 import '../../vpn/data/subscription_label.dart';
@@ -21,7 +20,6 @@ import '../../vpn/data/vpn_nodes_repository.dart';
 import '../../vpn/data/vpn_service_config.dart';
 import '../../vpn/data/vpn_session_meta.dart';
 import '../../vpn/data/vpn_session_snapshot.dart';
-import '../../vpn/data/xray_share_config.dart';
 import '../../vpn/domain/vpn_connect_error.dart';
 import '../../settings/data/auto_reconnect_prefs.dart';
 import '../../settings/data/split_tunnel_prefs.dart';
@@ -1157,37 +1155,11 @@ class VpnNotifier extends Notifier<VpnStatus> {
                   displayLabel: shown.title,
                 );
           started = raw && _dialGen == dial;
-        } else if (windowsDesktop && windowsDialScheme(imported.scheme)) {
-          started =
-              await VpnController.instance.startWindowsShare(imported.raw);
-        } else if (canDialScheme(imported.scheme, ios: false) &&
-            defaultTargetPlatform == TargetPlatform.android) {
-          final xrayJson = buildXraySocksConfig(imported);
-          if (xrayJson == null) {
-            SessionTrace.mark('fail', {'code': 'share_unsupported'});
-            state = const VpnError(
-              message: 'share_unsupported',
-              code: 'share_unsupported',
-            );
-            return;
-          }
-          SessionTrace.mark('dns', {'dns': 'system'});
-          started = await VpnController.instance.startXray(
-            xrayJson,
-            displayLabel: shown.title,
-          );
-        } else if (windowsDesktop) {
+        } else {
           SessionTrace.mark('fail', {'code': 'share_unsupported'});
           state = const VpnError(
             message: 'share_unsupported',
             code: 'share_unsupported',
-          );
-          return;
-        } else {
-          SessionTrace.mark('fail', {'code': 'share_ios_hy2_only'});
-          state = const VpnError(
-            message: 'share_ios_hy2_only',
-            code: 'share_ios_hy2_only',
           );
           return;
         }

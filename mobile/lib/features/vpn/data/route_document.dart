@@ -61,11 +61,39 @@ class DocumentSyncException implements Exception {
 
   final DocumentSyncDecision decision;
 }
+/// Whether [scheme] may start a system tunnel (ADR 033).
+///
+/// Hysteria2 only, on every OS. [ios] stays on the signature so existing
+/// call sites compile; it no longer changes the answer.
 bool canDialScheme(String scheme, {required bool ios}) {
   final name = scheme.toLowerCase();
-  if (name == 'hysteria2' || name == 'hy2') return true;
-  if (ios) return false;
-  return name == 'vless' || name == 'vmess' || name == 'trojan' || name == 'ss';
+  return name == 'hysteria2' || name == 'hy2';
+}
+
+/// How a parsed paste should behave on the add screen (ADR 033).
+enum ShareImportDial {
+  /// At least one Hysteria2 line can start.
+  hasHy2,
+
+  /// One pasted URI that is not Hysteria2 — do not add it.
+  singleUnsupported,
+
+  /// A document with no Hysteria2 line. Keep it; nothing starts.
+  noneHy2,
+}
+
+ShareImportDial shareImportDial(
+  List<ParsedShareLink> links, {
+  required bool fromDocument,
+}) {
+  if (links.any((link) => canDialScheme(link.scheme, ios: false))) {
+    return ShareImportDial.hasHy2;
+  }
+  if (links.isEmpty) return ShareImportDial.hasHy2;
+  if (!fromDocument && links.length == 1) {
+    return ShareImportDial.singleUnsupported;
+  }
+  return ShareImportDial.noneHy2;
 }
 
 String? _tryBase64(String text) {

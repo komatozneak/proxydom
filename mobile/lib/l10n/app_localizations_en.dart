@@ -1766,6 +1766,9 @@ class AppL10nEn extends AppL10n {
   String get freeSharePool => 'Share';
 
   @override
+  String get freeShareCopied => 'Key copied';
+
+  @override
   String get freeShareFail => 'Could not create the link';
 
   @override
@@ -1812,7 +1815,17 @@ class AppL10nEn extends AppL10n {
   String get freePoolMarked => 'Marked';
 
   @override
-  String get freeIosHy2Only => 'iPhone starts Hysteria2 only';
+  String get freeIosHy2Only => 'This protocol cannot start.';
+
+  @override
+  String get freeHy2OnlyAdd =>
+      'Could not add the node: only Hysteria2 is supported.';
+
+  @override
+  String get freeNoHy2Lines => 'This source has no Hysteria2 lines.';
+
+  @override
+  String get freeSchemeParked => 'This protocol cannot start.';
 
   @override
   String get freePoolGeneral => 'General';

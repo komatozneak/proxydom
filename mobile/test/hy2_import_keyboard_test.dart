@@ -71,4 +71,48 @@ void main() {
     expect(find.text('Ссылка не разобрана'), findsOneWidget);
     expect(find.text('Ошибка подключения'), findsNothing);
   });
+
+  testWidgets('a lone vless key is not added', (tester) async {
+    final router = GoRouter(
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (context, state) => const Hy2ImportScreen(),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp.router(
+          routerConfig: router,
+          locale: const Locale('ru'),
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.enterText(
+      find.byType(TextField),
+      'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443#A',
+    );
+    await tester.pump();
+
+    expect(
+      find.text(
+        'Не удалось добавить узел: поддерживается только протокол Hysteria2.',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.widgetWithText(FilledButton, 'Сохранить'),
+          )
+          .onPressed,
+      isNull,
+    );
+  });
 }
