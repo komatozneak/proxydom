@@ -86,4 +86,24 @@ void main() {
       1,
     );
   });
+
+  test('share copies the document address, or the pasted lines', () {
+    expect(
+      const ShareCatalog(
+        id: 'doc',
+        title: 'Teremok',
+        lines: ['hysteria2://secret@10.0.0.1:443#A'],
+        url: 'https://sub.example.org/hs4gGfjG',
+      ).subscriptionKey,
+      'https://sub.example.org/hs4gGfjG',
+    );
+    expect(
+      const ShareCatalog(
+        id: 'paste',
+        title: 'One',
+        lines: ['  hysteria2://secret@10.0.0.2:443#B  '],
+      ).subscriptionKey,
+      'hysteria2://secret@10.0.0.2:443#B',
+    );
+  });
 }

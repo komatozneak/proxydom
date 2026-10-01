@@ -101,9 +101,9 @@ def main() -> None:
             start = block_start + len(patched)
         return out
 
-    text = patch_identifier("online.teremokconnect.app", app_profile, text)
+    text = patch_identifier("su.proxydom.app", app_profile, text)
     text = patch_identifier(
-        "online.teremokconnect.app.VpnTunnelProvider", tunnel_profile, text
+        "su.proxydom.app.VpnTunnelProvider", tunnel_profile, text
     )
     pbx.write_text(text, encoding="utf-8")
     print(f"patched signing in {pbx}")

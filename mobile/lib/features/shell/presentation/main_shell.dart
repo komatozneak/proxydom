@@ -60,6 +60,14 @@ double _domHouseExtent(bool light) {
 /// How far the DOM circle rises above the nav band. The top rule moves up with it.
 const double _domAboveBar = (_domButtonSize - _navBarHeight) / 2;
 
+/// Centered on the band, the circle hangs this far under it.
+/// A phone absorbs that in the home-indicator inset. Windows has no inset,
+/// so the same hang leaves the window.
+double _domButtonBottom(double inset) {
+  if (windowsDesktop) return inset;
+  return inset - _domAboveBar;
+}
+
 /// Authenticated shell — branch indices MUST match [AppRouter] StatefulShellRoute:
 /// 0=Locations, 1=Home(VPN), 2=Settings.
 class MainShell extends ConsumerStatefulWidget {
@@ -189,8 +197,7 @@ class _MainShellState extends ConsumerState<MainShell> {
           left: 0,
           right: 0,
           height: _domButtonSize,
-          bottom: MediaQuery.paddingOf(context).bottom +
-              (_navBarHeight - _domButtonSize) / 2,
+          bottom: _domButtonBottom(MediaQuery.paddingOf(context).bottom),
           child: Center(
             child: _CenterNavMark(
               selected: selected == MainShell.homeIndex,

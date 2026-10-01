@@ -479,11 +479,11 @@ void main() {
   test('AppConfig.vpsBaseUrl points to RF control-plane prod backend', () {
     expect(
       AppConfig.vpsBaseUrl,
-      'https://api.teremokconnect.online:8443/v2',
+      'https://api.proxydom.su/v2',
     );
     expect(AppConfig.vpsBaseUrl, startsWith('https://'));
     expect(AppConfig.vpsBaseUrl, contains('/v2'));
-    expect(AppConfig.vpsIpv4, '176.114.64.174');
+    expect(AppConfig.vpsIpv4, '195.225.108.81');
   });
 
   test('AppConfig dev switch via APP_ENV=dev dart-define', () {

@@ -63,7 +63,7 @@ hysteria2://user:pass@203.0.113.12:443/?sni=c.example#Charlie
 
   test('an https subscription address is not an empty key list', () {
     const url =
-        'https://api.teremokconnect.online:8443/api/v1/sub/example-token';
+        'https://api.proxydom.su/api/v1/sub/example-token';
     expect(isPendingSubscriptionUrl(url), isTrue);
     expect(parseShareSubscription(url), isEmpty);
     const body = '''

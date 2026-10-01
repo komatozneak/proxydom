@@ -695,7 +695,7 @@ final class Hy2TunnelEngine: NSObject {
 
   private static func err(_ code: Int, _ message: String) -> NSError {
     NSError(
-      domain: "online.teremokconnect.app.vpn",
+      domain: "su.proxydom.app.vpn",
       code: code,
       userInfo: [NSLocalizedDescriptionKey: message]
     )

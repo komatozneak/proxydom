@@ -232,11 +232,20 @@ class VpnController {
 
   /// Start in-process Xray (same gomobile runtime as Hy2). [configJson] has
   /// secrets; it is not logged.
+  ///
+  /// Android app exclusions use the same package list as Hysteria2. Site
+  /// suffixes stay out of this start: VLESS does not apply them, and
+  /// [SplitTunnelPrefs.markApplied] would hide that the site draft is still
+  /// pending.
   Future<bool> startXray(
     String configJson, {
     String? displayLabel,
   }) async {
     try {
+      final disallowedApps = _isIosSplit
+          ? const <String>[]
+          : ((await SplitTunnelPrefs.loadDisallowedPackages()).toList()
+            ..sort());
       final paramsJson = jsonEncode({
         'schemaVersion': 2,
         'vpnCore': 'xray',
@@ -246,6 +255,7 @@ class VpnController {
             : kVpnBrandSessionName,
         'outboundType': 'xray',
         'xrayConfig': configJson,
+        if (disallowedApps.isNotEmpty) 'disallowedApplications': disallowedApps,
       });
       final result = await _methodChannel.invokeMethod<bool>(
         'start',

@@ -22,7 +22,7 @@ class AppConfig {
   );
 
   /// Production API origin (scheme + host + port), no path.
-  static const String vpsApiOrigin = 'https://api.teremokconnect.online:8443';
+  static const String vpsApiOrigin = 'https://api.proxydom.su';
 
   /// Production backend — `/v2` (ADR 009) or legacy `/api/v1`.
   static const String vpsBaseUrl =
@@ -30,12 +30,12 @@ class AppConfig {
 
   /// Seed hosts for discovery failover (own domains only — not Огонь .xyz).
   static const List<String> discoverySeedHosts = [
-    'https://api.teremokconnect.online:8443',
-    'https://api2.teremokconnect.online:8443',
+    'https://api.proxydom.su',
+    'https://api2.proxydom.su',
   ];
 
   /// Hostname for the RF control-plane API (no scheme / path).
-  static const String vpsHostname = 'api.teremokconnect.online';
+  static const String vpsHostname = 'api.proxydom.su';
 
   /// Compile-time override for the control-plane A-record used by TUN
   /// `excludeRoute` and Xray DNS `hosts` pin. Empty → [vpsIpv4Fallback].
@@ -46,11 +46,11 @@ class AppConfig {
     defaultValue: '',
   );
 
-  /// Last-known good A-record for [vpsHostname] (Selectel RF API master).
+  /// Last-known good A-record for [vpsHostname] (API host, 195.225.108.81).
   /// Prefer override / DNS resolution at runtime where available; this is the
   /// offline fallback so TUN bypass and Xray hosts pin stay valid if DNS fails
-  /// under VPN. Must match live `api.teremokconnect.online` A-record.
-  static const String vpsIpv4Fallback = '176.114.64.174';
+  /// under VPN. Must match the live `api.proxydom.su` A-record.
+  static const String vpsIpv4Fallback = '195.225.108.81';
 
   /// Effective control-plane IPv4 for routing / DNS hosts pin.
   static String get vpsControlPlaneIpv4 {
@@ -138,19 +138,19 @@ class AppConfig {
       'https://t.me/$supportTelegramUsername';
 
   /// Bank / Play / Platega review — public legal pages (always-on footer).
-  static const String privacyPolicyUrl =
-      'https://teremokconnect.online/privacy.html';
+  static const String privacyPolicyUrl = 'https://proxydom.su/privacy.html';
 
-  static const String termsOfServiceUrl =
-      'https://teremokconnect.online/terms.html';
+  static const String termsOfServiceUrl = 'https://proxydom.su/terms.html';
 
-  static const String pricingUrl = 'https://teremokconnect.online/pricing.html';
+  /// The utility is free: there are no tariffs, no catalog, and no checkout.
+  /// Kept for call sites that expect a constant; points at support by design.
+  static const String pricingUrl = 'https://proxydom.su/support.html';
 
-  static const String supportPageUrl =
-      'https://teremokconnect.online/support.html';
+  static const String supportPageUrl = 'https://proxydom.su/support.html';
 
-  static const String accountDeletionUrl =
-      'https://teremokconnect.online/account-deletion.html';
+  /// No accounts in the utility, so no data to delete. Kept for call sites that
+  /// expect a constant; points at support by design.
+  static const String accountDeletionUrl = 'https://proxydom.su/support.html';
 
   static const String supportEmail = '27komatozneak@gmail.com';
 

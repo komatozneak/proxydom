@@ -141,6 +141,63 @@ void main() {
       ['exact.example.com'],
     );
   });
+
+  test('Android VLESS start sends app exclusions and no site suffixes', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    SharedPreferences.setMockInitialValues({});
+    await SplitTunnelPrefs.setDisallowedPackage('ru.yandex.taxi', true);
+    final map = await _captureStartParams(
+      () => VpnController.instance.startXray('{"outbounds":[]}'),
+    );
+    expect(map['vpnCore'], 'xray');
+    expect(map['xrayConfig'], '{"outbounds":[]}');
+    expect(
+      List<String>.from(map['disallowedApplications'] as List<dynamic>),
+      ['ru.yandex.taxi'],
+    );
+    expect(map, isNot(contains('directDomainSuffixes')));
+    expect(await SplitTunnelPrefs.hasPendingChanges(), isTrue);
+  });
+
+  test('Android VLESS start omits an empty app list', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    SharedPreferences.setMockInitialValues({});
+    final map = await _captureStartParams(
+      () => VpnController.instance.startXray('{}'),
+    );
+    expect(map, isNot(contains('disallowedApplications')));
+    expect(map, isNot(contains('directDomainSuffixes')));
+  });
+
+  test('iOS VLESS start does not send Android app exclusions', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    SharedPreferences.setMockInitialValues({});
+    await SplitTunnelPrefs.setDisallowedPackage('ru.yandex.taxi', true);
+    final map = await _captureStartParams(
+      () => VpnController.instance.startXray('{}'),
+    );
+    expect(map, isNot(contains('disallowedApplications')));
+    expect(map, isNot(contains('directDomainSuffixes')));
+  });
+}
+
+Future<Map<String, dynamic>> _captureStartParams(
+  Future<bool> Function() start,
+) async {
+  String? captured;
+  TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+      .setMockMethodCallHandler(
+    const MethodChannel('teremok/vpn'),
+    (call) async {
+      if (call.method == 'start') {
+        final args = Map<Object?, Object?>.from(call.arguments as Map);
+        captured = args['paramsJson'] as String?;
+      }
+      return true;
+    },
+  );
+  await start();
+  return jsonDecode(captured!) as Map<String, dynamic>;
 }
 
 VpnConfig _hy2Config() {

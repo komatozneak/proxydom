@@ -16,9 +16,9 @@
 	<false/>
 	<key>provisioningProfiles</key>
 	<dict>
-		<key>online.teremokconnect.app</key>
+		<key>su.proxydom.app</key>
 		<string>APP_PROFILE_NAME</string>
-		<key>online.teremokconnect.app.VpnTunnelProvider</key>
+		<key>su.proxydom.app.VpnTunnelProvider</key>
 		<string>TUNNEL_PROFILE_NAME</string>
 	</dict>
 </dict>

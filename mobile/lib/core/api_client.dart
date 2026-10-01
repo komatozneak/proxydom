@@ -17,10 +17,10 @@ class ApiClient {
 
   static bool isControlPlaneHost(String host) {
     final h = host.trim().toLowerCase();
-    return h == 'api.teremokconnect.online' ||
-        h == 'api2.teremokconnect.online' ||
-        h == 'teremokconnect.online' ||
-        h.endsWith('.teremokconnect.online');
+    return h == 'api.proxydom.su' ||
+        h == 'api2.proxydom.su' ||
+        h == 'proxydom.su' ||
+        h.endsWith('.proxydom.su');
   }
 
   /// Discovery failover: switch Dio base to `{origin}/v2` (or legacy `/api/v1`).

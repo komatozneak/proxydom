@@ -3,8 +3,8 @@ import NetworkExtension
 
 /// Shared App Group + UserDefaults keys (Runner ↔ Packet Tunnel).
 enum TeremokVpnShared {
-  static let appGroupId = "group.online.teremokconnect.app"
-  static let tunnelBundleId = "online.teremokconnect.app.VpnTunnelProvider"
+  static let appGroupId = "group.su.proxydom.app"
+  static let tunnelBundleId = "su.proxydom.app.VpnTunnelProvider"
   static let paramsKey = "vpn.paramsJson"
   static let statusKey = "vpn.status"
   static let lastErrorKey = "vpn.lastError"

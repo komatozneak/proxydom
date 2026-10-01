@@ -43,7 +43,7 @@ void main() {
     expect(secure, isNotEmpty);
 
     final dio = Dio(
-      BaseOptions(baseUrl: 'https://api.teremokconnect.online:8443/v2'),
+      BaseOptions(baseUrl: 'https://api.proxydom.su/v2'),
     );
     final adapter = _RecordingAdapter();
     dio.httpClientAdapter = adapter;
@@ -83,7 +83,7 @@ void main() {
       () {
     expect(ApiClient.usesDefaultTlsTransport(ApiClient.instance), isTrue);
     final refresh = Dio(
-      BaseOptions(baseUrl: 'https://api.teremokconnect.online:8443/v2'),
+      BaseOptions(baseUrl: 'https://api.proxydom.su/v2'),
     );
     expect(ApiClient.usesDefaultTlsTransport(refresh), isTrue);
   });

@@ -339,14 +339,14 @@ void main() {
           ['socks-in']);
     });
 
-    test('routing does not force teremokconnect.online direct', () {
+    test('routing does not force proxydom.su direct', () {
       final config = buildAndParse(makeInputs());
       final rules = (config['routing'] as Map)['rules'] as List;
       final pinned = rules.where((r) {
         final domain = (r as Map)['domain'];
         if (domain is! List) return false;
         return domain.any(
-          (entry) => entry.toString().contains('teremokconnect.online'),
+          (entry) => entry.toString().contains('proxydom.su'),
         );
       });
       expect(pinned, isEmpty);

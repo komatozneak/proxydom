@@ -64,6 +64,18 @@ class ShareCatalog {
   /// still frames the text: that is how Happ draws every announcement.
   final bool announceFrame;
 
+  /// What Share copies: the document address, or the pasted lines.
+  String? get subscriptionKey {
+    final document = url?.trim();
+    if (document != null && document.isNotEmpty) return document;
+    final kept = [
+      for (final line in lines)
+        if (line.trim().isNotEmpty) line.trim(),
+    ];
+    if (kept.isEmpty) return null;
+    return kept.join('\n');
+  }
+
   ShareCatalog copyWith({
     String? title,
     List<String>? lines,

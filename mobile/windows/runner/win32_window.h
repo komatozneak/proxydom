@@ -92,6 +92,11 @@ class Win32Window {
 
   bool quit_on_close_ = false;
 
+  // Outer window size in physical pixels. Min and max track stay here so the
+  // phone frame cannot be dragged to another size.
+  LONG fixed_width_ = 0;
+  LONG fixed_height_ = 0;
+
   // window handle for top level window.
   HWND window_handle_ = nullptr;
 

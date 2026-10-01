@@ -2,9 +2,9 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../../../core/busy/busy_overlay.dart';
 import '../../../core/diagnostics/product_log.dart';
@@ -97,7 +97,11 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
                 children: [
                   Text(l.freeServers),
                   const SizedBox(width: 16),
-                  _ServerCountChip(count: _imported.length),
+                  _ServerCountChip(
+                    count: _catalogs.isNotEmpty
+                        ? _catalogs.length
+                        : _imported.length,
+                  ),
                 ],
               )
             : Text(l.regionTitle),
@@ -365,17 +369,33 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
   }
 
   Future<void> _shareCatalog(ShareCatalog catalog) async {
-    final text = catalog.lines.join('\n');
-    if (text.isEmpty || !mounted) return;
-    final box = context.findRenderObject();
-    final origin = box is RenderBox && box.hasSize
-        ? box.localToGlobal(Offset.zero) & box.size
-        : null;
-    await Share.share(
-      text,
-      subject: catalog.title,
-      sharePositionOrigin: origin,
-    );
+    final key = catalog.subscriptionKey;
+    if (key == null || !mounted) {
+      UiLog.action(
+        'locations',
+        'share',
+        result: 'rejected',
+        reason: 'empty',
+      );
+      return;
+    }
+    final l = AppL10n.of(context);
+    try {
+      await Clipboard.setData(ClipboardData(text: key));
+    } on Object catch (e) {
+      if (!mounted) return;
+      UiLog.action(
+        'locations',
+        'share',
+        result: 'fail',
+        reason: e.runtimeType.toString(),
+      );
+      showTeremokSnackBar(context, l.freeShareFail);
+      return;
+    }
+    if (!mounted) return;
+    UiLog.action('locations', 'share', result: 'copied');
+    showTeremokSnackBar(context, l.freeShareCopied);
   }
 
   Future<void> _refreshCatalog(ShareCatalog catalog) async {
@@ -493,11 +513,14 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     final link = _imported[index];
     final label = labelForShareLink(link);
     final selected = _selectedId == '$index';
+    final theme = Theme.of(context);
     return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12),
       leading: PoolServerMark(label: label),
       title: Text(label.title),
       subtitle: Text(label.subtitle.isEmpty ? link.endpoint : label.subtitle),
       selected: selected,
+      selectedTileColor: theme.colorScheme.primaryContainer,
       onTap: () => _chooseImported(index),
     );
   }
@@ -547,7 +570,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
         children: [
           CatalogProfileChrome(
             title: Text(
-              catalog.lines.length > 1 ? '$title · ${catalog.lines.length}' : title,
+              title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.titleMedium?.copyWith(
@@ -592,14 +615,18 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
                           ? AppIcons.paperPlane
                           : AppIcons.link,
                       size: 22,
-                      color: onFill,
+                      color: catalogPlaneInk(dark: dark),
                     ),
                   )
                 : null,
             trash: _catalogIconButton(
               tooltip: l.freeDelete,
               onTap: () => _deleteProfile(catalog.id),
-              icon: AppIcon(AppIcons.trash, size: 20, color: onFill),
+              icon: const AppIcon(
+                AppIcons.trash,
+                size: 20,
+                color: AppBrand.surfaceElevatedLight,
+              ),
             ),
             band: band,
             trashFill: catalogTrashFill(
@@ -701,7 +728,8 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
                     final index = filtered[i];
                     final link = _imported[index];
                     final selected = _selectedId == '$index';
-                    final schemeBlocked = !canDialScheme(link.scheme, ios: false);
+                    final schemeBlocked =
+                        !canDialScheme(link.scheme, ios: false);
                     return ImportedProfileCard(
                       name: link.name,
                       scheme: link.scheme,
@@ -1060,17 +1088,22 @@ class _ServerCountChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final dark = theme.brightness == Brightness.dark;
+    final wide = count > 9;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      width: wide ? null : 28,
+      height: 28,
+      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+      padding: EdgeInsets.symmetric(horizontal: wide ? 8 : 0),
+      alignment: Alignment.center,
       decoration: BoxDecoration(
         color:
             dark ? AppBrand.surfaceVariantDark : AppBrand.surfaceElevatedLight,
-        borderRadius: BorderRadius.circular(AppBrand.radiusPill),
+        borderRadius: BorderRadius.circular(999),
         border: Border.all(color: theme.colorScheme.outline),
       ),
       child: Text(
         '$count',
-        style: theme.textTheme.titleMedium?.copyWith(
+        style: theme.textTheme.labelLarge?.copyWith(
           fontWeight: FontWeight.w800,
           color: dark ? AppBrand.inkDark : AppBrand.inkLight,
         ),

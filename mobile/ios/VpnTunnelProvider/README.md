@@ -4,10 +4,14 @@ Network Extension target is in `Runner.xcodeproj` (`VpnTunnelProvider`).
 
 ## Once (Apple Developer portal)
 
-1. App ID `online.teremokconnect.app` — Network Extensions + App Groups.
-2. App ID `online.teremokconnect.app.VpnTunnelProvider` — same.
-3. App Group `group.online.teremokconnect.app` on **both**.
-4. App Store provisioning profiles for **both** IDs (CI / TestFlight).
+1. App ID `su.proxydom.app` — Network Extensions (Packet Tunnel) + App Groups.
+2. App ID `su.proxydom.app.VpnTunnelProvider` — same.
+3. App Group `group.su.proxydom.app` on **both**.
+4. App Store provisioning profiles for **both** IDs — CI creates them via
+   `app-store-connect fetch-signing-files --strict-match-identifier`, вручную не нужны.
+
+Team `LG3N5WA9TD`; App Store seller — ТОО «УМИКУМ» (`UMICUM LLP`). Скриншот-порядок
+и проверка: `docs/ops/apple-org-umicum-runbook.md` §4.
 
 ## Hy2bind.xcframework (required to link)
 

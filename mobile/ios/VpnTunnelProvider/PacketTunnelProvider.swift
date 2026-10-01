@@ -46,7 +46,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         )
         completionHandler(
           error ?? NSError(
-            domain: "online.teremokconnect.app.vpn",
+            domain: "su.proxydom.app.vpn",
             code: 6,
             userInfo: [NSLocalizedDescriptionKey: "Hy2 start cancelled"]
           )
@@ -128,7 +128,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     TeremokVpnShared.setLastError(message, generation: sessionGeneration)
     completionHandler(
       NSError(
-        domain: "online.teremokconnect.app.vpn",
+        domain: "su.proxydom.app.vpn",
         code: errorCode,
         userInfo: [NSLocalizedDescriptionKey: message]
       )

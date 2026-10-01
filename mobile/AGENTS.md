@@ -5,7 +5,9 @@ Rules for AI agents working in `mobile/`. Complements root `AGENTS.md`.
 ## Name
 
 Google Play: **Прокси Дом**. English name: **Proxy Dom**. Package **`com.proxy.dom`**. The Telegram bot stays **Теремок VPN**.
-Repo and domains stay `teremok` / `teremokconnect`. The Gradle `applicationId` slice is not landed yet. iOS bundle id is still `online.teremokconnect.app`.
+Repo stays `teremok` / `teremokconnect`. The Gradle `applicationId` slice is not landed yet.
+iOS bundle id is **`su.proxydom.app`** (extension `su.proxydom.app.VpnTunnelProvider`, App Group
+`group.su.proxydom.app`); the former `online.teremokconnect.app` belonged to the abandoned project.
 Name rule: `.cursor/rules/05-product-names.mdc`.
 
 ## Dial set
@@ -43,9 +45,11 @@ Do **not** bulk-generate AI PNGs without commercial license + owner go (Visual A
 - Flutter + Riverpod + go_router + Dio
 - VPN core: Hysteria2 / hy2bind (ADR 018), MethodChannel `teremok/vpn`
 - minSdk **26** (hard requirement — do not roll back)
-- Billing: **Platega hosted only on Android** (ADR 017). Do **not** add Play Billing /
-  `com.android.vending.BILLING`. On **iOS**, hide Platega CTA (`hideInAppPlategaCheckout`);
-  see ADR 019 + `docs/ops/ios-iap-parked.md`.
+- Billing: **Platega hosted on Android** (ADR 017); Play Billing не используется.
+  **iOS-сборка — чистая утилита, оплаты нет вообще**: ни Platega, ни каталога,
+  ни Premium/квот/бота-кассира. Требование App Review Guideline 5.4, обоснование —
+  `docs/ops/apple-org-umicum-runbook.md` §5.2. Флаг `hideInAppPlategaCheckout`
+  больше не основной механизм — код оплаты в iOS-сборке отсутствует.
 
 ## Tests
 

@@ -8,7 +8,7 @@
 	</array>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.online.teremokconnect.app</string>
+		<string>group.su.proxydom.app</string>
 	</array>
 </dict>
 </plist>

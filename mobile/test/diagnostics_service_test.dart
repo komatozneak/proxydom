@@ -149,7 +149,7 @@ void main() {
       messenger.setMockMethodCallHandler(packageChannel, (call) async {
         return <String, dynamic>{
           'appName': 'Teremok',
-          'packageName': 'online.teremokconnect.app',
+          'packageName': 'su.proxydom.app',
           'version': '0.1.15',
           'buildNumber': '2034',
         };
@@ -197,7 +197,7 @@ void main() {
       messenger.setMockMethodCallHandler(packageChannel, (call) async {
         return <String, dynamic>{
           'appName': 'Teremok',
-          'packageName': 'online.teremokconnect.app',
+          'packageName': 'su.proxydom.app',
           'version': '0.1.15',
           'buildNumber': '2034',
         };
