@@ -527,14 +527,11 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     final notice = profileNotice(
       announce: catalog.announce,
       supportUrl: catalog.supportUrl,
-      announceFrame: catalog.announceFrame,
-      documentUrl: catalog.url,
-      trafficMeta: catalog.trafficMeta,
     );
     final dark = theme.brightness == Brightness.dark;
     final showRefresh = catalog.url != null && catalog.url!.isNotEmpty;
     final planeUrl = notice.planeUrl?.trim() ?? '';
-    final parkPlane = showRefresh && notice.visible && planeUrl.isNotEmpty;
+    final parkPlane = planeUrl.isNotEmpty;
     final onFill = dark ? AppBrand.inkDark : AppBrand.inkLight;
     final band = dark ? AppBrand.noticeBandDark : AppBrand.noticeBand;
     final noticeBody = notice.text?.trim() ?? '';
@@ -612,14 +609,11 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
             seamColor: theme.colorScheme.outline,
             notice: noticeBody.isEmpty
                 ? null
-                : Padding(
-                    padding: EdgeInsets.fromLTRB(12, 0, parkPlane ? 8 : 4, 12),
-                    child: SubscriptionNoticeView(
-                      text: notice.text,
-                      planeUrl: notice.planeUrl,
-                      frame: notice.frame,
-                      showPlane: !parkPlane,
-                    ),
+                : SubscriptionNoticeView(
+                    text: notice.text,
+                    planeUrl: notice.planeUrl,
+                    frame: false,
+                    showPlane: false,
                   ),
           ),
           if (hasLines) ...[

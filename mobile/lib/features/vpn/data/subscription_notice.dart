@@ -1,7 +1,4 @@
-import '../../../core/config.dart';
-
 import 'subscription_label.dart';
-import 'subscription_traffic.dart';
 
 /// Happ announcement limit. Longer text is cut before it is shown or sent.
 const subscriptionAnnounceLimit = 200;
@@ -165,108 +162,17 @@ String? _httpUrl(String? value) {
   return url;
 }
 
-/// Paper plane for the Teremok VPN bot.
-String teremokBotUrl() {
-  final name =
-      AppConfig.telegramBotUsername.trim().replaceFirst(RegExp(r'^@'), '');
-  return 'https://t.me/$name';
-}
-
-/// ``🗓️ Ещё 5 дней``. Zero is the expiry date itself.
-String daysLeftLine(int days) {
-  final count = days < 0 ? 0 : days;
-  if (count == 0) return '🗓️ Последний день';
-  return '🗓️ Ещё $count ${_dayWord(count)}';
-}
-
-/// What the profile card shows. A document announcement wins. A new link
-/// with none still gets the Teremok VPN note and the bot plane.
+/// What the profile card shows. Text and the plane come only from the link.
+/// An empty announcement leaves the slot blank. This screen does not draw
+/// the Happ frame.
 SubscriptionNotice profileNotice({
   String? announce,
   String? supportUrl,
-  bool announceFrame = false,
-  String? documentUrl,
-  String? trafficMeta,
-  DateTime? now,
 }) {
-  final remote = announce?.trim();
-  if (remote != null && remote.isNotEmpty) {
-    final plane = _httpUrl(supportUrl) ?? teremokBotUrl();
-    return SubscriptionNotice(
-      text: remote,
-      planeUrl: plane,
-      frame: announceFrame,
-    );
-  }
-  final clock = (now ?? DateTime.now()).toUtc();
-  final traffic = parseSubscriptionTraffic(trafficMeta);
-  final active =
-      traffic == null || traffic.unlimited || traffic.remainingBytes > 0;
-  final expire = _expireUnix(trafficMeta);
-  final days = expire == null ? null : _calendarDays(expire, clock);
-  return composeKeyDescription(
-    _teremokCopy(
-      code: _publicCode(documentUrl),
-      active: active,
-      days: days,
-    ),
-    planeUrl: teremokBotUrl(),
-    frame: true,
+  final body = _clip(announce ?? '');
+  return SubscriptionNotice(
+    text: body.isEmpty ? null : body,
+    planeUrl: _httpUrl(supportUrl),
+    frame: false,
   );
-}
-
-String _teremokCopy({
-  required String? code,
-  required bool active,
-  required int? days,
-}) {
-  final lines = <String>['Значок справа ведёт в бота'];
-  if (code != null) {
-    lines.add('🔑 $code ${active ? 'Active' : 'Пауза'}');
-  }
-  if (days != null) lines.add(daysLeftLine(days));
-  lines.add('◻️ Молчит? Жми 🔄');
-  lines.add('❤️ Теремок VPN');
-  return lines.join('\n');
-}
-
-String? _publicCode(String? url) {
-  final uri = Uri.tryParse(url ?? '');
-  if (uri == null) return null;
-  final parts = uri.pathSegments.where((part) => part.isNotEmpty).toList();
-  if (parts.isEmpty) return null;
-  final clean = parts.last.replaceAll(RegExp(r'[^A-Za-z0-9]'), '');
-  if (clean.length < 8) return null;
-  return clean.substring(0, 8);
-}
-
-int? _expireUnix(String? header) {
-  if (header == null) return null;
-  for (final part in header.split(';')) {
-    final piece = part.trim();
-    final eq = piece.indexOf('=');
-    if (eq <= 0) continue;
-    if (piece.substring(0, eq).trim().toLowerCase() != 'expire') continue;
-    final value = int.tryParse(piece.substring(eq + 1).trim());
-    if (value == null || value <= 0) return null;
-    return value;
-  }
-  return null;
-}
-
-int _calendarDays(int expireUnix, DateTime now) {
-  final end =
-      DateTime.fromMillisecondsSinceEpoch(expireUnix * 1000, isUtc: true);
-  final today = DateTime.utc(now.year, now.month, now.day);
-  final last = DateTime.utc(end.year, end.month, end.day);
-  final days = last.difference(today).inDays;
-  return days < 0 ? 0 : days;
-}
-
-String _dayWord(int count) {
-  final mod10 = count % 10;
-  final mod100 = count % 100;
-  if (mod10 == 1 && mod100 != 11) return 'день';
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'дня';
-  return 'дней';
 }

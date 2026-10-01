@@ -134,35 +134,30 @@ $_link
     expect(catalog.announceFrame, isTrue);
   });
 
-  test('a new link without an announcement still shows the Teremok note', () {
-    final expire =
-        DateTime.utc(2026, 9, 30, 23, 59, 59).millisecondsSinceEpoch ~/ 1000;
-    final notice = profileNotice(
-      documentUrl: 'https://sub.proxydom.su/sdc91quyABCDEFGH',
-      trafficMeta: 'upload=0; download=0; total=100; expire=$expire',
-      now: DateTime.utc(2026, 9, 25, 12),
-    );
-    expect(notice.frame, isTrue);
-    expect(notice.planeUrl, teremokBotUrl());
-    expect(notice.text, contains('Значок справа ведёт в бота'));
-    expect(notice.text, contains('🔑 sdc91quy Active'));
-    expect(notice.text, contains('🗓️ Ещё 5 дней'));
-    expect(notice.text, contains('◻️ Молчит? Жми 🔄'));
-    expect(notice.text, contains('❤️ Теремок VPN'));
-    expect(daysLeftLine(1), '🗓️ Ещё 1 день');
-    expect(daysLeftLine(2), '🗓️ Ещё 2 дня');
-    expect(daysLeftLine(11), '🗓️ Ещё 11 дней');
-    expect(daysLeftLine(0), '🗓️ Последний день');
+  test('a link without an announcement leaves the slot empty', () {
+    final notice = profileNotice();
+    expect(notice.text, isNull);
+    expect(notice.planeUrl, isNull);
+    expect(notice.frame, isFalse);
+    expect(notice.visible, isFalse);
   });
 
-  test('a document announcement replaces the Teremok note', () {
+  test('a document announcement is shown as it arrived', () {
     final notice = profileNotice(
       announce: 'Свой текст',
       supportUrl: 'https://t.me/other',
-      announceFrame: true,
     );
     expect(notice.text, 'Свой текст');
     expect(notice.planeUrl, 'https://t.me/other');
-    expect(notice.frame, isTrue);
+    expect(notice.frame, isFalse);
+  });
+
+  test('a non-http support url does not become a plane', () {
+    final notice = profileNotice(
+      announce: 'Текст',
+      supportUrl: 'javascript:alert(1)',
+    );
+    expect(notice.text, 'Текст');
+    expect(notice.planeUrl, isNull);
   });
 }

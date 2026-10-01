@@ -12,24 +12,29 @@ const kSubscriptionNoticePlaneKey =
 const kCatalogRefreshBandKey = ValueKey<String>('catalog-refresh-band');
 const kCatalogRefreshSlotKey = ValueKey<String>('catalog-refresh-slot');
 const kCatalogPlaneSlotKey = ValueKey<String>('catalog-plane-slot');
+const kCatalogShareSlotKey = ValueKey<String>('catalog-share-slot');
 const kCatalogTrashFillKey = ValueKey<String>('catalog-trash-fill');
 
-/// Square action cell on the profile card. Share, refresh, and trash match.
+/// Square action cell on the profile card. Refresh and trash match.
 const double catalogActionExtent = 52;
 
-/// Teeth on the tear-off edge under the Telegram plane. Three, as on the sketch.
-const int catalogStampDiamonds = 3;
+/// Paper plane on the sky circle. The dark sheet uses the light band as ink.
+Color catalogPlaneInk({required bool dark}) {
+  return dark ? AppBrand.noticeBand : const Color(0xFF1578A8);
+}
 
-/// Trash cell. The same ink as the notebook margin, washed so the icon stays readable.
+/// Trash cell. Solid margin ink, the orange square on the profile sketch.
 Color catalogTrashFill(Color surface, {required bool dark}) {
+  if (!dark) return AppBrand.paperMargin;
   return Color.alphaBlend(
-    AppBrand.paperMargin.withValues(alpha: dark ? 0.58 : 0.55),
+    AppBrand.paperMargin.withValues(alpha: 0.92),
     surface,
   );
 }
 
-/// Profile title row. Refresh and the Telegram plane share one sky column.
-/// The trash cell uses the margin ink. Share stays an unfilled icon.
+/// Title row: name, share, refresh, trash.
+/// The announcement sits under the name. A support link's plane sits under
+/// the refresh cell, with a trash-width gap so it does not land on the bin.
 class CatalogProfileChrome extends StatelessWidget {
   const CatalogProfileChrome({
     super.key,
@@ -67,27 +72,53 @@ class CatalogProfileChrome extends StatelessWidget {
         child: child,
       );
 
-  /// Refresh cell, and when the plane is present, the tear-off stamp under it.
-  Widget _refreshBand(Widget refreshButton, Widget? planeButton) {
-    final slots = Column(
-      children: [
-        _slot(refreshButton, key: kCatalogRefreshSlotKey),
-        if (planeButton != null) _slot(planeButton, key: kCatalogPlaneSlotKey),
-      ],
+  /// Sky circle for share, and for the plane under the refresh cell.
+  Widget _circleSlot(Widget child, {Key? key}) {
+    return Padding(
+      key: key,
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: Center(
+        child: Material(
+          color: band,
+          shape: const CircleBorder(),
+          clipBehavior: Clip.antiAlias,
+          child: SizedBox(
+            width: 40,
+            height: 40,
+            child: child,
+          ),
+        ),
+      ),
     );
+  }
+
+  /// Text under the title. The plane column lines up with refresh when that
+  /// button is present, and with the right edge of the title row otherwise.
+  Widget? _description(Widget? body, Widget? planeButton, bool hasRefresh) {
+    if (body == null && planeButton == null) return null;
     if (planeButton == null) {
-      return ColoredBox(
-        key: kCatalogRefreshBandKey,
-        color: band,
-        child: slots,
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 2, 16, 12),
+        child: body,
       );
     }
-    return CatalogStampBand(
-      key: kCatalogRefreshBandKey,
-      color: band,
-      lineColor: seamColor,
-      bodyHeight: catalogActionExtent * 2,
-      child: slots,
+    return Padding(
+      padding: const EdgeInsets.only(top: 2, bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(left: 16, right: 8),
+              child: body ?? const SizedBox.shrink(),
+            ),
+          ),
+          if (hasRefresh) const SizedBox(width: catalogActionExtent),
+          _circleSlot(planeButton, key: kCatalogPlaneSlotKey),
+          const SizedBox(width: 1),
+          const SizedBox(width: catalogActionExtent),
+        ],
+      ),
     );
   }
 
@@ -96,161 +127,42 @@ class CatalogProfileChrome extends StatelessWidget {
     final refreshButton = refresh;
     final planeButton = plane;
     final body = notice;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    final description = _description(body, planeButton, refreshButton != null);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+        SizedBox(
+          height: catalogActionExtent,
+          child: Row(
             children: [
-              SizedBox(
-                height: catalogActionExtent,
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.only(left: 16, right: 12),
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: title,
-                        ),
-                      ),
-                    ),
-                    _seam(),
-                    _slot(share),
-                    if (refreshButton != null && planeButton == null) _seam(),
-                  ],
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 16, right: 8),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: title,
+                  ),
                 ),
               ),
-              if (body != null) body,
+              _circleSlot(share, key: kCatalogShareSlotKey),
+              if (refreshButton != null)
+                ColoredBox(
+                  key: kCatalogRefreshBandKey,
+                  color: band,
+                  child: _slot(refreshButton, key: kCatalogRefreshSlotKey),
+                ),
+              _seam(),
+              ColoredBox(
+                key: kCatalogTrashFillKey,
+                color: trashFill,
+                child: _slot(trash),
+              ),
             ],
           ),
         ),
-        if (refreshButton != null)
-          _refreshBand(refreshButton, planeButton),
-        if (planeButton == null) _seam(),
-        ColoredBox(
-          key: kCatalogTrashFillKey,
-          color: trashFill,
-          child: _slot(trash),
-        ),
+        if (description != null) description,
       ],
     );
-  }
-}
-
-/// Sky column whose bottom edge is a stamp you tear off.
-///
-/// Both gray sides run down to the outer tips. Only the lower half of each
-/// diamond hangs below the band, so the edge reads as a torn stamp.
-class CatalogStampBand extends StatelessWidget {
-  const CatalogStampBand({
-    super.key,
-    required this.color,
-    required this.lineColor,
-    required this.bodyHeight,
-    required this.child,
-  });
-
-  final Color color;
-  final Color lineColor;
-  final double bodyHeight;
-  final Widget child;
-
-  /// How far the outer tips hang below the waist. 45° so each tooth is a diamond.
-  static double dropFor(
-    double width, {
-    double stroke = _StampBandPainter.strokeWidth,
-  }) {
-    return (width - stroke) / (catalogStampDiamonds + 1);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final drop = dropFor(catalogActionExtent);
-    return CustomPaint(
-      painter: _StampBandPainter(
-        color: color,
-        lineColor: lineColor,
-        bodyHeight: bodyHeight,
-      ),
-      child: SizedBox(
-        width: catalogActionExtent,
-        height: bodyHeight + drop,
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: child,
-        ),
-      ),
-    );
-  }
-}
-
-class _StampBandPainter extends CustomPainter {
-  const _StampBandPainter({
-    required this.color,
-    required this.lineColor,
-    required this.bodyHeight,
-  });
-
-  final Color color;
-  final Color lineColor;
-  final double bodyHeight;
-
-  static const double strokeWidth = 1;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    const inset = strokeWidth / 2;
-    const left = inset;
-    final right = size.width - inset;
-    final span = right - left;
-    final step = span / (catalogStampDiamonds + 1);
-    final depth = step;
-    final waist = bodyHeight;
-    final bottom = waist + depth;
-    final valleyA = left + step;
-    final middle = left + 2 * step;
-    final valleyB = left + 3 * step;
-
-    final fill = Path()
-      ..moveTo(0, 0)
-      ..lineTo(size.width, 0)
-      ..lineTo(size.width, bottom)
-      ..lineTo(valleyB, waist)
-      ..lineTo(middle, bottom)
-      ..lineTo(valleyA, waist)
-      ..lineTo(0, bottom)
-      ..close();
-    canvas.drawPath(fill, Paint()..color = color);
-
-    final line = Paint()
-      ..color = lineColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeJoin = StrokeJoin.miter
-      ..strokeMiterLimit = 2
-      ..isAntiAlias = true;
-
-    // Side rules run to the outer tips. Only the lower teeth are outlined.
-    canvas.drawPath(
-      Path()
-        ..moveTo(left, 0)
-        ..lineTo(left, bottom)
-        ..lineTo(valleyA, waist)
-        ..lineTo(middle, bottom)
-        ..lineTo(valleyB, waist)
-        ..lineTo(right, bottom)
-        ..lineTo(right, 0),
-      line,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _StampBandPainter oldDelegate) {
-    return oldDelegate.color != color ||
-        oldDelegate.lineColor != lineColor ||
-        oldDelegate.bodyHeight != bodyHeight;
   }
 }
 
@@ -268,7 +180,7 @@ class SubscriptionNoticeView extends StatelessWidget {
   final String? planeUrl;
   final bool frame;
 
-  /// False when the profile card draws the plane in the refresh column.
+  /// False when the profile card draws the plane under the refresh cell.
   final bool showPlane;
 
   @override
@@ -281,7 +193,10 @@ class SubscriptionNoticeView extends StatelessWidget {
     final telegram = plane.isNotEmpty && subscriptionPlaneIsTelegram(plane);
     final copy = Text(
       body,
-      style: theme.textTheme.bodyMedium?.copyWith(height: 1.35),
+      style: theme.textTheme.bodyMedium?.copyWith(
+        height: 1.35,
+        color: theme.colorScheme.onSurfaceVariant,
+      ),
     );
     final framed = frame && body.isNotEmpty
         ? DecoratedBox(

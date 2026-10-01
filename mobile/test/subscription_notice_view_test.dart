@@ -71,7 +71,7 @@ void main() {
     expect(find.byKey(kSubscriptionNoticePlaneKey), findsNothing);
   });
 
-  testWidgets('refresh and the Telegram plane share the sky band',
+  testWidgets('the plane, refresh, and trash sit above the description',
       (tester) async {
     const surface = Color(0xFFFFFFFF);
     final trash = catalogTrashFill(surface, dark: false);
@@ -88,46 +88,43 @@ void main() {
             band: AppBrand.noticeBand,
             trashFill: trash,
             seamColor: AppBrand.lineLight,
-            notice: const Text('Значок справа ведёт в бота'),
+            notice: const SubscriptionNoticeView(
+              text: 'Значок справа ведёт в бота',
+              planeUrl: null,
+              frame: false,
+              showPlane: false,
+            ),
           ),
         ),
       ),
     );
 
-    final refresh = tester.getRect(find.byKey(kCatalogRefreshSlotKey));
+    final share = tester.getRect(find.byKey(kCatalogShareSlotKey));
     final plane = tester.getRect(find.byKey(kCatalogPlaneSlotKey));
-    expect(plane.top, closeTo(refresh.bottom, 0.5));
-    expect(plane.left, closeTo(refresh.left, 0.5));
-    expect(plane.width, refresh.width);
+    final refresh = tester.getRect(find.byKey(kCatalogRefreshSlotKey));
+    final trashBox = tester.getRect(find.byKey(kCatalogTrashFillKey));
+    final notice = tester.getRect(find.text('Значок справа ведёт в бота'));
 
-    final stamp = tester.getRect(find.byKey(kCatalogRefreshBandKey));
-    expect(stamp.bottom, greaterThan(plane.bottom + 4));
-    expect(stamp.left, closeTo(plane.left, 0.5));
-    expect(stamp.right, closeTo(plane.right, 0.5));
+    expect(share.center.dy, closeTo(refresh.center.dy, 1));
+    expect(share.right, lessThanOrEqualTo(refresh.left + 0.5));
+    expect(plane.center.dx, closeTo(refresh.center.dx, 1));
+    expect(plane.top, greaterThanOrEqualTo(refresh.bottom - 0.5));
+    expect(refresh.right, lessThanOrEqualTo(trashBox.left + 0.5));
+    expect(notice.top, greaterThanOrEqualTo(trashBox.bottom - 0.5));
+    expect(notice.right, lessThanOrEqualTo(plane.left + 0.5));
+    expect(find.byKey(kSubscriptionNoticeFrameKey), findsNothing);
+
+    final band = tester.getRect(find.byKey(kCatalogRefreshBandKey));
+    expect(band.bottom, closeTo(refresh.bottom, 1));
+    expect(band.top, closeTo(refresh.top, 1));
     expect(
-      tester.widget<CatalogStampBand>(find.byKey(kCatalogRefreshBandKey)).color,
+      tester.widget<ColoredBox>(find.byKey(kCatalogRefreshBandKey)).color,
       AppBrand.noticeBand,
     );
     expect(
-      CatalogStampBand.dropFor(catalogActionExtent),
-      closeTo(
-        (catalogActionExtent - 1) / (catalogStampDiamonds + 1),
-        0.01,
-      ),
-    );
-    expect(
       tester.widget<ColoredBox>(find.byKey(kCatalogTrashFillKey)).color,
-      trash,
+      AppBrand.paperMargin,
     );
-    expect(
-      find.ancestor(
-        of: find.byIcon(Icons.share),
-        matching: find.byKey(kCatalogRefreshBandKey),
-      ),
-      findsNothing,
-    );
-    expect(trash.r, greaterThan(trash.g));
-    expect(trash.g, greaterThan(trash.b));
-    expect(trash.r, greaterThan(AppBrand.paperMargin.r));
+    expect(find.byIcon(Icons.share), findsOneWidget);
   });
 }
