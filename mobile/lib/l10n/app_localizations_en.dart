@@ -880,6 +880,23 @@ class AppL10nEn extends AppL10n {
       'Tile already in Quick Settings — open the shade and scroll';
 
   @override
+  String get settingsQsTileAddedHint =>
+      'The tile is in Quick Settings. Tap to remove it';
+
+  @override
+  String get settingsQsTileRemove => 'Remove';
+
+  @override
+  String get settingsQsTileRemoveTitle => 'Remove the tile';
+
+  @override
+  String get settingsQsTileRemoveBody =>
+      'Pull down the shade, tap the pencil, and drag “Proxy Dom” to the top.';
+
+  @override
+  String get settingsQsTileRemoveAck => 'Got it';
+
+  @override
   String get settingsQsTileManual =>
       'Add manually: shade → pencil → “Proxy Dom”';
 

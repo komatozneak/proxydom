@@ -10,6 +10,21 @@ class QsTilePrefs {
   static bool get isSupported =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
+  /// True after the system reports the tile is in Quick Settings.
+  ///
+  /// Cleared when the user drags the tile out ([TeremokTileService.onTileRemoved]).
+  static Future<bool> isAdded() async {
+    if (!isSupported) return false;
+    try {
+      final result = await _channel.invokeMethod<bool>('isQsTileAdded');
+      return result ?? false;
+    } on PlatformException {
+      return false;
+    } on MissingPluginException {
+      return false;
+    }
+  }
+
   /// Prompt the system to pin [TeremokTileService].
   ///
   /// Returns one of: `added`, `already_added`, `not_added`, `manual`.

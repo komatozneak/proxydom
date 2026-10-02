@@ -52,6 +52,7 @@ flutter:
     - assets/brand/connect/s1-flat-launcher.png
     - assets/brand/sites/claude.png
     - assets/icon/mono_teremok.png
+    - assets/icon/ic_launcher_monochrome.png
     - assets/icon/nav_vpn_teremok.png
     - assets/icon/logo_mark_nav.png
     - assets/icon/logo_mark_nav_light.png

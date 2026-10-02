@@ -26,17 +26,33 @@ class SettingsScreen extends ConsumerStatefulWidget {
   ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+class _SettingsScreenState extends ConsumerState<SettingsScreen>
+    with WidgetsBindingObserver {
   bool? _notifEnabled;
   bool _notifLoading = false;
   bool _qsAdding = false;
+  bool _qsTileAdded = false;
   String _versionLabel = '';
   TunnelLogLevel _logLevel = TunnelLogLevel.info;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _bootstrap();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && QsTilePrefs.isSupported) {
+      _loadQsTileAdded();
+    }
   }
 
   Future<void> _bootstrap() async {
@@ -46,6 +62,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     ];
     if (VpnNotificationPrefs.isSupported) {
       futures.add(_loadNotif());
+    }
+    if (QsTilePrefs.isSupported) {
+      futures.add(_loadQsTileAdded());
     }
     await Future.wait(futures);
   }
@@ -77,21 +96,56 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     setState(() => _notifLoading = false);
   }
 
+  Future<void> _loadQsTileAdded() async {
+    final added = await QsTilePrefs.isAdded();
+    if (!mounted) return;
+    setState(() => _qsTileAdded = added);
+  }
+
   Future<void> _onAddQsTile() async {
     if (_qsAdding) return;
+    if (_qsTileAdded) {
+      await _showQsTileRemoveDialog();
+      return;
+    }
     setState(() => _qsAdding = true);
     final result = await QsTilePrefs.requestAdd();
     UiLog.action('settings', 'qs_tile', result: result);
     if (!mounted) return;
-    setState(() => _qsAdding = false);
+    final added = result == 'added' || result == 'already_added';
+    setState(() {
+      _qsAdding = false;
+      if (added) _qsTileAdded = true;
+    });
+    if (result == 'already_added') {
+      await _showQsTileRemoveDialog();
+      return;
+    }
     final l = AppL10n.of(context);
     final message = switch (result) {
       'added' => l.settingsQsTileAdded,
-      'already_added' => l.settingsQsTileAlreadyAdded,
       'not_added' => l.settingsQsTileNotAdded,
       _ => l.settingsQsTileManual,
     };
     showTeremokSnackBar(context, message);
+  }
+
+  Future<void> _showQsTileRemoveDialog() async {
+    final l = AppL10n.of(context);
+    await showDialog<void>(
+      context: context,
+      useRootNavigator: true,
+      builder: (ctx) => AlertDialog(
+        title: Text(l.settingsQsTileRemoveTitle),
+        content: Text(l.settingsQsTileRemoveBody),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l.settingsQsTileRemoveAck),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _loadLogLevel() async {
@@ -288,9 +342,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           if (showNotif && QsTilePrefs.isSupported)
             _SettingsRow(
-              icon: AppIcons.house,
+              leading: const _QsTileMonoIcon(),
               title: l.settingsQsTileTitle,
-              subtitle: l.settingsQsTileHint,
+              subtitle: _qsTileAdded
+                  ? l.settingsQsTileAddedHint
+                  : l.settingsQsTileHint,
               onTap: _qsAdding ? null : _onAddQsTile,
               trailing: _qsAdding
                   ? const SizedBox(
@@ -298,7 +354,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       height: 22,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : null,
+                  : _qsTileAdded
+                      ? Text(
+                          l.settingsQsTileRemove,
+                          style:
+                              Theme.of(context).textTheme.labelLarge?.copyWith(
+                                    color:
+                                        Theme.of(context).colorScheme.primary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                        )
+                      : null,
             ),
           if (showNoVpn)
             _SettingsRow(
@@ -474,6 +540,38 @@ class _SettingsRow extends StatelessWidget {
               const AppIcon(AppIcons.chevronRight, size: 18),
             ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Living House from `ic_launcher_monochrome`, tinted like the other row icons.
+class _QsTileMonoIcon extends StatelessWidget {
+  const _QsTileMonoIcon();
+
+  static const _asset = 'assets/icon/ic_launcher_monochrome.png';
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = theme.iconTheme.color ?? theme.colorScheme.onSurface;
+    return Container(
+      width: 36,
+      height: 36,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: AppBrand.oakWithOpacity(0.08),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: ColorFiltered(
+        colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+        child: Image.asset(
+          _asset,
+          width: 20,
+          height: 20,
+          filterQuality: FilterQuality.medium,
+          excludeFromSemantics: true,
         ),
       ),
     );

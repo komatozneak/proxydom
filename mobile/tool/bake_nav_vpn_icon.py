@@ -1,6 +1,6 @@
-"""Bake bottom-nav Teremok + VPN cutout from mono silhouette.
+"""Bake bottom-nav Teremok + DOM cutout from mono silhouette.
 
-Output: assets/icon/nav_vpn_teremok.png (white glyph, transparent VPN holes)
+Output: assets/icon/nav_vpn_teremok.png (white glyph, transparent DOM holes)
 so Flutter ColorFiltered(srcIn) can theme the house while letters punch through.
 """
 from __future__ import annotations
@@ -16,9 +16,9 @@ OUT = os.path.join(ROOT, "assets", "icon", "nav_vpn_teremok.png")
 
 def _load_font(size: int) -> ImageFont.ImageFont:
     candidates = [
+        r"C:\Windows\Fonts\impact.ttf",
         r"C:\Windows\Fonts\arialbd.ttf",
         r"C:\Windows\Fonts\segoeuib.ttf",
-        r"C:\Windows\Fonts\Impact.ttf",
         r"C:\Windows\Fonts\arial.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
     ]
@@ -45,7 +45,7 @@ def punch_vpn(mono: Image.Image) -> Image.Image:
     font = _load_font(font_size)
     probe = ImageDraw.Draw(Image.new("L", (8, 8)))
     for _ in range(14):
-        box = probe.textbbox((0, 0), "VPN", font=font)
+        box = probe.textbbox((0, 0), "DOM", font=font)
         text_w = box[2] - box[0]
         if text_w <= 0:
             break
@@ -56,7 +56,7 @@ def punch_vpn(mono: Image.Image) -> Image.Image:
 
     mask = Image.new("L", out.size, 0)
     draw = ImageDraw.Draw(mask)
-    # Fat cutout so VPN stays readable at ~40dp.
+    # Fat cutout so DOM stays readable at ~40dp.
     for dx, dy in (
         (0, 0),
         (1, 0),
@@ -68,7 +68,7 @@ def punch_vpn(mono: Image.Image) -> Image.Image:
         (1, 1),
         (-1, 1),
     ):
-        draw.text((cx + dx, cy + dy), "VPN", font=font, fill=255, anchor="mm")
+        draw.text((cx + dx, cy + dy), "DOM", font=font, fill=255, anchor="mm")
     mask = mask.filter(ImageFilter.GaussianBlur(radius=0.55))
 
     pixels = out.load()
