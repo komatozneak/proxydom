@@ -152,7 +152,9 @@ class AppConfig {
   /// expect a constant; points at support by design.
   static const String accountDeletionUrl = 'https://proxydom.su/support.html';
 
-  static const String supportEmail = '27komatozneak@gmail.com';
+  /// Role contact shown in the app. Matches the site footer and the mailbox
+  /// the Apple and D&B correspondence runs on.
+  static const String supportEmail = 'support@proxydom.su';
 
   /// Subscription list prices (RUB) — keep in sync with backend PLAN_*_PRICE_RUB.
   static const int plan1mPriceRub = 199;
