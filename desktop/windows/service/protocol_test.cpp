@@ -146,6 +146,10 @@ int main() {
   expect(domain_allowed("lan.example"), "domain");
   expect(!domain_allowed("http://lan.example"), "domain rejects a url");
   expect(!domain_allowed("../x"), "domain rejects dots");
+  expect(prove_generation_due(0, 1), "first generation is proved");
+  expect(!prove_generation_due(1, 1), "the same generation is not proved twice");
+  expect(prove_generation_due(1, 2), "the next server is proved");
+  expect(!prove_generation_due(0, 0), "generation 0 is not a proof");
 
   if (g_failed != 0) {
     std::cerr << g_failed << " failed\n";

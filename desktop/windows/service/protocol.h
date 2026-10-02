@@ -70,6 +70,11 @@ std::string state_event_v2(std::int64_t generation,
 // Gate 2 finished. Connected is still false until the controller proves ingress.
 std::string tun_ready_event(std::int64_t generation);
 
+// One HTTP 204 per service generation. Idle resets [last_proved] to 0.
+inline bool prove_generation_due(std::int64_t last_proved, std::int64_t generation) {
+  return generation > 0 && generation > last_proved;
+}
+
 std::string ack_event(const std::string& command,
                       bool accepted,
                       std::int64_t generation,

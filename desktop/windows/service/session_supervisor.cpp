@@ -194,7 +194,7 @@ std::string user_message(TunnelCode code, const std::string& extra) {
     case TunnelCode::TunNotReady:
       return "Виртуальный адаптер недоступен";
     case TunnelCode::EgressFailed:
-      return "Связь через выбранную строку не подтверждена";
+      return "Не удалось подтвердить доступность узла. Попробуйте другой сервер";
     case TunnelCode::CleanupFailed:
       return "Ошибка восстановления сети. Перезапустите службу";
     case TunnelCode::Busy:

@@ -49,15 +49,20 @@ class WindowsTunnel {
   bool _connectPending = false;
   DateTime? _brokerCooldownUntil;
 
-  /// True while a command is in flight, cleanup is unverified, or a failed
-  /// hello is still in its short lock. Connected stays tappable.
+  /// The pipe broke or the controller never opened. Connecting is not this.
+  bool get brokerCooling {
+    final until = _brokerCooldownUntil;
+    return until != null && DateTime.now().isBefore(until);
+  }
+
+  /// True while a command is in flight, cleanup is unverified, or the pipe
+  /// just broke. Connected stays tappable.
   bool get nestLocked {
     if (_connectPending) return true;
     if ((phase == 'idle' || phase == 'disconnecting') && !cleanupVerified) {
       return true;
     }
-    final until = _brokerCooldownUntil;
-    return until != null && DateTime.now().isBefore(until);
+    return brokerCooling;
   }
 
   void _coolBroker() {
@@ -301,30 +306,21 @@ class WindowsTunnel {
         cleanupVerified: terminal.cleanupVerified ?? false,
       );
     } on TimeoutException {
-      if (accepted) {
-        return WindowsConnectResult(
-          ok: false,
-          accepted: true,
-          notice: kWindowsConnectingTimeoutCaption,
-          code: 'connecting_timeout',
-          generation: generation,
-          cleanupVerified: cleanupVerified,
-        );
-      }
-      _controller?.kill();
-      _controller = null;
-      _commands = null;
-      _coolBroker();
-      return const WindowsConnectResult(
+      // An accepted connect is still on the pipe. Killing the controller
+      // would look like the service disappeared.
+      return WindowsConnectResult(
         ok: false,
-        notice: kWindowsServiceMissing,
-        code: 'broker_unavailable',
+        accepted: accepted,
+        notice: kWindowsConnectingTimeoutCaption,
+        code: 'connecting_timeout',
+        generation: generation,
+        cleanupVerified: cleanupVerified,
       );
     } catch (_) {
-      if (accepted) {
+      if (accepted || _commands != null) {
         return WindowsConnectResult(
           ok: false,
-          accepted: true,
+          accepted: accepted,
           notice: kWindowsConnectingTimeoutCaption,
           code: 'connecting_timeout',
           generation: generation,
