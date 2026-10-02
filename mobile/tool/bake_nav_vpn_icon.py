@@ -1,6 +1,6 @@
 """Bake bottom-nav Teremok + DOM cutout from mono silhouette.
 
-Output: assets/icon/nav_vpn_teremok.png (white glyph, transparent DOM holes)
+Output: assets/icon/nav_vpn_proxydom.png (white glyph, transparent DOM holes)
 so Flutter ColorFiltered(srcIn) can theme the house while letters punch through.
 """
 from __future__ import annotations
@@ -10,8 +10,8 @@ import os
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
-MONO = os.path.join(ROOT, "assets", "icon", "mono_teremok.png")
-OUT = os.path.join(ROOT, "assets", "icon", "nav_vpn_teremok.png")
+MONO = os.path.join(ROOT, "assets", "icon", "mono_proxydom.png")
+OUT = os.path.join(ROOT, "assets", "icon", "nav_vpn_proxydom.png")
 
 
 def _load_font(size: int) -> ImageFont.ImageFont:

@@ -15,7 +15,7 @@ import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/connect_button.dart';
 import '../../../core/widgets/house_pulsar.dart';
 import '../../../core/widgets/signal_nest_hero.dart';
-import '../../../core/widgets/teremok_snackbar.dart';
+import '../../../core/widgets/proxydom_snackbar.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../settings/data/installed_apps_channel.dart';
 import '../../settings/data/split_tunnel_prefs.dart';

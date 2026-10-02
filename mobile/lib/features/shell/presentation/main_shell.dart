@@ -12,7 +12,7 @@ import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/notebook_paper.dart';
-import '../../../core/widgets/teremok_nav_icon.dart';
+import '../../../core/widgets/proxydom_nav_icon.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../home/application/vpn_provider.dart';
 

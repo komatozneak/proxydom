@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../../core/diagnostics/ui_log.dart';
-import '../../../core/widgets/teremok_snackbar.dart';
+import '../../../core/widgets/proxydom_snackbar.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../home/application/vpn_provider.dart';
 import '../../home/application/vpn_status.dart';

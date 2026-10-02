@@ -6,9 +6,9 @@
 |---|---|
 | `onboarding_globe.png` | Onboarding hero. |
 | `connect/s1-flat-launcher.png` | Living House mascot (mustard + white door). Used by Home connect glyph. |
-| `icon/fg_teremok.png` | Adaptive icon foreground (from mascot). |
-| `icon/mono_teremok.png` | Android 13+ themed / monochrome silhouette. |
-| `icon/nav_vpn_teremok.png` | Bottom-nav center mark: mono house + «DOM» cutout (Latin, not l10n). |
+| `icon/fg_proxydom.png` | Adaptive icon foreground (from mascot). |
+| `icon/mono_proxydom.png` | Android 13+ themed / monochrome silhouette. |
+| `icon/nav_vpn_proxydom.png` | Bottom-nav center mark: mono house + «DOM» cutout (Latin, not l10n). |
 | `rive/signal_nest_connect.riv` | Optional Rive export (Flutter painter is SoT). |
 
 ## Regenerate launcher icons
@@ -21,7 +21,7 @@ dart run flutter_launcher_icons
 python tool/bake_nav_vpn_icon.py
 ```
 
-Background: `#FAF8F3`. Notification / status smallIcon: `android/.../drawable/ic_stat_teremok.xml`.
+Background: `#FAF8F3`. Notification / status smallIcon: `android/.../drawable/ic_stat_proxydom.xml`.
 
 ## Tagline
 
@@ -30,6 +30,6 @@ Background: `#FAF8F3`. Notification / status smallIcon: `android/.../drawable/ic
 ## Rules
 
 - No Cyrillic baked into PNGs (l10n = Flutter Text widgets).
-- Exception: Latin «DOM» may be cut into `nav_vpn_teremok.png` for the Ogon-style center tab.
+- Exception: Latin «DOM» may be cut into `nav_vpn_proxydom.png` for the Ogon-style center tab.
 - Colors via `AppBrand.*` / `Theme.of(context).colorScheme.*`.
 - Do not resurrect `fg_oak_moss` oak+moss shield as the store icon.

@@ -13,7 +13,7 @@ import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/location_flag_icon.dart';
-import '../../../core/widgets/teremok_snackbar.dart';
+import '../../../core/widgets/proxydom_snackbar.dart';
 import '../../../l10n/app_localizations.dart';
 import 'vpn_platform_copy.dart';
 import 'windows_share_qr.dart';
