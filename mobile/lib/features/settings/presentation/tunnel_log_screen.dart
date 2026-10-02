@@ -15,7 +15,7 @@ import '../../../core/diagnostics/windows_service_log.dart';
 import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
-import '../../../core/widgets/teremok_snackbar.dart';
+import '../../../core/widgets/proxydom_snackbar.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../vpn/data/vpn_controller.dart';
 

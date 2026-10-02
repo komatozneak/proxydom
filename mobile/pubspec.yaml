@@ -51,9 +51,9 @@ flutter:
     - assets/brand/
     - assets/brand/connect/s1-flat-launcher.png
     - assets/brand/sites/claude.png
-    - assets/icon/mono_teremok.png
+    - assets/icon/mono_proxydom.png
     - assets/icon/ic_launcher_monochrome.png
-    - assets/icon/nav_vpn_teremok.png
+    - assets/icon/nav_vpn_proxydom.png
     - assets/icon/logo_mark_nav.png
     - assets/icon/logo_mark_nav_light.png
     - assets/rive/signal_nest_connect.riv
@@ -83,8 +83,8 @@ flutter_launcher_icons:
   android: true
   ios: true
   remove_alpha_ios: true
-  image_path: assets/icon/fg_teremok.png
+  image_path: assets/icon/fg_proxydom.png
   adaptive_icon_background: "#FAF8F3"
-  adaptive_icon_foreground: assets/icon/fg_teremok.png
-  adaptive_icon_monochrome: assets/icon/mono_teremok.png
+  adaptive_icon_foreground: assets/icon/fg_proxydom.png
+  adaptive_icon_monochrome: assets/icon/mono_proxydom.png
   min_sdk_android: 26

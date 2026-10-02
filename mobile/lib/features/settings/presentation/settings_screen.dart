@@ -12,7 +12,7 @@ import '../../../core/ios_store_gates.dart';
 import '../../../core/support_contact.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
-import '../../../core/widgets/teremok_snackbar.dart';
+import '../../../core/widgets/proxydom_snackbar.dart';
 import '../../../l10n/app_localizations.dart';
 import '../application/locale_provider.dart';
 import '../application/theme_mode_provider.dart';

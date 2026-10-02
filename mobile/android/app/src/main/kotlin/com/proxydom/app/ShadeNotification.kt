@@ -132,7 +132,7 @@ object ShadeNotification {
         val channel = if (visible) CHANNEL_VISIBLE else CHANNEL_QUIET
         val status = line.ifBlank { context.getString(R.string.vpn_notification_connected) }
         val builder = NotificationCompat.Builder(context, channel)
-            .setSmallIcon(R.drawable.ic_stat_teremok)
+            .setSmallIcon(R.drawable.ic_stat_proxydom)
             .setContentTitle("Прокси Дом")
             .setContentText(status)
             .setOngoing(true)

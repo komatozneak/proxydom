@@ -89,8 +89,8 @@ def main() -> None:
     fg = _fit_on_canvas(mascot, SIZE, SAFE_SCALE)
     mono = _fit_on_canvas(_monochrome_silhouette(mascot), SIZE, SAFE_SCALE)
 
-    fg_path = os.path.join(OUT, "fg_teremok.png")
-    mono_path = os.path.join(OUT, "mono_teremok.png")
+    fg_path = os.path.join(OUT, "fg_proxydom.png")
+    mono_path = os.path.join(OUT, "mono_proxydom.png")
     fg.save(fg_path, optimize=True)
     mono.save(mono_path, optimize=True)
     fg.save(os.path.join(OUT, "fg_oak_moss.png"), optimize=True)
@@ -102,7 +102,7 @@ def main() -> None:
     print("wrote", mono_path, os.path.getsize(mono_path))
     print("SAFE_SCALE", SAFE_SCALE, "content-cropped")
     print(
-        "note: bottom-nav DOM glyph is curated at assets/icon/nav_vpn_teremok.png; "
+        "note: bottom-nav DOM glyph is curated at assets/icon/nav_vpn_proxydom.png; "
         "optional PIL cutout: python tool/bake_nav_vpn_icon.py"
     )
 
