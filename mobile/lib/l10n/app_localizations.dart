@@ -1693,6 +1693,36 @@ abstract class AppL10n {
   /// **'Tile already in Quick Settings — open the shade and scroll'**
   String get settingsQsTileAlreadyAdded;
 
+  /// No description provided for @settingsQsTileAddedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The tile is in Quick Settings. Tap to remove it'**
+  String get settingsQsTileAddedHint;
+
+  /// No description provided for @settingsQsTileRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get settingsQsTileRemove;
+
+  /// No description provided for @settingsQsTileRemoveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove the tile'**
+  String get settingsQsTileRemoveTitle;
+
+  /// No description provided for @settingsQsTileRemoveBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Pull down the shade, tap the pencil, and drag “Proxy Dom” to the top.'**
+  String get settingsQsTileRemoveBody;
+
+  /// No description provided for @settingsQsTileRemoveAck.
+  ///
+  /// In en, this message translates to:
+  /// **'Got it'**
+  String get settingsQsTileRemoveAck;
+
   /// No description provided for @settingsQsTileManual.
   ///
   /// In en, this message translates to:

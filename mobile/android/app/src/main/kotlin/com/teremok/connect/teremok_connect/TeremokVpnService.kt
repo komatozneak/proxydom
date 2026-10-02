@@ -2076,6 +2076,9 @@ object VpnChannelRegistry {
                         val host = activityProvider() ?: appContext
                         QsTilePrompter.requestAdd(host, result)
                     }
+                    "isQsTileAdded" -> {
+                        result.success(QsTilePresence.isAdded(appContext))
+                    }
                     "listLauncherApps" -> {
                         val includeIcons = call.argument<Boolean>("includeIcons") ?: true
                         result.success(listLauncherApps(appContext, includeIcons))

@@ -882,6 +882,23 @@ class AppL10nRu extends AppL10n {
       'Плитка уже в шторке — откройте панель и пролистайте';
 
   @override
+  String get settingsQsTileAddedHint =>
+      'Плитка в шторке. Нажмите, чтобы убрать';
+
+  @override
+  String get settingsQsTileRemove => 'Убрать';
+
+  @override
+  String get settingsQsTileRemoveTitle => 'Убрать плитку';
+
+  @override
+  String get settingsQsTileRemoveBody =>
+      'Потяните шторку вниз, нажмите карандаш и перетащите «Прокси Дом» наверх.';
+
+  @override
+  String get settingsQsTileRemoveAck => 'Понятно';
+
+  @override
   String get settingsQsTileManual =>
       'Добавьте вручную: шторка → карандаш → «Прокси Дом»';
 

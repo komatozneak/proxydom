@@ -102,7 +102,7 @@ def main() -> None:
     print("wrote", mono_path, os.path.getsize(mono_path))
     print("SAFE_SCALE", SAFE_SCALE, "content-cropped")
     print(
-        "note: bottom-nav VPN glyph is curated at assets/icon/nav_vpn_teremok.png; "
+        "note: bottom-nav DOM glyph is curated at assets/icon/nav_vpn_teremok.png; "
         "optional PIL cutout: python tool/bake_nav_vpn_icon.py"
     )
 

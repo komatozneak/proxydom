@@ -24,8 +24,14 @@ class TeremokTileService : TileService() {
     }
 
     override fun onTileAdded() {
+        QsTilePresence.setAdded(applicationContext, true)
         super.onTileAdded()
         updateTileState()
+    }
+
+    override fun onTileRemoved() {
+        QsTilePresence.setAdded(applicationContext, false)
+        super.onTileRemoved()
     }
 
     override fun onClick() {
@@ -90,10 +96,7 @@ class TeremokTileService : TileService() {
         val tile = qsTile ?: return
         tile.state = state
         tile.label = getString(R.string.qs_tile_label)
-        tile.icon = Icon.createWithResource(
-            this,
-            if (state == Tile.STATE_ACTIVE) R.drawable.ic_qs_vpn else R.drawable.ic_qs_vpn_off,
-        )
+        tile.icon = Icon.createWithResource(this, R.drawable.ic_qs_vpn)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             tile.subtitle = getString(
                 when (status) {
