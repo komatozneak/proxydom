@@ -44,6 +44,12 @@ struct ClientCommand {
   // True when `direct_domains` overflowed kMaxDirectDomains. The service log
   // records it: a silently truncated list looks like a routing bug.
   bool direct_domains_truncated = false;
+  // Hosts that must stay on the proxy even when UDP bypass is on. Without them
+  // the UDP rule would drag a force-proxied site out through the tunnel.
+  std::vector<std::string> force_proxy_domains;
+  // Route UDP to the physical NIC. Game traffic is UDP to bare IPs, which no
+  // domain rule can match, and the addresses change.
+  bool udp_direct = false;
 };
 
 std::string encode_frame(const std::string& json);
@@ -56,9 +62,12 @@ bool own_adapter_name(const std::wstring& name);
 bool domain_allowed(const std::string& host);
 
 // [server_ip] is the IPv4 pinned before the adapter comes up. Empty rejects.
+// [force_proxy_domains] are matched before the UDP rule, [udp_direct] last.
 std::string build_singbox_config(const ShareLine& line,
                                  const std::string& server_ip,
-                                 const std::vector<std::string>& domains);
+                                 const std::vector<std::string>& domains,
+                                 const std::vector<std::string>& force_proxy_domains,
+                                 bool udp_direct);
 
 // First prove the key through a loopback SOCKS endpoint. This config has no
 // TUN inbound, auto_route, DNS hijack, or other system-network mutation.

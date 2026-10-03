@@ -342,6 +342,8 @@ struct App {
     ConnectRequest request;
     request.uri = command.uri;
     request.direct_domains = command.direct_domains;
+    request.force_proxy_domains = command.force_proxy_domains;
+    request.udp_direct = command.udp_direct;
     if (command.direct_domains_truncated) {
       // A dropped exclusion row routes its site through the proxy and looks
       // like a routing bug. Say so in the log the app exports.

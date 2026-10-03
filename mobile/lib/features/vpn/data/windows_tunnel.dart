@@ -241,6 +241,8 @@ class WindowsTunnel {
   Future<WindowsConnectResult> connect(
     String uri, {
     required List<String> directDomains,
+    List<String> forceProxyDomains = const [],
+    bool udpDirect = false,
   }) async {
     if (_connectPending || phase != 'idle' || !cleanupVerified) {
       return WindowsConnectResult(
@@ -256,7 +258,12 @@ class WindowsTunnel {
     var accepted = false;
     try {
       await _send(tunnelHello());
-      await _send(tunnelConnect(uri: uri, directDomains: directDomains));
+      await _send(tunnelConnect(
+        uri: uri,
+        directDomains: directDomains,
+        forceProxyDomains: forceProxyDomains,
+        udpDirect: udpDirect,
+      ));
       final ack = await _waitFor(
         (event) =>
             (event.event == 'ack' && event.command == 'connect') ||

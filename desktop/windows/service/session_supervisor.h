@@ -104,6 +104,8 @@ struct TunnelSnapshot {
 struct ConnectRequest {
   std::string uri;
   std::vector<std::string> direct_domains;
+  std::vector<std::string> force_proxy_domains;
+  bool udp_direct = false;
 };
 
 struct BeginResult {

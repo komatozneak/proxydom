@@ -651,7 +651,8 @@ TunnelSnapshot TunnelSupervisor::run_connect(const ConnectRequest& request, Canc
   if (stop_requested(ConnectStep::Resolved, cancel)) return finish(TunnelCode::None, {}, true);
 
   gate("core", nullptr);
-  const std::string config = build_singbox_config(line, server_ip, request.direct_domains);
+  const std::string config = build_singbox_config(line, server_ip, request.direct_domains,
+                                                   request.force_proxy_domains, request.udp_direct);
   if (config.empty() || !files_.write_config(config)) {
     const unsigned long win32 = config.empty() ? 13u : files_.last_error();
     log_.write(ledger_.generation, "core_config_failed", "", win32);

@@ -21,6 +21,24 @@ void main() {
     expect(message['direct_domains'], ['lan.example']);
   });
 
+  test('connect carries the udp bypass and the force-proxy hosts', () {
+    final message = tunnelConnect(
+      uri: 'hy2://secret@cdn.example:443',
+      directDomains: ['steamserver.net'],
+      forceProxyDomains: ['youtube.com', 'bad host'],
+      udpDirect: true,
+    );
+    expect(message['force_proxy_domains'], ['youtube.com']);
+    expect(message['udp_direct'], 1);
+
+    final off = tunnelConnect(
+      uri: 'hy2://secret@cdn.example:443',
+      directDomains: const [],
+    );
+    expect(off['force_proxy_domains'], isEmpty);
+    expect(off['udp_direct'], 0);
+  });
+
   test('state parser preserves authoritative broker fields', () {
     final event = TunnelStateEvent.parse(
       '{"event":"state","generation":4,"state":"connected",'
