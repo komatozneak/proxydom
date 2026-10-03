@@ -47,18 +47,23 @@ void main() {
   });
 
   group('prefs defaults', () {
-    test('popular RU categories default ON including TikTok', () async {
+    test('popular RU categories default ON, TikTok stays in the tunnel',
+        () async {
       expect(
-        kOsnovnyeCategories.every((c) => c.defaultEnabled),
-        isTrue,
+        kOsnovnyeCategories.where((c) => c.defaultEnabled).length,
+        kOsnovnyeCategories.length - 1,
+      );
+      expect(
+        kTunnelOnlyOsnovnyeIds,
+        contains('tiktok'),
       );
       expect(
         await SplitTunnelPrefs.osnovnyeEnabledCount(),
-        kOsnovnyeCategories.length,
+        kOsnovnyeCategories.length - 1,
       );
       final map = await SplitTunnelPrefs.loadOsnovnyeEnabled();
+      expect(map['tiktok'], isFalse);
       expect(map['vk'], isTrue);
-      expect(map['tiktok'], isTrue);
       expect(map['banks'], isTrue);
       expect(map['shops'], isTrue);
       expect(map['mailok'], isTrue);
@@ -70,7 +75,6 @@ void main() {
         suffixes,
         containsAll([
           'vk.com',
-          'tiktok.com',
           'yandex.ru',
           'kinopoisk.ru',
           'dzen.ru',
@@ -93,6 +97,20 @@ void main() {
           'ivi.ru',
           '2gis.ru',
         ]),
+      );
+      expect(suffixes, isNot(contains('tiktok.com')));
+      expect(suffixes, isNot(contains('musical.ly')));
+      expect(suffixes, isNot(contains('byteoversea.com')));
+    });
+
+    test('TikTok opt-in still works and is not re-forced off', () async {
+      await SplitTunnelPrefs.setOsnovnyeEnabled('tiktok', true);
+      expect((await SplitTunnelPrefs.loadOsnovnyeEnabled())['tiktok'], isTrue);
+      final suffixes = await SplitTunnelPrefs.enabledDomainSuffixes();
+      expect(suffixes, contains('tiktok.com'));
+      expect(
+        await SplitTunnelPrefs.osnovnyeEnabledCount(),
+        kOsnovnyeCategories.length,
       );
     });
 
@@ -163,14 +181,14 @@ void main() {
         () async {
       expect(
         await SplitTunnelPrefs.osnovnyeEnabledCount(),
-        kOsnovnyeCategories.length,
+        kOsnovnyeCategories.length - 1,
       );
       await SplitTunnelPrefs.setOsnovnyeEnabled('vk', true);
       final suffixes = await SplitTunnelPrefs.enabledDomainSuffixes();
       expect(suffixes, contains('vk.com'));
-      expect(suffixes, contains('tiktok.com'));
+      expect(suffixes, isNot(contains('tiktok.com')));
       expect(await SplitTunnelPrefs.osnovnyeEnabledCount(),
-          kOsnovnyeCategories.length);
+          kOsnovnyeCategories.length - 1);
       await SplitTunnelPrefs.addSite(domain: 'youtube.com');
       final withYt = await SplitTunnelPrefs.enabledDomainSuffixes();
       expect(withYt, contains('youtube.com'));
@@ -190,10 +208,10 @@ void main() {
         containsAll(['vk.com', 'yandex.ru', 'ozon.ru', 'wildberries.ru']),
       );
       expect(suffixes, contains('steampowered.com'));
-      expect(suffixes, contains('tiktok.com'));
+      expect(suffixes, isNot(contains('tiktok.com')));
       expect(
         await SplitTunnelPrefs.osnovnyeEnabledCount(),
-        kOsnovnyeCategories.length,
+        kOsnovnyeCategories.length - 1,
       );
 
       await SplitTunnelPrefs.setOsnovnyeEnabled('vk', false);
@@ -203,8 +221,39 @@ void main() {
       );
       expect(
         await SplitTunnelPrefs.osnovnyeEnabledCount(),
-        kOsnovnyeCategories.length - 1,
+        kOsnovnyeCategories.length - 2,
       );
+    });
+
+    test('one-shot pulls a shipped TikTok default back into the tunnel',
+        () async {
+      SharedPreferences.setMockInitialValues({
+        'split_tunnel_osnovnye_rf_defaults_v1': true,
+        'split_tunnel_osnovnye_v2_defaults_v1': true,
+        'split_tunnel_osnovnye_v3_defaults_v1': true,
+        'split_tunnel_osnovnye_v4_defaults_v1': true,
+        'split_tunnel_osnovnye_v1':
+            '{"vk":true,"tiktok":true,"yandex":true,"ozon":true,"wb":true,'
+                '"shops":true,"mailok":true,"telecom":true,"media":true,'
+                '"transport":true}',
+        'split_tunnel_disallowed_apps_v1': <String>[
+          'com.zhiliaoapp.musically',
+          'com.ss.android.ugc.trill',
+          'ru.avito',
+        ],
+      });
+      final map = await SplitTunnelPrefs.loadOsnovnyeEnabled();
+      expect(map['tiktok'], isFalse);
+      expect(
+        await SplitTunnelPrefs.enabledDomainSuffixes(),
+        isNot(contains('tiktok.com')),
+      );
+      expect(await SplitTunnelPrefs.loadDisallowedPackages(), {'ru.avito'});
+      expect(await SplitTunnelPrefs.hasPendingChanges(), isTrue);
+
+      // Runs once — a deliberate opt-in after the migration sticks.
+      await SplitTunnelPrefs.setOsnovnyeEnabled('tiktok', true);
+      expect((await SplitTunnelPrefs.loadOsnovnyeEnabled())['tiktok'], isTrue);
     });
 
     test('disallowed apps prefs round-trip', () async {
@@ -224,23 +273,26 @@ void main() {
       addTearDown(() => debugDefaultTargetPlatformOverride = null);
       SharedPreferences.setMockInitialValues({});
       await SplitTunnelPrefs.loadOsnovnyeEnabled();
-      await SplitTunnelPrefs.setOsnovnyeEnabled('tiktok', false);
       await SplitTunnelPrefs.setOsnovnyeEnabled('vk', false);
-      expect((await SplitTunnelPrefs.loadOsnovnyeEnabled())['tiktok'], isFalse);
       expect((await SplitTunnelPrefs.loadOsnovnyeEnabled())['vk'], isFalse);
 
       final first = await SplitTunnelPrefs.ensureIosSitesAllEnabledIfNeeded();
       expect(first, isTrue);
       final map = await SplitTunnelPrefs.loadOsnovnyeEnabled();
-      expect(map.values.every((v) => v), isTrue);
-      expect(map['tiktok'], isTrue);
+      expect(map['vk'], isTrue);
+      expect(map['yandex'], isTrue);
+      // iOS has no per-app split, so the all-ON seed must not push TikTok out
+      // of the tunnel on iPhone either.
+      expect(map['tiktok'], isFalse);
+      final hosts = await SplitTunnelPrefs.enabledIosCatalogResolutionHosts();
+      expect(hosts, isNot(contains('tiktok.com')));
 
       final second = await SplitTunnelPrefs.ensureIosSitesAllEnabledIfNeeded();
       expect(second, isFalse);
-      await SplitTunnelPrefs.setOsnovnyeEnabled('tiktok', false);
+      await SplitTunnelPrefs.setOsnovnyeEnabled('vk', false);
       final third = await SplitTunnelPrefs.ensureIosSitesAllEnabledIfNeeded();
       expect(third, isFalse);
-      expect((await SplitTunnelPrefs.loadOsnovnyeEnabled())['tiktok'], isFalse);
+      expect((await SplitTunnelPrefs.loadOsnovnyeEnabled())['vk'], isFalse);
     });
 
     test('seedDefaultBypassIfNeeded adds only installed curated packages',
@@ -309,25 +361,28 @@ void main() {
       expect(again, isFalse);
     });
 
-    test('v4 seed adds TikTok/Avito without restoring user-off v3 packages',
-        () async {
+    test('v4 seed adds Avito without restoring user-off v3 packages', () async {
       SharedPreferences.setMockInitialValues({
         'split_tunnel_seeded_bypass_v1': true,
         'split_tunnel_seeded_bypass_v2': true,
         'split_tunnel_seeded_bypass_v3': true,
       });
       expect(kDefaultBypassPackagesV4, contains('ru.avito'));
-      expect(kDefaultBypassPackagesV4, contains('com.zhiliaoapp.musically'));
+      expect(
+        kDefaultBypassPackagesV4.any(kTunnelOnlyBypassPackages.contains),
+        isFalse,
+      );
+      expect(
+        kDefaultBypassPackages.any(kTunnelOnlyBypassPackages.contains),
+        isFalse,
+      );
       final added = await SplitTunnelPrefs.seedDefaultBypassIfNeeded([
         'ru.oneme.app',
         'ru.avito',
         'com.zhiliaoapp.musically',
       ]);
       expect(added, isTrue);
-      expect(await SplitTunnelPrefs.loadDisallowedPackages(), {
-        'com.zhiliaoapp.musically',
-        'ru.avito',
-      });
+      expect(await SplitTunnelPrefs.loadDisallowedPackages(), {'ru.avito'});
       final again = await SplitTunnelPrefs.seedDefaultBypassIfNeeded([
         'ru.oneme.app',
         'ru.avito',

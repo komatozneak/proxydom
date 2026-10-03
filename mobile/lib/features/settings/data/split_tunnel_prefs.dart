@@ -147,6 +147,7 @@ class SplitTunnelPrefs {
   static const _osnovnyeV2DefaultsKey = 'split_tunnel_osnovnye_v2_defaults_v1';
   static const _osnovnyeV3DefaultsKey = 'split_tunnel_osnovnye_v3_defaults_v1';
   static const _osnovnyeV4DefaultsKey = 'split_tunnel_osnovnye_v4_defaults_v1';
+  static const _tunnelOnlyDefaultsKey = 'split_tunnel_tunnel_only_defaults_v1';
   static const _disallowedAppsKey = 'split_tunnel_disallowed_apps_v1';
   static const _seededBypassKey = 'split_tunnel_seeded_bypass_v1';
   static const _seededBypassV2Key = 'split_tunnel_seeded_bypass_v2';
@@ -178,7 +179,7 @@ class SplitTunnelPrefs {
 
   /// One-shot: turn ON live RF lists even if an older JSON saved them false.
   ///
-  /// Does not touch TikTok. After this flag is set, a user OFF sticks.
+  /// TikTok is deliberately absent — see [kTunnelOnlyOsnovnyeIds].
   static Future<void> _applyRfOsnovnyeDefaultsIfNeeded(
     SharedPreferences prefs,
   ) async {
@@ -240,9 +241,9 @@ class SplitTunnelPrefs {
     await prefs.setBool(_osnovnyeV3DefaultsKey, true);
   }
 
-  /// One-shot: TikTok + popular RU shops/mail/telecom/media/transport ON.
+  /// One-shot: popular RU shops/mail/telecom/media/transport ON.
   ///
-  /// Older RF migrate left TikTok off. After this flag, a user OFF sticks.
+  /// TikTok is not here — [kTunnelOnlyOsnovnyeIds] keeps it in the tunnel.
   static Future<void> _applyV4OsnovnyeDefaultsIfNeeded(
     SharedPreferences prefs,
   ) async {
@@ -262,27 +263,70 @@ class SplitTunnelPrefs {
     await prefs.setBool(_osnovnyeV4DefaultsKey, true);
   }
 
-  /// Live «Основные» toggles. Popular RU Direct defaults ON, including TikTok.
+  /// One-shot: undo a wrong allowlist default on installs that already shipped it.
+  ///
+  /// TikTok is throttled in RF since 2022, so a bypassed TikTok is a dead app
+  /// for the ordinary user — the default was a bug, not a feature. Force it back
+  /// into the tunnel and drop the seeded TikTok packages from the bypass list.
+  /// Runs after every vN seed; later user toggles stick.
+  static Future<void> _applyTunnelOnlyDefaultsIfNeeded(
+    SharedPreferences prefs,
+  ) async {
+    if (prefs.getBool(_tunnelOnlyDefaultsKey) == true) return;
+    var changed = false;
+
+    final map = _decodeOsnovnyeMap(prefs);
+    var mapChanged = false;
+    for (final id in kTunnelOnlyOsnovnyeIds) {
+      if (map[id] != false) {
+        map[id] = false;
+        mapChanged = true;
+      }
+    }
+    if (mapChanged) {
+      await prefs.setString(_osnovnyeKey, jsonEncode(map));
+      changed = true;
+    }
+
+    final packages = await loadDisallowedPackages();
+    if (packages.any(kTunnelOnlyBypassPackages.contains)) {
+      packages.removeAll(kTunnelOnlyBypassPackages);
+      await prefs.setStringList(
+        _disallowedAppsKey,
+        packages.toList()..sort(),
+      );
+      changed = true;
+    }
+
+    if (changed) await _bumpDraft(prefs);
+    await prefs.setBool(_tunnelOnlyDefaultsKey, true);
+  }
+
+  /// Live «Основные» toggles. Popular RU Direct defaults ON; TikTok OFF.
   static Future<Map<String, bool>> loadOsnovnyeEnabled() async {
     final prefs = await SharedPreferences.getInstance();
     await _applyRfOsnovnyeDefaultsIfNeeded(prefs);
     await _applyV2OsnovnyeDefaultsIfNeeded(prefs);
     await _applyV3OsnovnyeDefaultsIfNeeded(prefs);
     await _applyV4OsnovnyeDefaultsIfNeeded(prefs);
+    await _applyTunnelOnlyDefaultsIfNeeded(prefs);
     return _decodeOsnovnyeMap(prefs);
   }
 
   /// iOS: one-shot turn ON every Sites «Основные» row that is still off.
   ///
   /// NoVPN UI is hidden on iOS; this keeps excludedRoutes useful in the
-  /// background (including TikTok). Runs once per install; later toggles stick.
+  /// background. Runs once per install; later toggles stick.
+  /// [kTunnelOnlyOsnovnyeIds] rows are skipped — they only work behind the VPN.
   static Future<bool> ensureIosSitesAllEnabledIfNeeded() async {
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) return false;
     final prefs = await SharedPreferences.getInstance();
+    await _applyTunnelOnlyDefaultsIfNeeded(prefs);
     if (prefs.getBool(_iosAllOnKey) == true) return false;
     final map = await loadOsnovnyeEnabled();
     var changed = false;
     for (final c in kOsnovnyeCategories) {
+      if (kTunnelOnlyOsnovnyeIds.contains(c.id)) continue;
       if (map[c.id] != true) {
         map[c.id] = true;
         changed = true;
@@ -576,7 +620,7 @@ const kDefaultBypassPackagesV3 = <String>{
   'ru.oneme.app',
 };
 
-/// v4: popular RU apps that skip DNS (shops, maps, mail/OK, media, TikTok).
+/// v4: popular RU apps that skip DNS (shops, maps, mail/OK, media, telecom).
 const kDefaultBypassPackagesV4 = <String>{
   'ru.avito',
   'ru.rutube.app',
@@ -588,8 +632,6 @@ const kDefaultBypassPackagesV4 = <String>{
   'ru.yandex.yandexmaps',
   'com.yandex.browser',
   'ru.yandex.searchplugin',
-  'com.zhiliaoapp.musically',
-  'com.ss.android.ugc.trill',
   'ru.ivi.client',
   'ru.more.play',
   'ru.dns.shop.android',
@@ -624,7 +666,6 @@ const kDefaultBypassPackages = <String>{
 /// Live RF site lists that default ON (suffix → Hy2 direct / iOS exclude).
 const kRfDefaultOnOsnovnyeIds = <String>{
   'vk',
-  'tiktok',
   'yandex',
   'ozon',
   'wb',
@@ -655,14 +696,29 @@ const kOsnovnyeV3Ids = <String>{
   'max',
 };
 
-/// TikTok + remaining popular RU rows (shops / Mail·OK / telecom / media / maps).
+/// Remaining popular RU rows (shops / Mail·OK / telecom / media / transport).
 const kOsnovnyeV4Ids = <String>{
-  'tiktok',
   'shops',
   'mailok',
   'telecom',
   'media',
   'transport',
+};
+
+/// Rows that must never be enabled by a default or a one-shot seed.
+///
+/// TikTok is globally throttled in RF since 2022: a bypassed TikTok opens to a
+/// stalled feed for the ordinary user, so only the tunnel makes it usable. The
+/// toggle stays in the UI — an explicit opt-in, never a shipped default.
+const kTunnelOnlyOsnovnyeIds = <String>{
+  'tiktok',
+};
+
+/// Android packages of the [kTunnelOnlyOsnovnyeIds] rows, removed from the
+/// seeded bypass by the same one-shot.
+const kTunnelOnlyBypassPackages = <String>{
+  'com.zhiliaoapp.musically',
+  'com.ss.android.ugc.trill',
 };
 
 /// One row under Sites → Основные.
@@ -719,8 +775,9 @@ const kOsnovnyeCategories = <OsnovnyeCategory>[
     labelRu: 'TikTok',
     labelEn: 'TikTok',
     badge: 'TT',
-    // Owner: popular RU Direct, not "keep TikTok on the tunnel".
-    defaultEnabled: true,
+    // RF throttles TikTok since 2022 — direct is a dead app. Default OFF keeps
+    // it in the tunnel on every platform; the row stays as an opt-in toggle.
+    defaultEnabled: false,
     domains: [
       'tiktok.com',
       'tiktokv.com',
