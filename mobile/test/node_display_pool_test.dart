@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/features/vpn/data/node_auto_selector.dart';
-import 'package:teremok_connect/features/vpn/data/node_display.dart';
-import 'package:teremok_connect/features/vpn/data/vpn_node.dart';
-import 'package:teremok_connect/l10n/app_localizations.dart';
+import 'package:proxydom/features/vpn/data/node_auto_selector.dart';
+import 'package:proxydom/features/vpn/data/node_display.dart';
+import 'package:proxydom/features/vpn/data/vpn_node.dart';
+import 'package:proxydom/l10n/app_localizations.dart';
 
 void main() {
   group('real server pool labels', () {
@@ -186,8 +186,6 @@ void main() {
       );
       expect(displaySubtitleForNode(yt, l), l.regionBlurbYoutube);
       expect(displaySubtitleForNode(game, l), l.regionBlurbGaming);
-      expect(
-          displaySubtitleForNode(yt, l), isNot(l.locationsPremiumUnavailable));
     });
 
     test('normalizeNodeHost strips IPv4 port', () {
@@ -198,8 +196,8 @@ void main() {
     test('FQDN host never appears in title or subtitle', () {
       const tt = VpnNode(
         id: 'tt-us',
-        label: 'tt-us.teremokconnect.online',
-        host: 'tt-us.teremokconnect.online',
+        label: 'node.proxydom.su',
+        host: 'node.proxydom.su',
         port: 443,
         status: 'connected',
         isDefault: false,
@@ -207,9 +205,9 @@ void main() {
         protocol: 'trusttunnel',
       );
       final place = placeForNode(tt, index: 0);
-      expect(place.title.toLowerCase(), isNot(contains('teremokconnect')));
+      expect(place.title.toLowerCase(), isNot(contains('proxydom')));
       expect(place.title.toLowerCase(), isNot(contains('tt-')));
-      expect(place.subtitle.toLowerCase(), isNot(contains('teremokconnect')));
+      expect(place.subtitle.toLowerCase(), isNot(contains('proxydom')));
       expect(place.subtitle, isNot(contains('.')));
       expect(place.title, 'Сервер 1');
       expect(place.subtitle, isEmpty);

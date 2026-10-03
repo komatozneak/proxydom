@@ -97,7 +97,7 @@ IconData? osnovnyeCategoryIcon(String categoryId) {
 class InstalledAppsChannel {
   InstalledAppsChannel._();
 
-  static const _channel = MethodChannel('teremok/vpn');
+  static const _channel = MethodChannel('proxydom/vpn');
 
   static Future<List<LauncherAppInfo>> listLauncherApps({
     bool includeIcons = true,

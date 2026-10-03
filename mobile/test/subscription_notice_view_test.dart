@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/core/theme.dart';
-import 'package:teremok_connect/features/vpn/presentation/subscription_notice_view.dart';
+import 'package:proxydom/core/theme.dart';
+import 'package:proxydom/features/vpn/presentation/subscription_notice_view.dart';
 
 void main() {
   testWidgets(

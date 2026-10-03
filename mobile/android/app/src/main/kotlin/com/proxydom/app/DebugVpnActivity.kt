@@ -1,4 +1,4 @@
-package com.teremok.connect.teremok_connect
+package com.proxydom.app
 
 import android.app.Activity
 import android.content.Intent
@@ -17,9 +17,9 @@ import android.widget.Toast
  * В release-сборке Шага 19 этот файл будет удалён (или помечен @VisibleForTesting).
  *
  * Использование:
- * 1. adb shell am start -n com.teremok.connect.teremok_connect.debug/.DebugVpnActivity
+ * 1. adb shell am start -n com.proxydom.app.debug/.DebugVpnActivity
  * 2. Нажать "Start VPN" → системный диалог "Разрешить VPN"
- * 3. Разрешить → в logcat: "TeremokVpn: TUN interface established"
+ * 3. Разрешить → в logcat: "ProxyDomVpn: TUN interface established"
  * 4. Нажать "Stop VPN" → "TUN interface closed"
  */
 class DebugVpnActivity : Activity() {
@@ -39,7 +39,7 @@ class DebugVpnActivity : Activity() {
         }
 
         val title = TextView(this).apply {
-            text = "Teremok Connect — Debug VPN"
+            text = "Proxy Dom — Debug VPN"
             textSize = 22f
             setPadding(0, 0, 0, 32)
         }
@@ -67,12 +67,12 @@ class DebugVpnActivity : Activity() {
         }
 
         val logButton = Button(this).apply {
-            text = "📋 View logcat for TeremokVpn"
+            text = "📋 View logcat for ProxyDomVpn"
             setOnClickListener {
-                Log.i(TAG, "Check logcat: adb logcat -s TeremokVpn:V DebugVpn:V")
+                Log.i(TAG, "Check logcat: adb logcat -s ProxyDomVpn:V DebugVpn:V")
                 Toast.makeText(
                     this@DebugVpnActivity,
-                    "Run: adb logcat -s TeremokVpn:V",
+                    "Run: adb logcat -s ProxyDomVpn:V",
                     Toast.LENGTH_LONG,
                 ).show()
             }
@@ -115,18 +115,18 @@ class DebugVpnActivity : Activity() {
     }
 
     private fun launchVpnService() {
-        val intent = Intent(this, TeremokVpnService::class.java).apply {
-            action = TeremokVpnService.ACTION_START
-            putExtra(TeremokVpnService.EXTRA_USERNAME, "debug_user")
-            putExtra(TeremokVpnService.EXTRA_PROTOCOL, "VLESS+Reality")
+        val intent = Intent(this, ProxyDomVpnService::class.java).apply {
+            action = ProxyDomVpnService.ACTION_START
+            putExtra(ProxyDomVpnService.EXTRA_USERNAME, "debug_user")
+            putExtra(ProxyDomVpnService.EXTRA_PROTOCOL, "VLESS+Reality")
         }
         startService(intent)
         Log.i(TAG, "launchVpnService: startService() отправлен")
     }
 
     private fun stopVpn() {
-        val intent = Intent(this, TeremokVpnService::class.java).apply {
-            action = TeremokVpnService.ACTION_STOP
+        val intent = Intent(this, ProxyDomVpnService::class.java).apply {
+            action = ProxyDomVpnService.ACTION_STOP
         }
         startService(intent)
         Log.i(TAG, "stopVpn: stop signal отправлен")

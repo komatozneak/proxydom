@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-/// Typed VPN session snapshot from native EventChannel `teremok/vpn/session`
+/// Typed VPN session snapshot from native EventChannel `proxydom/vpn/session`
 /// (ADR 014 — client Connect SoT).
 enum VpnSessionPhase {
   idle,

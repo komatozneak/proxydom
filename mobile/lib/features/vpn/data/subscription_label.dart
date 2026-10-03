@@ -42,7 +42,7 @@ String? decodeProfileTitle(String? header) {
   return prefixed ? null : raw;
 }
 
-/// First `# Teremok VPN 🏠` comment in a subscription body.
+/// First `# …` comment in a subscription body.
 String? titleFromSubscriptionBody(String body) {
   for (final line in body.split(RegExp(r'\r?\n'))) {
     final text = line.trim();

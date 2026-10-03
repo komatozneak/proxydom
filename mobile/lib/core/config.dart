@@ -127,38 +127,14 @@ class AppConfig {
     defaultValue: true,
   );
 
-  /// Product bot (no @). Deep links without a huge ``text=`` query.
-  static const String telegramBotUsername = 'vpn_teremok_bot';
-
-  /// Owner support Telegram username (no @). Prefill via [SupportContact].
-  static const String supportTelegramUsername = 'deathnkomatoz';
-
-  /// Bare chat link (no prefill). Prefer [SupportContact.open].
-  static const String supportTelegramUrl =
-      'https://t.me/$supportTelegramUsername';
-
-  /// Bank / Play / Platega review — public legal pages (always-on footer).
+  /// Bank / Play review — public legal pages (always-on footer).
   static const String privacyPolicyUrl = 'https://proxydom.su/privacy.html';
 
   static const String termsOfServiceUrl = 'https://proxydom.su/terms.html';
 
-  /// The utility is free: there are no tariffs, no catalog, and no checkout.
-  /// Kept for call sites that expect a constant; points at support by design.
-  static const String pricingUrl = 'https://proxydom.su/support.html';
-
   static const String supportPageUrl = 'https://proxydom.su/support.html';
-
-  /// No accounts in the utility, so no data to delete. Kept for call sites that
-  /// expect a constant; points at support by design.
-  static const String accountDeletionUrl = 'https://proxydom.su/support.html';
 
   /// Role contact shown in the app. Matches the site footer and the mailbox
   /// the Apple and D&B correspondence runs on.
   static const String supportEmail = 'support@proxydom.su';
-
-  /// Subscription list prices (RUB) — keep in sync with backend PLAN_*_PRICE_RUB.
-  static const int plan1mPriceRub = 199;
-  static const int plan3mPriceRub = 519;
-  static const int plan6mPriceRub = 929;
-  static const int plan12mPriceRub = 1490;
 }

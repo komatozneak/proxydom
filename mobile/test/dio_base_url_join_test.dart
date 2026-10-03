@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/core/config.dart';
+import 'package:proxydom/core/config.dart';
 
 /// Documents Dio 5 join: `uri = baseUrl + path` (no separator).
 /// Paths without a leading `/` break `/v2…` into `/v2billing…`.

@@ -1,4 +1,4 @@
-package com.teremok.connect.teremok_connect
+package com.proxydom.app
 
 import android.content.Context
 import android.os.Handler
@@ -70,7 +70,7 @@ class VpnTrafficMonitor(
                     }
                 }
             },
-            "teremok-traffic-monitor",
+            "proxydom-traffic-monitor",
         ).apply {
             isDaemon = true
             start()

@@ -1,4 +1,4 @@
-package com.teremok.connect.teremok_connect
+package com.proxydom.app
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
@@ -28,12 +28,12 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
-import com.teremok.connect.teremok_connect.session.AutoCandidate
-import com.teremok.connect.teremok_connect.session.PathHealth
-import com.teremok.connect.teremok_connect.session.SessionPhase
-import com.teremok.connect.teremok_connect.session.SessionSnapshot
-import com.teremok.connect.teremok_connect.session.SessionSnapshotBroadcaster
-import com.teremok.connect.teremok_connect.session.VpnSessionEngine
+import com.proxydom.app.session.AutoCandidate
+import com.proxydom.app.session.PathHealth
+import com.proxydom.app.session.SessionPhase
+import com.proxydom.app.session.SessionSnapshot
+import com.proxydom.app.session.SessionSnapshotBroadcaster
+import com.proxydom.app.session.VpnSessionEngine
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
@@ -48,13 +48,13 @@ import org.json.JSONObject
  * Sticky restore / QS persist / foreign Always-on conflict / lockdown leftover
  * routing stay — they are not product Always-on promotion.
  */
-class TeremokVpnService : VpnService() {
+class ProxyDomVpnService : VpnService() {
 
     companion object {
-        const val TAG = "TeremokVpn"
-        const val ACTION_START = "com.teremok.connect.START_VPN"
-        const val ACTION_START_AUTO = "com.teremok.connect.START_VPN_AUTO"
-        const val ACTION_STOP = "com.teremok.connect.STOP_VPN"
+        const val TAG = "ProxyDomVpn"
+        const val ACTION_START = "com.proxy.dom.START_VPN"
+        const val ACTION_START_AUTO = "com.proxy.dom.START_VPN_AUTO"
+        const val ACTION_STOP = "com.proxy.dom.STOP_VPN"
         const val EXTRA_AUTO_CANDIDATES = "autoCandidatesJson"
         const val EXTRA_USERNAME = "username"
         const val EXTRA_PROTOCOL = "protocol"
@@ -67,7 +67,7 @@ class TeremokVpnService : VpnService() {
         /** paramsJson["vpnCore"] — Hysteria2 only (ADR 018). */
         const val VPN_CORE_HYSTERIA = "hysteria"
 
-        const val PREFS_NAME = "teremok_vpn_session"
+        const val PREFS_NAME = "proxydom_vpn_session"
         private const val KEY_PARAMS_JSON = "params_json"
         private const val KEY_USERNAME = "username"
         private const val KEY_PROTOCOL = "protocol"
@@ -75,9 +75,9 @@ class TeremokVpnService : VpnService() {
         private const val KEY_APP_INITIATED = "app_initiated"
 
         @Volatile
-        private var instance: TeremokVpnService? = null
+        private var instance: ProxyDomVpnService? = null
 
-        fun currentInstance(): TeremokVpnService? = instance
+        fun currentInstance(): ProxyDomVpnService? = instance
 
         /**
          * Always-on "Block connections without VPN" — **preference / system setting**,
@@ -97,7 +97,7 @@ class TeremokVpnService : VpnService() {
          */
         fun queryAlwaysOnVpnLockdown(
             context: android.content.Context,
-            service: TeremokVpnService? = currentInstance(),
+            service: ProxyDomVpnService? = currentInstance(),
         ): Boolean? {
             val snap = queryAlwaysOnVpnSnapshot(context, service)
             return snap["lockdown"] as Boolean?
@@ -111,7 +111,7 @@ class TeremokVpnService : VpnService() {
          */
         fun queryAlwaysOnVpnSnapshot(
             context: android.content.Context,
-            service: TeremokVpnService? = currentInstance(),
+            service: ProxyDomVpnService? = currentInstance(),
         ): Map<String, Any?> {
             var fromRuntime: Boolean? = null
             var alwaysOnRuntime: Boolean? = null
@@ -168,7 +168,7 @@ class TeremokVpnService : VpnService() {
         }
 
         /**
-         * Detect a VPN that blocks Teremok Connect: foreign Always-on / lockdown,
+         * Detect a VPN that blocks Proxy Dom: foreign Always-on / lockdown,
          * or another app's live VPN (system TRANSPORT_VPN without our TUN).
          *
          * Keys: foreignAlwaysOn (Boolean), foreignVpnActive (Boolean),
@@ -213,7 +213,7 @@ class TeremokVpnService : VpnService() {
             )
         }
 
-        /** True while Teremok owns or is taking the system VPN slot. */
+        /** True while this app owns or is taking the system VPN slot. */
         fun isOurSessionOccupying(): Boolean {
             val svc = currentInstance() ?: return false
             if (svc.hasLiveTun() || svc.establishInProgress) return true
@@ -392,7 +392,7 @@ class TeremokVpnService : VpnService() {
             }
             val username = store.getString(KEY_USERNAME, "anonymous") ?: "anonymous"
             val protocol = store.getString(KEY_PROTOCOL, "unknown") ?: "unknown"
-            val intent = Intent(context, TeremokVpnService::class.java).apply {
+            val intent = Intent(context, ProxyDomVpnService::class.java).apply {
                 action = ACTION_START
                 putExtra(EXTRA_USERNAME, username)
                 putExtra(EXTRA_PROTOCOL, protocol)
@@ -413,7 +413,7 @@ class TeremokVpnService : VpnService() {
         }
 
         fun stopVpnService(context: android.content.Context) {
-            val intent = Intent(context, TeremokVpnService::class.java).apply {
+            val intent = Intent(context, ProxyDomVpnService::class.java).apply {
                 action = ACTION_STOP
             }
             context.startService(intent)
@@ -1413,7 +1413,7 @@ class TeremokVpnService : VpnService() {
                     done.countDown()
                 }
             },
-            "teremok-socks-probe",
+            "proxydom-socks-probe",
         ).apply { isDaemon = true }.start()
 
         val budgetMs =
@@ -1774,11 +1774,11 @@ class TeremokVpnService : VpnService() {
  * Вызывается из MainActivity.configureFlutterEngine().
  */
 object VpnChannelRegistry {
-    const val METHOD_CHANNEL = "teremok/vpn"
-    const val EVENT_CHANNEL = "teremok/vpn/status"
-    const val SESSION_EVENT_CHANNEL = "teremok/vpn/session"
-    const val TRAFFIC_EVENT_CHANNEL = "teremok/vpn/traffic"
-    const val PING_EVENT_CHANNEL = "teremok/vpn/ping"
+    const val METHOD_CHANNEL = "proxydom/vpn"
+    const val EVENT_CHANNEL = "proxydom/vpn/status"
+    const val SESSION_EVENT_CHANNEL = "proxydom/vpn/session"
+    const val TRAFFIC_EVENT_CHANNEL = "proxydom/vpn/traffic"
+    const val PING_EVENT_CHANNEL = "proxydom/vpn/ping"
 
     /** Launcher apps for «Что работает без VPN?» → Приложения (no QUERY_ALL_PACKAGES). */
     private fun listLauncherApps(
@@ -1847,7 +1847,7 @@ object VpnChannelRegistry {
         engine: FlutterEngine,
         appContext: android.content.Context,
         activityProvider: () -> android.app.Activity?,
-        serviceProvider: () -> TeremokVpnService?,
+        serviceProvider: () -> ProxyDomVpnService?,
         onPermissionRequest: (MethodChannel.Result) -> Unit,
         onNotificationPermissionRequest: (MethodChannel.Result) -> Unit = {},
         onInternetPermissionRequest: (MethodChannel.Result) -> Unit = {},
@@ -1866,11 +1866,11 @@ object VpnChannelRegistry {
                         }
                         val intent = Intent(
                             appContext,
-                            TeremokVpnService::class.java,
+                            ProxyDomVpnService::class.java,
                         ).apply {
-                            action = TeremokVpnService.ACTION_START_AUTO
+                            action = ProxyDomVpnService.ACTION_START_AUTO
                             putExtra(
-                                TeremokVpnService.EXTRA_AUTO_CANDIDATES,
+                                ProxyDomVpnService.EXTRA_AUTO_CANDIDATES,
                                 arr.toString(),
                             )
                         }
@@ -1893,13 +1893,13 @@ object VpnChannelRegistry {
 
                         val intent = Intent(
                             appContext,
-                            TeremokVpnService::class.java,
+                            ProxyDomVpnService::class.java,
                         ).apply {
-                            action = TeremokVpnService.ACTION_START
-                            putExtra(TeremokVpnService.EXTRA_USERNAME, username)
-                            putExtra(TeremokVpnService.EXTRA_PROTOCOL, protocol)
-                            putExtra(TeremokVpnService.EXTRA_PARAMS_JSON, paramsJson)
-                            putExtra(TeremokVpnService.EXTRA_APP_INITIATED, true)
+                            action = ProxyDomVpnService.ACTION_START
+                            putExtra(ProxyDomVpnService.EXTRA_USERNAME, username)
+                            putExtra(ProxyDomVpnService.EXTRA_PROTOCOL, protocol)
+                            putExtra(ProxyDomVpnService.EXTRA_PARAMS_JSON, paramsJson)
+                            putExtra(ProxyDomVpnService.EXTRA_APP_INITIATED, true)
                         }
                         appContext.startService(intent)
                         result.success(true)
@@ -1907,23 +1907,23 @@ object VpnChannelRegistry {
                     "stop" -> {
                         val intent = Intent(
                             appContext,
-                            TeremokVpnService::class.java,
+                            ProxyDomVpnService::class.java,
                         ).apply {
-                            action = TeremokVpnService.ACTION_STOP
+                            action = ProxyDomVpnService.ACTION_STOP
                         }
                         appContext.startService(intent)
                         result.success(true)
                     }
                     "wipeSession" -> {
-                        TeremokVpnService.stopVpnService(appContext)
-                        TeremokVpnService.wipePersistedSession(appContext)
+                        ProxyDomVpnService.stopVpnService(appContext)
+                        ProxyDomVpnService.wipePersistedSession(appContext)
                         result.success(true)
                     }
                     "getStatus" -> {
-                        result.success(TeremokVpnService.resolveUiStatus(appContext))
+                        result.success(ProxyDomVpnService.resolveUiStatus(appContext))
                     }
                     "hasActiveSession" -> {
-                        result.success(TeremokVpnService.hasActiveSession(appContext))
+                        result.success(ProxyDomVpnService.hasActiveSession(appContext))
                     }
                     "getLastError" -> {
                         result.success(VpnStatusBroadcaster.lastError())
@@ -1936,18 +1936,18 @@ object VpnChannelRegistry {
                     }
                     "isLockdownEnabled" -> {
                         // Preference/system lockdown — not tunnel-up. See
-                        // [TeremokVpnService.queryAlwaysOnVpnSnapshot].
+                        // [ProxyDomVpnService.queryAlwaysOnVpnSnapshot].
                         // Map → Dart; null lockdown → unavailable.
                         runCatching {
-                            TeremokVpnService.queryAlwaysOnVpnSnapshot(
+                            ProxyDomVpnService.queryAlwaysOnVpnSnapshot(
                                 appContext,
-                                serviceProvider() ?: TeremokVpnService.currentInstance(),
+                                serviceProvider() ?: ProxyDomVpnService.currentInstance(),
                             )
                         }.fold(
                             onSuccess = { result.success(it) },
                             onFailure = { e ->
                                 Log.w(
-                                    TeremokVpnService.TAG,
+                                    ProxyDomVpnService.TAG,
                                     "isLockdownEnabled query failed",
                                     e,
                                 )
@@ -1957,12 +1957,12 @@ object VpnChannelRegistry {
                     }
                     "getVpnConflict" -> {
                         runCatching {
-                            TeremokVpnService.queryVpnConflict(appContext)
+                            ProxyDomVpnService.queryVpnConflict(appContext)
                         }.fold(
                             onSuccess = { result.success(it) },
                             onFailure = { e ->
                                 Log.w(
-                                    TeremokVpnService.TAG,
+                                    ProxyDomVpnService.TAG,
                                     "getVpnConflict failed",
                                     e,
                                 )
@@ -1991,7 +1991,7 @@ object VpnChannelRegistry {
                             val pm = (activity ?: appContext).packageManager
                             val resolved = intent.resolveActivity(pm)
                             Log.i(
-                                TeremokVpnService.TAG,
+                                ProxyDomVpnService.TAG,
                                 "openVpnSettings resolve=$resolved activity=${activity != null}",
                             )
                             if (activity != null) {
@@ -2001,10 +2001,10 @@ object VpnChannelRegistry {
                             }
                             result.success(true)
                         } catch (e: ActivityNotFoundException) {
-                            Log.w(TeremokVpnService.TAG, "openVpnSettings: no activity", e)
+                            Log.w(ProxyDomVpnService.TAG, "openVpnSettings: no activity", e)
                             result.error("VPN_SETTINGS_UNAVAILABLE", e.message, null)
                         } catch (e: Exception) {
-                            Log.w(TeremokVpnService.TAG, "openVpnSettings failed", e)
+                            Log.w(ProxyDomVpnService.TAG, "openVpnSettings failed", e)
                             result.error("VPN_SETTINGS_FAILED", e.message, null)
                         }
                     }
@@ -2024,14 +2024,14 @@ object VpnChannelRegistry {
                             (activity ?: appContext).startActivity(intent)
                             result.success(true)
                         } catch (e: Exception) {
-                            Log.w(TeremokVpnService.TAG, "battery exemption failed", e)
+                            Log.w(ProxyDomVpnService.TAG, "battery exemption failed", e)
                             result.success(false)
                         }
                     }
                     "getSingBoxStderrTail" -> {
                         val maxLines = call.argument<Int>("maxLines") ?: 400
                         result.success(
-                            TeremokVpnService.readSingBoxStderrTail(appContext, maxLines),
+                            ProxyDomVpnService.readSingBoxStderrTail(appContext, maxLines),
                         )
                     }
                     "setCoreLogLevel" -> {
@@ -2068,7 +2068,7 @@ object VpnChannelRegistry {
                     "setShadeNotificationEnabled" -> {
                         val enabled = call.argument<Boolean>("enabled") ?: true
                         ShadeNotification.setVisible(appContext, enabled)
-                        val svc = serviceProvider() ?: TeremokVpnService.currentInstance()
+                        val svc = serviceProvider() ?: ProxyDomVpnService.currentInstance()
                         svc?.onNotificationStyleChanged()
                         result.success(true)
                     }
@@ -2162,7 +2162,7 @@ internal fun tunDnsPeerAddress(address: String, prefixLength: Int): String {
 
 /**
  * Конвертация org.json.JSONObject → Map<String, Any?> (рекурсивно для вложенных
- * объектов и массивов). Используется для парсинга paramsJson в [TeremokVpnService].
+ * объектов и массивов). Используется для парсинга paramsJson в [ProxyDomVpnService].
  */
 internal fun jsonToMap(json: JSONObject): Map<String, Any?> {
     val map = mutableMapOf<String, Any?>()
@@ -2234,7 +2234,7 @@ object VpnStatusBroadcaster {
             try {
                 sink.success(replay)
             } catch (e: Exception) {
-                Log.w(TeremokVpnService.TAG, "VpnStatusBroadcaster.replay failed: ${e.message}")
+                Log.w(ProxyDomVpnService.TAG, "VpnStatusBroadcaster.replay failed: ${e.message}")
             }
         }
     }
@@ -2246,19 +2246,19 @@ object VpnStatusBroadcaster {
     /** Update lastStatus without EventChannel (hop teardown during Auto). */
     fun remember(status: String) {
         lastStatus = status
-        appContext?.let { TeremokTileService.requestListening(it) }
+        appContext?.let { ProxyDomTileService.requestListening(it) }
     }
 
     fun emit(status: String) {
         lastStatus = status
-        appContext?.let { TeremokTileService.requestListening(it) }
+        appContext?.let { ProxyDomTileService.requestListening(it) }
         mainHandler.post {
             val current = sink
             if (current != null) {
                 try {
                     current.success(status)
                 } catch (e: Exception) {
-                    Log.w(TeremokVpnService.TAG, "VpnStatusBroadcaster.emit failed: ${e.message}")
+                    Log.w(ProxyDomVpnService.TAG, "VpnStatusBroadcaster.emit failed: ${e.message}")
                 }
             }
         }
@@ -2266,7 +2266,7 @@ object VpnStatusBroadcaster {
 }
 
 /**
- * Broadcasts downlink/uplink rates to Flutter EventChannel `teremok/vpn/traffic`.
+ * Broadcasts downlink/uplink rates to Flutter EventChannel `proxydom/vpn/traffic`.
  */
 object VpnTrafficBroadcaster {
     @Volatile
@@ -2300,7 +2300,7 @@ object VpnTrafficBroadcaster {
             try {
                 sink.success(payload)
             } catch (e: Exception) {
-                Log.w(TeremokVpnService.TAG, "VpnTrafficBroadcaster.replay failed: ${e.message}")
+                Log.w(ProxyDomVpnService.TAG, "VpnTrafficBroadcaster.replay failed: ${e.message}")
             }
         }
     }
@@ -2332,7 +2332,7 @@ object VpnTrafficBroadcaster {
                 try {
                     current.success(payload)
                 } catch (e: Exception) {
-                    Log.w(TeremokVpnService.TAG, "VpnTrafficBroadcaster.emit failed: ${e.message}")
+                    Log.w(ProxyDomVpnService.TAG, "VpnTrafficBroadcaster.emit failed: ${e.message}")
                 }
             }
         }
@@ -2340,7 +2340,7 @@ object VpnTrafficBroadcaster {
 }
 
 /**
- * Broadcasts path latency (ms) to Flutter EventChannel `teremok/vpn/ping`.
+ * Broadcasts path latency (ms) to Flutter EventChannel `proxydom/vpn/ping`.
  *
  * [emit] with null clears the last sample so Home shows `— ms` instead of a
  * stale RTT after the data-plane dies.
@@ -2364,7 +2364,7 @@ object VpnPingBroadcaster {
                 // keep a previous AsyncData from an older session.
                 sink.success(mapOf("delayMs" to replay))
             } catch (e: Exception) {
-                Log.w(TeremokVpnService.TAG, "VpnPingBroadcaster.replay failed: ${e.message}")
+                Log.w(ProxyDomVpnService.TAG, "VpnPingBroadcaster.replay failed: ${e.message}")
             }
         }
     }
@@ -2381,7 +2381,7 @@ object VpnPingBroadcaster {
                 try {
                     current.success(mapOf("delayMs" to null))
                 } catch (e: Exception) {
-                    Log.w(TeremokVpnService.TAG, "VpnPingBroadcaster.clear emit failed: ${e.message}")
+                    Log.w(ProxyDomVpnService.TAG, "VpnPingBroadcaster.clear emit failed: ${e.message}")
                 }
             }
         }
@@ -2396,7 +2396,7 @@ object VpnPingBroadcaster {
                 try {
                     current.success(payload)
                 } catch (e: Exception) {
-                    Log.w(TeremokVpnService.TAG, "VpnPingBroadcaster.emit failed: ${e.message}")
+                    Log.w(ProxyDomVpnService.TAG, "VpnPingBroadcaster.emit failed: ${e.message}")
                 }
             }
         }

@@ -1,4 +1,4 @@
-package com.teremok.connect.teremok_connect
+package com.proxydom.app
 
 import android.util.Log
 import java.io.BufferedReader
@@ -331,7 +331,7 @@ class VpnPingMonitor(
                             "GET $path HTTP/1.1\r\n" +
                                 "Host: $host\r\n" +
                                 "Connection: close\r\n" +
-                                "User-Agent: TeremokVpnProbe/1\r\n" +
+                                "User-Agent: ProxyDomProbe/1\r\n" +
                                 "\r\n"
                         writer.write(request.toByteArray(StandardCharsets.US_ASCII))
                         writer.flush()
@@ -484,7 +484,7 @@ class VpnPingMonitor(
                 "GET $PROBE_HTTPS_PATH HTTP/1.1\r\n" +
                     "Host: $hostHeader\r\n" +
                     "Connection: close\r\n" +
-                    "User-Agent: TeremokVpnProbe/1\r\n" +
+                    "User-Agent: ProxyDomProbe/1\r\n" +
                     "\r\n"
             socket.getOutputStream().write(request.toByteArray(StandardCharsets.US_ASCII))
             socket.getOutputStream().flush()
@@ -589,7 +589,7 @@ class VpnPingMonitor(
                     }
                     Log.i(TAG, "ping monitor stopped")
                 },
-                "teremok-ping-monitor",
+                "proxydom-ping-monitor",
             ).apply {
                 isDaemon = true
                 start()

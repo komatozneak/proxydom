@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/features/vpn/data/windows_tunnel_protocol.dart';
+import 'package:proxydom/features/vpn/data/windows_tunnel_protocol.dart';
 
 void main() {
   test('controller contract is protocol v3 newline JSON', () {
@@ -153,6 +153,14 @@ void main() {
     expect(
       windowsGateCaption('egress_timeout', '', generic),
       'Узел недоступен',
+    );
+    expect(
+      windowsGateCaption(
+        'egress_failed',
+        'Не удалось подтвердить доступность узла. Попробуйте другой сервер',
+        generic,
+      ),
+      'Не удалось подтвердить доступность узла. Попробуйте другой сервер',
     );
     expect(
       windowsGateCaption('route_failed', 'Сбой применения маршрутов', generic),

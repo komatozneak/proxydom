@@ -31,8 +31,8 @@ final class Hy2TunnelEngine: NSObject {
   private var lastIpv6DropLogged: UInt64 = 0
 
   private var pathMonitor: Network.NWPathMonitor?
-  private let pathQueue = DispatchQueue(label: "online.teremokconnect.vpn.path")
-  private let resetQueue = DispatchQueue(label: "online.teremokconnect.vpn.reset")
+  private let pathQueue = DispatchQueue(label: "su.proxydom.app.vpn.path")
+  private let resetQueue = DispatchQueue(label: "su.proxydom.app.vpn.reset")
   private var lastPath: TunnelPathSnapshot?
   private var resetWorkItem: DispatchWorkItem?
   private let resetDebounceMs: Int = 400
@@ -167,7 +167,7 @@ final class Hy2TunnelEngine: NSObject {
       excludedIPv4: routePlan.v4,
       excludedIPv6: routePlan.v6
     )
-    TeremokVpnShared.appendNativeLog(
+    ProxyDomVpnShared.appendNativeLog(
       "PacketTunnel.exclude host=\(cfg.dialHost) pin=\(cfg.remoteHost) "
         + "requested=\(routePlan.requestedHosts) "
         + "completed=\(routePlan.completedHosts) resolved=\(routePlan.resolvedHosts) "
@@ -175,7 +175,7 @@ final class Hy2TunnelEngine: NSObject {
         + "dropped_v4=\(routePlan.droppedIPv4) dropped_v6=\(routePlan.droppedIPv6) "
         + "capped=\(routePlan.capped) timeout=\(routePlan.timedOut)"
     )
-    TeremokVpnShared.appendNativeLog("PacketTunnel.v6 claim=default")
+    ProxyDomVpnShared.appendNativeLog("PacketTunnel.v6 claim=default")
     provider.setTunnelNetworkSettings(settings) { [weak self] error in
       guard let self else { return }
       if let error {
@@ -226,7 +226,7 @@ final class Hy2TunnelEngine: NSObject {
     let droppedV6 = ipv6DropCount
     healthLock.unlock()
     if droppedV6 > 0 {
-      TeremokVpnShared.appendNativeLog("PacketTunnel.v6 drop=\(droppedV6)")
+      ProxyDomVpnShared.appendNativeLog("PacketTunnel.v6 drop=\(droppedV6)")
     }
     persistHealth(force: true)
     provider = nil
@@ -294,8 +294,8 @@ final class Hy2TunnelEngine: NSObject {
     let pathWifi: Any = path.map { $0.usesWifi as Any } ?? NSNull()
     let pathCellular: Any = path.map { $0.usesCellular as Any } ?? NSNull()
     return [
-      "generation": TeremokVpnShared.currentGeneration(),
-      "session_active": TeremokVpnShared.isSessionActive(),
+      "generation": ProxyDomVpnShared.currentGeneration(),
+      "session_active": ProxyDomVpnShared.isSessionActive(),
       "path_satisfied": pathSatisfied,
       "path_wifi": pathWifi,
       "path_cellular": pathCellular,
@@ -306,7 +306,7 @@ final class Hy2TunnelEngine: NSObject {
       "ingress_age_ms": ingressAgeMs,
       "egress_age_ms": egressAgeMs,
       "ipv6_drop": ipv6DropSnapshot,
-      "last_stop_reason": TeremokVpnShared.lastStopReason(),
+      "last_stop_reason": ProxyDomVpnShared.lastStopReason(),
       "hy2": hyObj,
     ]
   }
@@ -331,7 +331,7 @@ final class Hy2TunnelEngine: NSObject {
     }
     lastHealthPersistAt = now
     healthLock.unlock()
-    TeremokVpnShared.persistTunnelHealth(healthJSON())
+    ProxyDomVpnShared.persistTunnelHealth(healthJSON())
   }
 
   private func startPathMonitor() {
@@ -386,14 +386,14 @@ final class Hy2TunnelEngine: NSObject {
       #if canImport(Hy2bind)
       let err = Hy2bindResetNetwork(reason) ?? ""
       if err.isEmpty {
-        TeremokVpnShared.appendNativeLog("PacketTunnel.reset ok reason=\(reason)")
+        ProxyDomVpnShared.appendNativeLog("PacketTunnel.reset ok reason=\(reason)")
       } else if err == "reset_busy" {
-        TeremokVpnShared.appendNativeLog("PacketTunnel.reset coalesced reason=\(reason)")
+        ProxyDomVpnShared.appendNativeLog("PacketTunnel.reset coalesced reason=\(reason)")
       } else {
-        TeremokVpnShared.appendNativeLog("PacketTunnel.reset fail reason=\(reason) err=\(err)")
+        ProxyDomVpnShared.appendNativeLog("PacketTunnel.reset fail reason=\(reason) err=\(err)")
       }
       #else
-      TeremokVpnShared.appendNativeLog("PacketTunnel.reset skip reason=\(reason)")
+      ProxyDomVpnShared.appendNativeLog("PacketTunnel.reset skip reason=\(reason)")
       #endif
       self.persistHealth(force: true)
     }
@@ -422,7 +422,7 @@ final class Hy2TunnelEngine: NSObject {
         self.healthLock.unlock()
         let injectErr = Hy2bindInjectPacket(packet) ?? ""
         if !injectErr.isEmpty {
-          NSLog("[Teremok] injectPacket: %@", injectErr)
+          NSLog("[ProxyDom] injectPacket: %@", injectErr)
         }
       }
       #else
@@ -455,7 +455,7 @@ final class Hy2TunnelEngine: NSObject {
     }
     healthLock.unlock()
     if shouldLog {
-      TeremokVpnShared.appendNativeLog("PacketTunnel.v6 drop=\(count)")
+      ProxyDomVpnShared.appendNativeLog("PacketTunnel.v6 drop=\(count)")
     }
   }
 

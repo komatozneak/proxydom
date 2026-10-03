@@ -29,7 +29,7 @@ class AppIcon extends StatelessWidget {
   }
 }
 
-/// Canonical Phosphor set for Teremok UI (regular weight).
+/// Canonical Phosphor set for Proxy Dom UI (regular weight).
 abstract final class AppIcons {
   static const IconData power = PhosphorIconsRegular.power;
   static const IconData shield = PhosphorIconsRegular.shield;

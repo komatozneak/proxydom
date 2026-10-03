@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/diagnostics/ui_log.dart';
-import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/notebook_paper.dart';
@@ -198,7 +197,7 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
         result: 'ok',
         extra: {'links': links.length, 'connect': connect},
       );
-      showTeremokSnackBar(context, AppL10n.of(context).freeServerAdded);
+      showProxyDomSnackBar(context, AppL10n.of(context).freeServerAdded);
       if (connect && links.isNotEmpty) {
         if (!mounted) return;
         await _stopLiveTunnel(reason: 'import');
@@ -243,9 +242,6 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
   @override
   Widget build(BuildContext context) {
     final l = AppL10n.of(context);
-    if (!hideInAppPlategaCheckout) {
-      return const Scaffold(body: SizedBox.shrink());
-    }
     final theme = Theme.of(context);
     final keyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
     return NotebookPaper(

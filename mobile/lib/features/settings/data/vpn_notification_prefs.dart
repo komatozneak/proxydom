@@ -7,7 +7,7 @@ class VpnNotificationPrefs {
   VpnNotificationPrefs._();
 
   static const _visibleKey = 'shade_notification_visible';
-  static const _channel = MethodChannel('teremok/vpn');
+  static const _channel = MethodChannel('proxydom/vpn');
 
   static bool get isSupported =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.android;

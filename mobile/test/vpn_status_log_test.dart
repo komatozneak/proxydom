@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/features/home/application/vpn_status.dart';
-import 'package:teremok_connect/features/home/application/vpn_status_log.dart';
-import 'package:teremok_connect/features/vpn/data/vpn_controller.dart';
+import 'package:proxydom/features/home/application/vpn_status.dart';
+import 'package:proxydom/features/home/application/vpn_status_log.dart';
+import 'package:proxydom/features/vpn/data/vpn_controller.dart';
 
 void main() {
   test('repeated native status does not emit another line', () {

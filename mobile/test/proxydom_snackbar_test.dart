@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/core/widgets/proxydom_snackbar.dart';
+import 'package:proxydom/core/widgets/proxydom_snackbar.dart';
 
 void main() {
-  testWidgets('showTeremokSnackBar uses the 2.2s product duration',
+  testWidgets('showProxyDomSnackBar uses the 2.2s product duration',
       (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
           body: Builder(
             builder: (context) => TextButton(
-              onPressed: () => showTeremokSnackBar(context, 'Скопировано'),
+              onPressed: () => showProxyDomSnackBar(context, 'Скопировано'),
               child: const Text('go'),
             ),
           ),

@@ -1,4 +1,4 @@
-package com.teremok.connect.teremok_connect
+package com.proxydom.app
 
 import android.content.Context
 import org.json.JSONObject
@@ -29,8 +29,8 @@ internal object CoreLog {
             val obj = JSONObject(configJson)
             val dir = File(context.filesDir, "xray")
             dir.mkdirs()
-            obj.put("teremokLogDir", dir.absolutePath)
-            obj.put("teremokLogLevel", resolve(context))
+            obj.put("proxydomLogDir", dir.absolutePath)
+            obj.put("proxydomLogLevel", resolve(context))
             obj.toString()
         } catch (_: Exception) {
             configJson

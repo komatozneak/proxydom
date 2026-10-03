@@ -1,4 +1,4 @@
-package com.teremok.connect.teremok_connect.session
+package com.proxydom.app.session
 
 /**
  * Session phases for [VpnSessionEngine] (ADR 014).

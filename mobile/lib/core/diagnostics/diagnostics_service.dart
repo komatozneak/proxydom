@@ -2,26 +2,20 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
-import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 
-import '../api_client.dart';
-import '../ios_store_gates.dart';
 import 'app_log_buffer.dart';
 import 'tunnel_log_redact.dart';
 import 'egress_verify.dart';
 import '../../features/home/application/vpn_status.dart';
 import '../../features/vpn/data/vpn_config.dart';
 import '../../features/vpn/data/vpn_controller.dart';
-import '../../features/vpn/data/vpn_session_meta.dart';
 
 /// Collects a local diagnostic bundle for the user to paste into support.
 class DiagnosticsService {
-  DiagnosticsService({Dio? dio}) : _dio = dio ?? ApiClient.instance;
-
-  final Dio _dio;
+  DiagnosticsService();
 
   static String? lastFlutterError;
 
@@ -77,13 +71,7 @@ class DiagnosticsService {
       VpnController.instance.getUnderlyingNetworkInterface(),
     );
 
-    final sessionMeta = await VpnSessionMeta.load();
-    final config = cachedConfig ?? VpnConfigCache.instance.current;
-    final expectedHost = freeKeyClient
-        ? null
-        : sessionMeta.expectedEgressHost ?? config?.expectedEgressHost;
-
-    final egress = await _probeEgress(expectedHost);
+    final egress = await _probeEgress(null);
 
     final vpnUiLine = _vpnUiLabel(vpnUi);
     final lastVpnError = vpnUi is VpnError ? vpnUi.message : '(none)';
@@ -99,27 +87,8 @@ class DiagnosticsService {
       ..writeln('vpn_native: ${nativeStatus.name}')
       ..writeln('vpn_native_last_error: ${nativeError ?? '(none)'}')
       ..writeln('vpn_lockdown: $lockdown')
-      ..writeln('external_ip: ${egress.externalIpLabel}');
-    if (!freeKeyClient) {
-      buffer
-        ..writeln('catalog_host: ${formatCatalogHost(catalogHost)}')
-        ..writeln('expected_egress_host: ${expectedHost ?? '(unknown)'}')
-        ..writeln('egress_ok: ${egress.egressOkLabel}')
-        ..writeln(
-          'egress_check: ${egressCheckLabel(externalIp: egress.externalIp, catalogHost: catalogHost)}',
-        )
-        ..writeln('ru_rules_loaded: ${sessionMeta.ruRulesLoaded}')
-        ..writeln(
-          'ru_rules_paths: ${sessionMeta.ruRuleTags.isEmpty ? '(none)' : sessionMeta.ruRuleTags.join(', ')}',
-        );
-    }
-    buffer.writeln('underlying_network: ${underlying ?? '(unsupported)'}');
-    if (!freeKeyClient) {
-      buffer
-        ..writeln('auto_winner_id: ${autoWinnerId ?? '(none)'}')
-        ..writeln('auto_winner_label: ${autoWinnerLabel ?? '(none)'}');
-    }
-    buffer
+      ..writeln('external_ip: ${egress.externalIpLabel}')
+      ..writeln('underlying_network: ${underlying ?? '(unsupported)'}')
       ..writeln('last_prove: ${lastProve ?? '(none)'}')
       ..writeln('vpn_stderr_tail:')
       ..writeln(redactTunnelLog(stderrTail ?? '(unsupported)'))
@@ -177,31 +146,6 @@ class DiagnosticsService {
       debugPrint(report.substring(i, end), wrapWidth: logcatChunkChars);
     }
     debugPrint('=== DIAG-REPORT END ===', wrapWidth: logcatChunkChars);
-  }
-
-  Future<void> submit({
-    required String report,
-    bool dumpToLogcat = true,
-  }) async {
-    if (dumpToLogcat) dumpReportToLogcat(report);
-    final payload = clipForPost(report);
-    final resp = await _dio.post<Map<String, dynamic>>(
-      '/support/diagnostics',
-      data: {'report': payload},
-      options: Options(
-        receiveTimeout: const Duration(seconds: 30),
-        sendTimeout: const Duration(seconds: 30),
-      ),
-    );
-    final code = resp.statusCode ?? 0;
-    if (code < 200 || code >= 300) {
-      throw DioException(
-        requestOptions: resp.requestOptions,
-        response: resp,
-        type: DioExceptionType.badResponse,
-        message: 'diagnostics failed: $code',
-      );
-    }
   }
 
   Future<T?> _probe<T>(Future<T?> future) async {

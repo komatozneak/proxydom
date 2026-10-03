@@ -1,12 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/core/vpn_nodes.dart';
-import 'package:teremok_connect/features/vpn/data/vpn_node.dart';
+import 'package:proxydom/features/vpn/data/vpn_node.dart';
 
 void main() {
-  test('SelectedRegionStore key is selected_region_id', () {
-    expect(SelectedRegionStore.key, 'selected_region_id');
-  });
-
   test('VpnNode maps connected status', () {
     const node = VpnNode(
       id: '1',

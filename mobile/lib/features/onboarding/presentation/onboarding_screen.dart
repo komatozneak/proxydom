@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/diagnostics/ui_log.dart';
-import '../../../core/ios_store_gates.dart';
 import '../../../core/router.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
@@ -54,56 +53,40 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   List<_OnboardingCard> _cards(AppL10n l) {
-    if (freeKeyClient) {
-      return [
-        _OnboardingCard(
-          icon: AppIcons.shield,
-          title: l.freeOnboardTitle,
-          body: l.freeOnboardBody,
-        ),
-        _OnboardingCard(
-          icon: AppIcons.clipboard,
-          title: l.freeOnboardAddTitle,
-          body: l.freeOnboardAddBody,
-        ),
-        _OnboardingCard(
-          icon: AppIcons.power,
-          title: l.freeOnboardConnectTitle,
-          body: l.freeOnboardConnectBody,
-        ),
-      ];
-    }
     return [
       _OnboardingCard(
-        icon: AppIcons.power,
-        title: l.onboardingConnectTitle,
-        body: onboardingConnectBodyForPlatform(l),
+        icon: AppIcons.shield,
+        title: l.freeOnboardTitle,
+        body: l.freeOnboardBody,
       ),
       _OnboardingCard(
-        icon: AppIcons.servers,
-        title: l.onboardingRegionTitle,
-        body: l.onboardingRegionBody,
+        icon: AppIcons.clipboard,
+        title: l.freeOnboardAddTitle,
+        body: l.freeOnboardAddBody,
+      ),
+      _OnboardingCard(
+        icon: AppIcons.power,
+        title: l.freeOnboardConnectTitle,
+        body: l.freeOnboardConnectBody,
       ),
     ];
   }
 
   Future<void> _finish({bool openImport = false}) async {
-    if (freeKeyClient) {
-      UiLog.action(
-        'onboarding',
-        'finish',
-        extra: {'route': openImport ? '/import' : '/home'},
-      );
-      await OnboardingPrefs.markWelcomeSeen();
-      AppRouter.welcomeSeenCache = true;
-      if (!mounted) return;
-      // Same push as Home, so «Добавить» has a back path to the house.
-      context.go('/home');
-      if (!openImport) return;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        AppRouter.config.push('/import');
-      });
-    }
+    UiLog.action(
+      'onboarding',
+      'finish',
+      extra: {'route': openImport ? '/import' : '/home'},
+    );
+    await OnboardingPrefs.markWelcomeSeen();
+    AppRouter.welcomeSeenCache = true;
+    if (!mounted) return;
+    // Same push as Home, so «Добавить» has a back path to the house.
+    context.go('/home');
+    if (!openImport) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      AppRouter.config.push('/import');
+    });
   }
 
   void _next(int total) {
@@ -203,20 +186,18 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               child: SizedBox(
                 width: double.infinity,
                 child: FilledButton(
-                  onPressed: () => freeKeyClient && _index >= cards.length - 1
+                  onPressed: () => _index >= cards.length - 1
                       ? _finish(openImport: true)
                       : _next(cards.length),
                   child: Text(
-                    freeKeyClient && _index >= cards.length - 1
+                    _index >= cards.length - 1
                         ? l.freeAddServer
-                        : (_index >= cards.length - 1
-                            ? l.onboardingDone
-                            : l.onboardingNext),
+                        : l.onboardingNext,
                   ),
                 ),
               ),
             ),
-            if (freeKeyClient && _index >= cards.length - 1)
+            if (_index >= cards.length - 1)
               TextButton(
                 onPressed: _finish,
                 child: Text(l.freeLater),

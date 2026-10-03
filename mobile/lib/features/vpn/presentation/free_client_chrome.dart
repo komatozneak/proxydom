@@ -6,15 +6,21 @@ import '../../../core/widgets/app_icon.dart';
 import '../../../l10n/app_localizations.dart';
 
 /// Paste, and on the phone a matching QR. Windows has no camera and no QR.
+///
+/// [onRefresh] reloads saved subscription documents. On the phone it is a
+/// small circular-arrow control beside QR. On Windows it is a labeled button
+/// beside Paste.
 class FreeClientActionBar extends StatelessWidget {
   const FreeClientActionBar({
     super.key,
     required this.onPaste,
     required this.onScan,
+    this.onRefresh,
   });
 
   final VoidCallback onPaste;
   final VoidCallback onScan;
+  final VoidCallback? onRefresh;
 
   @override
   Widget build(BuildContext context) {
@@ -34,26 +40,57 @@ class FreeClientActionBar extends StatelessWidget {
       pad: pad,
       height: barHeight,
     );
+    final refresh = onRefresh;
     if (windowsDesktop) {
-      return SizedBox(height: barHeight, width: double.infinity, child: paste);
-    }
-    return Row(
-      children: [
-        Expanded(child: paste),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _action(
-            onPressed: onScan,
-            icon: AppIcons.qrCode,
-            label: l.freeQr,
-            background: AppBrand.paperMargin,
-            foreground: AppBrand.inkLight,
-            shape: shape,
-            pad: pad,
-            height: barHeight,
-          ),
+      if (refresh == null) {
+        return SizedBox(height: barHeight, width: double.infinity, child: paste);
+      }
+      return SizedBox(
+        height: barHeight,
+        child: Row(
+          children: [
+            Expanded(child: paste),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _action(
+                onPressed: refresh,
+                icon: AppIcons.refresh,
+                label: l.freeRefresh,
+                background: AppBrand.paperMargin,
+                foreground: AppBrand.inkLight,
+                shape: shape,
+                pad: pad,
+                height: barHeight,
+              ),
+            ),
+          ],
         ),
-      ],
+      );
+    }
+    return SizedBox(
+      height: barHeight,
+      child: Row(
+        children: [
+          Expanded(child: paste),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _action(
+              onPressed: onScan,
+              icon: AppIcons.qrCode,
+              label: l.freeQr,
+              background: AppBrand.paperMargin,
+              foreground: AppBrand.inkLight,
+              shape: shape,
+              pad: pad,
+              height: barHeight,
+            ),
+          ),
+          if (refresh != null) ...[
+            const SizedBox(width: 8),
+            _PhoneRefreshButton(onPressed: refresh, tooltip: l.freeRefresh),
+          ],
+        ],
+      ),
     );
   }
 
@@ -92,10 +129,46 @@ class FreeClientActionBar extends StatelessWidget {
   }
 }
 
+/// Phone-only reload. No caption: the circular arrows are the label.
+class _PhoneRefreshButton extends StatelessWidget {
+  const _PhoneRefreshButton({
+    required this.onPressed,
+    required this.tooltip,
+  });
+
+  final VoidCallback onPressed;
+  final String tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 40,
+      height: 40,
+      child: IconButton(
+        tooltip: tooltip,
+        onPressed: onPressed,
+        padding: EdgeInsets.zero,
+        style: IconButton.styleFrom(
+          backgroundColor: AppBrand.paperMargin,
+          foregroundColor: AppBrand.inkLight,
+          shape: const CircleBorder(),
+        ),
+        icon: const AppIcon(AppIcons.refresh, size: 20, color: AppBrand.inkLight),
+      ),
+    );
+  }
+}
+
 class FreeClientEmptyState extends StatelessWidget {
   const FreeClientEmptyState({super.key, this.compact = false});
 
   final bool compact;
+
+  /// The DOM mark, the same plate the launcher icon, the bottom nav and the
+  /// download card carry — not a generic folder glyph. It is self-contained, so
+  /// it needs no tint per theme, and it must not be ColorFiltered: that crushes
+  /// the DOM cutout.
+  static const _markAsset = 'assets/icon/logo_mark_nav.png';
 
   @override
   Widget build(BuildContext context) {
@@ -104,10 +177,14 @@ class FreeClientEmptyState extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(
-          AppIcons.folder,
-          size: compact ? 36 : 48,
-          color: theme.colorScheme.onSurfaceVariant,
+        Image.asset(
+          _markAsset,
+          width: compact ? 40 : 56,
+          height: compact ? 40 : 56,
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.high,
+          // The title and body below already name what is missing.
+          excludeFromSemantics: true,
         ),
         SizedBox(height: compact ? 8 : 12),
         Text(

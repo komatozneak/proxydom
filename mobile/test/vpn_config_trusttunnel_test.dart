@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/features/vpn/data/vpn_config.dart';
-import 'package:teremok_connect/features/vpn/data/vpn_node.dart';
+import 'package:proxydom/features/vpn/data/vpn_config.dart';
+import 'package:proxydom/features/vpn/data/vpn_node.dart';
 
 void main() {
   test('parses the golden backend trusttunnel_profile v1 fixture', () {
@@ -87,7 +87,7 @@ void main() {
     final profile = TrustTunnelProfile.fromJson({
       'schema_version': 1,
       'node_id': 'us-youtube-tt',
-      'hostname': 'tt-us.teremokconnect.online',
+      'hostname': 'node.proxydom.su',
       'addresses': ['45.91.248.91:443'],
       'username': 'u',
       'password': 'p',

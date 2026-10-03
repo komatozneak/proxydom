@@ -30,8 +30,8 @@ var coreSecret = regexp.MustCompile(`(?i)\b(auth|token|password|secret|authoriza
 // share document. Empty dir means the handler stays quiet.
 func prepareCoreLog(configJSON string) {
 	var env struct {
-		Dir   string `json:"teremokLogDir"`
-		Level string `json:"teremokLogLevel"`
+		Dir   string `json:"proxydomLogDir"`
+		Level string `json:"proxydomLogLevel"`
 	}
 	_ = json.Unmarshal([]byte(configJSON), &env)
 	coreMu.Lock()
@@ -243,5 +243,5 @@ func rotateCoreLocked(path string) {
 		return
 	}
 	defer file.Close()
-	_, _ = file.WriteString("[TEREMOK] Previous log window expired or reached the 8 MiB limit.\n")
+	_, _ = file.WriteString("[PROXYDOM] Previous log window expired or reached the 8 MiB limit.\n")
 }

@@ -1,4 +1,4 @@
-package com.teremok.connect.teremok_connect
+package com.proxydom.app
 
 /**
  * Collapses a failed bind that succeeds again inside [windowMs] into one debug line.

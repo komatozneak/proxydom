@@ -29,7 +29,7 @@ final RegExp _socksProbeFailPattern = RegExp(
   caseSensitive: false,
 );
 
-/// Parsed `id@host: SOCKS HTTPS probe failed` from [TeremokVpnService.failStart].
+/// Parsed `id@host: SOCKS HTTPS probe failed` from [ProxyDomVpnService.failStart].
 class SocksProbeFailure {
   const SocksProbeFailure({required this.nodeId, required this.host});
 

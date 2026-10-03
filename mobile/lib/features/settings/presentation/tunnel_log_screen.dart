@@ -140,7 +140,7 @@ class _TunnelLogScreenState extends State<TunnelLogScreen> {
     await Clipboard.setData(ClipboardData(text: text));
     if (!mounted) return;
     final l = AppL10n.of(context);
-    showTeremokSnackBar(
+    showProxyDomSnackBar(
       context,
       saved == null ? l.tunnelLogsCopied : l.tunnelLogsDebugFile(saved),
     );
@@ -156,14 +156,14 @@ class _TunnelLogScreenState extends State<TunnelLogScreen> {
       extra: {'lines': lines.length},
     );
     if (lines.isEmpty && !windowsDesktop) {
-      showTeremokSnackBar(context, l.tunnelLogsEmpty);
+      showProxyDomSnackBar(context, l.tunnelLogsEmpty);
       return;
     }
     final text = await _bundle(lines);
     final saved = windowsDesktop ? await writeWindowsDebugFile(text) : null;
     if (!mounted) return;
     if (saved != null) {
-      showTeremokSnackBar(context, l.tunnelLogsDebugFile(saved));
+      showProxyDomSnackBar(context, l.tunnelLogsDebugFile(saved));
       final box = context.findRenderObject();
       final origin = box is RenderBox && box.hasSize
           ? box.localToGlobal(Offset.zero) & box.size
@@ -180,7 +180,7 @@ class _TunnelLogScreenState extends State<TunnelLogScreen> {
       return;
     }
     if (text.isEmpty) {
-      showTeremokSnackBar(context, l.tunnelLogsEmpty);
+      showProxyDomSnackBar(context, l.tunnelLogsEmpty);
       return;
     }
     final box = context.findRenderObject();

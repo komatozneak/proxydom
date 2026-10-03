@@ -1,4 +1,4 @@
-package com.teremok.connect.teremok_connect
+package com.proxydom.app
 
 import android.Manifest
 import android.app.Activity
@@ -51,15 +51,15 @@ class MainActivity : FlutterFragmentActivity() {
      * params are missing. Consent → start last session without waiting for Flutter.
      */
     private fun handleTileIntent(intent: Intent?) {
-        if (intent?.action != TeremokTileService.ACTION_TILE_TOGGLE) return
+        if (intent?.action != ProxyDomTileService.ACTION_TILE_TOGGLE) return
         intent.action = Intent.ACTION_MAIN
-        if (!TeremokVpnService.hasPersistedParams(this)) {
+        if (!ProxyDomVpnService.hasPersistedParams(this)) {
             Log.i(TAG, "QS tile: no persisted session — Home")
             return
         }
-        val prepareIntent = TeremokVpnService.prepareVpn(this)
+        val prepareIntent = ProxyDomVpnService.prepareVpn(this)
         if (prepareIntent == null) {
-            TeremokVpnService.startFromPersistedSession(this)
+            ProxyDomVpnService.startFromPersistedSession(this)
             return
         }
         pendingTileConnect = true
@@ -157,9 +157,9 @@ class MainActivity : FlutterFragmentActivity() {
             engine = flutterEngine,
             appContext = applicationContext,
             activityProvider = { this },
-            serviceProvider = { TeremokVpnService.currentInstance() },
+            serviceProvider = { ProxyDomVpnService.currentInstance() },
             onPermissionRequest = { result ->
-                val prepareIntent: Intent? = TeremokVpnService.prepareVpn(this)
+                val prepareIntent: Intent? = ProxyDomVpnService.prepareVpn(this)
                 if (prepareIntent == null) {
                     result.success(true)
                 } else if (pendingPermissionResult != null) {
@@ -261,7 +261,7 @@ class MainActivity : FlutterFragmentActivity() {
         if (requestCode != REQUEST_VPN_PERMISSION) return
 
         val granted = resultCode == Activity.RESULT_OK && VpnService.prepare(this) == null
-        val conflict = TeremokVpnService.queryVpnConflict(this)
+        val conflict = ProxyDomVpnService.queryVpnConflict(this)
         Log.i(
             TAG,
             "VPN permission resultCode=$resultCode, granted=$granted, conflict=$conflict",
@@ -269,7 +269,7 @@ class MainActivity : FlutterFragmentActivity() {
         if (pendingTileConnect) {
             pendingTileConnect = false
             if (granted) {
-                TeremokVpnService.startFromPersistedSession(this)
+                ProxyDomVpnService.startFromPersistedSession(this)
             }
         }
         pendingPermissionResult?.success(granted)

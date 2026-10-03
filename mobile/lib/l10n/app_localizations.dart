@@ -100,7 +100,7 @@ abstract class AppL10n {
   /// Title shown in app bar and OS task switcher
   ///
   /// In en, this message translates to:
-  /// **'Teremok Connect'**
+  /// **'Proxy Dom'**
   String get appTitle;
 
   /// No description provided for @loginTitle.
@@ -136,7 +136,7 @@ abstract class AppL10n {
   /// No description provided for @homeTitle.
   ///
   /// In en, this message translates to:
-  /// **'Teremok'**
+  /// **'Proxy Dom'**
   String get homeTitle;
 
   /// No description provided for @homeVpnHint.
@@ -166,19 +166,19 @@ abstract class AppL10n {
   /// No description provided for @homeTapHint.
   ///
   /// In en, this message translates to:
-  /// **'Tap Teremok to connect'**
+  /// **'Tap the house to connect'**
   String get homeTapHint;
 
   /// No description provided for @homeConnectingHint.
   ///
   /// In en, this message translates to:
-  /// **'Hold on — Teremok is opening the door…'**
+  /// **'Hold on — the house is opening the door…'**
   String get homeConnectingHint;
 
   /// No description provided for @homeConnectedHint.
   ///
   /// In en, this message translates to:
-  /// **'Teremok is online'**
+  /// **'The house is online'**
   String get homeConnectedHint;
 
   /// No description provided for @homeProtected.
@@ -241,35 +241,11 @@ abstract class AppL10n {
   /// **'Modes'**
   String get navModes;
 
-  /// No description provided for @navSubscription.
-  ///
-  /// In en, this message translates to:
-  /// **'Subscription'**
-  String get navSubscription;
-
-  /// No description provided for @navPremium.
-  ///
-  /// In en, this message translates to:
-  /// **'Premium'**
-  String get navPremium;
-
   /// No description provided for @homeTrafficRemainder.
   ///
   /// In en, this message translates to:
   /// **'Data left'**
   String get homeTrafficRemainder;
-
-  /// No description provided for @homeQuotaUnlimitedTeaser.
-  ///
-  /// In en, this message translates to:
-  /// **'Unlimited with Premium'**
-  String get homeQuotaUnlimitedTeaser;
-
-  /// No description provided for @homeQuotaUnlimitedCta.
-  ///
-  /// In en, this message translates to:
-  /// **'Get unlimited'**
-  String get homeQuotaUnlimitedCta;
 
   /// No description provided for @homeTrafficExhausted.
   ///
@@ -288,72 +264,6 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Allowlists'**
   String get homeNoVpnRow;
-
-  /// No description provided for @premiumHeadline.
-  ///
-  /// In en, this message translates to:
-  /// **'More locations'**
-  String get premiumHeadline;
-
-  /// No description provided for @premiumBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Premium unlocks extra locations, up to 5 devices, and removes the free 4.20 GB cap.'**
-  String get premiumBody;
-
-  /// No description provided for @premiumFeatureYt.
-  ///
-  /// In en, this message translates to:
-  /// **'Extra locations for streaming'**
-  String get premiumFeatureYt;
-
-  /// No description provided for @premiumFeatureSpeed.
-  ///
-  /// In en, this message translates to:
-  /// **'Priority exits for streaming'**
-  String get premiumFeatureSpeed;
-
-  /// No description provided for @premiumUnlimitedTraffic.
-  ///
-  /// In en, this message translates to:
-  /// **'Unlimited traffic'**
-  String get premiumUnlimitedTraffic;
-
-  /// No description provided for @premiumCta.
-  ///
-  /// In en, this message translates to:
-  /// **'Get Premium'**
-  String get premiumCta;
-
-  /// No description provided for @premiumOpenLocations.
-  ///
-  /// In en, this message translates to:
-  /// **'Open locations'**
-  String get premiumOpenLocations;
-
-  /// No description provided for @subscriptionTabHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Manage plans and promo codes. Premium unlocks extra locations.'**
-  String get subscriptionTabHint;
-
-  /// No description provided for @subscriptionPay.
-  ///
-  /// In en, this message translates to:
-  /// **'Pay'**
-  String get subscriptionPay;
-
-  /// No description provided for @locationsPremiumLocked.
-  ///
-  /// In en, this message translates to:
-  /// **'Premium'**
-  String get locationsPremiumLocked;
-
-  /// No description provided for @locationsPremiumUnavailable.
-  ///
-  /// In en, this message translates to:
-  /// **'Available with Premium'**
-  String get locationsPremiumUnavailable;
 
   /// No description provided for @settingsNoVpn.
   ///
@@ -625,24 +535,6 @@ abstract class AppL10n {
   /// **'Couldn’t reach a server. Tap again or pick a location yourself.'**
   String get homePathIncompatibleHint;
 
-  /// No description provided for @homeQuotaExceededTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Free traffic used up'**
-  String get homeQuotaExceededTitle;
-
-  /// No description provided for @homeQuotaExceededHint.
-  ///
-  /// In en, this message translates to:
-  /// **'You’ve used this month’s 4.20 GB. Upgrade to Premium for unlimited traffic.'**
-  String get homeQuotaExceededHint;
-
-  /// No description provided for @homeQuotaUpgradeCta.
-  ///
-  /// In en, this message translates to:
-  /// **'Upgrade'**
-  String get homeQuotaUpgradeCta;
-
   /// No description provided for @homeTtProvisionFailedTitle.
   ///
   /// In en, this message translates to:
@@ -763,23 +655,11 @@ abstract class AppL10n {
   /// **'Active'**
   String get settingsActiveBadge;
 
-  /// No description provided for @settingsAccessEarlyTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Premium'**
-  String get settingsAccessEarlyTitle;
-
   /// No description provided for @settingsAccessEarlySubtitle.
   ///
   /// In en, this message translates to:
   /// **'Access is by invite.'**
   String get settingsAccessEarlySubtitle;
-
-  /// No description provided for @settingsAccessBetaTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Premium'**
-  String get settingsAccessBetaTitle;
 
   /// No description provided for @settingsAccessBetaSubtitle.
   ///
@@ -805,12 +685,6 @@ abstract class AppL10n {
   /// **'Free'**
   String get settingsAccessFreeTitle;
 
-  /// No description provided for @settingsAccessFreeSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'1 device · up to 4.20 GB per month.'**
-  String get settingsAccessFreeSubtitle;
-
   /// No description provided for @settingsAccessActiveUntil.
   ///
   /// In en, this message translates to:
@@ -834,18 +708,6 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Trial until {date}'**
   String settingsSubscriptionTrialUntil(String date);
-
-  /// No description provided for @settingsSubscriptionAlpha.
-  ///
-  /// In en, this message translates to:
-  /// **'Premium'**
-  String get settingsSubscriptionAlpha;
-
-  /// No description provided for @settingsSubscriptionExpired.
-  ///
-  /// In en, this message translates to:
-  /// **'Subscription expired'**
-  String get settingsSubscriptionExpired;
 
   /// No description provided for @settingsSubscriptionLoadError.
   ///
@@ -1027,12 +889,6 @@ abstract class AppL10n {
   /// **'You'**
   String get devicesThisDevice;
 
-  /// No description provided for @devicesOwnerLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Subscription owner'**
-  String get devicesOwnerLabel;
-
   /// No description provided for @devicesInvitedLabel.
   ///
   /// In en, this message translates to:
@@ -1086,24 +942,6 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'This install becomes its own Free account'**
   String get devicesLeaveHint;
-
-  /// No description provided for @devicesLeave.
-  ///
-  /// In en, this message translates to:
-  /// **'Leave external subscription'**
-  String get devicesLeave;
-
-  /// No description provided for @devicesLeaveTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Leave this subscription?'**
-  String get devicesLeaveTitle;
-
-  /// No description provided for @devicesLeaveBody.
-  ///
-  /// In en, this message translates to:
-  /// **'This install becomes its own Free account. The paid subscription stays with the owner. Save the new recovery code if shown.'**
-  String get devicesLeaveBody;
 
   /// No description provided for @devicesLeaveConfirm.
   ///
@@ -1180,7 +1018,7 @@ abstract class AppL10n {
   /// No description provided for @splitTunnelBundledLead.
   ///
   /// In en, this message translates to:
-  /// **'Listed sites use your usual connection, not the protected one. Everything else still goes through Teremok.'**
+  /// **'Listed sites use your usual connection, not the protected one. Everything else still goes through Proxy Dom.'**
   String get splitTunnelBundledLead;
 
   /// No description provided for @splitTunnelBundledRuTitle.
@@ -1204,7 +1042,7 @@ abstract class AppL10n {
   /// No description provided for @splitTunnelBundledInfoBody.
   ///
   /// In en, this message translates to:
-  /// **'Listed sites use your usual connection, not the protected one. Everything else still goes through Teremok.\n\nOn iPhone you cannot take a whole app out of the VPN — only a website by address. Safari usually follows the list. A bank or marketplace app may stay in the VPN.\n\nBig services use many servers. Some pages or video may still go through the VPN with the switch on. If a site should stay protected, turn it off here.\n\nTap Reconnect after you change the list.'**
+  /// **'Listed sites use your usual connection, not the protected one. Everything else still goes through Proxy Dom.\n\nOn iPhone you cannot take a whole app out of the VPN — only a website by address. Safari usually follows the list. A bank or marketplace app may stay in the VPN.\n\nBig services use many servers. Some pages or video may still go through the VPN with the switch on. If a site should stay protected, turn it off here.\n\nTap Reconnect after you change the list.'**
   String get splitTunnelBundledInfoBody;
 
   /// No description provided for @splitTunnelBundledInfoClose.
@@ -1216,7 +1054,7 @@ abstract class AppL10n {
   /// No description provided for @splitTunnelSitesLead.
   ///
   /// In en, this message translates to:
-  /// **'Listed sites use your usual connection, not the protected one. Everything else still goes through Teremok.'**
+  /// **'Listed sites use your usual connection, not the protected one. Everything else still goes through Proxy Dom.'**
   String get splitTunnelSitesLead;
 
   /// No description provided for @splitTunnelSitesIosNote.
@@ -1540,7 +1378,7 @@ abstract class AppL10n {
   /// No description provided for @tunnelLogsFetch.
   ///
   /// In en, this message translates to:
-  /// **'Subscription'**
+  /// **'Document'**
   String get tunnelLogsFetch;
 
   /// No description provided for @tunnelLogsNetwork.
@@ -1626,12 +1464,6 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Couldn\'t build the report'**
   String get settingsReportFailed;
-
-  /// No description provided for @settingsReportTelegramFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'Couldn\'t send via the bot. The report is copied.'**
-  String get settingsReportTelegramFailed;
 
   /// No description provided for @settingsReportUnauthorized.
   ///
@@ -1848,18 +1680,6 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'General'**
   String get regionSectionGeneral;
-
-  /// No description provided for @regionSectionYoutube.
-  ///
-  /// In en, this message translates to:
-  /// **'Premium'**
-  String get regionSectionYoutube;
-
-  /// No description provided for @regionSectionYoutubeIos.
-  ///
-  /// In en, this message translates to:
-  /// **'Services'**
-  String get regionSectionYoutubeIos;
 
   /// No description provided for @regionSectionFree.
   ///
@@ -2113,84 +1933,6 @@ abstract class AppL10n {
   /// **'Skip'**
   String get welcomeSkip;
 
-  /// No description provided for @promoTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Invite code'**
-  String get promoTitle;
-
-  /// No description provided for @promoHeadline.
-  ///
-  /// In en, this message translates to:
-  /// **'Enter your personal code'**
-  String get promoHeadline;
-
-  /// No description provided for @promoBody.
-  ///
-  /// In en, this message translates to:
-  /// **'If you have a code, enter it here.'**
-  String get promoBody;
-
-  /// No description provided for @promoCodeLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Code'**
-  String get promoCodeLabel;
-
-  /// No description provided for @promoCodeHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Your invite code'**
-  String get promoCodeHint;
-
-  /// No description provided for @promoCodeEmpty.
-  ///
-  /// In en, this message translates to:
-  /// **'Enter a code'**
-  String get promoCodeEmpty;
-
-  /// No description provided for @promoSubmit.
-  ///
-  /// In en, this message translates to:
-  /// **'Continue'**
-  String get promoSubmit;
-
-  /// No description provided for @promoOutcomeInvalid.
-  ///
-  /// In en, this message translates to:
-  /// **'Code not found. Check it and try again.'**
-  String get promoOutcomeInvalid;
-
-  /// No description provided for @promoOutcomeExpired.
-  ///
-  /// In en, this message translates to:
-  /// **'This code has expired.'**
-  String get promoOutcomeExpired;
-
-  /// No description provided for @promoOutcomeExhausted.
-  ///
-  /// In en, this message translates to:
-  /// **'This code has already been used.'**
-  String get promoOutcomeExhausted;
-
-  /// No description provided for @promoOutcomeRevoked.
-  ///
-  /// In en, this message translates to:
-  /// **'This code is no longer valid.'**
-  String get promoOutcomeRevoked;
-
-  /// No description provided for @promoOutcomeRateLimited.
-  ///
-  /// In en, this message translates to:
-  /// **'Too many attempts. Please wait a minute.'**
-  String get promoOutcomeRateLimited;
-
-  /// No description provided for @promoOutcomeUnknown.
-  ///
-  /// In en, this message translates to:
-  /// **'Couldn’t apply the code. Try again.'**
-  String get promoOutcomeUnknown;
-
   /// No description provided for @referralShareTitle.
   ///
   /// In en, this message translates to:
@@ -2317,18 +2059,6 @@ abstract class AppL10n {
   /// **'Welcome!'**
   String get lockedHeadline;
 
-  /// No description provided for @lockedBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Get a subscription — then connect in one tap.'**
-  String get lockedBody;
-
-  /// No description provided for @lockedCta.
-  ///
-  /// In en, this message translates to:
-  /// **'Get a subscription or enter a promo code'**
-  String get lockedCta;
-
   /// No description provided for @lockedRefreshAccess.
   ///
   /// In en, this message translates to:
@@ -2340,30 +2070,6 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Support'**
   String get settingsSupport;
-
-  /// No description provided for @settingsSupportHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Telegram — transfer after reinstall'**
-  String get settingsSupportHint;
-
-  /// No description provided for @settingsSupportHintIos.
-  ///
-  /// In en, this message translates to:
-  /// **'Questions in the Telegram bot'**
-  String get settingsSupportHintIos;
-
-  /// No description provided for @lockedPay1m.
-  ///
-  /// In en, this message translates to:
-  /// **'Pay 1 month'**
-  String get lockedPay1m;
-
-  /// No description provided for @lockedPay3m.
-  ///
-  /// In en, this message translates to:
-  /// **'Pay 3 months'**
-  String get lockedPay3m;
 
   /// No description provided for @lockedPlan1m.
   ///
@@ -2389,18 +2095,6 @@ abstract class AppL10n {
   /// **'12 months'**
   String get lockedPlan12m;
 
-  /// No description provided for @lockedPayAmount.
-  ///
-  /// In en, this message translates to:
-  /// **'Pay {price} ₽'**
-  String lockedPayAmount(int price);
-
-  /// No description provided for @lockedPerMonth.
-  ///
-  /// In en, this message translates to:
-  /// **'{price} ₽/mo'**
-  String lockedPerMonth(int price);
-
   /// No description provided for @lockedSavePercent.
   ///
   /// In en, this message translates to:
@@ -2419,47 +2113,11 @@ abstract class AppL10n {
   /// **'Agreement'**
   String get settingsTerms;
 
-  /// No description provided for @settingsPricing.
-  ///
-  /// In en, this message translates to:
-  /// **'Pricing'**
-  String get settingsPricing;
-
   /// No description provided for @settingsDeleteAccount.
   ///
   /// In en, this message translates to:
   /// **'Delete account'**
   String get settingsDeleteAccount;
-
-  /// No description provided for @lockedOrPromo.
-  ///
-  /// In en, this message translates to:
-  /// **'Or enter a promo code'**
-  String get lockedOrPromo;
-
-  /// No description provided for @lockedPayFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'Couldn’t start payment. Try again or contact support.'**
-  String get lockedPayFailed;
-
-  /// No description provided for @lockedPayReturnTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Payment opened'**
-  String get lockedPayReturnTitle;
-
-  /// No description provided for @lockedPayReturnBody.
-  ///
-  /// In en, this message translates to:
-  /// **'After you finish paying in the browser, tap Check access.'**
-  String get lockedPayReturnBody;
-
-  /// No description provided for @lockedPayReturnCheck.
-  ///
-  /// In en, this message translates to:
-  /// **'Check access'**
-  String get lockedPayReturnCheck;
 
   /// No description provided for @recoveryCodeTitle.
   ///
@@ -2472,12 +2130,6 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Recovery code'**
   String get recoveryCodeHeadline;
-
-  /// No description provided for @recoveryCodeBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Save this code — you’ll need it after reinstall. Without it you can restore via Telegram.'**
-  String get recoveryCodeBody;
 
   /// No description provided for @recoveryCodeCopy.
   ///
@@ -2514,18 +2166,6 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Enter recovery code'**
   String get restoreHeadline;
-
-  /// No description provided for @restoreBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Enter the recovery code or open Telegram.'**
-  String get restoreBody;
-
-  /// No description provided for @restoreBodyIos.
-  ///
-  /// In en, this message translates to:
-  /// **'Enter the recovery code or open Telegram.'**
-  String get restoreBodyIos;
 
   /// No description provided for @restorePaymentLabel.
   ///
@@ -2635,24 +2275,6 @@ abstract class AppL10n {
   /// **'Enter recovery code'**
   String get restoreHeadlineCode;
 
-  /// No description provided for @restoreBodyCode.
-  ///
-  /// In en, this message translates to:
-  /// **'After reinstall, enter the recovery code or open Telegram.'**
-  String get restoreBodyCode;
-
-  /// No description provided for @restoreBodyCodeIos.
-  ///
-  /// In en, this message translates to:
-  /// **'After reinstall, enter the recovery code or open Telegram.'**
-  String get restoreBodyCodeIos;
-
-  /// No description provided for @settingsInviteDevice.
-  ///
-  /// In en, this message translates to:
-  /// **'Add device to my subscription'**
-  String get settingsInviteDevice;
-
   /// No description provided for @settingsInviteDeviceHint.
   ///
   /// In en, this message translates to:
@@ -2695,23 +2317,11 @@ abstract class AppL10n {
   /// **'Device added to the group'**
   String get settingsAcceptSeatOk;
 
-  /// No description provided for @settingsSeatPremiumRequired.
-  ///
-  /// In en, this message translates to:
-  /// **'Adding devices requires Premium'**
-  String get settingsSeatPremiumRequired;
-
   /// No description provided for @settingsSeatCodeNotFound.
   ///
   /// In en, this message translates to:
   /// **'Code not found or expired'**
   String get settingsSeatCodeNotFound;
-
-  /// No description provided for @settingsSeatDeviceLimit.
-  ///
-  /// In en, this message translates to:
-  /// **'Device limit reached for this subscription'**
-  String get settingsSeatDeviceLimit;
 
   /// No description provided for @settingsSeatOwnCode.
   ///
@@ -2742,18 +2352,6 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Scan the QR code or follow the link'**
   String get settingsSeatScanHint;
-
-  /// No description provided for @settingsPayOwnerOnly.
-  ///
-  /// In en, this message translates to:
-  /// **'Only the subscription owner can pay'**
-  String get settingsPayOwnerOnly;
-
-  /// No description provided for @settingsSeatForbidden.
-  ///
-  /// In en, this message translates to:
-  /// **'Only the subscription owner can do this'**
-  String get settingsSeatForbidden;
 
   /// No description provided for @seatAcceptConsentTitle.
   ///
@@ -2796,174 +2394,6 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Couldn’t start the session. Check your connection.'**
   String get bootstrapFailed;
-
-  /// No description provided for @accountHubTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Account'**
-  String get accountHubTitle;
-
-  /// No description provided for @accountHubGuestLead.
-  ///
-  /// In en, this message translates to:
-  /// **'This account is on this device. Recovery code — after reinstall. Telegram — the same account.'**
-  String get accountHubGuestLead;
-
-  /// No description provided for @accountHubLinkedLead.
-  ///
-  /// In en, this message translates to:
-  /// **'Telegram is linked. The bot is the same account: subscription and restore.'**
-  String get accountHubLinkedLead;
-
-  /// No description provided for @accountHubLinkedLeadIos.
-  ///
-  /// In en, this message translates to:
-  /// **'Telegram is linked. The bot is the same account and restore.'**
-  String get accountHubLinkedLeadIos;
-
-  /// No description provided for @accountHubRecoveryMissing.
-  ///
-  /// In en, this message translates to:
-  /// **'This phone already saved the code. After reinstall, open Telegram with the same account.'**
-  String get accountHubRecoveryMissing;
-
-  /// No description provided for @accountHubLinkTelegram.
-  ///
-  /// In en, this message translates to:
-  /// **'Telegram'**
-  String get accountHubLinkTelegram;
-
-  /// No description provided for @accountHubLinkTelegramHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Subscription and restore in the bot'**
-  String get accountHubLinkTelegramHint;
-
-  /// No description provided for @accountHubLinkEmail.
-  ///
-  /// In en, this message translates to:
-  /// **'Email'**
-  String get accountHubLinkEmail;
-
-  /// No description provided for @accountHubLinkEmailHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Link with a code from email'**
-  String get accountHubLinkEmailHint;
-
-  /// No description provided for @accountHubRecovery.
-  ///
-  /// In en, this message translates to:
-  /// **'Recovery code'**
-  String get accountHubRecovery;
-
-  /// No description provided for @accountHubRecoveryHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Restore access after reinstall'**
-  String get accountHubRecoveryHint;
-
-  /// No description provided for @accountHubRecoverySaveBanner.
-  ///
-  /// In en, this message translates to:
-  /// **'Save your recovery code — you’ll need it after reinstall.'**
-  String get accountHubRecoverySaveBanner;
-
-  /// No description provided for @accountHubRecoverySaveCta.
-  ///
-  /// In en, this message translates to:
-  /// **'Save code'**
-  String get accountHubRecoverySaveCta;
-
-  /// No description provided for @accountHubPromo.
-  ///
-  /// In en, this message translates to:
-  /// **'Promo code'**
-  String get accountHubPromo;
-
-  /// No description provided for @accountHubPromoHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Redeem a code'**
-  String get accountHubPromoHint;
-
-  /// No description provided for @accountHubAccessSection.
-  ///
-  /// In en, this message translates to:
-  /// **'Your access'**
-  String get accountHubAccessSection;
-
-  /// No description provided for @accountHubContact.
-  ///
-  /// In en, this message translates to:
-  /// **'Contact'**
-  String get accountHubContact;
-
-  /// No description provided for @accountHubLoadError.
-  ///
-  /// In en, this message translates to:
-  /// **'Couldn’t load account'**
-  String get accountHubLoadError;
-
-  /// No description provided for @accountTelegramLead.
-  ///
-  /// In en, this message translates to:
-  /// **'Open the bot and confirm. Come back — status updates automatically.'**
-  String get accountTelegramLead;
-
-  /// No description provided for @accountTelegramOpenBot.
-  ///
-  /// In en, this message translates to:
-  /// **'Open Telegram'**
-  String get accountTelegramOpenBot;
-
-  /// No description provided for @accountTelegramWaiting.
-  ///
-  /// In en, this message translates to:
-  /// **'Waiting for confirmation…'**
-  String get accountTelegramWaiting;
-
-  /// No description provided for @accountTelegramWaitingHint.
-  ///
-  /// In en, this message translates to:
-  /// **'After /start in the bot, return here.'**
-  String get accountTelegramWaitingHint;
-
-  /// No description provided for @accountTelegramStartFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'Couldn’t start Telegram linking'**
-  String get accountTelegramStartFailed;
-
-  /// No description provided for @accountTelegramVpnRequired.
-  ///
-  /// In en, this message translates to:
-  /// **'Connect first.'**
-  String get accountTelegramVpnRequired;
-
-  /// No description provided for @restoreTelegramCta.
-  ///
-  /// In en, this message translates to:
-  /// **'Restore via Telegram'**
-  String get restoreTelegramCta;
-
-  /// No description provided for @restoreTelegramVpnRequired.
-  ///
-  /// In en, this message translates to:
-  /// **'Connect first.'**
-  String get restoreTelegramVpnRequired;
-
-  /// No description provided for @homeTelegramRestoreCta.
-  ///
-  /// In en, this message translates to:
-  /// **'Had Teremok before? Restore via Telegram'**
-  String get homeTelegramRestoreCta;
-
-  /// No description provided for @homeTelegramRestoreConnectFirst.
-  ///
-  /// In en, this message translates to:
-  /// **'Connect first.'**
-  String get homeTelegramRestoreConnectFirst;
 
   /// No description provided for @accountEmailLead.
   ///
@@ -3127,60 +2557,6 @@ abstract class AppL10n {
   /// **'Not now'**
   String get vpnDisclosureDecline;
 
-  /// No description provided for @accountTelegramLinkedTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'{handle} is linked'**
-  String accountTelegramLinkedTitle(String handle);
-
-  /// No description provided for @accountTelegramLinkedBody.
-  ///
-  /// In en, this message translates to:
-  /// **'After reinstall, restore access with this Telegram. Subscription is in the bot too.'**
-  String get accountTelegramLinkedBody;
-
-  /// No description provided for @accountTelegramOwnerRestoredTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Your account is restored'**
-  String get accountTelegramOwnerRestoredTitle;
-
-  /// No description provided for @accountTelegramOwnerRestoredBody.
-  ///
-  /// In en, this message translates to:
-  /// **'You can manage the subscription and restore access via Telegram.'**
-  String get accountTelegramOwnerRestoredBody;
-
-  /// No description provided for @accountTelegramMemberRestoredTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'You’re back in the subscription'**
-  String get accountTelegramMemberRestoredTitle;
-
-  /// No description provided for @accountTelegramMemberRestoredBody.
-  ///
-  /// In en, this message translates to:
-  /// **'The owner hasn’t changed. Access will refresh in the app.'**
-  String get accountTelegramMemberRestoredBody;
-
-  /// No description provided for @accountTelegramDone.
-  ///
-  /// In en, this message translates to:
-  /// **'Done'**
-  String get accountTelegramDone;
-
-  /// No description provided for @restoreTelegramSlotRevoked.
-  ///
-  /// In en, this message translates to:
-  /// **'The owner removed this device. Ask for a new invite code.'**
-  String get restoreTelegramSlotRevoked;
-
-  /// No description provided for @restoreTelegramSubscriptionInactive.
-  ///
-  /// In en, this message translates to:
-  /// **'The subscription is not active. After it is renewed you can restore this seat.'**
-  String get restoreTelegramSubscriptionInactive;
-
   /// No description provided for @freeAdd.
   ///
   /// In en, this message translates to:
@@ -3298,7 +2674,7 @@ abstract class AppL10n {
   /// No description provided for @freeSubscriptionLoadFail.
   ///
   /// In en, this message translates to:
-  /// **'The subscription did not load. The document host did not answer.'**
+  /// **'The document did not load. The host did not answer.'**
   String get freeSubscriptionLoadFail;
 
   /// No description provided for @freeSubscriptionMissing.

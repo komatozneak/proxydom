@@ -10,7 +10,7 @@ Future<String?> fetchExternalIp() async {
       connectTimeout: const Duration(seconds: 15),
       receiveTimeout: const Duration(seconds: 15),
       responseType: ResponseType.plain,
-      headers: {'User-Agent': 'TeremokConnect/0.1'},
+      headers: {'User-Agent': 'ProxyDom/0.1'},
     ),
   );
   try {

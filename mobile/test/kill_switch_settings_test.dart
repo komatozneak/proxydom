@@ -2,13 +2,13 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/features/vpn/data/vpn_controller.dart';
+import 'package:proxydom/features/vpn/data/vpn_controller.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('VpnController lockdown / openVpnSettings', () {
-    const channel = MethodChannel('teremok/vpn');
+    const channel = MethodChannel('proxydom/vpn');
     final log = <MethodCall>[];
 
     setUp(() {

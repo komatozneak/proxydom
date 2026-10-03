@@ -2,9 +2,9 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/features/home/application/vpn_status.dart';
-import 'package:teremok_connect/features/vpn/data/vpn_session_snapshot.dart';
-import 'package:teremok_connect/features/vpn/domain/vpn_connect_error.dart';
+import 'package:proxydom/features/home/application/vpn_status.dart';
+import 'package:proxydom/features/vpn/data/vpn_session_snapshot.dart';
+import 'package:proxydom/features/vpn/domain/vpn_connect_error.dart';
 
 void main() {
   group('parseSocksProbeFailure', () {

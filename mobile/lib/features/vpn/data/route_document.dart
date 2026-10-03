@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'share_link_parser.dart';
 
-/// How a remote document body should be treated. Not a Teremok account.
+/// How a remote document body should be treated. Not an account.
 enum DocumentBodyKind { links, empty, broken }
 
 /// What a refresh does with the saved document.

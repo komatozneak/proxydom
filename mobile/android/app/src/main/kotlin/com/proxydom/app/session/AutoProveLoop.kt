@@ -1,4 +1,4 @@
-package com.teremok.connect.teremok_connect.session
+package com.proxydom.app.session
 
 /**
  * Sequential Auto prove (not TCP RTT). First item whose [prove] returns true wins.

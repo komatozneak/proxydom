@@ -2,12 +2,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:teremok_connect/features/settings/data/vpn_notification_prefs.dart';
+import 'package:proxydom/features/settings/data/vpn_notification_prefs.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  const channel = MethodChannel('teremok/vpn');
+  const channel = MethodChannel('proxydom/vpn');
 
   setUp(() {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;

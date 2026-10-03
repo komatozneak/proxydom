@@ -1,4 +1,4 @@
-module github.com/komatozneak/teremok-connect/hy2bind
+module github.com/komatozneak/proxydom/hy2bind
 
 go 1.26.0
 

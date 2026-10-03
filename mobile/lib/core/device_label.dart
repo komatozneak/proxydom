@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 /// MethodChannel shared with VPN native (see [VpnChannelRegistry]).
-const MethodChannel kDeviceLabelChannel = MethodChannel('teremok/vpn');
+const MethodChannel kDeviceLabelChannel = MethodChannel('proxydom/vpn');
 
 const _genericLabels = {
   'android',

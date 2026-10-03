@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/core/theme.dart';
-import 'package:teremok_connect/features/onboarding/presentation/onboarding_screen.dart';
+import 'package:proxydom/core/theme.dart';
+import 'package:proxydom/features/onboarding/presentation/onboarding_screen.dart';
 
 int _argb(Color c) {
   try {

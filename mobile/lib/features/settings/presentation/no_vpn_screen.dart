@@ -123,7 +123,7 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
       final ok = await ref.read(vpnProvider.notifier).reconnectToApplyRouting();
       UiLog.action('no_vpn', 'reconnect', result: ok ? 'ok' : 'fail');
       if (!mounted) return;
-      showTeremokSnackBar(
+      showProxyDomSnackBar(
         context,
         ok ? l.splitTunnelApplied : l.splitTunnelApplyFailed,
       );

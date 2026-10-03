@@ -7,14 +7,11 @@ import 'package:path_provider/path_provider.dart';
 import 'package:rive/rive.dart';
 
 import 'app.dart';
-import 'core/api_discovery.dart';
 import 'core/config.dart';
 import 'core/diagnostics/app_log_buffer.dart';
 import 'core/diagnostics/diagnostics_service.dart';
 import 'core/diagnostics/tunnel_log_prefs.dart';
 import 'core/internet_permission.dart';
-import 'core/ios_store_gates.dart';
-import 'core/legacy_account_cache.dart';
 import 'core/router.dart';
 import 'features/vpn/data/windows_tunnel.dart';
 
@@ -53,12 +50,6 @@ void main() async {
     'app.boot internet_ok=$internetOk ms=${boot.elapsedMilliseconds}',
   );
 
-  try {
-    await ApiDiscovery.instance.loadCachedOrigin();
-  } catch (e) {
-    AppLogBuffer.instance.debug('app.boot cache_origin fail: $e');
-  }
-
   final container = ProviderContainer();
   installFlutterErrorHandler();
   AppLogBuffer.instance.debug(
@@ -67,13 +58,12 @@ void main() async {
   if (AppConfig.baseUrl.contains('10.0.2.2')) {
     // ignore: avoid_print
     print(
-      '[Teremok Connect] WARNING: 10.0.2.2 только для эмулятора. '
+      '[Proxy Dom] WARNING: 10.0.2.2 только для эмулятора. '
       'Запусти: flutter run --dart-define=APP_ENV=dev (эмулятор) '
       'или без флага / run_prod.ps1 (prod VPS)',
     );
   }
 
-  await discardLegacyAccountCache();
   await AppRouter.warmWelcomeFlag();
 
   AppLogBuffer.instance.debug(
@@ -82,17 +72,16 @@ void main() async {
   runApp(
     UncontrolledProviderScope(
       container: container,
-      child: const TeremokApp(),
+      child: const ProxyDomApp(),
     ),
   );
 
-  // Discovery + bind after first frame (cached origin already applied).
-  unawaited(_bootDiscoveryInBackground(internetOk: internetOk, boot: boot));
+  // Bind after the first frame. The utility does not discover an owner API.
+  unawaited(_bindUnderlyingAfterFirstFrame(internetOk: internetOk));
 }
 
-Future<void> _bootDiscoveryInBackground({
+Future<void> _bindUnderlyingAfterFirstFrame({
   required bool internetOk,
-  required Stopwatch boot,
 }) async {
   try {
     await bindProcessToUnderlyingNetwork();
@@ -100,23 +89,6 @@ Future<void> _bootDiscoveryInBackground({
     AppLogBuffer.instance.debug('app.boot bind_underlying fail: $e');
   }
   if (!internetOk) {
-    AppLogBuffer.instance.debug('app.boot discovery skipped: INTERNET denied');
-    return;
-  }
-  if (freeKeyClient) {
-    AppLogBuffer.instance.debug('app.boot discovery skipped: local key client');
-    return;
-  }
-  final disc = Stopwatch()..start();
-  try {
-    final origin = await ApiDiscovery.instance.refreshAndSelect();
-    AppLogBuffer.instance.debug(
-      'app.boot discovery_ms=${disc.elapsedMilliseconds} '
-      'origin=${origin ?? 'none'} total_ms=${boot.elapsedMilliseconds}',
-    );
-  } catch (e) {
-    AppLogBuffer.instance.debug(
-      'app.boot discovery fail ms=${disc.elapsedMilliseconds}: $e',
-    );
+    AppLogBuffer.instance.debug('app.boot bind skipped: INTERNET denied');
   }
 }

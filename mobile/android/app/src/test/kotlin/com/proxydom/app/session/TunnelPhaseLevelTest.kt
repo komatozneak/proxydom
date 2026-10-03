@@ -1,4 +1,4 @@
-package com.teremok.connect.teremok_connect.session
+package com.proxydom.app.session
 
 import org.junit.Assert.assertEquals
 import org.junit.Test

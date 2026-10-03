@@ -1,4 +1,4 @@
-package com.teremok.connect.teremok_connect
+package com.proxydom.app
 
 import android.app.PendingIntent
 import android.content.ComponentName
@@ -16,7 +16,7 @@ import android.service.quicksettings.TileService
  * Toggle only: ACTIVE while up / bringing up, INACTIVE when idle.
  * Click always start/stop (Amnezia). Always-on may restart the tunnel.
  */
-class TeremokTileService : TileService() {
+class ProxyDomTileService : TileService() {
 
     override fun onStartListening() {
         super.onStartListening()
@@ -44,16 +44,16 @@ class TeremokTileService : TileService() {
     }
 
     private fun handleClick() {
-        val status = TeremokVpnService.resolveUiStatus(applicationContext)
+        val status = ProxyDomVpnService.resolveUiStatus(applicationContext)
         when (status) {
             "connected", "connecting", "preparing" -> {
-                TeremokVpnService.stopVpnService(applicationContext)
+                ProxyDomVpnService.stopVpnService(applicationContext)
                 applyTile(Tile.STATE_INACTIVE, status = "idle")
             }
             else -> {
                 val prepared = VpnService.prepare(this) == null
                 val started = prepared &&
-                    TeremokVpnService.startFromPersistedSession(applicationContext)
+                    ProxyDomVpnService.startFromPersistedSession(applicationContext)
                 if (started) {
                     applyTile(Tile.STATE_ACTIVE, status = "connecting")
                 } else {
@@ -88,14 +88,16 @@ class TeremokTileService : TileService() {
     }
 
     private fun updateTileState() {
-        val status = TeremokVpnService.resolveUiStatus(applicationContext)
-        applyTile(TeremokVpnService.tileStateFor(status), status)
+        val status = ProxyDomVpnService.resolveUiStatus(applicationContext)
+        applyTile(ProxyDomVpnService.tileStateFor(status), status)
     }
 
     private fun applyTile(state: Int, status: String) {
         val tile = qsTile ?: return
         tile.state = state
         tile.label = getString(R.string.qs_tile_label)
+        // Same house as the in-app DOM mark: white glyph, letters punched out
+        // so the system tint still leaves DOM readable.
         tile.icon = Icon.createWithResource(this, R.drawable.ic_qs_vpn)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             tile.subtitle = getString(
@@ -113,13 +115,13 @@ class TeremokTileService : TileService() {
     }
 
     companion object {
-        const val ACTION_TILE_TOGGLE = "com.teremok.connect.QS_TILE_TOGGLE"
+        const val ACTION_TILE_TOGGLE = "com.proxy.dom.QS_TILE_TOGGLE"
 
         fun requestListening(context: Context) {
             runCatching {
                 requestListeningState(
                     context.applicationContext,
-                    ComponentName(context.applicationContext, TeremokTileService::class.java),
+                    ComponentName(context.applicationContext, ProxyDomTileService::class.java),
                 )
             }
         }

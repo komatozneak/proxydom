@@ -1,9 +1,9 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/core/diagnostics/app_log_buffer.dart';
-import 'package:teremok_connect/core/diagnostics/product_log.dart';
-import 'package:teremok_connect/core/diagnostics/tunnel_log_level.dart';
+import 'package:proxydom/core/diagnostics/app_log_buffer.dart';
+import 'package:proxydom/core/diagnostics/product_log.dart';
+import 'package:proxydom/core/diagnostics/tunnel_log_level.dart';
 
 void main() {
   tearDown(AppLogBuffer.instance.resetForTest);

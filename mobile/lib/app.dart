@@ -19,8 +19,8 @@ import 'l10n/app_localizations.dart';
 
 export 'core/app_locale.dart' show AppLocale;
 
-class TeremokApp extends ConsumerWidget {
-  const TeremokApp({super.key});
+class ProxyDomApp extends ConsumerWidget {
+  const ProxyDomApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -29,7 +29,7 @@ class TeremokApp extends ConsumerWidget {
     final locale = ref.watch(localeProvider).valueOrNull ?? AppLocale.current;
 
     return MaterialApp.router(
-      title: windowsDesktop ? 'Прокси Дом' : 'Teremok Connect',
+      title: 'Прокси Дом',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,

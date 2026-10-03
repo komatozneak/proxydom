@@ -17,17 +17,17 @@ bool get _isIosSplit => !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
 
 /// Bridge between Flutter UI and Android VpnService (Hysteria2, ADR 018).
 ///
-/// Uses [MethodChannel] `teremok/vpn` for commands and [EventChannel]
-/// `teremok/vpn/status` for live status updates from native code.
+/// Uses [MethodChannel] `proxydom/vpn` for commands and [EventChannel]
+/// `proxydom/vpn/status` for live status updates from native code.
 class VpnController {
   VpnController._();
   static final VpnController instance = VpnController._();
 
-  static const _methodChannel = MethodChannel('teremok/vpn');
-  static const _eventChannel = EventChannel('teremok/vpn/status');
-  static const _sessionEventChannel = EventChannel('teremok/vpn/session');
-  static const _trafficEventChannel = EventChannel('teremok/vpn/traffic');
-  static const _pingEventChannel = EventChannel('teremok/vpn/ping');
+  static const _methodChannel = MethodChannel('proxydom/vpn');
+  static const _eventChannel = EventChannel('proxydom/vpn/status');
+  static const _sessionEventChannel = EventChannel('proxydom/vpn/session');
+  static const _trafficEventChannel = EventChannel('proxydom/vpn/traffic');
+  static const _pingEventChannel = EventChannel('proxydom/vpn/ping');
 
   static const Duration stopTimeout = Duration(seconds: 5);
 
@@ -41,6 +41,9 @@ class VpnController {
   int windowsGeneration = 0;
 
   bool get windowsNestLocked => WindowsTunnel.instance.nestLocked;
+
+  /// Pipe closed or the controller binary is missing. Not a live connect.
+  bool get windowsBrokerCooling => WindowsTunnel.instance.brokerCooling;
 
   /// One share line through the Windows broker (ADR 031).
   Future<bool> startWindowsShare(String uri) async {
@@ -622,7 +625,7 @@ class VpnController {
   }
 }
 
-/// Parses EventChannel `teremok/vpn/ping` payloads.
+/// Parses EventChannel `proxydom/vpn/ping` payloads.
 ///
 /// Explicit `delayMs: null` clears a stale RTT (native consecutive probe fail).
 @visibleForTesting

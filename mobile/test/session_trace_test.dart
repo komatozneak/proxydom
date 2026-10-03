@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/core/diagnostics/app_log_buffer.dart';
-import 'package:teremok_connect/core/diagnostics/session_trace.dart';
-import 'package:teremok_connect/core/diagnostics/tunnel_log_level.dart';
+import 'package:proxydom/core/diagnostics/app_log_buffer.dart';
+import 'package:proxydom/core/diagnostics/session_trace.dart';
+import 'package:proxydom/core/diagnostics/tunnel_log_level.dart';
 
 void main() {
   setUp(() {
