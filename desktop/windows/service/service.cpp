@@ -95,6 +95,7 @@ struct App {
   Win32TunnelLog log;
   Win32Sleeper sleeper;
   TunnelSupervisor supervisor;
+  std::int64_t last_hello_log_ms_ = 0;
   CancelFlag cancel;
   std::mutex queue_mu;
   std::condition_variable queue_cv;
@@ -189,7 +190,8 @@ struct App {
       ok = GetOverlappedResult(client, &ov, &wrote, TRUE) == TRUE;
     }
     CloseHandle(ov.hEvent);
-    if (ok) log.write(0, "pipe_tx", "ok", wrote);
+    // The byte count of our own ack carries nothing the ack itself does not.
+    // Journalling it once per frame buried every lifecycle event in noise.
     return ok && wrote == frame.size();
   }
 
@@ -295,15 +297,25 @@ struct App {
       ack("connect", false, supervisor.snapshot().generation, "protocol", user_message(TunnelCode::Protocol, {}));
       return true;
     }
-    log.write(supervisor.snapshot().generation, command.command, "rx", 0);
     if (command.protocol_version != 3) {
       ack(command.command, false, supervisor.snapshot().generation, "protocol", user_message(TunnelCode::Protocol, {}));
       return true;
     }
+    // The controller pings every couple of seconds to hold the pipe lease.
+    // Journalling each ping made 84% of a session's lines heartbeat, which is
+    // how a failed gate and a routing counter both end up invisible.
     if (command.command == "hello") {
+      const auto stamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+                             std::chrono::steady_clock::now().time_since_epoch())
+                             .count();
+      if (stamp - last_hello_log_ms_ >= 30000) {
+        last_hello_log_ms_ = stamp;
+        log.write(supervisor.snapshot().generation, "hello", "rx", 0);
+      }
       emit(supervisor.snapshot());
       return true;
     }
+    log.write(supervisor.snapshot().generation, command.command, "rx", 0);
     if (command.command == "prove") {
       const auto now = supervisor.snapshot();
       if (command.generation != now.generation || now.phase != TunnelPhase::Connecting) {
