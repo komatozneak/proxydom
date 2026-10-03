@@ -599,7 +599,9 @@ std::string build_singbox_config(const ShareLine& line,
                                  const std::string& server_ip,
                                  const std::vector<std::string>& domains,
                                  const std::vector<std::string>& force_proxy_domains,
-                                 bool udp_direct) {
+                                 bool udp_direct,
+                                 unsigned short api_port,
+                                 const std::string& api_secret) {
   const std::string outbound = proxy_outbound(line, server_ip);
   if (outbound.empty()) return {};
 
@@ -634,7 +636,15 @@ std::string build_singbox_config(const ShareLine& line,
          << "\"auto_route\":false,\"strict_route\":false,"
          << "\"dns_mode\":\"hijack\",\"dns_address\":[\"198.18.0.2\"]}],"
          << "\"outbounds\":[" << outbound << ",{\"type\":\"direct\",\"tag\":\"direct\"}],"
-         << "\"route\":{\"auto_detect_interface\":true,\"final\":\"proxy\",\"rules\":[" << rules.str() << "]}"
+         << "\"route\":{\"auto_detect_interface\":true,\"final\":\"proxy\",\"rules\":[" << rules.str() << "]},"
+         << "\"experimental\":{";
+  if (api_port != 0) {
+    config << "\"clash_api\":{\"external_controller\":\"127.0.0.1:" << api_port << "\",\"secret\":\""
+           << json_escape(api_secret) << "\"}";
+  } else {
+    config << "\"cache_file\":{\"enabled\":false}";
+  }
+  config << "}"
          << "}";
   return config.str();
 }

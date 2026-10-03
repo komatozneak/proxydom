@@ -153,6 +153,10 @@ struct App {
   void start() {
     supervisor.set_observer([this](const TunnelSnapshot& snap) { emit(snap); });
     supervisor.set_ready_observer([this](std::int64_t generation) { enqueue(tun_ready_event(generation)); });
+    // Only the broker knows the per-session secret, so the client the supervisor
+    // builds can read the engine's connection list and nothing else can.
+    supervisor.set_flow_factory(
+        [](unsigned short port, const std::string& secret) { return make_flow_probe(port, secret); });
     worker = std::thread([this] { loop(); });
   }
 
@@ -302,8 +306,8 @@ struct App {
       return true;
     }
     // The controller pings every couple of seconds to hold the pipe lease.
-    // Journalling each ping made 84% of a session's lines heartbeat, which is
-    // how a failed gate and a routing counter both end up invisible.
+    // Journalling each ping made 84% of the log heartbeat, which is how a
+    // connect failure and a flow counter both end up invisible.
     if (command.command == "hello") {
       const auto stamp = std::chrono::duration_cast<std::chrono::milliseconds>(
                              std::chrono::steady_clock::now().time_since_epoch())

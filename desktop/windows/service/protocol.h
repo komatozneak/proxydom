@@ -63,11 +63,15 @@ bool domain_allowed(const std::string& host);
 
 // [server_ip] is the IPv4 pinned before the adapter comes up. Empty rejects.
 // [force_proxy_domains] are matched before the UDP rule, [udp_direct] last.
+// [api_port] and [api_secret] expose the loopback clash api the broker reads its
+// routing counters from. Port 0 leaves it off entirely.
 std::string build_singbox_config(const ShareLine& line,
                                  const std::string& server_ip,
                                  const std::vector<std::string>& domains,
                                  const std::vector<std::string>& force_proxy_domains,
-                                 bool udp_direct);
+                                 bool udp_direct,
+                                 unsigned short api_port,
+                                 const std::string& api_secret);
 
 // First prove the key through a loopback SOCKS endpoint. This config has no
 // TUN inbound, auto_route, DNS hijack, or other system-network mutation.
