@@ -371,6 +371,10 @@ struct FlowState {
   bool reachable = true;
   int polls = 0;
   std::vector<FlowRow> rows;
+  std::size_t untracked = 0;
+  // One row set per poll. When set it wins over `rows`, so a test can make the
+  // counters advance the way the real api does: cumulative, per connection.
+  std::vector<std::vector<FlowRow>> script;
 };
 
 // The supervisor owns the probe for the length of a session, so the test keeps
@@ -382,6 +386,9 @@ class FakeFlows : public FlowProbe {
     ++state_->polls;
     if (!state_->reachable) return false;
     out.rows = state_->rows;
+    out.untracked = state_->untracked;
+    const std::size_t index = static_cast<std::size_t>(state_->polls - 1);
+    if (!state_->script.empty() && index < state_->script.size()) out.rows = state_->script[index];
     return true;
   }
   unsigned long last_error() const override { return 0; }
@@ -390,9 +397,10 @@ class FakeFlows : public FlowProbe {
   std::shared_ptr<FlowState> state_;
 };
 
-FlowRow flow_row(std::string network, std::string chain, std::string destination,
+FlowRow flow_row(std::string id, std::string network, std::string chain, std::string destination,
                  std::uint64_t up, std::uint64_t down) {
   FlowRow row;
+  row.id = std::move(id);
   row.network = std::move(network);
   row.chain = std::move(chain);
   row.destination = std::move(destination);
@@ -933,9 +941,9 @@ void test_flow_counters_record_the_outbound() {
   Harness h;
   auto state = std::make_shared<FlowState>();
   state->rows = {
-      flow_row("udp", "direct", "10.20.30.40:27015", 900 * 1024, 4 * 1024 * 1024),
-      flow_row("udp", "proxy", "142.250.1.1:443", 200 * 1024, 300 * 1024),
-      flow_row("tcp", "proxy", "104.16.0.1:443", 2048, 2048),
+      flow_row("d-1", "udp", "direct", "10.20.30.40:27015", 900 * 1024, 4 * 1024 * 1024),
+      flow_row("p-1", "udp", "proxy", "142.250.1.1:443", 200 * 1024, 300 * 1024),
+      flow_row("t-1", "tcp", "proxy", "104.16.0.1:443", 2048, 2048),
   };
   unsigned short seen_port = 0;
   std::string seen_secret;
@@ -1010,19 +1018,174 @@ void test_connections_body_parses() {
   expect(rows[0].destination == "10.20.30.40:27015", "a destination is ip plus port");
   expect(rows[0].process == "dota2.exe", "the owning process is named by its leaf");
   expect(rows[0].upload == 120 && rows[0].download == 4096, "byte counts survive");
+  expect(rows[0].id == "a" && rows[1].id == "b", "the connection id is read");
   expect(rows[1].chain == "proxy", "the other hop is not mistaken");
 
   // A member the engine has never heard of must not cost us the counts.
   const std::string future =
-      R"({"connections":[{"metadata":{"network":"udp","destinationIP":"1.2.3.4","destinationPort":"5",)"
-      R"("somethingNew":{"nested":[1,2,3]}},"upload":1,"download":2,"brandNew":true,)"
-      R"("chains":["direct"]}],"extra":42})";
+      R"({"connections":[{"id":"c","metadata":{"network":"udp","destinationIP":"1.2.3.4",)"
+      R"("destinationPort":"5","somethingNew":{"nested":[1,2,3]}},"upload":1,"download":2,)"
+      R"("brandNew":true,"chains":["direct"]}],"extra":42})";
   expect(parse_connections(future, rows), "an unknown field does not fail the parse");
   expect(rows.size() == 1, "the row still arrives");
   expect(!rows.empty() && rows[0].download == 2 && rows[0].chain == "direct",
          "the counts still come through");
-  expect(!parse_connections("", rows) && rows.empty(), "an empty body is not a sample");
+
+  // Without an id the row cannot be told apart from next poll's row, so it must
+  // not reach the total: banking it would count the same bytes every poll.
+  const std::string anonymous =
+      R"({"connections":[{"metadata":{"network":"udp","destinationIP":"1.2.3.4",)"
+      R"("destinationPort":"5"},"upload":9,"download":99,"chains":["direct"]}]})";
+  std::size_t untracked = 0;
+  expect(parse_connections(anonymous, rows, &untracked), "the body itself still parses");
+  expect(rows.empty(), "a connection with no id is left out of the sample");
+  expect(untracked == 1, "and is counted so the session can say so once");
+
+  expect(!parse_connections("", rows), "an empty body is not a sample");
   expect(!parse_connections("{\"downloadTotal\":1}", rows), "a body without connections is refused");
+}
+
+// The clash api reports each connection's own cumulative counters. Adding them
+// to the total on every poll counts each connection's whole history once per
+// poll, which is what made a still lobby report gigabytes. The total has to be
+// the sum of per-id deltas, and it must never go backwards.
+void test_connection_ids_make_the_total_monotonic() {
+  Harness h;
+  auto state = std::make_shared<FlowState>();
+  // One game flow that keeps moving, and later a replacement for it.
+  state->script = {
+      {flow_row("game", "udp", "direct", "162.254.1.1:27015", 1000, 100000)},
+      {flow_row("game", "udp", "direct", "162.254.1.1:27015", 1100, 300000)},
+      {flow_row("game", "udp", "direct", "162.254.1.1:27015", 1200, 900000)},
+      // "game" is gone. A new id starts from wherever it starts; none of the
+      // old flow's bytes are re-counted.
+      {flow_row("game2", "udp", "direct", "162.254.9.9:27015", 50, 700)},
+      {flow_row("game2", "udp", "direct", "162.254.9.9:27015", 150, 2700)},
+  };
+  std::uint64_t now = 0;
+  h.supervisor.set_clock([&now] { return now; });
+  h.supervisor.set_flow_factory([state](unsigned short, const std::string&) {
+    return std::unique_ptr<FlowProbe>(new FakeFlows(state));
+  });
+
+  const auto connected = h.connect();
+  expect(connected.phase == TunnelPhase::Connected, "the session connects");
+
+  for (int step = 0; step < 5; ++step) {
+    now += 5000;
+    h.supervisor.watchdog(h.cancel);
+  }
+  h.supervisor.disconnect(h.cancel);
+
+  // Read every total the journal printed and prove none of them went backwards.
+  std::uint64_t last_down = 0;
+  bool monotonic = true;
+  std::uint64_t printed = 0;
+  for (const auto& line : h.log.lines) {
+    if (line.event != "flow_summary" && line.event != "flow_total") continue;
+    const std::string marker = "udp:direct=dn:";
+    const auto at = line.code.find(marker);
+    if (at == std::string::npos) continue;
+    const std::uint64_t value = std::stoull(line.code.substr(at + marker.size()));
+    if (value < last_down) monotonic = false;
+    last_down = value;
+    printed = static_cast<std::uint64_t>(std::count(line.code.begin(), line.code.end(), '='));
+  }
+  expect(monotonic, "a session total never goes backwards");
+  // 200000 on the second poll, 600000 on the third, 2000 after the flow was
+  // replaced. Adding the raw counters instead would report 1704200, because
+  // every poll would re-count the history of whatever was still connected.
+  expect(last_down == 802000, "the total is the sum of per-id deltas, not of raw counters");
+  expect(printed > 0, "the closing line carries a total per network and outbound");
+}
+
+// A dip is a lull in a window, so it is measured rather than left for the reader
+// to reconstruct from two totals.
+void test_a_lull_is_journalled_as_a_number() {
+  Harness h;
+  auto state = std::make_shared<FlowState>();
+  // Poll 1 establishes the baseline. Polls 2-4 move nothing, which is fifteen
+  // seconds of stillness. Poll 5 moves again, which must clear the lull.
+  state->script = {
+      {flow_row("game", "udp", "direct", "162.254.1.1:27015", 1000, 100000)},
+      {flow_row("game", "udp", "direct", "162.254.1.1:27015", 1000, 100000)},
+      {flow_row("game", "udp", "direct", "162.254.1.1:27015", 1000, 100000)},
+      {flow_row("game", "udp", "direct", "162.254.1.1:27015", 1000, 100000)},
+      {flow_row("game", "udp", "direct", "162.254.1.1:27015", 2000, 200000)},
+      {flow_row("game", "udp", "direct", "162.254.1.1:27015", 3000, 300000)},
+  };
+  std::uint64_t now = 0;
+  h.supervisor.set_clock([&now] { return now; });
+  h.supervisor.set_flow_factory([state](unsigned short, const std::string&) {
+    return std::unique_ptr<FlowProbe>(new FakeFlows(state));
+  });
+
+  h.connect();
+  for (int step = 0; step < 6; ++step) {
+    now += 5000;
+    h.supervisor.watchdog(h.cancel);
+  }
+
+  std::vector<std::string> rates;
+  for (const auto& line : h.log.lines) {
+    if (line.event == "flow_rate") rates.push_back(line.code);
+  }
+  expect(rates.size() == 2, "one rate line per summary window");
+
+  if (rates.size() == 2) {
+    // Window one closed while the flow was already still.
+    expect(rates[0].find("quiet_ms=10000") != std::string::npos,
+           "the lull in progress is journalled");
+    expect(rates[0].find("udp:direct=dn_kbps:0") != std::string::npos,
+           "a window with no bytes reads zero rather than nothing");
+    // Window two spans the stall and the recovery, so the worst lull is the
+    // full fifteen seconds and the running one has been cleared.
+    expect(rates[1].find("worst_quiet_ms=15000") != std::string::npos,
+           "the longest lull of the session is journalled");
+    expect(rates[1].find("quiet_ms=0") != std::string::npos,
+           "traffic resuming clears the lull in progress");
+    expect(rates[1].find("live_udp:direct:1") != std::string::npos,
+           "the number of live udp connections is journalled, so a re-established "
+           "flow is distinguishable from a stall");
+    expect(rates[1].find("udp:direct=dn_kbps:13") != std::string::npos,
+           "the rate is measured over the window, not inferred from totals");
+  }
+}
+
+// Counters the session cannot attribute must say so, once, rather than read as
+// a quiet network.
+void test_an_unattributable_row_is_reported_once() {
+  Harness h;
+  auto state = std::make_shared<FlowState>();
+  state->script = {
+      {FlowRow()},  // no id: the engine reported something we cannot track
+      {FlowRow()},
+      {FlowRow()},
+      {FlowRow()},
+  };
+  state->untracked = 1;
+  std::uint64_t now = 0;
+  h.supervisor.set_clock([&now] { return now; });
+  h.supervisor.set_flow_factory([state](unsigned short, const std::string&) {
+    return std::unique_ptr<FlowProbe>(new FakeFlows(state));
+  });
+
+  h.connect();
+  for (int step = 0; step < 4; ++step) {
+    now += 5000;
+    h.supervisor.watchdog(h.cancel);
+  }
+
+  int complaints = 0;
+  for (const auto& line : h.log.lines) {
+    if (line.event == "flow" && line.code == "no_connection_id") ++complaints;
+  }
+  expect(complaints == 1, "an unattributable connection is reported once, not every poll");
+  bool any_total = false;
+  for (const auto& line : h.log.lines) {
+    if (line.event == "flow_summary") any_total = true;
+  }
+  expect(!any_total, "and no total is invented from bytes that cannot be attributed");
 }
 
 // ADR 034. The pipe is a channel, not a lease. Only a lost client is allowed
@@ -1066,6 +1229,9 @@ int main() {
   test_resolve_and_route_table_failures();
   test_flow_counters_record_the_outbound();
   test_connections_body_parses();
+  test_connection_ids_make_the_total_monotonic();
+  test_a_lull_is_journalled_as_a_number();
+  test_an_unattributable_row_is_reported_once();
   test_only_a_lost_client_keeps_the_tunnel();
   if (g_failed != 0) {
     std::cerr << g_failed << " failed\n";

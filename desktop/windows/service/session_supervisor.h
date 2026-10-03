@@ -118,6 +118,18 @@ struct BeginResult {
   TunnelSnapshot snap;
 };
 
+// One live clash api connection, as last seen.
+//
+// The api reports each connection's own cumulative counters, so a session total
+// has to be the sum of per-id deltas. Adding the raw counters instead re-counts
+// every live connection's entire history on every poll, which is what made the
+// journal report gigabytes for a lobby that never moved a packet.
+struct FlowLive {
+  std::string key;  // "network:chain"
+  std::uint64_t upload = 0;
+  std::uint64_t download = 0;
+};
+
 class CancelFlag {
  public:
   void request() { flag_.store(true, std::memory_order_release); }
@@ -287,6 +299,9 @@ class TunnelSupervisor {
   // session starts with no controller and the journal carries no counters.
   void set_flow_factory(
       std::function<std::unique_ptr<FlowProbe>(unsigned short, const std::string&)> factory);
+  // Sample and summary clocks. Production leaves it unset and the supervisor
+  // reads the steady clock; a test drives it to place windows by hand.
+  void set_clock(std::function<std::uint64_t()> clock);
   // Medium controller reports gate 3. A mismatched generation is ignored.
   void note_user_proof(bool ok, std::int64_t generation);
   // Unit tests skip the real controller. Production leaves this false.
@@ -315,6 +330,10 @@ class TunnelSupervisor {
   void note_tun_timeout();
   // Reads the engine's connection list and folds it into the running totals.
   void sample_flows();
+  // Bytes per second over the window just closed, plus the longest lull. A dip
+  // is a property of a window, so it is measured here rather than left for the
+  // reader to reconstruct by subtracting two totals.
+  void emit_flow_rate();
   void emit_flow_summary(const char* event);
 
   RouteTable& routes_;
@@ -332,14 +351,24 @@ class TunnelSupervisor {
   std::function<void(ConnectStep)> hook_;
   std::function<std::unique_ptr<FlowProbe>(unsigned short, const std::string&)> flow_factory_;
   std::unique_ptr<FlowProbe> flows_;
-  // Running totals per "network:chain" plus the largest destination seen, so the
-  // journal can answer "did game UDP leave direct" without a second tool.
+  std::function<std::uint64_t()> clock_;
+  // Running totals per "network:chain", and the last seen counters per
+  // connection id. The journal answers "did game UDP leave direct" from the
+  // former and "did the flow stall" from the latter.
+  std::map<std::string, FlowLive> flow_live_;
   std::map<std::string, std::uint64_t> flow_up_;
   std::map<std::string, std::uint64_t> flow_down_;
+  // Bytes banked since the last flow_rate line, so a rate is a measured value.
+  std::map<std::string, std::uint64_t> rate_up_;
+  std::map<std::string, std::uint64_t> rate_down_;
+  std::uint64_t flow_window_ms_ = 0;
+  std::uint64_t flow_quiet_ms_ = 0;
+  std::uint64_t flow_worst_quiet_ms_ = 0;
   std::set<std::string> flow_announced_;
   std::uint64_t flow_last_sample_ms_ = 0;
   std::uint64_t flow_last_summary_ms_ = 0;
   bool flow_api_reported_ = false;
+  bool flow_untracked_reported_ = false;
   std::int64_t proof_generation_ = 0;
   int proof_result_ = 0;
   bool test_user_proof_ = false;
