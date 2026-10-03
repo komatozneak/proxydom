@@ -130,6 +130,21 @@ struct FlowLive {
   std::uint64_t download = 0;
 };
 
+// What one "network:chain" has done about silence, since the last rate line.
+//
+// The two figures are per window, not for the session. A session-long worst case
+// is set once and then cannot answer "was there a dip just now?" — it went blind
+// after the first lull of the session and stayed blind for the rest of it. The
+// window is the unit a person means by "did it just stutter", so it is the unit
+// the stall is measured in. The session record survives in worst_quiet_ms, but
+// only as history.
+struct FlowStall {
+  bool seeded = false;        // first sighting only sets the baseline
+  std::uint64_t running_ms = 0;  // lull in progress, not yet closed
+  std::uint64_t worst_ms = 0;    // longest lull that ended inside the window
+  std::uint64_t count = 0;       // how many lulls ended inside the window
+};
+
 class CancelFlag {
  public:
   void request() { flag_.store(true, std::memory_order_release); }
@@ -330,9 +345,10 @@ class TunnelSupervisor {
   void note_tun_timeout();
   // Reads the engine's connection list and folds it into the running totals.
   void sample_flows();
-  // Bytes per second over the window just closed, plus the longest lull. A dip
-  // is a property of a window, so it is measured here rather than left for the
-  // reader to reconstruct by subtracting two totals.
+  // Per chain, for the window just closed: bytes per second, the longest lull
+  // that ended inside it, how many lulls that was, and the live connection
+  // count. Every dip is therefore visible the moment it happens, and no earlier
+  // one can mask a later one.
   void emit_flow_rate();
   void emit_flow_summary(const char* event);
 
@@ -361,8 +377,11 @@ class TunnelSupervisor {
   // Bytes banked since the last flow_rate line, so a rate is a measured value.
   std::map<std::string, std::uint64_t> rate_up_;
   std::map<std::string, std::uint64_t> rate_down_;
+  // Silence, per chain. Silences are counted per chain because "nothing moved"
+  // for the whole session is not the question: what matters is whether the chain
+  // carrying the game went quiet while some other chain kept dribbling bytes.
+  std::map<std::string, FlowStall> stalls_;
   std::uint64_t flow_window_ms_ = 0;
-  std::uint64_t flow_quiet_ms_ = 0;
   std::uint64_t flow_worst_quiet_ms_ = 0;
   std::set<std::string> flow_announced_;
   std::uint64_t flow_last_sample_ms_ = 0;

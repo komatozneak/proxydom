@@ -464,33 +464,52 @@ void TunnelSupervisor::sample_flows() {
   // Connections that closed are forgotten. Their bytes were banked on the last
   // poll that saw them, so dropping them loses nothing and keeps the id map
   // the size of the live connection list.
-  const bool had_baseline = !flow_live_.empty();
   flow_live_.swap(live);
 
-  std::uint64_t moved = 0;
+  std::map<std::string, std::uint64_t> moved_by_key;
   for (const auto& item : up_now) {
     flow_up_[item.first] += item.second;
     rate_up_[item.first] += item.second;
-    moved += item.second;
+    moved_by_key[item.first] += item.second;
   }
   for (const auto& item : down_now) {
     flow_down_[item.first] += item.second;
     rate_down_[item.first] += item.second;
-    moved += item.second;
+    moved_by_key[item.first] += item.second;
   }
 
-  // A lull is a property of a window, so it is measured while the window is
-  // still open rather than reconstructed later from two totals. The first poll
-  // only establishes the baseline: having nothing to compare against is not the
-  // same as having seen nothing move.
-  if (had_baseline) {
-    if (moved == 0) {
-      flow_quiet_ms_ += window;
-      if (flow_quiet_ms_ > flow_worst_quiet_ms_) flow_worst_quiet_ms_ = flow_quiet_ms_;
+  // Silence, per chain. A chain's first sighting only sets its baseline: having
+  // nothing to compare against is not the same as having seen nothing move. A
+  // chain that disappears has whatever lull it was in closed out here, so a
+  // connection tearing down at the end of a silent stretch still reports it.
+  std::set<std::string> present;
+  for (const auto& entry : flow_live_) present.insert(entry.second.key);
+  for (const auto& key : present) {
+    FlowStall& stall = stalls_[key];
+    if (!stall.seeded) {
+      stall.seeded = true;
+      continue;
+    }
+    const auto moved = moved_by_key.find(key);
+    if (moved != moved_by_key.end() && moved->second > 0) {
+      if (stall.running_ms > 0) {
+        ++stall.count;
+        if (stall.running_ms > stall.worst_ms) stall.worst_ms = stall.running_ms;
+        stall.running_ms = 0;
+      }
     } else {
-      flow_quiet_ms_ = 0;
+      stall.running_ms += window;
+      if (stall.running_ms > flow_worst_quiet_ms_) flow_worst_quiet_ms_ = stall.running_ms;
     }
   }
+  for (auto& entry : stalls_) {
+    if (present.count(entry.first) != 0) continue;
+    if (entry.second.running_ms == 0) continue;
+    ++entry.second.count;
+    if (entry.second.running_ms > entry.second.worst_ms) entry.second.worst_ms = entry.second.running_ms;
+    entry.second.running_ms = 0;
+  }
+
   flow_window_ms_ += window;
 
   for (const auto& row : sample.rows) {
@@ -516,29 +535,42 @@ void TunnelSupervisor::sample_flows() {
 void TunnelSupervisor::emit_flow_rate() {
   const std::uint64_t seconds = flow_window_ms_ / 1000;
   std::map<std::string, std::uint64_t> live_counts;
-  for (const auto& entry : flow_live_) ++live_counts[entry.second.key];
+  std::set<std::string> live_keys;
+  for (const auto& entry : flow_live_) {
+    ++live_counts[entry.second.key];
+    live_keys.insert(entry.second.key);
+  }
 
-  std::string code;
-  for (const auto& entry : flow_down_) {
-    if (!code.empty()) code += " ";
-    const std::uint64_t down = seconds == 0 ? 0 : rate_down_[entry.first] / 1024 / seconds;
-    const std::uint64_t up = seconds == 0 ? 0 : rate_up_[entry.first] / 1024 / seconds;
-    code += journal_token(entry.first) + "=dn_kbps:" + std::to_string(down) +
-            "/up_kbps:" + std::to_string(up);
+  std::string code = "win_ms=" + std::to_string(flow_window_ms_) +
+                     " worst_quiet_ms=" + std::to_string(flow_worst_quiet_ms_);
+  for (const auto& entry : stalls_) {
+    const std::string& key = entry.first;
+    const FlowStall& stall = entry.second;
+    // A chain that is gone reports once, so its final lull is not lost, and is
+    // then forgotten.
+    if (live_keys.count(key) == 0 && stall.count == 0 && stall.running_ms == 0) continue;
+    const std::uint64_t down = seconds == 0 ? 0 : rate_down_[key] / 1024 / seconds;
+    const std::uint64_t up = seconds == 0 ? 0 : rate_up_[key] / 1024 / seconds;
+    code += " " + journal_token(key) + "=dn_kbps:" + std::to_string(down) +
+            "/up_kbps:" + std::to_string(up) +
+            " stall_ms:" + std::to_string(stall.worst_ms) +
+            " stalls:" + std::to_string(stall.count) +
+            " quiet_ms:" + std::to_string(stall.running_ms);
+    if (live_counts.count(key) != 0) code += " live:" + std::to_string(live_counts[key]);
   }
-  for (const auto& entry : live_counts) {
-    code += " live_" + journal_token(entry.first) + ":" + std::to_string(entry.second);
-  }
-  // quiet_ms is the lull in progress; worst_quiet_ms is the longest one this
-  // session has seen. A dip is the second number.
-  log_.write(ledger_.generation, "flow_rate",
-             "win_ms=" + std::to_string(flow_window_ms_) +
-                 " quiet_ms=" + std::to_string(flow_quiet_ms_) +
-                 " worst_quiet_ms=" + std::to_string(flow_worst_quiet_ms_) + " " + code,
-             0);
+  log_.write(ledger_.generation, "flow_rate", code, 0);
+
   rate_up_.clear();
   rate_down_.clear();
   flow_window_ms_ = 0;
+  for (auto& entry : stalls_) {
+    entry.second.worst_ms = 0;
+    entry.second.count = 0;
+  }
+  for (auto it = stalls_.begin(); it != stalls_.end();) {
+    if (live_keys.count(it->first) == 0) it = stalls_.erase(it);
+    else ++it;
+  }
 }
 
 void TunnelSupervisor::emit_flow_summary(const char* event) {
@@ -867,8 +899,8 @@ TunnelSnapshot TunnelSupervisor::run_connect(const ConnectRequest& request, Canc
   flow_down_.clear();
   rate_up_.clear();
   rate_down_.clear();
+  stalls_.clear();
   flow_window_ms_ = 0;
-  flow_quiet_ms_ = 0;
   flow_worst_quiet_ms_ = 0;
   flow_announced_.clear();
   flow_last_sample_ms_ = 0;
