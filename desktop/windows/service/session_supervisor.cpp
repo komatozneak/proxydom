@@ -248,6 +248,26 @@ std::string active_foreign_tunnel(const std::vector<RouteView>& routes) {
   return {};
 }
 
+bool tunnel_should_stop(TeardownReason reason) {
+  return reason != TeardownReason::ClientGone;
+}
+
+const char* reason_name(TeardownReason reason) {
+  switch (reason) {
+    case TeardownReason::ClientGone:
+      return "client_gone";
+    case TeardownReason::Explicit:
+      return "explicit";
+    case TeardownReason::ServiceStop:
+      return "service_stop";
+    case TeardownReason::Suspend:
+      return "suspend";
+    case TeardownReason::Lost:
+      return "lost";
+  }
+  return "unknown";
+}
+
 std::string encode_ledger(const Ledger& ledger) {
   std::ostringstream out;
   out << "v1\n"

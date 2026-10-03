@@ -102,8 +102,6 @@ struct App {
   std::deque<std::function<void()>> jobs;
   std::atomic<bool> stop{false};
   std::atomic<int> busy{0};
-  std::mutex pipe_mu;
-  HANDLE pipe = nullptr;
   std::thread worker;
 
   App()
@@ -170,10 +168,15 @@ struct App {
   std::mutex out_mu;
   std::deque<std::string> outgoing;
   HANDLE kick = nullptr;
+  // A state change with nobody attached is unreadable, and the next `hello`
+  // re-emits the authoritative snapshot, so dropping it loses nothing. Without
+  // this a tunnel kept alive across a detached window grows the queue forever.
+  bool attached = false;
 
   void enqueue(const std::string& json) {
     {
       std::lock_guard<std::mutex> lock(out_mu);
+      if (!attached) return;
       outgoing.push_back(json);
     }
     if (kick != nullptr) SetEvent(kick);
@@ -383,24 +386,28 @@ struct App {
     {
       std::lock_guard<std::mutex> lock(out_mu);
       outgoing.clear();
-    }
-    {
-      std::lock_guard<std::mutex> lock(pipe_mu);
-      pipe = client;
+      attached = true;
     }
     log.write(0, "pipe_client", "ok", 0);
     exchange(client);
-    log.write(supervisor.snapshot().generation, "pipe_end", "win32", GetLastError());
-    const auto leftover = supervisor.snapshot();
-    if (leftover.phase != TunnelPhase::Idle || !leftover.cleanup_verified) {
+    {
+      std::lock_guard<std::mutex> lock(out_mu);
+      attached = false;
+    }
+    const auto snap = supervisor.snapshot();
+    log.write(snap.generation, "pipe_end", "win32", GetLastError());
+    // The pipe is a channel, not a lease. Losing the controller must not take
+    // the tunnel down: the service owns the session, the watchdog keeps
+    // checking it, and the next window re-attaches with `hello`. Only an
+    // explicit disconnect, a service stop, sleep, or a lost engine may stop it.
+    const TeardownReason reason = TeardownReason::ClientGone;
+    if (tunnel_should_stop(reason)) {
       cancel.request();
       post([this] { supervisor.disconnect(cancel); });
       wait_until_settled();
+      return;
     }
-    {
-      std::lock_guard<std::mutex> lock(pipe_mu);
-      pipe = nullptr;
-    }
+    log.write(snap.generation, "detach", reason_name(reason), 0);
   }
 
 };
