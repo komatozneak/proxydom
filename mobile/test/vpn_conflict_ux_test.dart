@@ -2,30 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:teremok_connect/core/theme.dart';
-import 'package:teremok_connect/features/home/application/vpn_provider.dart';
-import 'package:teremok_connect/features/home/application/vpn_status.dart';
-import 'package:teremok_connect/features/home/presentation/home_screen.dart';
-import 'package:teremok_connect/features/vpn/data/vpn_controller.dart';
-import 'package:teremok_connect/features/vpn/data/vpn_node.dart';
-import 'package:teremok_connect/features/vpn/data/vpn_nodes_repository.dart';
-import 'package:teremok_connect/features/vpn/domain/vpn_connect_error.dart';
-import 'package:teremok_connect/l10n/app_localizations.dart';
-
-class _FakeVpnNodesRepository extends VpnNodesRepository {
-  @override
-  Future<List<VpnNode>> listNodes({bool allowCacheFallback = true}) async =>
-      const [];
-
-  @override
-  Future<({List<VpnNode> nodes, bool fromCache})> listNodesDetailed({
-    bool allowCacheFallback = true,
-  }) async =>
-      (nodes: <VpnNode>[], fromCache: false);
-
-  @override
-  Future<String?> getSelectedNodeId() async => null;
-}
+import 'package:proxydom/core/theme.dart';
+import 'package:proxydom/features/home/application/vpn_provider.dart';
+import 'package:proxydom/features/home/application/vpn_status.dart';
+import 'package:proxydom/features/home/presentation/home_screen.dart';
+import 'package:proxydom/features/vpn/data/vpn_controller.dart';
+import 'package:proxydom/features/vpn/domain/vpn_connect_error.dart';
+import 'package:proxydom/l10n/app_localizations.dart';
 
 class _FixedVpnNotifier extends VpnNotifier {
   _FixedVpnNotifier(this._status);
@@ -136,8 +119,6 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          vpnNodesRepositoryProvider
-              .overrideWithValue(_FakeVpnNodesRepository()),
           vpnProvider.overrideWith(
             () => _FixedVpnNotifier(
               const VpnError(
@@ -176,8 +157,6 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          vpnNodesRepositoryProvider
-              .overrideWithValue(_FakeVpnNodesRepository()),
           vpnProvider.overrideWith(
             () => _FixedVpnNotifier(
               const VpnError(
@@ -216,8 +195,6 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          vpnNodesRepositoryProvider
-              .overrideWithValue(_FakeVpnNodesRepository()),
           vpnProvider.overrideWith(
             () => _FixedVpnNotifier(
               const VpnError(
@@ -260,8 +237,6 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          vpnNodesRepositoryProvider
-              .overrideWithValue(_FakeVpnNodesRepository()),
           vpnProvider.overrideWith(
             () => _FixedVpnNotifier(
               const VpnError(
@@ -295,8 +270,6 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          vpnNodesRepositoryProvider
-              .overrideWithValue(_FakeVpnNodesRepository()),
           vpnProvider.overrideWith(
             () => _FixedVpnNotifier(
               const VpnError(
@@ -338,8 +311,6 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          vpnNodesRepositoryProvider
-              .overrideWithValue(_FakeVpnNodesRepository()),
           vpnProvider.overrideWith(() => notifier),
         ],
         child: MaterialApp(

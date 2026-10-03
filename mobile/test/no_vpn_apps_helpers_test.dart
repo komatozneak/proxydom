@@ -1,8 +1,8 @@
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/core/widgets/app_icon.dart';
-import 'package:teremok_connect/features/settings/data/installed_apps_channel.dart';
+import 'package:proxydom/core/widgets/app_icon.dart';
+import 'package:proxydom/features/settings/data/installed_apps_channel.dart';
 
 void main() {
   group('noVpnAppsCounter', () {

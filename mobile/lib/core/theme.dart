@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Teremok VPN — monochrome mark harmony (charcoal + white + zinc).
+/// Proxy Dom — monochrome mark harmony (charcoal + white + zinc).
 ///
 /// Hex values live only here. Widget code must use [AppBrand] or
 /// `Theme.of(context).colorScheme.*`, never raw `Color(0xFF…)`.

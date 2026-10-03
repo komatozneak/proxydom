@@ -75,6 +75,8 @@ Map<String, Object?> tunnelHello() => const {
 Map<String, Object?> tunnelConnect({
   required String uri,
   required List<String> directDomains,
+  List<String> forceProxyDomains = const [],
+  bool udpDirect = false,
 }) {
   return {
     'command': 'connect',
@@ -84,6 +86,11 @@ Map<String, Object?> tunnelConnect({
       for (final domain in directDomains)
         if (tunnelDomainAllowed(domain)) domain,
     ],
+    'force_proxy_domains': [
+      for (final domain in forceProxyDomains)
+        if (tunnelDomainAllowed(domain)) domain,
+    ],
+    'udp_direct': udpDirect ? 1 : 0,
   };
 }
 

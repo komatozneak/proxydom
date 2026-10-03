@@ -14,14 +14,14 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     options: [String: NSObject]?,
     completionHandler: @escaping (Error?) -> Void
   ) {
-    sessionGeneration = TeremokVpnShared.currentGeneration()
-    TeremokVpnShared.appendNativeLog(
+    sessionGeneration = ProxyDomVpnShared.currentGeneration()
+    ProxyDomVpnShared.appendNativeLog(
       "PacketTunnel.startTunnel gen=\(sessionGeneration)"
     )
-    TeremokVpnShared.setStatus("connecting", generation: sessionGeneration)
-    TeremokVpnShared.setLastError(nil, generation: sessionGeneration)
+    ProxyDomVpnShared.setStatus("connecting", generation: sessionGeneration)
+    ProxyDomVpnShared.setLastError(nil, generation: sessionGeneration)
 
-    guard let paramsJson = TeremokVpnShared.defaults?.string(forKey: TeremokVpnShared.paramsKey),
+    guard let paramsJson = ProxyDomVpnShared.defaults?.string(forKey: ProxyDomVpnShared.paramsKey),
           !paramsJson.isEmpty
     else {
       finishStart(
@@ -41,7 +41,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
       guard let self else { return }
       guard self.engine === hy2 else {
         // stopTunnel or a newer start owns the provider now.
-        TeremokVpnShared.appendNativeLog(
+        ProxyDomVpnShared.appendNativeLog(
           "PacketTunnel.startCompletion stale gen=\(self.sessionGeneration)"
         )
         completionHandler(
@@ -62,11 +62,11 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         )
         return
       }
-      TeremokVpnShared.appendNativeLog(
+      ProxyDomVpnShared.appendNativeLog(
         "PacketTunnel.connected gen=\(self.sessionGeneration)"
       )
-      TeremokVpnShared.setStatus("connected", generation: self.sessionGeneration)
-      TeremokVpnShared.setLastError(nil, generation: self.sessionGeneration)
+      ProxyDomVpnShared.setStatus("connected", generation: self.sessionGeneration)
+      ProxyDomVpnShared.setLastError(nil, generation: self.sessionGeneration)
       completionHandler(nil)
     }
   }
@@ -76,22 +76,22 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     completionHandler: @escaping () -> Void
   ) {
     if TunnelStopIntent.clearsSessionActive(reason) {
-      TeremokVpnShared.setSessionActive(false)
+      ProxyDomVpnShared.setSessionActive(false)
     }
     let reasonTag = "nevpn_\(reason.rawValue)"
-    TeremokVpnShared.setLastStopReason(reasonTag)
-    TeremokVpnShared.appendNativeLog(
+    ProxyDomVpnShared.setLastStopReason(reasonTag)
+    ProxyDomVpnShared.appendNativeLog(
       "PacketTunnel.stopTunnel reason=\(reason.rawValue) gen=\(sessionGeneration)"
     )
     NSLog(
-      "[Teremok] PacketTunnelProvider.stopTunnel reason=%d gen=%d",
+      "[ProxyDom] PacketTunnelProvider.stopTunnel reason=%d gen=%d",
       reason.rawValue,
       sessionGeneration
     )
     engine?.stop()
     engine = nil
-    TeremokVpnShared.setStatus("idle", generation: sessionGeneration)
-    TeremokVpnShared.setLastError(nil, generation: sessionGeneration)
+    ProxyDomVpnShared.setStatus("idle", generation: sessionGeneration)
+    ProxyDomVpnShared.setLastError(nil, generation: sessionGeneration)
     completionHandler()
   }
 
@@ -106,7 +106,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         completionHandler(live.data(using: .utf8))
         return
       }
-      let persisted = TeremokVpnShared.lastTunnelHealth()
+      let persisted = ProxyDomVpnShared.lastTunnelHealth()
       completionHandler(persisted.data(using: .utf8))
       return
     }
@@ -118,14 +118,14 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     message: String,
     completionHandler: @escaping (Error?) -> Void
   ) {
-    TeremokVpnShared.appendNativeLog(
+    ProxyDomVpnShared.appendNativeLog(
       "PacketTunnel.startFailed code=\(errorCode) msg=\(message)"
     )
-    NSLog("[Teremok] PacketTunnelProvider start failed: %@", message)
+    NSLog("[ProxyDom] PacketTunnelProvider start failed: %@", message)
     engine?.stop()
     engine = nil
-    TeremokVpnShared.setStatus("idle", generation: sessionGeneration)
-    TeremokVpnShared.setLastError(message, generation: sessionGeneration)
+    ProxyDomVpnShared.setStatus("idle", generation: sessionGeneration)
+    ProxyDomVpnShared.setLastError(message, generation: sessionGeneration)
     completionHandler(
       NSError(
         domain: "su.proxydom.app.vpn",

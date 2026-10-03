@@ -1,5 +1,5 @@
-name: teremok_connect
-description: Teremok Connect VPN client
+name: proxydom
+description: Proxy Dom — local proxy configurator
 publish_to: 'none'
 version: 1.0.0+1
 

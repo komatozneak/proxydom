@@ -1,8 +1,8 @@
-package com.teremok.connect.teremok_connect.session
+package com.proxydom.app.session
 
 import android.util.Log
-import com.teremok.connect.teremok_connect.DefaultNetworkMonitor
-import com.teremok.connect.teremok_connect.DiagnosticRing
+import com.proxydom.app.DefaultNetworkMonitor
+import com.proxydom.app.DiagnosticRing
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicLong
@@ -10,7 +10,7 @@ import java.util.concurrent.atomic.AtomicLong
 /**
  * Sole VPN session owner (ADR 014): FSM + generation + serial start/stop.
  *
- * Host ([TeremokVpnService]) implements [Host] for TUN/core I/O; the engine
+ * Host ([ProxyDomVpnService]) implements [Host] for TUN/core I/O; the engine
  * never blocks the main thread.
  */
 class VpnSessionEngine(
@@ -59,7 +59,7 @@ class VpnSessionEngine(
     }
 
     private val dispatcher: ExecutorService = Executors.newSingleThreadExecutor { r ->
-        Thread(r, "teremok-vpn-session").apply { isDaemon = true }
+        Thread(r, "proxydom-vpn-session").apply { isDaemon = true }
     }
 
     @Volatile

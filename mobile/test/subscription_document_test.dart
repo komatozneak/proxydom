@@ -1,8 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/features/vpn/data/hy2_import_store.dart';
-import 'package:teremok_connect/features/vpn/data/hy2_link_parser.dart';
+import 'package:proxydom/features/vpn/data/hy2_import_store.dart';
+import 'package:proxydom/features/vpn/data/hy2_link_parser.dart';
 
 void main() {
   test('https document keeps the fragment as a fallback title', () {
@@ -33,6 +33,7 @@ void main() {
     final encoded = base64Encode(utf8.encode(https));
     final samples = [
       'happ://add/$https',
+      'proxydom://add/$https',
       'teremok://import?url=https%3A%2F%2Fsub.example.org%2Fexport.txt',
       'happ://sub/$encoded',
     ];

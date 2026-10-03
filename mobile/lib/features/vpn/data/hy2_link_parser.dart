@@ -115,7 +115,7 @@ class SubscriptionDocumentTarget {
 
 /// One http(s) document, or null when [raw] is share lines.
 ///
-/// Throws [FormatException] `subscription` when a Happ/Teremok deeplink does
+/// Throws [FormatException] `subscription` when a custom-scheme deeplink does
 /// not contain an http(s) address. No request is made.
 SubscriptionDocumentTarget? subscriptionDocumentTarget(String raw) {
   final text = raw.trim();
@@ -124,7 +124,9 @@ SubscriptionDocumentTarget? subscriptionDocumentTarget(String raw) {
   if (lower.startsWith('https://') || lower.startsWith('http://')) {
     return _webTarget(text);
   }
-  if (lower.startsWith('happ://') || lower.startsWith('teremok://')) {
+  if (lower.startsWith('happ://') ||
+      lower.startsWith('proxydom://') ||
+      lower.startsWith('teremok://')) {
     return _deeplinkTarget(text);
   }
   return null;
@@ -159,7 +161,7 @@ SubscriptionDocumentTarget _webTarget(String text) {
 
 SubscriptionDocumentTarget _deeplinkTarget(String text) {
   final nested = RegExp(
-    r'^(?:teremok|happ)://(?:add|import)/(https?://.*)$',
+    r'^(?:proxydom|teremok|happ)://(?:add|import)/(https?://.*)$',
     caseSensitive: false,
   ).firstMatch(text);
   if (nested != null) {

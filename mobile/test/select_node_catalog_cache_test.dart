@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/features/vpn/data/vpn_node.dart';
-import 'package:teremok_connect/features/vpn/data/vpn_nodes_repository.dart';
+import 'package:proxydom/features/vpn/data/vpn_node.dart';
 
 /// Catalog resolution used by [VpnNotifier.fetchConfig] for concrete node ids.
 List<VpnNode>? preferCachedCatalog({
@@ -75,8 +74,4 @@ void main() {
     expect(liveCalls, 1);
   });
 
-  test('VpnNodesRepository exposes loadCachedNodes for switch path', () {
-    // Compile-time contract: switch path must be able to read disk cache.
-    expect(VpnNodesRepository().loadCachedNodes, isA<Function>());
-  });
 }

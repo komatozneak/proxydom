@@ -506,7 +506,7 @@ bool _isOpsOrGenericLabel(String raw) {
   return RegExp(r'^node[-_\s]?\d+$', caseSensitive: false).hasMatch(t) ||
       RegExp(r'^(Сервер|Server)\s*\d+$', caseSensitive: false).hasMatch(t) ||
       RegExp(r'^tt[-_]', caseSensitive: false).hasMatch(t) ||
-      t.toLowerCase().contains('teremokconnect');
+      t.toLowerCase().contains('proxydom');
 }
 
 /// Hostname / FQDN / ops id — never show in Locations title/subtitle.
@@ -514,7 +514,7 @@ bool _looksLikeHostOrFqdn(String raw) {
   final t = normalizeNodeHost(raw);
   if (t.isEmpty) return false;
   if (t.contains('.')) {
-    // e.g. tt-us.teremokconnect.online, example.com
+    // e.g. node.proxydom.su, example.com
     return true;
   }
   if (RegExp(r'^tt[-_]', caseSensitive: false).hasMatch(t)) return true;

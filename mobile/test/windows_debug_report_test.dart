@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/core/diagnostics/windows_service_log.dart';
+import 'package:proxydom/core/diagnostics/windows_service_log.dart';
 
 void main() {
   test('debug report keeps both journals and masks a share secret', () {

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/core/theme.dart';
-import 'package:teremok_connect/core/widgets/house_pulsar.dart';
+import 'package:proxydom/core/theme.dart';
+import 'package:proxydom/core/widgets/house_pulsar.dart';
 
 void main() {
   test('flame is brighter than the roof so the house edge stays visible', () {

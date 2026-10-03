@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/features/vpn/data/subscription_traffic.dart';
+import 'package:proxydom/features/vpn/data/subscription_traffic.dart';
 
 void main() {
   const gib = 1024 * 1024 * 1024;

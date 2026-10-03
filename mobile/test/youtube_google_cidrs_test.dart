@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/features/vpn/data/youtube_google_cidrs.dart';
+import 'package:proxydom/features/vpn/data/youtube_google_cidrs.dart';
 
 void main() {
   test('parseYoutubeGoogleCidrs skips comments and blanks', () {

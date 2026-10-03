@@ -1,4 +1,4 @@
-package com.teremok.connect.teremok_connect
+package com.proxydom.app
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -16,13 +16,15 @@ import androidx.core.app.NotificationCompat
  * No compact RemoteViews — Pixel clips a 48dp custom row.
  */
 object ShadeNotification {
-    const val CHANNEL_VISIBLE = "teremok_shade_v1"
-    const val CHANNEL_QUIET = "teremok_shade_quiet_v1"
+    const val CHANNEL_VISIBLE = "proxydom_shade_v1"
+    const val CHANNEL_QUIET = "proxydom_shade_quiet_v1"
     private const val NOTIFICATION_ID = 42_001
-    private const val PREFS = "teremok_shade"
+    private const val PREFS = "proxydom_shade"
     private const val KEY_VISIBLE = "shade_notification_visible"
 
     private val LEGACY_CHANNELS = listOf(
+        "teremok_shade_v1",
+        "teremok_shade_quiet_v1",
         "teremok_vpn",
         "teremok_vpn_v2",
         "teremok_vpn_v3",

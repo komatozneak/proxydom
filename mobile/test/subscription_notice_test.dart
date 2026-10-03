@@ -3,9 +3,9 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:teremok_connect/features/vpn/data/hy2_import_store.dart';
-import 'package:teremok_connect/features/vpn/data/subscription_device.dart';
-import 'package:teremok_connect/features/vpn/data/subscription_notice.dart';
+import 'package:proxydom/features/vpn/data/hy2_import_store.dart';
+import 'package:proxydom/features/vpn/data/subscription_device.dart';
+import 'package:proxydom/features/vpn/data/subscription_notice.dart';
 
 const _link = 'hysteria2://user:pass@203.0.113.12:443/?sni=c.example#Charlie';
 

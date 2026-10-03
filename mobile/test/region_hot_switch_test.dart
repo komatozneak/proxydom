@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/features/home/application/vpn_provider.dart';
-import 'package:teremok_connect/features/home/application/vpn_status.dart';
-import 'package:teremok_connect/features/vpn/presentation/locations_screen.dart';
+import 'package:proxydom/features/home/application/vpn_provider.dart';
+import 'package:proxydom/features/home/application/vpn_status.dart';
+import 'package:proxydom/features/vpn/presentation/locations_screen.dart';
 
 void main() {
   group('regionPickUsesBusyOverlay', () {

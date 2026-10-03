@@ -3,9 +3,14 @@
 #include <atomic>
 #include <cstdint>
 #include <functional>
+#include <map>
+#include <memory>
 #include <mutex>
+#include <set>
 #include <string>
 #include <vector>
+
+#include "flow_probe.h"
 
 // Service-owned TUN session. Win32 is behind the interfaces below so a fake
 // network can prove that Idle is emitted only after a verified restore.
@@ -104,6 +109,8 @@ struct TunnelSnapshot {
 struct ConnectRequest {
   std::string uri;
   std::vector<std::string> direct_domains;
+  std::vector<std::string> force_proxy_domains;
+  bool udp_direct = false;
 };
 
 struct BeginResult {
@@ -257,6 +264,10 @@ class TunnelSupervisor {
   void set_observer(std::function<void(const TunnelSnapshot&)> observer);
   void set_ready_observer(std::function<void(std::int64_t)> observer);
   void set_hook(std::function<void(ConnectStep)> hook);
+  // Builds the loopback client for the engine's clash api. Left unset, the
+  // session starts with no controller and the journal carries no counters.
+  void set_flow_factory(
+      std::function<std::unique_ptr<FlowProbe>(unsigned short, const std::string&)> factory);
   // Medium controller reports gate 3. A mismatched generation is ignored.
   void note_user_proof(bool ok, std::int64_t generation);
   // Unit tests skip the real controller. Production leaves this false.
@@ -283,6 +294,9 @@ class TunnelSupervisor {
   void gate(const char* step, const char* outcome);
   // Names the adapter wait in the service log. Connect still ends as tun_init_timeout.
   void note_tun_timeout();
+  // Reads the engine's connection list and folds it into the running totals.
+  void sample_flows();
+  void emit_flow_summary(const char* event);
 
   RouteTable& routes_;
   EngineHost& engine_;
@@ -297,6 +311,16 @@ class TunnelSupervisor {
   std::function<void(const TunnelSnapshot&)> observer_;
   std::function<void(std::int64_t)> ready_observer_;
   std::function<void(ConnectStep)> hook_;
+  std::function<std::unique_ptr<FlowProbe>(unsigned short, const std::string&)> flow_factory_;
+  std::unique_ptr<FlowProbe> flows_;
+  // Running totals per "network:chain" plus the largest destination seen, so the
+  // journal can answer "did game UDP leave direct" without a second tool.
+  std::map<std::string, std::uint64_t> flow_up_;
+  std::map<std::string, std::uint64_t> flow_down_;
+  std::set<std::string> flow_announced_;
+  std::uint64_t flow_last_sample_ms_ = 0;
+  std::uint64_t flow_last_summary_ms_ = 0;
+  bool flow_api_reported_ = false;
   std::int64_t proof_generation_ = 0;
   int proof_result_ = 0;
   bool test_user_proof_ = false;

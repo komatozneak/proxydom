@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/core/busy/busy_overlay.dart';
-import 'package:teremok_connect/core/busy/busy_overlay_host.dart';
-import 'package:teremok_connect/core/theme.dart';
+import 'package:proxydom/core/busy/busy_overlay.dart';
+import 'package:proxydom/core/busy/busy_overlay_host.dart';
+import 'package:proxydom/core/theme.dart';
 
 Widget _hostApp() {
   return ProviderScope(

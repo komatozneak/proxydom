@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Persisted [ThemeMode] for Teremok (system / light / dark).
+/// Persisted [ThemeMode] (system / light / dark).
 class ThemeModePrefs {
   ThemeModePrefs._();
 

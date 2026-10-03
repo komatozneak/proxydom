@@ -1,4 +1,4 @@
-package com.teremok.connect.teremok_connect
+package com.proxydom.app
 
 /**
  * Native recovery when Hy2 QUIC dies while VpnService still shows connected.
@@ -6,7 +6,7 @@ package com.teremok.connect.teremok_connect
  * The app-side auto-reconnect switch is gone (ADR 020, 2026-09-30): the Dart
  * layer never ran while the screen was off, and it could not fire while native
  * status stayed `connected`. Screen-off Doze / Wi-Fi sleep is that case —
- * recover in [TeremokVpnService].
+ * recover in [ProxyDomVpnService].
  */
 object DeadTunnelReconnect {
     const val MAX_ATTEMPTS = 8

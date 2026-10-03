@@ -1,9 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/features/onboarding/presentation/onboarding_screen.dart';
-import 'package:teremok_connect/features/vpn/presentation/vpn_platform_copy.dart';
-import 'package:teremok_connect/l10n/app_localizations_en.dart';
-import 'package:teremok_connect/l10n/app_localizations_ru.dart';
+import 'package:proxydom/features/onboarding/presentation/onboarding_screen.dart';
+import 'package:proxydom/features/vpn/presentation/vpn_platform_copy.dart';
+import 'package:proxydom/l10n/app_localizations_en.dart';
+import 'package:proxydom/l10n/app_localizations_ru.dart';
 
 void main() {
   tearDown(() {

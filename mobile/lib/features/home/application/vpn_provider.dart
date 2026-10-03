@@ -16,7 +16,6 @@ import '../../vpn/data/vpn_config.dart';
 import '../../vpn/data/vpn_controller.dart';
 import '../../vpn/data/windows_tunnel.dart';
 import '../../vpn/data/windows_tunnel_protocol.dart';
-import '../../vpn/data/vpn_nodes_repository.dart';
 import '../../vpn/data/vpn_service_config.dart';
 import '../../vpn/data/vpn_session_meta.dart';
 import '../../vpn/data/vpn_session_snapshot.dart';
@@ -24,10 +23,6 @@ import '../../vpn/domain/vpn_connect_error.dart';
 import '../../settings/data/split_tunnel_prefs.dart';
 import 'vpn_status.dart';
 import 'vpn_status_log.dart';
-
-final vpnNodesRepositoryProvider = Provider<VpnNodesRepository>(
-  (ref) => VpnNodesRepository(),
-);
 
 const _connectedSinceKey = 'vpn_connected_since_ms';
 
@@ -83,7 +78,6 @@ class VpnNotifier extends Notifier<VpnStatus> {
   String? get catalogHost => _catalogHost;
 
   String? _lastProveSummary;
-  String? _lastLoggedProveId;
   String? _catalogHost;
 
   /// Session Binding/Proving/TunUp/CoreStarting owns error/idle until terminal.
@@ -497,7 +491,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
     // must still paint Nest Connected (ConnectedHealthy can lag / miss).
     if (_sessionProving) return;
     if (_suppressAutoReconnect || _switchStop) return;
-    if (hideInAppPlategaCheckout && _liveDialGen != _dialGen) return;
+    if (_liveDialGen != _dialGen) return;
     final effectiveGen = gen ?? _activeConnectGen ?? _connectGeneration;
     if (_enterConnectedGenInFlight == effectiveGen) {
       return;
@@ -551,7 +545,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
     );
     final sessionKey = '${_sessionScheme(protocol)}|$_profileHost|$serverName';
     if (keepLiveFreeSession(
-      freeClient: freeKeyClient,
+      freeClient: true,
       sessionOpen: _freeSessionOpen,
       sameProfile: _freeSessionKey == sessionKey,
     )) {
@@ -598,11 +592,14 @@ class VpnNotifier extends Notifier<VpnStatus> {
       protocol: protocol,
       connectedSince: since,
     );
+    await _markSplitTunnelApplied();
     SessionTrace.mark('connected');
     _rememberFreeSession(sessionKey);
     unawaited(_persistConnectedUi());
-    final probeToken = ++_egressProbeToken;
-    unawaited(_logEgressProbe(token: probeToken));
+    if (VpnController.instance.egressProbeSupported) {
+      final probeToken = ++_egressProbeToken;
+      unawaited(_logEgressProbe(token: probeToken));
+    }
     unawaited(
       VpnController.instance.getUnderlyingNetworkInterface().then((iface) {
         final name = iface?.trim();
@@ -892,6 +889,20 @@ class VpnNotifier extends Notifier<VpnStatus> {
     );
   }
 
+  /// Exclusion rules are live from the moment the session is Connected, so the
+  /// draft revision is spent there — not when the start command was accepted.
+  ///
+  /// Marking on command acceptance was wrong on Android (a start that never
+  /// establishes still spent the draft) and absent on Windows (the banner never
+  /// cleared). Both paint sites call this.
+  Future<void> _markSplitTunnelApplied() async {
+    try {
+      await SplitTunnelPrefs.markApplied();
+    } catch (e) {
+      _vpnLog('[VPN] markApplied failed: $e');
+    }
+  }
+
   /// Explicit stop → start so route-mode / site prefs enter the next runtime config.
   Future<bool> reconnectToApplyRouting() async {
     final wasConnected = state is VpnConnected || state is VpnConnecting;
@@ -915,6 +926,9 @@ class VpnNotifier extends Notifier<VpnStatus> {
     await _clearConnectedSince();
     state = const VpnDisconnected();
     await connect(forceRestart: true);
+    // connect() owns the native channels; the cancel above must not be the last
+    // word, or the resumed session never repaints and Nest spins forever.
+    _subscribeToStatus();
     return state is VpnConnected;
   }
 
@@ -926,7 +940,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
     // Deduplicate concurrent connect() (auto-reconnect + nest tap).
     _suppressAutoReconnect = false;
     if (windowsDesktop) {
-      if (VpnController.instance.windowsNestLocked) return;
+      if (VpnController.instance.windowsBrokerCooling) return;
       // Link loss recovery is not a setting: the Windows service drops the
       // tunnel and never brings it back, so the app layer always re-dials.
       WindowsTunnel.instance.onLinkLost = () {
@@ -941,7 +955,6 @@ class VpnNotifier extends Notifier<VpnStatus> {
     }
     if (_connectInFlight != null) {
       final switching = forceRestart &&
-          hideInAppPlategaCheckout &&
           await _selectedHost() != _handshakeHost;
       if (!switching) return _connectInFlight!;
       _connectGeneration++;
@@ -978,13 +991,11 @@ class VpnNotifier extends Notifier<VpnStatus> {
         native == VpnNativeStatus.preparing) {
       await VpnController.instance.stop(reason: 'restart');
     }
-    if (hideInAppPlategaCheckout) {
-      final imported = await Hy2ImportStore.instance.selected();
-      if (await _abortStaleConnect(gen)) return;
-      if (imported == null) {
-        state = const VpnDisconnected();
-        return;
-      }
+    final selectedLink = await Hy2ImportStore.instance.selected();
+    if (await _abortStaleConnect(gen)) return;
+    if (selectedLink == null) {
+      state = const VpnDisconnected();
+      return;
     }
     // Conflict before Connecting — foreign VPN must not paint a spinner.
     final existing = await VpnController.instance.getStatus();
@@ -1015,7 +1026,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
     if (state is VpnError || state is VpnDisconnected) {
       state = const VpnConnecting(progress: 0.0);
     }
-    if (hideInAppPlategaCheckout && forceRestart) {
+    if (forceRestart) {
       final dial = ++_dialGen;
       state = const VpnConnecting(progress: 0.2);
       final busy = existing == VpnNativeStatus.connected ||
@@ -1072,8 +1083,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
       if (await _abortStaleConnect(gen)) return;
       state = const VpnConnecting(progress: 0.5);
 
-      if (hideInAppPlategaCheckout) {
-        // ADR 026: pasted profile only. Do not call GET /vpn/config.
+      // ADR 026: pasted profile only. The owner catalog is not dialed.
         var imported = await Hy2ImportStore.instance.selected();
         if (await _abortStaleConnect(gen)) return;
         if (imported != null && isUnspecifiedShareHost(imported.endpoint)) {
@@ -1203,18 +1213,13 @@ class VpnNotifier extends Notifier<VpnStatus> {
             protocol: imported.scheme,
             connectedSince: DateTime.now(),
           );
+          await _markSplitTunnelApplied();
           return;
         }
         SessionTrace.mark('vpn_service');
         state = const VpnConnecting(progress: 0.8);
         await _waitUntilHandshakeSettles(gen);
         return;
-      }
-
-      state = const VpnError(
-        message: 'hy2_import_required',
-        code: 'hy2_import_required',
-      );
     } catch (e, st) {
       if (await _abortStaleConnect(gen)) return;
       _cancelConnectingWatchdog();
@@ -1462,7 +1467,6 @@ class VpnNotifier extends Notifier<VpnStatus> {
   }
 
   void _rememberFreeSession(String sessionKey) {
-    if (!freeKeyClient) return;
     _freeSessionOpen = true;
     _freeSessionKey = sessionKey;
   }
@@ -1600,43 +1604,15 @@ class VpnNotifier extends Notifier<VpnStatus> {
     if (wasProving && !_sessionProving && state is VpnConnecting) {
       _connectingUiStartedAt = DateTime.now();
     }
-    if (snap.isProving) {
-      if (!freeKeyClient) {
-        final proveId = snap.candidateId ?? '';
-        if (proveId.isNotEmpty && proveId != _lastLoggedProveId) {
-          _lastLoggedProveId = proveId;
-          _lastProveSummary = 'id=$proveId proving';
-          ProductLog.event(
-            'vpn.prove',
-            level: ProductLogLevel.debug,
-            fields: {'id': proveId, 'ok': 'pending'},
-          );
-        }
-      }
-    }
     if (snap.isConnected) {
-      if (hideInAppPlategaCheckout &&
-          (snap.generation <= _nativeGenFloor || _switchStop)) {
+      if (snap.generation <= _nativeGenFloor || _switchStop) {
         return;
       }
-      if (hideInAppPlategaCheckout) {
-        _liveDialGen = _dialGen;
-      }
+      _liveDialGen = _dialGen;
       final proveId = snap.candidateId ?? _autoActiveNodeId ?? '';
       _lastProveSummary = 'id=$proveId ok reason=${snap.reason.name}';
       _cancelConnectingWatchdog();
       final alreadyOn = state is VpnConnected;
-      if (!freeKeyClient && !alreadyOn) {
-        ProductLog.event(
-          'vpn.prove',
-          level: ProductLogLevel.info,
-          fields: {
-            'id': proveId,
-            'ok': true,
-            'reason': snap.reason.name,
-          },
-        );
-      }
       if (_freeSessionOpen) return;
       unawaited(
         _enterConnected(freshSession: !alreadyOn && state is VpnConnecting),

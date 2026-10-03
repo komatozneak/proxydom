@@ -1,19 +1,19 @@
 {
   "@@locale": "ru",
-  "appTitle": "Teremok Connect",
+  "appTitle": "Прокси Дом",
   "loginTitle": "Вход",
   "loginTestButton": "Войти (тестовая кнопка)",
   "loginErrorTimeout": "Нет ответа от сервера",
   "loginErrorNetwork": "Нет связи с сервером",
   "loginErrorGeneric": "Не удалось выполнить запрос",
-  "homeTitle": "Теремок",
+  "homeTitle": "Прокси Дом",
   "homeVpnHint": "VPN UI — в шагах 9+",
   "homeDisconnected": "Не подключено",
   "homeConnecting": "Подключение...",
   "homeConnected": "Подключено",
-  "homeTapHint": "Нажмите на Теремок, чтобы войти",
-  "homeConnectingHint": "Подождите, Теремок открывает дверь…",
-  "homeConnectedHint": "Теремок на связи",
+  "homeTapHint": "Нажмите на дом, чтобы войти",
+  "homeConnectingHint": "Подождите, дом открывает дверь…",
+  "homeConnectedHint": "Дом на связи",
   "homeProtected": "Защищено",
   "homeError": "Ошибка подключения",
   "homeConnect": "Подключиться",
@@ -24,31 +24,20 @@
   "navVpn": "VPN",
   "navLocations": "Локации",
   "navModes": "Режимы",
-  "navSubscription": "Подписка",
-  "navPremium": "Премиум",
   "homeTrafficRemainder": "Остаток трафика",
-  "homeQuotaUnlimitedTeaser": "Безлимит с Premium",
-  "homeQuotaUnlimitedCta": "Подключить безлимит",
   "homeTrafficExhausted": "Трафик закончился",
   "homeTrafficAmount": "{remaining} / {limit} ГБ",
   "@homeTrafficAmount": {
     "placeholders": {
-      "remaining": {"type": "String"},
-      "limit": {"type": "String"}
+      "remaining": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "String"
+      }
     }
   },
   "homeNoVpnRow": "Белые списки",
-  "premiumHeadline": "Расширенные локации",
-  "premiumBody": "Премиум открывает дополнительные локации, до 5 устройств и снимает лимит 4,20 ГБ.",
-  "premiumFeatureYt": "Дополнительные локации для просмотра",
-  "premiumFeatureSpeed": "Приоритетные выходы для стриминга",
-  "premiumUnlimitedTraffic": "Безлимитный трафик",
-  "premiumCta": "Оформить Премиум",
-  "premiumOpenLocations": "Открыть локации",
-  "subscriptionTabHint": "Тарифы и промокоды. Премиум открывает дополнительные локации.",
-  "subscriptionPay": "Оплатить",
-  "locationsPremiumLocked": "Премиум",
-  "locationsPremiumUnavailable": "Доступно в Premium",
   "settingsNoVpn": "Белые списки",
   "settingsNoVpnHint": "Приложения и сайты, которые идут мимо",
   "modesTitle": "Режим",
@@ -94,9 +83,6 @@
   "homeRetry": "Повторить",
   "homeErrorFriendly": "Не удалось подключиться. Попробуйте снова.",
   "homePathIncompatibleHint": "Не вышло проверить сервер. Нажмите ещё раз или выберите локацию вручную.",
-  "homeQuotaExceededTitle": "Лимит Free исчерпан",
-  "homeQuotaExceededHint": "В этом месяце израсходованы 4,20 ГБ. Оформите Premium — без лимита трафика.",
-  "homeQuotaUpgradeCta": "Оформить Premium",
   "homeTtProvisionFailedTitle": "Сервер недоступен",
   "homeTtProvisionFailedHint": "Не удалось подготовить эту локацию. Попробуйте позже или выберите другую.",
   "homeVpnProbeFailedTitle": "Сервер не отвечает",
@@ -114,13 +100,17 @@
   "homeVpnConflictHintNamed": "Отключите «{app}» в настройках Android, затем подключитесь снова.",
   "@homeVpnConflictHintNamed": {
     "placeholders": {
-      "app": {"type": "String"}
+      "app": {
+        "type": "String"
+      }
     }
   },
   "homeVpnConflictHintNamedIos": "Отключите «{app}» в Настройках → VPN.",
   "@homeVpnConflictHintNamedIos": {
     "placeholders": {
-      "app": {"type": "String"}
+      "app": {
+        "type": "String"
+      }
     }
   },
   "homeVpnPermissionHint": "Разрешите VPN в системном запросе Android, затем нажмите подключение снова.",
@@ -134,23 +124,36 @@
   "settingsSubscriptionActive": "Активна",
   "settingsProBadge": "PRO",
   "settingsActiveBadge": "Активна",
-  "settingsAccessEarlyTitle": "Премиум",
   "settingsAccessEarlySubtitle": "Доступ по приглашению.",
-  "settingsAccessBetaTitle": "Премиум",
   "settingsAccessBetaSubtitle": "Доступ по приглашению · без лимита Free.",
   "settingsAccessNoneTitle": "Нет доступа",
   "settingsAccessNoneSubtitle": "Нужен код приглашения.",
   "settingsAccessFreeTitle": "Бесплатный",
-  "settingsAccessFreeSubtitle": "1 устройство · до 4,20 ГБ в месяц.",
   "settingsAccessActiveUntil": "Действует до {date}.",
-  "@settingsAccessActiveUntil": {"placeholders": {"date": {"type": "String"}}},
+  "@settingsAccessActiveUntil": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
   "settingsAccessCancelledSubtitle": "Автопродление выключено.",
   "settingsSubscriptionActiveUntil": "Активна до {date}",
-  "@settingsSubscriptionActiveUntil": {"placeholders": {"date": {"type": "String"}}},
+  "@settingsSubscriptionActiveUntil": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
   "settingsSubscriptionTrialUntil": "Пробный период до {date}",
-  "@settingsSubscriptionTrialUntil": {"placeholders": {"date": {"type": "String"}}},
-  "settingsSubscriptionAlpha": "Премиум",
-  "settingsSubscriptionExpired": "Подписка истекла",
+  "@settingsSubscriptionTrialUntil": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
   "settingsSubscriptionLoadError": "Не удалось загрузить статус",
   "settingsServerRegion": "Регион сервера",
   "settingsProtocol": "Протокол",
@@ -165,7 +168,9 @@
   "devicesCreated": "Создано: {date}",
   "@devicesCreated": {
     "placeholders": {
-      "date": {"type": "String"}
+      "date": {
+        "type": "String"
+      }
     }
   },
   "devicesCurrentDevice": "Это устройство",
@@ -176,15 +181,21 @@
   "devicesGroupEmpty": "Пока одно устройство · ещё {count} мест",
   "@devicesGroupEmpty": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "devicesLimitReached": "Лимит устройств достигнут",
   "devicesCount": "{active} из {max}",
   "@devicesCount": {
     "placeholders": {
-      "active": {"type": "int"},
-      "max": {"type": "int"}
+      "active": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
     }
   },
   "devicesEmpty": "Пока нет устройств — подключите VPN, чтобы зарегистрировать это.",
@@ -197,7 +208,6 @@
   "devicesRenamed": "Имя обновлено",
   "devicesRenameFailed": "Не удалось переименовать",
   "devicesThisDevice": "Вы",
-  "devicesOwnerLabel": "Владелец подписки",
   "devicesInvitedLabel": "Приглашённое устройство",
   "devicesRevoke": "Удалить",
   "devicesRevokeTitle": "Отозвать устройство?",
@@ -207,9 +217,6 @@
   "devicesRevoked": "Устройство отозвано",
   "devicesRevokeFailed": "Не удалось отозвать устройство",
   "devicesLeaveHint": "Это устройство станет отдельным бесплатным аккаунтом",
-  "devicesLeave": "Покинуть чужую подписку",
-  "devicesLeaveTitle": "Покинуть чужую подписку?",
-  "devicesLeaveBody": "Это устройство станет отдельным бесплатным аккаунтом. Оплаченная подписка останется у владельца. Сохраните новый код восстановления, если он появится.",
   "devicesLeaveConfirm": "Покинуть",
   "devicesLeft": "Устройство отвязано от аккаунта",
   "devicesLeaveFailed": "Не удалось покинуть аккаунт",
@@ -222,17 +229,23 @@
   "devicesLimitOpenManage": "Управление устройствами",
   "splitTunnelSearchHint": "Поиск по моим сайтам",
   "splitTunnelBundledSection": "Готовый список",
-  "splitTunnelBundledLead": "Сайты из списка открываются обычным интернетом, не через защиту. Остальное — через Теремок.",
+  "splitTunnelBundledLead": "Сайты из списка открываются обычным интернетом, не через защиту. Остальное — через Прокси Дом.",
   "splitTunnelBundledRuTitle": "Готовые списки",
   "splitTunnelBundledRuSubtitle": "VK, Яндекс, маркетплейсы, MAX и другие — одним касанием",
   "splitTunnelBundledInfoTitle": "Как это работает",
-  "splitTunnelBundledInfoBody": "Сайты из списка открываются обычным интернетом, не через защиту. Остальное по-прежнему через Теремок.\n\nНа iPhone нельзя вытащить из VPN целое приложение — только сайт по адресу. В Safari обычно срабатывает. Приложение банка или маркетплейса может остаться в VPN: у них свои адреса.\n\nКрупные сервисы сидят на куче серверов. Часть страниц или видео может идти через защиту, даже если тумблер включён. Если сайт должен быть под защитой — выключите его здесь.\n\nПосле изменения нажмите «Переподключить».",
+  "splitTunnelBundledInfoBody": "Сайты из списка открываются обычным интернетом, не через защиту. Остальное по-прежнему через Прокси Дом.\n\nНа iPhone нельзя вытащить из VPN целое приложение — только сайт по адресу. В Safari обычно срабатывает. Приложение банка или маркетплейса может остаться в VPN: у них свои адреса.\n\nКрупные сервисы сидят на куче серверов. Часть страниц или видео может идти через защиту, даже если тумблер включён. Если сайт должен быть под защитой — выключите его здесь.\n\nПосле изменения нажмите «Переподключить».",
   "splitTunnelBundledInfoClose": "Понятно",
-  "splitTunnelSitesLead": "Сайты из списка открываются обычным интернетом, не через защиту. Остальное — через Теремок.",
+  "splitTunnelSitesLead": "Сайты из списка открываются обычным интернетом, не через защиту. Остальное — через Прокси Дом.",
   "splitTunnelSitesIosNote": "На iPhone из VPN выходит только точный hostname (не все поддомены). Целое приложение вытащить нельзя.",
   "splitTunnelCustomSection": "Мои сайты",
   "splitTunnelCustomCount": "{count}",
-  "@splitTunnelCustomCount": {"placeholders": {"count": {"type": "int"}}},
+  "@splitTunnelCustomCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "splitTunnelAddSite": "Добавить сайт",
   "splitTunnelSiteNameOptional": "Название (необязательно)",
   "splitTunnelDomainLabel": "Адрес сайта",
@@ -269,7 +282,13 @@
   "settingsDiagnostics": "Диагностика",
   "settingsDiagnosticsHint": "Проверить соединение",
   "settingsVersion": "Версия {version}",
-  "@settingsVersion": {"placeholders": {"version": {"type": "String"}}},
+  "@settingsVersion": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
   "settingsTitle": "Настройки",
   "settingsSendReport": "Отправить отчёт",
   "tunnelLogsTitle": "Логи туннеля",
@@ -284,7 +303,7 @@
   "tunnelLogsUi": "Интерфейс",
   "tunnelLogsCore": "Ядро",
   "tunnelLogsDns": "DNS",
-  "tunnelLogsFetch": "Подписка",
+  "tunnelLogsFetch": "Документ",
   "tunnelLogsNetwork": "Сеть",
   "tunnelLogsRefresh": "Обновить",
   "tunnelLogsCopy": "Копировать",
@@ -294,7 +313,9 @@
   "tunnelLogsDebugFile": "Файл для отправки: {path}",
   "@tunnelLogsDebugFile": {
     "placeholders": {
-      "path": {"type": "String"}
+      "path": {
+        "type": "String"
+      }
     }
   },
   "tunnelLogsEmpty": "Записей нет",
@@ -305,11 +326,12 @@
   "settingsReportSaved": "Отчёт сохранён: {id}. Скопирован в буфер.",
   "@settingsReportSaved": {
     "placeholders": {
-      "id": {"type": "String"}
+      "id": {
+        "type": "String"
+      }
     }
   },
   "settingsReportFailed": "Не удалось собрать отчёт",
-  "settingsReportTelegramFailed": "Не удалось отправить через бота. Текст отчёта скопирован.",
   "settingsReportUnauthorized": "Сессия устарела — войдите снова и повторите",
   "settingsReportNetworkError": "Нет связи с сервером — попробуйте позже",
   "settingsVpnNotificationTitle": "Уведомление в шторке",
@@ -331,12 +353,30 @@
   "homeConfigError": "Не удалось получить конфиг: {message}",
   "homeFetchConfig": "Получить конфиг",
   "homeUptime": "Время сессии: {time}",
-  "@homeUptime": {"placeholders": {"time": {"type": "String"}}},
+  "@homeUptime": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
   "homeSessionLabel": "Сессия",
   "homeServer": "Сервер: {name}",
-  "@homeServer": {"placeholders": {"name": {"type": "String"}}},
+  "@homeServer": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "homeIp": "Ваш IP: {ip}",
-  "@homeIp": {"placeholders": {"ip": {"type": "String"}}},
+  "@homeIp": {
+    "placeholders": {
+      "ip": {
+        "type": "String"
+      }
+    }
+  },
   "homeIpLoading": "Ваш IP: …",
   "homeIpUnavailable": "Ваш IP: недоступен — туннель без интернета",
   "homeRegionAuto": "Авто",
@@ -349,8 +389,6 @@
   "regionSelected": "Выбрано",
   "regionSectionServers": "Серверы",
   "regionSectionGeneral": "Общего назначения",
-  "regionSectionYoutube": "Премиум",
-  "regionSectionYoutubeIos": "Сервис",
   "regionSectionFree": "Бесплатно",
   "regionSectionEurope": "Латвия",
   "regionSectionUsa": "США",
@@ -366,14 +404,32 @@
   "regionFree": "Свободно",
   "regionNoneOnline": "Нет доступных серверов — попробуйте позже",
   "regionLoadError": "Не удалось загрузить список: {error}",
-  "@regionLoadError": {"placeholders": {"error": {"type": "String"}}},
+  "@regionLoadError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "regionLoadErrorAbort": "API недоступен — отключите «Всегда VPN» (и «Блокировать без VPN») в системе, затем откройте список снова",
   "regionCachedHint": "Показан сохранённый список — сеть сейчас нестабильна",
   "regionEmpty": "Список серверов пуст",
   "regionChanged": "Регион: {name}",
-  "@regionChanged": {"placeholders": {"name": {"type": "String"}}},
+  "@regionChanged": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "regionChangeFailed": "Не удалось сменить регион: {error}",
-  "@regionChangeFailed": {"placeholders": {"error": {"type": "String"}}},
+  "@regionChangeFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "regionSwitchingTitle": "Меняем локацию…",
   "regionSwitchingBody": "Подключаем выбранный сервер",
   "regionSwitchedTitle": "Готово",
@@ -390,26 +446,19 @@
   "switchLanguage": "RU",
   "updateAvailableTitle": "Доступно обновление",
   "updateAvailableBody": "Вышла версия {version}. Рекомендуем обновиться.",
-  "@updateAvailableBody": {"placeholders": {"version": {"type": "String"}}},
+  "@updateAvailableBody": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
   "updateNow": "Обновить",
   "updateLater": "Позже",
   "welcomeHeadline": "Тёплый дом в холодном интернете",
   "welcomeBody": "Аккаунт создаётся сам. Дальше один тап — защищённое соединение.",
   "welcomeContinue": "Продолжить",
   "welcomeSkip": "Пропустить",
-  "promoTitle": "Код доступа",
-  "promoHeadline": "Введите персональный код",
-  "promoBody": "Если есть код — введите его здесь.",
-  "promoCodeLabel": "Код",
-  "promoCodeHint": "Ваш промокод",
-  "promoCodeEmpty": "Введите код",
-  "promoSubmit": "Продолжить",
-  "promoOutcomeInvalid": "Код не найден. Проверьте и попробуйте снова.",
-  "promoOutcomeExpired": "Срок действия кода истёк.",
-  "promoOutcomeExhausted": "Этот код уже использован.",
-  "promoOutcomeRevoked": "Код больше не действует.",
-  "promoOutcomeRateLimited": "Слишком много попыток. Подождите минуту.",
-  "promoOutcomeUnknown": "Не удалось применить код. Попробуйте ещё раз.",
   "referralShareTitle": "Пригласить друга",
   "referralShareBody": "Друг вводит код после установки. Дни вам капают после его оплаты, не после установки.",
   "referralCopy": "Скопировать ссылку",
@@ -431,44 +480,25 @@
   "betaGateContinueAnyway": "Продолжить всё равно",
   "lockedTitle": "Активация",
   "lockedHeadline": "Добро пожаловать!",
-  "lockedBody": "Оформите подписку — и подключайтесь в один тап.",
-  "lockedCta": "Оформить подписку или введите промокод",
   "lockedRefreshAccess": "Обновить доступ",
   "settingsSupport": "Поддержка",
-  "settingsSupportHint": "Telegram — перенос после переустановки",
-  "settingsSupportHintIos": "Вопросы в Telegram-боте",
-  "lockedPay1m": "Оплатить 1 месяц",
-  "lockedPay3m": "Оплатить 3 месяца",
   "lockedPlan1m": "1 месяц",
   "lockedPlan3m": "3 месяца",
   "lockedPlan6m": "6 месяцев",
   "lockedPlan12m": "12 месяцев",
-  "lockedPayAmount": "Оплатить {price} ₽",
-  "lockedPerMonth": "{price} ₽/мес",
   "lockedSavePercent": "−{percent}%",
   "lockedVerifyCode": "Код проверки: {code}",
   "settingsTerms": "Соглашение",
-  "settingsPricing": "Тарифы",
   "settingsDeleteAccount": "Удаление аккаунта",
-  "lockedOrPromo": "Или введите промокод",
-  "lockedPayFailed": "Не удалось начать оплату. Попробуйте снова или напишите в поддержку.",
-  "lockedPayReturnTitle": "Оплата открыта",
-  "lockedPayReturnBody": "После оплаты в браузере нажмите «Проверить доступ».",
-  "lockedPayReturnCheck": "Проверить доступ",
   "recoveryCodeTitle": "Код восстановления",
   "recoveryCodeHeadline": "Код восстановления",
-  "recoveryCodeBody": "Сохраните код — понадобится после переустановки. Без кода можно восстановить через Telegram.",
   "recoveryCodeCopy": "Скопировать",
   "recoveryCodeCopied": "Код скопирован",
   "recoveryCodeConfirm": "Продолжить",
   "recoveryCodeContinue": "Продолжить",
   "restoreTitle": "Восстановить доступ",
   "restoreHeadlineCode": "Введите код восстановления",
-  "restoreBodyCode": "После переустановки введите код восстановления или откройте Telegram.",
-  "restoreBodyCodeIos": "После переустановки введите код восстановления или откройте Telegram.",
   "restoreHeadline": "Восстановить доступ",
-  "restoreBody": "Введите код восстановления или откройте Telegram.",
-  "restoreBodyIos": "Введите код восстановления или откройте Telegram.",
   "restorePaymentLabel": "Номер платежа",
   "restorePaymentHint": "UUID из чека / СМС",
   "restorePaymentEmpty": "Введите номер платежа",
@@ -486,7 +516,6 @@
   "restoreDeviceLimitOwner": "Владелец",
   "restoreDeviceLimitPickFailed": "Не удалось освободить слот. Попробуйте снова.",
   "restoreSettingsHint": "После переустановки — код восстановления",
-  "settingsInviteDevice": "Добавить устройство в подписку",
   "settingsInviteDeviceHint": "Код для входа в группу",
   "settingsAcceptSeat": "Войти в группу",
   "settingsAcceptSeatHint": "Присоединиться по приглашению",
@@ -494,16 +523,12 @@
   "settingsSeatCodeCopied": "Код скопирован",
   "settingsSeatInviteFailed": "Не удалось создать код приглашения",
   "settingsAcceptSeatOk": "Устройство добавлено в группу",
-  "settingsSeatPremiumRequired": "Добавление устройств доступно в Premium",
   "settingsSeatCodeNotFound": "Код не найден или истёк",
-  "settingsSeatDeviceLimit": "Достигнут лимит устройств на подписке",
   "settingsSeatOwnCode": "Нельзя принять свой код — введите его на другом устройстве",
   "settingsSeatAcceptFailed": "Не удалось войти в группу",
   "settingsSeatCodeTtl": "Код действует 30 минут",
   "settingsSeatShowQr": "Показать код",
   "settingsSeatScanHint": "Отсканируйте QR-код или перейдите по ссылке",
-  "settingsPayOwnerOnly": "Оплату оформляет владелец подписки",
-  "settingsSeatForbidden": "Это может сделать только владелец подписки",
   "seatAcceptConsentTitle": "Войти в эту группу?",
   "seatAcceptConsentBody": "Владелец аккаунта увидит имя устройства, платформу и дату добавления. Выйти из группы можно позже.",
   "seatAcceptConsentConfirm": "Войти",
@@ -511,34 +536,6 @@
   "settingsRecoverAccess": "Восстановить доступ",
   "settingsRecoverAccessHint": "Код восстановления после переустановки",
   "bootstrapFailed": "Не удалось начать сессию. Проверьте связь.",
-  "accountHubTitle": "Аккаунт",
-  "accountHubGuestLead": "Аккаунт на этом устройстве. Код восстановления — после переустановки. Telegram — тот же аккаунт.",
-  "accountHubLinkedLead": "Telegram привязан. Бот — тот же аккаунт: подписка и восстановление.",
-  "accountHubLinkedLeadIos": "Telegram привязан. Бот — тот же аккаунт и восстановление.",
-  "accountHubRecoveryMissing": "Код на этом телефоне уже сохраняли. После переустановки откройте Telegram с тем же аккаунтом.",
-  "accountHubLinkTelegram": "Telegram",
-  "accountHubLinkTelegramHint": "Подписка и восстановление в боте",
-  "accountHubLinkEmail": "Почта",
-  "accountHubLinkEmailHint": "Привязать по коду из письма",
-  "accountHubRecovery": "Код восстановления",
-  "accountHubRecoveryHint": "Восстановить доступ после переустановки",
-  "accountHubRecoverySaveBanner": "Сохраните код восстановления — он понадобится после переустановки.",
-  "accountHubRecoverySaveCta": "Сохранить код",
-  "accountHubPromo": "Промокод",
-  "accountHubPromoHint": "Активировать код",
-  "accountHubAccessSection": "Ваш доступ",
-  "accountHubContact": "Контакт",
-  "accountHubLoadError": "Не удалось загрузить аккаунт",
-  "accountTelegramLead": "Откройте бота и подтвердите привязку. Вернитесь в приложение — статус обновится автоматически.",
-  "accountTelegramOpenBot": "Открыть Telegram",
-  "accountTelegramWaiting": "Ждём подтверждения…",
-  "accountTelegramWaitingHint": "После /start в боте вернитесь сюда.",
-  "accountTelegramStartFailed": "Не удалось начать привязку Telegram",
-  "accountTelegramVpnRequired": "Сначала подключитесь.",
-  "restoreTelegramCta": "Восстановить через Telegram",
-  "restoreTelegramVpnRequired": "Сначала подключитесь.",
-  "homeTelegramRestoreCta": "Уже был Теремок? Восстановите через Telegram",
-  "homeTelegramRestoreConnectFirst": "Сначала подключитесь.",
   "accountEmailLead": "Укажите почту — пришлём одноразовый код.",
   "accountEmailLabel": "Email",
   "accountEmailSendCode": "Отправить код",
@@ -566,20 +563,6 @@
   "vpnDisclosureNotBody": "Не ведёт историю сайтов и не читает рекламный идентификатор. Не продаёт доступ и не выдаёт серверы: строку приносите вы.",
   "vpnDisclosureAccept": "Принимаю и продолжить",
   "vpnDisclosureDecline": "Не сейчас",
-  "accountTelegramLinkedTitle": "{handle} привязан",
-  "@accountTelegramLinkedTitle": {
-    "placeholders": {
-      "handle": {"type": "String"}
-    }
-  },
-  "accountTelegramLinkedBody": "После переустановки доступ восстанавливается через этот Telegram. Подписка тоже в боте.",
-  "accountTelegramOwnerRestoredTitle": "Аккаунт восстановлен",
-  "accountTelegramOwnerRestoredBody": "Теперь можно управлять подпиской и восстанавливать доступ через Telegram.",
-  "accountTelegramMemberRestoredTitle": "Вернулись в подписку",
-  "accountTelegramMemberRestoredBody": "Владелец не изменился. Доступ подтянется в приложении.",
-  "accountTelegramDone": "Готово",
-  "restoreTelegramSlotRevoked": "Владелец удалил это устройство. Попросите новый код приглашения.",
-  "restoreTelegramSubscriptionInactive": "Подписка сейчас не активна. После продления место можно восстановить снова.",
   "freeAdd": "Добавить",
   "freePaste": "Вставить",
   "freeQr": "QR",
@@ -599,7 +582,7 @@
   "freePreview": "Найдено",
   "freeServerAdded": "Сервер добавлен",
   "freeLinkInvalid": "Ссылка не разобрана",
-  "freeSubscriptionLoadFail": "Подписка не загрузилась. Адрес документа не ответил.",
+  "freeSubscriptionLoadFail": "Документ не загрузился. Адрес не ответил.",
   "freeSubscriptionMissing": "По этому адресу документа нет.",
   "freeSubscriptionDeviceLimit": "В этом документе кончились места для устройств. Освободите одно и обновите список.",
   "freeSubscriptionClientRefused": "Документ прислал заглушку вместо сервера.",
@@ -634,7 +617,9 @@
   "freeRefreshDone": "Обновлено: {count}",
   "@freeRefreshDone": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "freeRefreshFail": "Не удалось обновить"

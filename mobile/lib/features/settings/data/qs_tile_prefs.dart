@@ -5,14 +5,14 @@ import 'package:flutter/services.dart';
 class QsTilePrefs {
   QsTilePrefs._();
 
-  static const _channel = MethodChannel('teremok/vpn');
+  static const _channel = MethodChannel('proxydom/vpn');
 
   static bool get isSupported =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
   /// True after the system reports the tile is in Quick Settings.
   ///
-  /// Cleared when the user drags the tile out ([TeremokTileService.onTileRemoved]).
+  /// Cleared when the user drags the tile out ([ProxyDomTileService.onTileRemoved]).
   static Future<bool> isAdded() async {
     if (!isSupported) return false;
     try {
@@ -25,7 +25,7 @@ class QsTilePrefs {
     }
   }
 
-  /// Prompt the system to pin [TeremokTileService].
+  /// Prompt the system to pin [ProxyDomTileService].
   ///
   /// Returns one of: `added`, `already_added`, `not_added`, `manual`.
   static Future<String> requestAdd() async {

@@ -16,4 +16,4 @@ Wire `CODE_SIGN_ENTITLEMENTS = Runner.entitlements` in Runner Debug/Release/Prof
 
 Portal: Identifiers → App ID `su.proxydom.app` → enable App Groups + Network Extensions; App ID for the extension bundle `su.proxydom.app.VpnTunnelProvider`. App Group `group.su.proxydom.app` must be attached to **both** App IDs. Team `LG3N5WA9TD`, App Store seller — ТОО «УМИКУМ» (`UMICUM LLP`).
 
-Прежние идентификаторы `online.teremokconnect.app` относились к заброшенному проекту. Порядок создания и проверка — `docs/ops/apple-org-umicum-runbook.md` §4.
+Прежние идентификаторы заброшенного проекта не используем. Порядок создания и проверка — `docs/ops/apple-org-umicum-runbook.md` §4.

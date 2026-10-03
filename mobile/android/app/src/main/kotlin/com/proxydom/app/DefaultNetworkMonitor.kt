@@ -1,4 +1,4 @@
-package com.teremok.connect.teremok_connect
+package com.proxydom.app
 
 import android.content.Context
 import android.net.ConnectivityManager
@@ -212,7 +212,7 @@ internal object DefaultNetworkMonitor {
         if (ctx != null) {
             VpnUnderlyingNetworkPolicy.bindProcessTo(ctx, network, iface)
         }
-        val vpn = TeremokVpnService.currentInstance() ?: return
+        val vpn = ProxyDomVpnService.currentInstance() ?: return
         VpnUnderlyingNetworkPolicy.applyTo(
             vpn,
             VpnUnderlyingNetworkPolicy.Underlying(network, iface),
@@ -225,7 +225,7 @@ internal object DefaultNetworkMonitor {
      */
     private fun releaseProcessBindIfTunDown() {
         val ctx = appContext ?: return
-        val tunUp = TeremokVpnService.currentInstance()?.hasLiveTun() == true
+        val tunUp = ProxyDomVpnService.currentInstance()?.hasLiveTun() == true
         if (tunUp) {
             Log.i(TAG, "keep process bind — TUN up, no replacement physical")
             DiagnosticRing.event("debug", "net.bind", "action=keep")

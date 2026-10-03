@@ -114,7 +114,7 @@ if ($builtInfo.Length -lt 1MB) {
 }
 
 # aapt/apksigner on a subst/mapped Z: path can report type=1 and skip native-code.
-$apk = Join-Path $env:TEMP "teremok-sideload-app-release.apk"
+$apk = Join-Path $env:TEMP "proxydom-sideload-app-release.apk"
 Copy-Item -LiteralPath $apkBuilt -Destination $apk -Force
 $apkMb = [math]::Round((Get-Item -LiteralPath $apk).Length / 1MB, 1)
 Write-Host ('Checking {0} ({1} MB)' -f (Split-Path $apk -Leaf), $apkMb)
@@ -144,8 +144,8 @@ foreach ($abi in $RequiredAbis) {
 
 $prevEap = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
-$verifyFile = Join-Path $env:TEMP "teremok-apksigner-out.txt"
-$zipFile = Join-Path $env:TEMP "teremok-zipalign-out.txt"
+$verifyFile = Join-Path $env:TEMP "proxydom-apksigner-out.txt"
+$zipFile = Join-Path $env:TEMP "proxydom-zipalign-out.txt"
 try {
     cmd.exe /c "`"$zipalign`" -c -P 16 4 `"$apk`" > `"$zipFile`" 2>&1"
     $zipCode = $LASTEXITCODE
@@ -203,4 +203,4 @@ $sizeMb = [math]::Round((Get-Item -LiteralPath $apkBuilt).Length / 1MB, 1)
 Write-Host ('OK: {0} ({1} MB)' -f $apkBuilt, $sizeMb)
 Write-Host ('package={0} version={1}+{2} minSdk=26' -f $ProductionPackage, $expectedVersionName, $expectedVersionCode)
 Write-Host ('signerSha256={0}' -f $apkSha)
-Write-Host "Upload the APK above to /var/www/teremok-downloads (do not use android-apk-ci)."
+Write-Host "Upload the APK above to the proxydom.su downloads directory (do not use android-apk-ci)."

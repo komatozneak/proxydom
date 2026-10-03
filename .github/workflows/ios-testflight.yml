@@ -18,8 +18,8 @@ env:
   FLUTTER_VERSION: "3.35.1"
   HYSTERIA_TAG: "v2.6.2"
   GO_VERSION: "1.25.x"
-  APP_BUNDLE_ID: online.teremokconnect.app
-  TUNNEL_BUNDLE_ID: online.teremokconnect.app.VpnTunnelProvider
+  APP_BUNDLE_ID: su.proxydom.app
+  TUNNEL_BUNDLE_ID: su.proxydom.app.VpnTunnelProvider
 
 jobs:
   testflight:
@@ -114,7 +114,7 @@ jobs:
           test -s "$RUNNER_TEMP/cert_key"
 
           # --strict-match-identifier: do not also match RunnerTests
-          # (online.teremokconnect.app.RunnerTests).
+          # (su.proxydom.app.RunnerTests).
           app-store-connect fetch-signing-files "$APP_BUNDLE_ID" \
             --platform IOS \
             --type IOS_APP_STORE \
@@ -179,10 +179,32 @@ jobs:
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
-          name: teremok-ios-ipa
+          name: proxydom-ios-ipa
           path: mobile/build/ios/ipa/*.ipa
           if-no-files-found: error
           retention-days: 14
+
+      - name: Scan IPA for selling copy
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          ipa="$(ls build/ios/ipa/*.ipa | head -n 1)"
+          tmp="$(mktemp -d)"
+          unzip -q "$ipa" -d "$tmp"
+          app="$(find "$tmp" -type d -name '*.app' | head -n 1)"
+          found=0
+          for token in 'Premium' 'Премиум' 'Platega' 'Тариф' 'промокод' 'Teremok VPN' 'vpn_teremok_bot' 'квота' 't.me/' '₽' 'Купить' 'Оплатить'; do
+            if strings -a "$app/Runner" | grep -Fq "$token"; then
+              echo "FAIL: '$token' in Runner"
+              found=1
+            fi
+          done
+          tunnel="$(find "$app" -type f -name 'VpnTunnelProvider' | head -n 1)"
+          if [ -n "$tunnel" ] && strings -a "$tunnel" | grep -Fq 'Teremok VPN'; then
+            echo "FAIL: name in tunnel"
+            found=1
+          fi
+          exit "$found"
 
       - name: Upload to App Store Connect
         if: ${{ inputs.upload }}

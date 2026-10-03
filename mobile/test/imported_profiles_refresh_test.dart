@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:teremok_connect/features/vpn/data/hy2_import_store.dart';
+import 'package:proxydom/features/vpn/data/hy2_import_store.dart';
 
 void main() {
   test('saving a profile notifies listeners', () async {

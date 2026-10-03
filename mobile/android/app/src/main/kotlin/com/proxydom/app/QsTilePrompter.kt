@@ -1,4 +1,4 @@
-package com.teremok.connect.teremok_connect
+package com.proxydom.app
 
 import android.app.StatusBarManager
 import android.content.ComponentName
@@ -13,7 +13,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 /**
  * Whether the user currently has the tile in Quick Settings.
  *
- * Android has no API for an app to remove a tile. [TeremokTileService]
+ * Android has no API for an app to remove a tile. [ProxyDomTileService]
  * updates this from [onTileAdded] / [onTileRemoved]; the add prompt sets it
  * when the system reports the tile is already there.
  */
@@ -56,7 +56,7 @@ object QsTilePrompter {
             }
         }
         try {
-            val component = ComponentName(context, TeremokTileService::class.java)
+            val component = ComponentName(context, ProxyDomTileService::class.java)
             // Same Living House as ic_launcher_monochrome (tight crop for the dialog).
             val icon = Icon.createWithResource(context, R.drawable.ic_qs_vpn)
             sb.requestAddTileService(

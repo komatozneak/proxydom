@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:teremok_connect/core/theme.dart';
-import 'package:teremok_connect/features/vpn/data/vpn_disclosure_prefs.dart';
-import 'package:teremok_connect/features/vpn/presentation/vpn_disclosure_dialog.dart';
-import 'package:teremok_connect/l10n/app_localizations.dart';
+import 'package:proxydom/core/theme.dart';
+import 'package:proxydom/features/vpn/data/vpn_disclosure_prefs.dart';
+import 'package:proxydom/features/vpn/presentation/vpn_disclosure_dialog.dart';
+import 'package:proxydom/l10n/app_localizations.dart';
 
 int _connects = 0;
 

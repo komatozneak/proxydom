@@ -9,7 +9,7 @@ class AppL10nEn extends AppL10n {
   AppL10nEn([String locale = 'en']) : super(locale);
 
   @override
-  String get appTitle => 'Teremok Connect';
+  String get appTitle => 'Proxy Dom';
 
   @override
   String get loginTitle => 'Sign in';
@@ -27,7 +27,7 @@ class AppL10nEn extends AppL10n {
   String get loginErrorGeneric => 'Request failed';
 
   @override
-  String get homeTitle => 'Teremok';
+  String get homeTitle => 'Proxy Dom';
 
   @override
   String get homeVpnHint => 'VPN UI — comes in step 9+';
@@ -42,13 +42,13 @@ class AppL10nEn extends AppL10n {
   String get homeConnected => 'Connected';
 
   @override
-  String get homeTapHint => 'Tap Teremok to connect';
+  String get homeTapHint => 'Tap the house to connect';
 
   @override
-  String get homeConnectingHint => 'Hold on — Teremok is opening the door…';
+  String get homeConnectingHint => 'Hold on — the house is opening the door…';
 
   @override
-  String get homeConnectedHint => 'Teremok is online';
+  String get homeConnectedHint => 'The house is online';
 
   @override
   String get homeProtected => 'Protected';
@@ -81,19 +81,7 @@ class AppL10nEn extends AppL10n {
   String get navModes => 'Modes';
 
   @override
-  String get navSubscription => 'Subscription';
-
-  @override
-  String get navPremium => 'Premium';
-
-  @override
   String get homeTrafficRemainder => 'Data left';
-
-  @override
-  String get homeQuotaUnlimitedTeaser => 'Unlimited with Premium';
-
-  @override
-  String get homeQuotaUnlimitedCta => 'Get unlimited';
 
   @override
   String get homeTrafficExhausted => 'Traffic used up';
@@ -105,41 +93,6 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get homeNoVpnRow => 'Allowlists';
-
-  @override
-  String get premiumHeadline => 'More locations';
-
-  @override
-  String get premiumBody =>
-      'Premium unlocks extra locations, up to 5 devices, and removes the free 4.20 GB cap.';
-
-  @override
-  String get premiumFeatureYt => 'Extra locations for streaming';
-
-  @override
-  String get premiumFeatureSpeed => 'Priority exits for streaming';
-
-  @override
-  String get premiumUnlimitedTraffic => 'Unlimited traffic';
-
-  @override
-  String get premiumCta => 'Get Premium';
-
-  @override
-  String get premiumOpenLocations => 'Open locations';
-
-  @override
-  String get subscriptionTabHint =>
-      'Manage plans and promo codes. Premium unlocks extra locations.';
-
-  @override
-  String get subscriptionPay => 'Pay';
-
-  @override
-  String get locationsPremiumLocked => 'Premium';
-
-  @override
-  String get locationsPremiumUnavailable => 'Available with Premium';
 
   @override
   String get settingsNoVpn => 'Allowlists';
@@ -284,16 +237,6 @@ class AppL10nEn extends AppL10n {
       'Couldn’t reach a server. Tap again or pick a location yourself.';
 
   @override
-  String get homeQuotaExceededTitle => 'Free traffic used up';
-
-  @override
-  String get homeQuotaExceededHint =>
-      'You’ve used this month’s 4.20 GB. Upgrade to Premium for unlimited traffic.';
-
-  @override
-  String get homeQuotaUpgradeCta => 'Upgrade';
-
-  @override
   String get homeTtProvisionFailedTitle => 'Server unavailable';
 
   @override
@@ -367,13 +310,7 @@ class AppL10nEn extends AppL10n {
   String get settingsActiveBadge => 'Active';
 
   @override
-  String get settingsAccessEarlyTitle => 'Premium';
-
-  @override
   String get settingsAccessEarlySubtitle => 'Access is by invite.';
-
-  @override
-  String get settingsAccessBetaTitle => 'Premium';
 
   @override
   String get settingsAccessBetaSubtitle =>
@@ -387,10 +324,6 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get settingsAccessFreeTitle => 'Free';
-
-  @override
-  String get settingsAccessFreeSubtitle =>
-      '1 device · up to 4.20 GB per month.';
 
   @override
   String settingsAccessActiveUntil(String date) {
@@ -409,12 +342,6 @@ class AppL10nEn extends AppL10n {
   String settingsSubscriptionTrialUntil(String date) {
     return 'Trial until $date';
   }
-
-  @override
-  String get settingsSubscriptionAlpha => 'Premium';
-
-  @override
-  String get settingsSubscriptionExpired => 'Subscription expired';
 
   @override
   String get settingsSubscriptionLoadError => 'Couldn’t load status';
@@ -518,9 +445,6 @@ class AppL10nEn extends AppL10n {
   String get devicesThisDevice => 'You';
 
   @override
-  String get devicesOwnerLabel => 'Subscription owner';
-
-  @override
   String get devicesInvitedLabel => 'Invited device';
 
   @override
@@ -547,16 +471,6 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get devicesLeaveHint => 'This install becomes its own Free account';
-
-  @override
-  String get devicesLeave => 'Leave external subscription';
-
-  @override
-  String get devicesLeaveTitle => 'Leave this subscription?';
-
-  @override
-  String get devicesLeaveBody =>
-      'This install becomes its own Free account. The paid subscription stays with the owner. Save the new recovery code if shown.';
 
   @override
   String get devicesLeaveConfirm => 'Leave';
@@ -598,7 +512,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get splitTunnelBundledLead =>
-      'Listed sites use your usual connection, not the protected one. Everything else still goes through Teremok.';
+      'Listed sites use your usual connection, not the protected one. Everything else still goes through Proxy Dom.';
 
   @override
   String get splitTunnelBundledRuTitle => 'Ready-made lists';
@@ -612,14 +526,14 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get splitTunnelBundledInfoBody =>
-      'Listed sites use your usual connection, not the protected one. Everything else still goes through Teremok.\n\nOn iPhone you cannot take a whole app out of the VPN — only a website by address. Safari usually follows the list. A bank or marketplace app may stay in the VPN.\n\nBig services use many servers. Some pages or video may still go through the VPN with the switch on. If a site should stay protected, turn it off here.\n\nTap Reconnect after you change the list.';
+      'Listed sites use your usual connection, not the protected one. Everything else still goes through Proxy Dom.\n\nOn iPhone you cannot take a whole app out of the VPN — only a website by address. Safari usually follows the list. A bank or marketplace app may stay in the VPN.\n\nBig services use many servers. Some pages or video may still go through the VPN with the switch on. If a site should stay protected, turn it off here.\n\nTap Reconnect after you change the list.';
 
   @override
   String get splitTunnelBundledInfoClose => 'Got it';
 
   @override
   String get splitTunnelSitesLead =>
-      'Listed sites use your usual connection, not the protected one. Everything else still goes through Teremok.';
+      'Listed sites use your usual connection, not the protected one. Everything else still goes through Proxy Dom.';
 
   @override
   String get splitTunnelSitesIosNote =>
@@ -790,7 +704,7 @@ class AppL10nEn extends AppL10n {
   String get tunnelLogsDns => 'DNS';
 
   @override
-  String get tunnelLogsFetch => 'Subscription';
+  String get tunnelLogsFetch => 'Document';
 
   @override
   String get tunnelLogsNetwork => 'Network';
@@ -839,10 +753,6 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get settingsReportFailed => 'Couldn\'t build the report';
-
-  @override
-  String get settingsReportTelegramFailed =>
-      'Couldn\'t send via the bot. The report is copied.';
 
   @override
   String get settingsReportUnauthorized =>
@@ -968,12 +878,6 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get regionSectionGeneral => 'General';
-
-  @override
-  String get regionSectionYoutube => 'Premium';
-
-  @override
-  String get regionSectionYoutubeIos => 'Services';
 
   @override
   String get regionSectionFree => 'Free';
@@ -1114,46 +1018,6 @@ class AppL10nEn extends AppL10n {
   String get welcomeSkip => 'Skip';
 
   @override
-  String get promoTitle => 'Invite code';
-
-  @override
-  String get promoHeadline => 'Enter your personal code';
-
-  @override
-  String get promoBody => 'If you have a code, enter it here.';
-
-  @override
-  String get promoCodeLabel => 'Code';
-
-  @override
-  String get promoCodeHint => 'Your invite code';
-
-  @override
-  String get promoCodeEmpty => 'Enter a code';
-
-  @override
-  String get promoSubmit => 'Continue';
-
-  @override
-  String get promoOutcomeInvalid => 'Code not found. Check it and try again.';
-
-  @override
-  String get promoOutcomeExpired => 'This code has expired.';
-
-  @override
-  String get promoOutcomeExhausted => 'This code has already been used.';
-
-  @override
-  String get promoOutcomeRevoked => 'This code is no longer valid.';
-
-  @override
-  String get promoOutcomeRateLimited =>
-      'Too many attempts. Please wait a minute.';
-
-  @override
-  String get promoOutcomeUnknown => 'Couldn’t apply the code. Try again.';
-
-  @override
   String get referralShareTitle => 'Invite a friend';
 
   @override
@@ -1223,28 +1087,10 @@ class AppL10nEn extends AppL10n {
   String get lockedHeadline => 'Welcome!';
 
   @override
-  String get lockedBody => 'Get a subscription — then connect in one tap.';
-
-  @override
-  String get lockedCta => 'Get a subscription or enter a promo code';
-
-  @override
   String get lockedRefreshAccess => 'Refresh access';
 
   @override
   String get settingsSupport => 'Support';
-
-  @override
-  String get settingsSupportHint => 'Telegram — transfer after reinstall';
-
-  @override
-  String get settingsSupportHintIos => 'Questions in the Telegram bot';
-
-  @override
-  String get lockedPay1m => 'Pay 1 month';
-
-  @override
-  String get lockedPay3m => 'Pay 3 months';
 
   @override
   String get lockedPlan1m => '1 month';
@@ -1257,16 +1103,6 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get lockedPlan12m => '12 months';
-
-  @override
-  String lockedPayAmount(int price) {
-    return 'Pay $price ₽';
-  }
-
-  @override
-  String lockedPerMonth(int price) {
-    return '$price ₽/mo';
-  }
 
   @override
   String lockedSavePercent(int percent) {
@@ -1282,37 +1118,13 @@ class AppL10nEn extends AppL10n {
   String get settingsTerms => 'Agreement';
 
   @override
-  String get settingsPricing => 'Pricing';
-
-  @override
   String get settingsDeleteAccount => 'Delete account';
-
-  @override
-  String get lockedOrPromo => 'Or enter a promo code';
-
-  @override
-  String get lockedPayFailed =>
-      'Couldn’t start payment. Try again or contact support.';
-
-  @override
-  String get lockedPayReturnTitle => 'Payment opened';
-
-  @override
-  String get lockedPayReturnBody =>
-      'After you finish paying in the browser, tap Check access.';
-
-  @override
-  String get lockedPayReturnCheck => 'Check access';
 
   @override
   String get recoveryCodeTitle => 'Recovery code';
 
   @override
   String get recoveryCodeHeadline => 'Recovery code';
-
-  @override
-  String get recoveryCodeBody =>
-      'Save this code — you’ll need it after reinstall. Without it you can restore via Telegram.';
 
   @override
   String get recoveryCodeCopy => 'Copy code';
@@ -1331,12 +1143,6 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get restoreHeadline => 'Enter recovery code';
-
-  @override
-  String get restoreBody => 'Enter the recovery code or open Telegram.';
-
-  @override
-  String get restoreBodyIos => 'Enter the recovery code or open Telegram.';
 
   @override
   String get restorePaymentLabel => 'Payment ID';
@@ -1397,17 +1203,6 @@ class AppL10nEn extends AppL10n {
   String get restoreHeadlineCode => 'Enter recovery code';
 
   @override
-  String get restoreBodyCode =>
-      'After reinstall, enter the recovery code or open Telegram.';
-
-  @override
-  String get restoreBodyCodeIos =>
-      'After reinstall, enter the recovery code or open Telegram.';
-
-  @override
-  String get settingsInviteDevice => 'Add device to my subscription';
-
-  @override
   String get settingsInviteDeviceHint => 'Create a code to join your group';
 
   @override
@@ -1429,14 +1224,7 @@ class AppL10nEn extends AppL10n {
   String get settingsAcceptSeatOk => 'Device added to the group';
 
   @override
-  String get settingsSeatPremiumRequired => 'Adding devices requires Premium';
-
-  @override
   String get settingsSeatCodeNotFound => 'Code not found or expired';
-
-  @override
-  String get settingsSeatDeviceLimit =>
-      'Device limit reached for this subscription';
 
   @override
   String get settingsSeatOwnCode =>
@@ -1453,12 +1241,6 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get settingsSeatScanHint => 'Scan the QR code or follow the link';
-
-  @override
-  String get settingsPayOwnerOnly => 'Only the subscription owner can pay';
-
-  @override
-  String get settingsSeatForbidden => 'Only the subscription owner can do this';
 
   @override
   String get seatAcceptConsentTitle => 'Join this group?';
@@ -1482,99 +1264,6 @@ class AppL10nEn extends AppL10n {
   @override
   String get bootstrapFailed =>
       'Couldn’t start the session. Check your connection.';
-
-  @override
-  String get accountHubTitle => 'Account';
-
-  @override
-  String get accountHubGuestLead =>
-      'This account is on this device. Recovery code — after reinstall. Telegram — the same account.';
-
-  @override
-  String get accountHubLinkedLead =>
-      'Telegram is linked. The bot is the same account: subscription and restore.';
-
-  @override
-  String get accountHubLinkedLeadIos =>
-      'Telegram is linked. The bot is the same account and restore.';
-
-  @override
-  String get accountHubRecoveryMissing =>
-      'This phone already saved the code. After reinstall, open Telegram with the same account.';
-
-  @override
-  String get accountHubLinkTelegram => 'Telegram';
-
-  @override
-  String get accountHubLinkTelegramHint =>
-      'Subscription and restore in the bot';
-
-  @override
-  String get accountHubLinkEmail => 'Email';
-
-  @override
-  String get accountHubLinkEmailHint => 'Link with a code from email';
-
-  @override
-  String get accountHubRecovery => 'Recovery code';
-
-  @override
-  String get accountHubRecoveryHint => 'Restore access after reinstall';
-
-  @override
-  String get accountHubRecoverySaveBanner =>
-      'Save your recovery code — you’ll need it after reinstall.';
-
-  @override
-  String get accountHubRecoverySaveCta => 'Save code';
-
-  @override
-  String get accountHubPromo => 'Promo code';
-
-  @override
-  String get accountHubPromoHint => 'Redeem a code';
-
-  @override
-  String get accountHubAccessSection => 'Your access';
-
-  @override
-  String get accountHubContact => 'Contact';
-
-  @override
-  String get accountHubLoadError => 'Couldn’t load account';
-
-  @override
-  String get accountTelegramLead =>
-      'Open the bot and confirm. Come back — status updates automatically.';
-
-  @override
-  String get accountTelegramOpenBot => 'Open Telegram';
-
-  @override
-  String get accountTelegramWaiting => 'Waiting for confirmation…';
-
-  @override
-  String get accountTelegramWaitingHint =>
-      'After /start in the bot, return here.';
-
-  @override
-  String get accountTelegramStartFailed => 'Couldn’t start Telegram linking';
-
-  @override
-  String get accountTelegramVpnRequired => 'Connect first.';
-
-  @override
-  String get restoreTelegramCta => 'Restore via Telegram';
-
-  @override
-  String get restoreTelegramVpnRequired => 'Connect first.';
-
-  @override
-  String get homeTelegramRestoreCta =>
-      'Had Teremok before? Restore via Telegram';
-
-  @override
-  String get homeTelegramRestoreConnectFirst => 'Connect first.';
 
   @override
   String get accountEmailLead =>
@@ -1666,41 +1355,6 @@ class AppL10nEn extends AppL10n {
   String get vpnDisclosureDecline => 'Not now';
 
   @override
-  String accountTelegramLinkedTitle(String handle) {
-    return '$handle is linked';
-  }
-
-  @override
-  String get accountTelegramLinkedBody =>
-      'After reinstall, restore access with this Telegram. Subscription is in the bot too.';
-
-  @override
-  String get accountTelegramOwnerRestoredTitle => 'Your account is restored';
-
-  @override
-  String get accountTelegramOwnerRestoredBody =>
-      'You can manage the subscription and restore access via Telegram.';
-
-  @override
-  String get accountTelegramMemberRestoredTitle =>
-      'You’re back in the subscription';
-
-  @override
-  String get accountTelegramMemberRestoredBody =>
-      'The owner hasn’t changed. Access will refresh in the app.';
-
-  @override
-  String get accountTelegramDone => 'Done';
-
-  @override
-  String get restoreTelegramSlotRevoked =>
-      'The owner removed this device. Ask for a new invite code.';
-
-  @override
-  String get restoreTelegramSubscriptionInactive =>
-      'The subscription is not active. After it is renewed you can restore this seat.';
-
-  @override
   String get freeAdd => 'Add';
 
   @override
@@ -1759,7 +1413,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get freeSubscriptionLoadFail =>
-      'The subscription did not load. The document host did not answer.';
+      'The document did not load. The host did not answer.';
 
   @override
   String get freeSubscriptionMissing => 'That address has no document.';

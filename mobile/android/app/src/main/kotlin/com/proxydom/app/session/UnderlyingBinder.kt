@@ -1,10 +1,10 @@
-package com.teremok.connect.teremok_connect.session
+package com.proxydom.app.session
 
 import android.content.Context
 import android.net.Network
 import android.net.VpnService
-import com.teremok.connect.teremok_connect.DefaultNetworkMonitor
-import com.teremok.connect.teremok_connect.VpnUnderlyingNetworkPolicy
+import com.proxydom.app.DefaultNetworkMonitor
+import com.proxydom.app.VpnUnderlyingNetworkPolicy
 
 /**
  * Public current OS underlying for establish (ADR 014).

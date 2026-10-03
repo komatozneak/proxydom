@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:teremok_connect/features/vpn/data/vpn_session_meta.dart';
+import 'package:proxydom/features/vpn/data/vpn_session_meta.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

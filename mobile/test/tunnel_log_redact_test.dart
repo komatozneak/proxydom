@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/core/diagnostics/tunnel_log_redact.dart';
+import 'package:proxydom/core/diagnostics/tunnel_log_redact.dart';
 
 void main() {
   test('export masks node addresses and keeps the document host', () {

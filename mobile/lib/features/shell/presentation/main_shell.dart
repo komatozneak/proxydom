@@ -118,8 +118,6 @@ class _MainShellState extends ConsumerState<MainShell> {
     final l = AppL10n.of(context);
     final theme = Theme.of(context);
     final selected = widget.navigationShell.currentIndex;
-    final elevated = theme.colorScheme.surfaceContainerHighest;
-    final line = theme.colorScheme.outline;
     final paper = theme.brightness == Brightness.dark
         ? AppBrand.paperDark
         : AppBrand.paperLight;
@@ -136,11 +134,9 @@ class _MainShellState extends ConsumerState<MainShell> {
                 Expanded(
                   child: _SideNavGlyph(
                     icon: AppIcons.mapPin,
-                    label: freeKeyClient
-                        ? (Localizations.localeOf(context).languageCode == 'ru'
-                            ? 'Сервера'
-                            : 'Servers')
-                        : l.navLocations,
+                    label: Localizations.localeOf(context).languageCode == 'ru'
+                        ? 'Сервера'
+                        : 'Servers',
                     selected: selected == MainShell.locationsIndex,
                     onTap: () => _onTap(MainShell.locationsIndex),
                   ),
@@ -163,35 +159,25 @@ class _MainShellState extends ConsumerState<MainShell> {
     return Stack(
       children: [
         Scaffold(
-          backgroundColor: freeKeyClient ? paper : theme.colorScheme.surface,
-          body: freeKeyClient
-              ? _PaperStatusScrim(
-                  dark: theme.brightness == Brightness.dark,
-                  child: NotebookPaper(child: widget.navigationShell),
-                )
-              : widget.navigationShell,
-          bottomNavigationBar: freeKeyClient
-              ? NotebookPaper(
-                  emphasized: true,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      border: Border(
-                        top: BorderSide(
-                          color: AppBrand.paperMargin.withValues(alpha: 0.72),
-                          width: _navBarRuleWidth,
-                        ),
-                      ),
-                    ),
-                    child: bar,
+          backgroundColor: paper,
+          body: _PaperStatusScrim(
+            dark: theme.brightness == Brightness.dark,
+            child: NotebookPaper(child: widget.navigationShell),
+          ),
+          bottomNavigationBar: NotebookPaper(
+            emphasized: true,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(
+                    color: AppBrand.paperMargin.withValues(alpha: 0.72),
+                    width: _navBarRuleWidth,
                   ),
-                )
-              : DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: elevated,
-                    border: Border(top: BorderSide(color: line)),
-                  ),
-                  child: bar,
                 ),
+              ),
+              child: bar,
+            ),
+          ),
         ),
         Positioned(
           left: 0,
@@ -368,7 +354,7 @@ class _CenterNavMark extends StatelessWidget {
                 child: OverflowBox(
                   maxWidth: house,
                   maxHeight: house,
-                  child: TeremokNavIcon(
+                  child: ProxyDomNavIcon(
                     selected: selected,
                     size: house,
                   ),

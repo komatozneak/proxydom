@@ -1,8 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/features/vpn/data/vpn_session_inputs.dart';
-import 'package:teremok_connect/features/vpn/data/xray_config_builder.dart';
+import 'package:proxydom/features/vpn/data/vpn_session_inputs.dart';
+import 'package:proxydom/features/vpn/data/xray_config_builder.dart';
 
 void main() {
   const testCreds = VlessRealityCreds(

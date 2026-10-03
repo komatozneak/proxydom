@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -7,6 +8,12 @@
 // Share-line to sing-box config for ADR 029. No Win32 types in this header.
 
 constexpr std::uint32_t kFrameMaxBody = 65536;
+
+// Upper bound on `direct_domains` the broker keeps. The sites screen ships 120
+// default-on suffixes, so a smaller cap silently dropped most of them and the
+// dropped rows (every `steam*` name, `valvesoftware.com`) stayed on the proxy.
+// 512 names stay far below kFrameMaxBody and keep every preset plus headroom.
+constexpr std::size_t kMaxDirectDomains = 512;
 
 struct ShareLine {
   std::string scheme;
@@ -34,6 +41,15 @@ struct ClientCommand {
   int protocol_version = 0;
   std::int64_t generation = 0;
   std::vector<std::string> direct_domains;
+  // True when `direct_domains` overflowed kMaxDirectDomains. The service log
+  // records it: a silently truncated list looks like a routing bug.
+  bool direct_domains_truncated = false;
+  // Hosts that must stay on the proxy even when UDP bypass is on. Without them
+  // the UDP rule would drag a force-proxied site out through the tunnel.
+  std::vector<std::string> force_proxy_domains;
+  // Route UDP to the physical NIC. Game traffic is UDP to bare IPs, which no
+  // domain rule can match, and the addresses change.
+  bool udp_direct = false;
 };
 
 std::string encode_frame(const std::string& json);
@@ -46,9 +62,16 @@ bool own_adapter_name(const std::wstring& name);
 bool domain_allowed(const std::string& host);
 
 // [server_ip] is the IPv4 pinned before the adapter comes up. Empty rejects.
+// [force_proxy_domains] are matched before the UDP rule, [udp_direct] last.
+// [api_port] and [api_secret] expose the loopback clash api the broker reads its
+// routing counters from. Port 0 leaves it off entirely.
 std::string build_singbox_config(const ShareLine& line,
                                  const std::string& server_ip,
-                                 const std::vector<std::string>& domains);
+                                 const std::vector<std::string>& domains,
+                                 const std::vector<std::string>& force_proxy_domains,
+                                 bool udp_direct,
+                                 unsigned short api_port,
+                                 const std::string& api_secret);
 
 // First prove the key through a loopback SOCKS endpoint. This config has no
 // TUN inbound, auto_route, DNS hijack, or other system-network mutation.
@@ -69,6 +92,11 @@ std::string state_event_v2(std::int64_t generation,
                            bool cleanup_verified);
 // Gate 2 finished. Connected is still false until the controller proves ingress.
 std::string tun_ready_event(std::int64_t generation);
+
+// One HTTP 204 per service generation. Idle resets [last_proved] to 0.
+inline bool prove_generation_due(std::int64_t last_proved, std::int64_t generation) {
+  return generation > 0 && generation > last_proved;
+}
 
 std::string ack_event(const std::string& command,
                       bool accepted,

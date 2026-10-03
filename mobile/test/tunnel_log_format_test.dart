@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/core/diagnostics/tunnel_log_format.dart';
+import 'package:proxydom/core/diagnostics/tunnel_log_format.dart';
 
 void main() {
   test('iso and epoch-millis lines share one clock', () {

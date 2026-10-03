@@ -145,18 +145,24 @@ bool extract_int_field(const std::string& json, const std::string& key, std::int
   return true;
 }
 
-bool extract_domains(const std::string& json, std::vector<std::string>& domains, std::string& error) {
-  const std::string pattern = "\"direct_domains\"";
+bool extract_string_array(const std::string& json,
+                          const std::string& key,
+                          bool (*allowed)(const std::string&),
+                          std::size_t cap,
+                          std::vector<std::string>& out,
+                          bool& truncated,
+                          std::string& error) {
+  const std::string pattern = "\"" + key + "\"";
   const auto at = json.find(pattern);
   if (at == std::string::npos) return true;
   auto bracket = json.find('[', at + pattern.size());
   if (bracket == std::string::npos) {
-    error = "direct_domains";
+    error = key;
     return false;
   }
   auto end = json.find(']', bracket);
   if (end == std::string::npos) {
-    error = "direct_domains";
+    error = key;
     return false;
   }
   std::string body = json.substr(bracket + 1, end - bracket - 1);
@@ -165,7 +171,7 @@ bool extract_domains(const std::string& json, std::vector<std::string>& domains,
     while (i < body.size() && (body[i] == ' ' || body[i] == ',' || body[i] == '\n')) ++i;
     if (i >= body.size()) break;
     if (body[i] != '"') {
-      error = "direct_domains";
+      error = key;
       return false;
     }
     ++i;
@@ -175,15 +181,29 @@ bool extract_domains(const std::string& json, std::vector<std::string>& domains,
       ++i;
     }
     if (i >= body.size()) {
-      error = "direct_domains";
+      error = key;
       return false;
     }
     ++i;
-    if (!domain_allowed(host)) continue;
-    if (domains.size() >= 64) continue;
-    domains.push_back(host);
+    if (!allowed(host)) continue;
+    if (out.size() >= cap) {
+      truncated = true;
+      continue;
+    }
+    out.push_back(host);
   }
   return true;
+}
+
+bool extract_domains(const std::string& json, std::vector<std::string>& domains, bool& truncated, std::string& error) {
+  return extract_string_array(json, "direct_domains", domain_allowed, kMaxDirectDomains,
+                              domains, truncated, error);
+}
+
+bool extract_force_proxy(const std::string& json, std::vector<std::string>& domains, std::string& error) {
+  bool truncated = false;
+  return extract_string_array(json, "force_proxy_domains", domain_allowed, kMaxDirectDomains,
+                              domains, truncated, error);
 }
 
 std::string query_value(const std::string& query, const std::string& key) {
@@ -253,6 +273,10 @@ bool parse_command(const std::string& json, ClientCommand& out, std::string& err
     error = "config";
     return false;
   }
+  // [out] may be a reused struct. Without this reset the exclusion list of a
+  // previous command leaks into the next one.
+  out.direct_domains.clear();
+  out.direct_domains_truncated = false;
   bool present = false;
   if (!extract_string_field(json, "command", out.command, present) || !present) {
     error = "command";
@@ -278,7 +302,16 @@ bool parse_command(const std::string& json, ClientCommand& out, std::string& err
     return false;
   }
   if (!present) out.message.clear();
-  if (!extract_domains(json, out.direct_domains, error)) return false;
+  if (!extract_domains(json, out.direct_domains, out.direct_domains_truncated, error)) return false;
+  if (!extract_force_proxy(json, out.force_proxy_domains, error)) return false;
+  // The window sends 0/1; anything else is not a request for UDP bypass.
+  std::int64_t udp_direct = 0;
+  bool has_udp_direct = false;
+  if (!extract_int_field(json, "udp_direct", udp_direct, has_udp_direct)) {
+    error = "udp_direct";
+    return false;
+  }
+  out.udp_direct = has_udp_direct && udp_direct != 0;
   return true;
 }
 
@@ -564,7 +597,11 @@ std::string build_singbox_probe_config(const ShareLine& line,
 
 std::string build_singbox_config(const ShareLine& line,
                                  const std::string& server_ip,
-                                 const std::vector<std::string>& domains) {
+                                 const std::vector<std::string>& domains,
+                                 const std::vector<std::string>& force_proxy_domains,
+                                 bool udp_direct,
+                                 unsigned short api_port,
+                                 const std::string& api_secret) {
   const std::string outbound = proxy_outbound(line, server_ip);
   if (outbound.empty()) return {};
 
@@ -572,9 +609,21 @@ std::string build_singbox_config(const ShareLine& line,
   rules << "{\"action\":\"sniff\"},{\"protocol\":\"dns\",\"action\":\"hijack-dns\"},"
            "{\"ip_cidr\":[\"10.0.0.0/8\",\"172.16.0.0/12\",\"192.168.0.0/16\",\"127.0.0.0/8\","
            "\"fc00::/7\",\"fe80::/10\"],\"outbound\":\"direct\"}";
+  // sing-box takes the first matching rule, so force-proxy rows must sit above
+  // the UDP bypass — otherwise QUIC to a blocked CDN leaves the tunnel.
+  for (const auto& domain : force_proxy_domains) {
+    if (!domain_allowed(domain)) continue;
+    rules << ",{\"domain_suffix\":[\"" << json_escape(domain) << "\"],\"outbound\":\"proxy\"}";
+  }
   for (const auto& domain : domains) {
     if (!domain_allowed(domain)) continue;
     rules << ",{\"domain_suffix\":[\"" << json_escape(domain) << "\"],\"outbound\":\"direct\"}";
+  }
+  // Game traffic is UDP to bare IPs with no name to match, and those addresses
+  // change. This rule is what lets a game bypass the tunnel without a list.
+  // It governs TUN traffic only; the engine's own proxy socket is not routed.
+  if (udp_direct) {
+    rules << ",{\"network\":\"udp\",\"outbound\":\"direct\"}";
   }
 
   std::ostringstream config;
@@ -587,7 +636,15 @@ std::string build_singbox_config(const ShareLine& line,
          << "\"auto_route\":false,\"strict_route\":false,"
          << "\"dns_mode\":\"hijack\",\"dns_address\":[\"198.18.0.2\"]}],"
          << "\"outbounds\":[" << outbound << ",{\"type\":\"direct\",\"tag\":\"direct\"}],"
-         << "\"route\":{\"auto_detect_interface\":true,\"final\":\"proxy\",\"rules\":[" << rules.str() << "]}"
+         << "\"route\":{\"auto_detect_interface\":true,\"final\":\"proxy\",\"rules\":[" << rules.str() << "]},"
+         << "\"experimental\":{";
+  if (api_port != 0) {
+    config << "\"clash_api\":{\"external_controller\":\"127.0.0.1:" << api_port << "\",\"secret\":\""
+           << json_escape(api_secret) << "\"}";
+  } else {
+    config << "\"cache_file\":{\"enabled\":false}";
+  }
+  config << "}"
          << "}";
   return config.str();
 }

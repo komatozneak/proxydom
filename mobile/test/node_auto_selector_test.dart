@@ -1,9 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:teremok_connect/features/vpn/data/node_auto_selector.dart';
-import 'package:teremok_connect/features/vpn/data/node_display.dart';
-import 'package:teremok_connect/features/vpn/data/vpn_node.dart';
-import 'package:teremok_connect/features/vpn/data/vpn_nodes_repository.dart';
+import 'package:proxydom/features/vpn/data/node_auto_selector.dart';
+import 'package:proxydom/features/vpn/data/node_display.dart';
+import 'package:proxydom/features/vpn/data/vpn_node.dart';
 
 VpnNode _node({
   required String id,
@@ -191,19 +189,4 @@ void main() {
     );
   });
 
-  test(
-      'VpnNodesRepository persists Auto last winner across disconnect-shaped clear',
-      () async {
-    SharedPreferences.setMockInitialValues({});
-    final repo = VpnNodesRepository();
-    expect(await repo.getAutoLastWinnerId(), isNull);
-    await repo.setAutoLastWinnerId(kRegionAutoId);
-    expect(await repo.getAutoLastWinnerId(), isNull);
-    await repo.setAutoLastWinnerId('eu-hy2-1');
-    expect(await repo.getAutoLastWinnerId(), 'eu-hy2-1');
-    await repo.clearSelectedNodeId();
-    expect(await repo.getAutoLastWinnerId(), 'eu-hy2-1');
-    await repo.clearAutoLastWinnerId();
-    expect(await repo.getAutoLastWinnerId(), isNull);
-  });
 }

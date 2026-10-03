@@ -1,12 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/features/settings/data/qs_tile_prefs.dart';
+import 'package:proxydom/features/settings/data/qs_tile_prefs.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  const channel = MethodChannel('teremok/vpn');
+  const channel = MethodChannel('proxydom/vpn');
 
   tearDown(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger

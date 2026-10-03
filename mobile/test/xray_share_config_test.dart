@@ -1,8 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/features/vpn/data/share_link_parser.dart';
-import 'package:teremok_connect/features/vpn/data/xray_share_config.dart';
+import 'package:proxydom/features/vpn/data/share_link_parser.dart';
+import 'package:proxydom/features/vpn/data/xray_share_config.dart';
 
 void main() {
   test('vless reality config keeps the id and does not describe hy2', () {

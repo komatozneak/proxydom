@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/features/vpn/data/route_document.dart';
-import 'package:teremok_connect/features/vpn/data/share_link_parser.dart';
+import 'package:proxydom/features/vpn/data/route_document.dart';
+import 'package:proxydom/features/vpn/data/share_link_parser.dart';
 
 void main() {
   test('200 with a share line replaces the document', () {

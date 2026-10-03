@@ -8,7 +8,7 @@
 
 # VpnService (Шаг 11)
 -keep class android.net.VpnService { *; }
--keep class com.teremok.connect.teremok_connect.** { *; }
+-keep class com.proxydom.app.** { *; }
 
 # Hy2 gomobile AAR
 -keep class hy2bind.** { *; }

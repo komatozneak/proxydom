@@ -1,4 +1,4 @@
-package com.teremok.connect.teremok_connect.session
+package com.proxydom.app.session
 
 import android.os.Handler
 import android.os.Looper
@@ -7,7 +7,7 @@ import io.flutter.plugin.common.EventChannel
 import java.util.concurrent.atomic.AtomicReference
 
 /**
- * Broadcasts [SessionSnapshot] JSON to Flutter EventChannel `teremok/vpn/session`.
+ * Broadcasts [SessionSnapshot] JSON to Flutter EventChannel `proxydom/vpn/session`.
  * Also mirrors legacy status string via optional [onLegacyStatus].
  */
 object SessionSnapshotBroadcaster {

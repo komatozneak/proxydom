@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/core/app_locale.dart';
-import 'package:teremok_connect/features/vpn/data/vpn_node.dart';
-import 'package:teremok_connect/features/vpn/data/vpn_service_config.dart';
+import 'package:proxydom/core/app_locale.dart';
+import 'package:proxydom/features/vpn/data/vpn_node.dart';
+import 'package:proxydom/features/vpn/data/vpn_service_config.dart';
 
 void main() {
   test('imported share schemes keep their own label', () {

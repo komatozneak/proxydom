@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http_mock_adapter/http_mock_adapter.dart';
-import 'package:teremok_connect/core/updates/update_check_service.dart';
+import 'package:proxydom/core/updates/update_check_service.dart';
 
 void main() {
   group('UpdateCheckService.shouldPromptUpdate', () {

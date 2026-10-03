@@ -51,7 +51,7 @@ class ShareCatalog {
 
   /// Last `subscription-userinfo` snapshot from this document.
   ///
-  /// A display hint for the whole document, not a Teremok account balance.
+  /// A display hint for the whole document, not an account balance.
   /// A failed refresh keeps it. The document drop is what clears it.
   final String? trafficMeta;
   final int? updateIntervalHours;
@@ -144,7 +144,7 @@ class ShareRefreshOutcome {
 
 const _keep = Object();
 
-/// Local catalogs. Not an account and not a Teremok entitlement.
+/// Local catalogs. Not an account and not an entitlement.
 class Hy2ImportStore {
   Hy2ImportStore._();
   static final Hy2ImportStore instance = Hy2ImportStore._();
@@ -979,7 +979,11 @@ String _titleFor(String? explicit, List<ParsedShareLink> links) {
   return links.first.name;
 }
 
-String _newId() => DateTime.now().microsecondsSinceEpoch.toString();
+int _idSeq = 0;
+
+/// Clock resolution on Windows can repeat a microsecond, and two catalogs
+/// with one id are deleted together.
+String _newId() => '${DateTime.now().microsecondsSinceEpoch}-${_idSeq++}';
 
 int _lineCount(List<ShareCatalog> catalogs) {
   var count = 0;

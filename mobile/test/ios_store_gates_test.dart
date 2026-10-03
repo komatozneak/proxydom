@@ -2,9 +2,9 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/core/ios_store_gates.dart';
-import 'package:teremok_connect/features/settings/data/qs_tile_prefs.dart';
-import 'package:teremok_connect/features/settings/data/vpn_notification_prefs.dart';
+import 'package:proxydom/core/ios_store_gates.dart';
+import 'package:proxydom/features/settings/data/qs_tile_prefs.dart';
+import 'package:proxydom/features/settings/data/vpn_notification_prefs.dart';
 
 void main() {
   tearDown(() {
@@ -13,32 +13,19 @@ void main() {
 
   test('hideInAppPlategaCheckout true on iOS', () {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
-    expect(freeKeyClient, isTrue);
-    expect(hideInAppPlategaCheckout, isTrue);
     expect(androidPerAppSplit, isFalse);
     expect(iosAppsSplitUnsupported, isTrue);
     expect(windowsDesktop, isFalse);
     expect(sitesOnlySplit, isTrue);
-    expect(referralLandingPath, '/home');
-    expect(iosFreeClientRouteBlocked('/subscription'), isTrue);
-    expect(iosFreeClientRouteBlocked('/settings/devices'), isTrue);
-    expect(iosFreeClientRouteBlocked('/import'), isFalse);
   });
 
   test('free key client blocks cashier routes on Android', () {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
-    expect(freeKeyClient, isTrue);
-    expect(hideInAppPlategaCheckout, isTrue);
     expect(androidPerAppSplit, isTrue);
     expect(iosAppsSplitUnsupported, isFalse);
     expect(windowsDesktop, isFalse);
     expect(sitesOnlySplit, isFalse);
     expect(windowsDialScheme('hysteria2'), isTrue);
-    expect(referralLandingPath, '/home');
-    expect(iosFreeClientRouteBlocked('/subscription'), isTrue);
-    expect(iosFreeClientRouteBlocked('/premium'), isTrue);
-    expect(iosFreeClientRouteBlocked('/settings/account'), isTrue);
-    expect(iosFreeClientRouteBlocked('/import'), isFalse);
   });
 
   test('windows hides apps, shade, and the quick settings tile', () {

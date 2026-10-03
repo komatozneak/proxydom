@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/services.dart';
 
-import 'package:teremok_connect/core/device_label.dart';
+import 'package:proxydom/core/device_label.dart';
 
 void main() {
   test('Pixel uses model, not Google manufacturer', () {
@@ -54,7 +54,7 @@ void main() {
 
   test('readOsDeviceLabel maps native payload', () async {
     TestWidgetsFlutterBinding.ensureInitialized();
-    const channel = MethodChannel('teremok/vpn');
+    const channel = MethodChannel('proxydom/vpn');
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
       if (call.method == 'getDeviceLabel') {

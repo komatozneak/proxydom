@@ -50,7 +50,7 @@ val requiredMinSdk = 26
 val productionApplicationId = "com.proxy.dom"
 
 android {
-    namespace = "com.teremok.connect.teremok_connect"
+    namespace = "com.proxydom.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 

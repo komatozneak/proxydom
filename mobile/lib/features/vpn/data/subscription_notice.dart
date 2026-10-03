@@ -9,7 +9,7 @@ const subscriptionAnnounceLimit = 200;
 /// announcement is drawn. Markers in the source text ask for the same pieces:
 ///
 /// - `{{frame}}...{{/frame}}` — rounded border
-/// - `{{plane}}` or `{{plane:https://t.me/name}}` — paper plane
+/// - `{{plane}}` or `{{plane:<address>}}` — paper plane
 class SubscriptionNotice {
   const SubscriptionNotice({
     this.text,

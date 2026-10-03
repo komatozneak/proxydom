@@ -154,7 +154,7 @@ class _SignalNestHeroState extends State<SignalNestHero>
 
     return Semantics(
       button: true,
-      label: 'Teremok connect',
+      label: 'Proxy Dom',
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: _onTap,

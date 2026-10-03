@@ -1,4 +1,4 @@
-package com.teremok.connect.teremok_connect
+package com.proxydom.app
 
 import java.time.Instant
 import java.time.ZoneOffset
