@@ -145,7 +145,7 @@ bool extract_int_field(const std::string& json, const std::string& key, std::int
   return true;
 }
 
-bool extract_domains(const std::string& json, std::vector<std::string>& domains, std::string& error) {
+bool extract_domains(const std::string& json, std::vector<std::string>& domains, bool& truncated, std::string& error) {
   const std::string pattern = "\"direct_domains\"";
   const auto at = json.find(pattern);
   if (at == std::string::npos) return true;
@@ -180,7 +180,10 @@ bool extract_domains(const std::string& json, std::vector<std::string>& domains,
     }
     ++i;
     if (!domain_allowed(host)) continue;
-    if (domains.size() >= 64) continue;
+    if (domains.size() >= kMaxDirectDomains) {
+      truncated = true;
+      continue;
+    }
     domains.push_back(host);
   }
   return true;
@@ -253,6 +256,10 @@ bool parse_command(const std::string& json, ClientCommand& out, std::string& err
     error = "config";
     return false;
   }
+  // [out] may be a reused struct. Without this reset the exclusion list of a
+  // previous command leaks into the next one.
+  out.direct_domains.clear();
+  out.direct_domains_truncated = false;
   bool present = false;
   if (!extract_string_field(json, "command", out.command, present) || !present) {
     error = "command";
@@ -278,7 +285,7 @@ bool parse_command(const std::string& json, ClientCommand& out, std::string& err
     return false;
   }
   if (!present) out.message.clear();
-  if (!extract_domains(json, out.direct_domains, error)) return false;
+  if (!extract_domains(json, out.direct_domains, out.direct_domains_truncated, error)) return false;
   return true;
 }
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -7,6 +8,12 @@
 // Share-line to sing-box config for ADR 029. No Win32 types in this header.
 
 constexpr std::uint32_t kFrameMaxBody = 65536;
+
+// Upper bound on `direct_domains` the broker keeps. The sites screen ships 120
+// default-on suffixes, so a smaller cap silently dropped most of them and the
+// dropped rows (every `steam*` name, `valvesoftware.com`) stayed on the proxy.
+// 512 names stay far below kFrameMaxBody and keep every preset plus headroom.
+constexpr std::size_t kMaxDirectDomains = 512;
 
 struct ShareLine {
   std::string scheme;
@@ -34,6 +41,9 @@ struct ClientCommand {
   int protocol_version = 0;
   std::int64_t generation = 0;
   std::vector<std::string> direct_domains;
+  // True when `direct_domains` overflowed kMaxDirectDomains. The service log
+  // records it: a silently truncated list looks like a routing bug.
+  bool direct_domains_truncated = false;
 };
 
 std::string encode_frame(const std::string& json);

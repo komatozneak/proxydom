@@ -60,7 +60,7 @@ int main() {
   std::string long_connect =
       "{\"command\":\"connect\",\"protocol_version\":3,"
       "\"uri\":\"hy2://secret@cdn.example:443\",\"direct_domains\":[";
-  for (int i = 0; i < 70; ++i) {
+  for (std::size_t i = 0; i < 70; ++i) {
     if (i != 0) long_connect += ',';
     long_connect += "\"d" + std::to_string(i) + ".example\"";
   }
@@ -68,8 +68,24 @@ int main() {
   error.clear();
   expect(parse_command(long_connect, command, error), "long connect is still a command");
   expect(command.uri == "hy2://secret@cdn.example:443", "long connect keeps the share line");
-  expect(command.direct_domains.size() == 64, "direct names stop at 64");
+  // The sites screen ships 120 default-on suffixes. A 64 cap dropped the tail,
+  // which is where every steam* name sits, so Steam stayed on the proxy.
+  expect(command.direct_domains.size() == 70, "70 exclusion names all survive");
+  expect(!command.direct_domains_truncated, "70 names do not trip the cap");
   expect(encode_frame(long_connect).size() == 4 + long_connect.size(), "long connect still frames");
+
+  std::string over_connect =
+      "{\"command\":\"connect\",\"protocol_version\":3,"
+      "\"uri\":\"hy2://secret@cdn.example:443\",\"direct_domains\":[";
+  for (std::size_t i = 0; i < kMaxDirectDomains + 8; ++i) {
+    if (i != 0) over_connect += ',';
+    over_connect += "\"o" + std::to_string(i) + ".example\"";
+  }
+  over_connect += "]}";
+  error.clear();
+  expect(parse_command(over_connect, command, error), "over-cap connect is still a command");
+  expect(command.direct_domains.size() == kMaxDirectDomains, "direct names stop at the cap");
+  expect(command.direct_domains_truncated, "over-cap list reports truncation");
 
   ShareLine line;
   error.clear();

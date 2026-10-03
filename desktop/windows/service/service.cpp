@@ -342,6 +342,11 @@ struct App {
     ConnectRequest request;
     request.uri = command.uri;
     request.direct_domains = command.direct_domains;
+    if (command.direct_domains_truncated) {
+      // A dropped exclusion row routes its site through the proxy and looks
+      // like a routing bug. Say so in the log the app exports.
+      log.write(begin.snap.generation, "connect", "direct_domains_truncated", 0);
+    }
     post([this, request] { supervisor.run_connect(request, cancel); });
     ack("connect", true, begin.snap.generation, {}, {});
     return true;
