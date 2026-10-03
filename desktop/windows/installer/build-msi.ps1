@@ -6,6 +6,24 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+# A native tool writing to stderr is not a failure. Under ErrorActionPreference
+# "Stop" PowerShell promotes every CMake or WiX warning to a terminating error
+# and the build dies on a harmless warning. Native calls are gated on
+# $LASTEXITCODE instead; cmdlet failures keep the strict behaviour above.
+function Invoke-Native {
+    param([scriptblock]$Command, [string]$What)
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        & $Command
+        $code = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previous
+    }
+    if ($code -ne 0) { throw "$What failed (exit $code)." }
+}
+
 $Installer = $PSScriptRoot
 $WindowsRoot = Split-Path $Installer -Parent
 $Repo = Split-Path (Split-Path $WindowsRoot -Parent) -Parent
@@ -82,8 +100,7 @@ if (Test-Path (Join-Path $build "CMakeCache.txt")) {
         Remove-Item -LiteralPath $build -Recurse -Force
     }
 }
-cmd /c "call `"$vcvars`" >nul && `"$cmake`" -S `"$Service`" -B `"$build`" -DCMAKE_BUILD_TYPE=Release && `"$cmake`" --build `"$build`" --config Release --target ProxyDomBroker ProxyDomCtl"
-if ($LASTEXITCODE -ne 0) { throw "CMake build failed." }
+Invoke-Native { cmd /c "call `"$vcvars`" >nul && `"$cmake`" -S `"$Service`" -B `"$build`" -DCMAKE_BUILD_TYPE=Release && `"$cmake`" --build `"$build`" --config Release --target ProxyDomBroker ProxyDomCtl" } "CMake build"
 $bin = Join-Path $build "Release"
 if (-not (Test-Path (Join-Path $bin "ProxyDomBroker.exe"))) { $bin = $build }
 Copy-Item (Join-Path $bin "ProxyDomBroker.exe") (Join-Path $Payload "ProxyDomBroker.exe") -Force
@@ -93,8 +110,7 @@ if (-not (Test-Path (Join-Path $FlutterRelease "proxy_dom.exe"))) {
     Write-Host "Building Flutter window"
     Push-Location $Mobile
     try {
-        flutter build windows --release
-        if ($LASTEXITCODE -ne 0) { throw "flutter build windows failed." }
+        Invoke-Native { flutter build windows --release } "flutter build windows"
     } finally {
         Pop-Location
     }
@@ -126,6 +142,5 @@ $wixArgs = @(
 )
 if ($Quiet) { }
 Write-Host "Building MSI"
-& wix @wixArgs
-if ($LASTEXITCODE -ne 0) { throw "wix build failed." }
+Invoke-Native { & wix @wixArgs } "wix build"
 Write-Host "MSI: $msi"
