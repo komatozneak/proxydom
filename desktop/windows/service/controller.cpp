@@ -60,8 +60,14 @@ bool server_verdict(HANDLE pipe, ServerVerdict& out) {
   return true;
 }
 
+// Ten seconds, in tenths. The broker sets SERVICE_RUNNING and only then creates
+// the pipe, so a controller launched in the same moment as the service has to
+// wait for the pipe to appear.
+constexpr int kOpenAttempts = 100;
+constexpr int kOpenBackoffMs = 100;
+
 HANDLE open_broker() {
-  for (int attempt = 0; attempt < 30; ++attempt) {
+  for (int attempt = 0; attempt < kOpenAttempts; ++attempt) {
     HANDLE pipe =
         CreateFileW(kPipeName, FILE_READ_DATA | FILE_WRITE_DATA | SYNCHRONIZE, 0, nullptr,
                     OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
@@ -76,12 +82,16 @@ HANDLE open_broker() {
         SetLastError(ERROR_SERVICE_NOT_ACTIVE);
         return INVALID_HANDLE_VALUE;
       }
-      Sleep(100);
+      Sleep(kOpenBackoffMs);
       continue;
     }
     const DWORD error = GetLastError();
     if (error != ERROR_PIPE_BUSY && error != ERROR_FILE_NOT_FOUND && error != ERROR_SEM_TIMEOUT) break;
-    WaitNamedPipeW(kPipeName, 100);
+    // WaitNamedPipe returns at once when the pipe is not there yet, so on its own
+    // it turns thirty attempts into a few milliseconds and gives up long before
+    // a starting service has published the name. Back off explicitly.
+    if (error == ERROR_PIPE_BUSY) WaitNamedPipeW(kPipeName, kOpenBackoffMs);
+    else Sleep(kOpenBackoffMs);
   }
   return INVALID_HANDLE_VALUE;
 }
