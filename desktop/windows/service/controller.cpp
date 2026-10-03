@@ -22,7 +22,23 @@ namespace {
 const wchar_t* kPipeName = L"\\\\.\\pipe\\ProxyDomBrokerV3";
 const wchar_t* kServiceName = L"ProxyDomBroker";
 
-bool trusted_server(HANDLE pipe) {
+// Why the pipe's server may not be usable yet.
+//
+// Only Transient is worth waiting for. The broker sets SERVICE_RUNNING before
+// it creates the pipe, so a pipe that answers while our own service is still
+// START_PENDING is the broker arriving, not something else wearing its name.
+enum class ServerVerdict { Trusted, Transient, Foreign };
+
+ServerVerdict verdict_for(DWORD service_state, DWORD service_pid, DWORD pipe_pid) {
+  // A service pid of zero means the state could not be read. That is not the
+  // same as evidence that somebody else holds the name.
+  if (service_pid == 0) return ServerVerdict::Transient;
+  if (service_pid != pipe_pid) return ServerVerdict::Foreign;
+  if (service_state != SERVICE_RUNNING) return ServerVerdict::Transient;
+  return ServerVerdict::Trusted;
+}
+
+bool server_verdict(HANDLE pipe, ServerVerdict& out) {
   ULONG pid = 0;
   if (!GetNamedPipeServerProcessId(pipe, &pid) || pid == 0) return false;
   SC_HANDLE scm = OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT);
@@ -39,23 +55,43 @@ bool trusted_server(HANDLE pipe) {
                            sizeof(info), &needed) == TRUE;
   CloseServiceHandle(service);
   CloseServiceHandle(scm);
-  return ok && info.dwCurrentState == SERVICE_RUNNING && info.dwProcessId == pid;
+  if (!ok) return false;
+  out = verdict_for(info.dwCurrentState, info.dwProcessId, pid);
+  return true;
 }
 
+// Ten seconds, in tenths. The broker sets SERVICE_RUNNING and only then creates
+// the pipe, so a controller launched in the same moment as the service has to
+// wait for the pipe to appear.
+constexpr int kOpenAttempts = 100;
+constexpr int kOpenBackoffMs = 100;
+
 HANDLE open_broker() {
-  for (int attempt = 0; attempt < 30; ++attempt) {
+  for (int attempt = 0; attempt < kOpenAttempts; ++attempt) {
     HANDLE pipe =
         CreateFileW(kPipeName, FILE_READ_DATA | FILE_WRITE_DATA | SYNCHRONIZE, 0, nullptr,
                     OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (pipe != INVALID_HANDLE_VALUE) {
-      if (trusted_server(pipe)) return pipe;
+      ServerVerdict verdict = ServerVerdict::Foreign;
+      if (server_verdict(pipe, verdict) && verdict == ServerVerdict::Trusted) return pipe;
       CloseHandle(pipe);
-      SetLastError(ERROR_SERVICE_NOT_ACTIVE);
-      return INVALID_HANDLE_VALUE;
+      // Waiting is only right when the name belongs to our broker and it has not
+      // finished starting. For anything else, waiting would be the wrong answer
+      // to "this pipe is not the broker".
+      if (verdict != ServerVerdict::Transient) {
+        SetLastError(ERROR_SERVICE_NOT_ACTIVE);
+        return INVALID_HANDLE_VALUE;
+      }
+      Sleep(kOpenBackoffMs);
+      continue;
     }
     const DWORD error = GetLastError();
     if (error != ERROR_PIPE_BUSY && error != ERROR_FILE_NOT_FOUND && error != ERROR_SEM_TIMEOUT) break;
-    WaitNamedPipeW(kPipeName, 100);
+    // WaitNamedPipe returns at once when the pipe is not there yet, so on its own
+    // it turns thirty attempts into a few milliseconds and gives up long before
+    // a starting service has published the name. Back off explicitly.
+    if (error == ERROR_PIPE_BUSY) WaitNamedPipeW(kPipeName, kOpenBackoffMs);
+    else Sleep(kOpenBackoffMs);
   }
   return INVALID_HANDLE_VALUE;
 }

@@ -353,6 +353,19 @@ bool decode_ledger(const std::string& text, Ledger& ledger) {
   return true;
 }
 
+namespace {
+
+// The steady clock, behind a seam: sample windows and lulls are time-based, so
+// a test has to be able to place them by hand.
+std::uint64_t now_ms() {
+  return static_cast<std::uint64_t>(
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::steady_clock::now().time_since_epoch())
+          .count());
+}
+
+}  // namespace
+
 TunnelSupervisor::TunnelSupervisor(RouteTable& routes,
                                    EngineHost& engine,
                                    NameResolver& names,
@@ -369,6 +382,7 @@ TunnelSupervisor::TunnelSupervisor(RouteTable& routes,
       sleeper_(sleeper) {
   published_.phase = TunnelPhase::Idle;
   published_.cleanup_verified = true;
+  clock_ = now_ms;
 }
 
 void TunnelSupervisor::set_observer(std::function<void(const TunnelSnapshot&)> observer) {
@@ -389,21 +403,16 @@ constexpr std::uint64_t kFlowNoticeBytes = 64u * 1024u;
 constexpr std::uint64_t kFlowSampleMs = 5000;
 constexpr std::uint64_t kFlowSummaryMs = 15000;
 
-std::uint64_t now_ms() {
-  return static_cast<std::uint64_t>(
-      std::chrono::duration_cast<std::chrono::milliseconds>(
-          std::chrono::steady_clock::now().time_since_epoch())
-          .count());
-}
-
 }  // namespace
 
 void TunnelSupervisor::sample_flows() {
   if (!flows_) return;
-  const std::uint64_t stamp = now_ms();
+  const std::uint64_t stamp = clock_();
   // The service loop ticks about every two seconds; polling on its own clock
   // keeps the sample rate independent of how often the pipe wakes us.
   if (stamp - flow_last_sample_ms_ < kFlowSampleMs) return;
+  const std::uint64_t window =
+      flow_last_sample_ms_ == 0 ? kFlowSampleMs : stamp - flow_last_sample_ms_;
   flow_last_sample_ms_ = stamp;
 
   FlowSample sample;
@@ -417,14 +426,79 @@ void TunnelSupervisor::sample_flows() {
   }
   flow_api_reported_ = false;
 
-  for (const auto& row : sample.rows) {
-    const std::string key = row.network + ":" + row.chain;
-    flow_up_[key] += row.upload;
-    flow_down_[key] += row.download;
+  if (sample.untracked > 0 && !flow_untracked_reported_) {
+    // Without an id the counters cannot be attributed, so the totals will read
+    // low. Say so once: silent zeros would be worse than no counters at all.
+    flow_untracked_reported_ = true;
+    log_.write(ledger_.generation, "flow", "no_connection_id", 0);
+  }
 
-    const std::string notice = key + "|" + row.destination + "|" + row.process;
+  // Each row carries that connection's own cumulative counters, so the bytes
+  // this poll adds are the difference from the last poll. Without the id there
+  // is nothing to take a difference against, so such a row is skipped rather
+  // than banked: adding its whole history every five seconds is how a quiet
+  // lobby ends up looking like it moved seven gigabytes.
+  std::map<std::string, std::uint64_t> up_now;
+  std::map<std::string, std::uint64_t> down_now;
+  std::map<std::string, FlowLive> live;
+
+  for (const auto& row : sample.rows) {
+    if (row.id.empty()) continue;
+    const std::string key = row.network + ":" + row.chain;
+    FlowLive entry;
+    entry.key = key;
+    entry.upload = row.upload;
+    entry.download = row.download;
+
+    const auto previous = flow_live_.find(row.id);
+    if (previous != flow_live_.end() && previous->second.key == key &&
+        row.upload >= previous->second.upload && row.download >= previous->second.download) {
+      up_now[key] += row.upload - previous->second.upload;
+      down_now[key] += row.download - previous->second.download;
+    }
+    // A counter that went backwards means the id was reused for a different
+    // flow. Banking the difference would invent traffic, so nothing is added
+    // and the new counters simply become the baseline.
+    live.emplace(row.id, entry);
+  }
+  // Connections that closed are forgotten. Their bytes were banked on the last
+  // poll that saw them, so dropping them loses nothing and keeps the id map
+  // the size of the live connection list.
+  const bool had_baseline = !flow_live_.empty();
+  flow_live_.swap(live);
+
+  std::uint64_t moved = 0;
+  for (const auto& item : up_now) {
+    flow_up_[item.first] += item.second;
+    rate_up_[item.first] += item.second;
+    moved += item.second;
+  }
+  for (const auto& item : down_now) {
+    flow_down_[item.first] += item.second;
+    rate_down_[item.first] += item.second;
+    moved += item.second;
+  }
+
+  // A lull is a property of a window, so it is measured while the window is
+  // still open rather than reconstructed later from two totals. The first poll
+  // only establishes the baseline: having nothing to compare against is not the
+  // same as having seen nothing move.
+  if (had_baseline) {
+    if (moved == 0) {
+      flow_quiet_ms_ += window;
+      if (flow_quiet_ms_ > flow_worst_quiet_ms_) flow_worst_quiet_ms_ = flow_quiet_ms_;
+    } else {
+      flow_quiet_ms_ = 0;
+    }
+  }
+  flow_window_ms_ += window;
+
+  for (const auto& row : sample.rows) {
+    if (row.id.empty()) continue;
     if (row.upload + row.download < kFlowNoticeBytes) continue;
-    if (!flow_announced_.insert(notice).second) continue;
+    // Keyed by id so a flow that is torn down and re-established is announced
+    // again, while a long-lived one is announced once.
+    if (!flow_announced_.insert(row.id).second) continue;
     log_.write(ledger_.generation, "flow_seen",
                "net=" + journal_token(row.network) + " chain=" + journal_token(row.chain) +
                    " dst=" + journal_token(row.destination) + " proc=" + journal_token(row.process) +
@@ -434,8 +508,37 @@ void TunnelSupervisor::sample_flows() {
 
   if (stamp - flow_last_summary_ms_ >= kFlowSummaryMs) {
     flow_last_summary_ms_ = stamp;
+    emit_flow_rate();
     emit_flow_summary("flow_summary");
   }
+}
+
+void TunnelSupervisor::emit_flow_rate() {
+  const std::uint64_t seconds = flow_window_ms_ / 1000;
+  std::map<std::string, std::uint64_t> live_counts;
+  for (const auto& entry : flow_live_) ++live_counts[entry.second.key];
+
+  std::string code;
+  for (const auto& entry : flow_down_) {
+    if (!code.empty()) code += " ";
+    const std::uint64_t down = seconds == 0 ? 0 : rate_down_[entry.first] / 1024 / seconds;
+    const std::uint64_t up = seconds == 0 ? 0 : rate_up_[entry.first] / 1024 / seconds;
+    code += journal_token(entry.first) + "=dn_kbps:" + std::to_string(down) +
+            "/up_kbps:" + std::to_string(up);
+  }
+  for (const auto& entry : live_counts) {
+    code += " live_" + journal_token(entry.first) + ":" + std::to_string(entry.second);
+  }
+  // quiet_ms is the lull in progress; worst_quiet_ms is the longest one this
+  // session has seen. A dip is the second number.
+  log_.write(ledger_.generation, "flow_rate",
+             "win_ms=" + std::to_string(flow_window_ms_) +
+                 " quiet_ms=" + std::to_string(flow_quiet_ms_) +
+                 " worst_quiet_ms=" + std::to_string(flow_worst_quiet_ms_) + " " + code,
+             0);
+  rate_up_.clear();
+  rate_down_.clear();
+  flow_window_ms_ = 0;
 }
 
 void TunnelSupervisor::emit_flow_summary(const char* event) {
@@ -451,6 +554,10 @@ void TunnelSupervisor::emit_flow_summary(const char* event) {
 
 void TunnelSupervisor::set_ready_observer(std::function<void(std::int64_t)> observer) {
   ready_observer_ = std::move(observer);
+}
+
+void TunnelSupervisor::set_clock(std::function<std::uint64_t()> clock) {
+  if (clock) clock_ = std::move(clock);
 }
 
 void TunnelSupervisor::note_user_proof(bool ok, std::int64_t generation) {
@@ -755,12 +862,19 @@ TunnelSnapshot TunnelSupervisor::run_connect(const ConnectRequest& request, Canc
   unsigned short api_port = 0;
   std::string api_secret;
   flows_.reset();
+  flow_live_.clear();
   flow_up_.clear();
   flow_down_.clear();
+  rate_up_.clear();
+  rate_down_.clear();
+  flow_window_ms_ = 0;
+  flow_quiet_ms_ = 0;
+  flow_worst_quiet_ms_ = 0;
   flow_announced_.clear();
   flow_last_sample_ms_ = 0;
   flow_last_summary_ms_ = 0;
   flow_api_reported_ = false;
+  flow_untracked_reported_ = false;
   if (flow_factory_ && probe_.pick_loopback_port(api_port)) {
     api_secret = make_api_secret();
     flows_ = flow_factory_(api_port, api_secret);

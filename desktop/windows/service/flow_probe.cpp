@@ -153,8 +153,10 @@ std::string read_path_tail(const std::string& path) {
   return cut == std::string::npos ? path : path.substr(cut + 1);
 }
 
-bool read_connection(Cursor& c, FlowRow& row) {
+bool read_connection(Cursor& c, FlowRow& row, bool* no_id) {
+  *no_id = false;
   if (!c.eat('{')) return false;
+  std::string id;
   std::string network;
   std::string destination_ip;
   std::string destination_port;
@@ -191,6 +193,8 @@ bool read_connection(Cursor& c, FlowRow& row) {
           break;
         }
       }
+    } else if (key == "id") {
+      if (!read_string(c, id)) return false;
     } else if (key == "chains") {
       // The last element is the outbound the connection ended up on.
       if (!c.eat('[')) return false;
@@ -217,6 +221,13 @@ bool read_connection(Cursor& c, FlowRow& row) {
   }
 
   if (chain.empty()) return false;
+  if (id.empty()) {
+    // The row is otherwise readable, but without an id it cannot be told apart
+    // from next poll's row, so it must not reach the total.
+    *no_id = true;
+    return false;
+  }
+  row.id = id;
   row.network = network;
   row.chain = chain;
   row.process = process;
@@ -266,8 +277,10 @@ std::string journal_token(const std::string& value) {
   return out;
 }
 
-bool parse_connections(const std::string& body, std::vector<FlowRow>& out) {
+bool parse_connections(const std::string& body, std::vector<FlowRow>& out,
+                       std::size_t* untracked) {
   out.clear();
+  std::size_t without_id = 0;
   Cursor cursor{body};
   if (!cursor.eat('{')) return false;
 
@@ -284,10 +297,13 @@ bool parse_connections(const std::string& body, std::vector<FlowRow>& out) {
     if (!cursor.eat('[')) return false;
     while (!cursor.at(']')) {
       FlowRow row;
-      if (read_connection(cursor, row)) out.push_back(row);
+      bool no_id = false;
+      if (read_connection(cursor, row, &no_id)) out.push_back(row);
+      else if (no_id) ++without_id;
       if (!cursor.eat(',')) break;
     }
     cursor.eat(']');
+    if (untracked != nullptr) *untracked = without_id;
     return true;
   }
 }
@@ -346,8 +362,10 @@ class WinHttpFlowProbe : public FlowProbe {
             if (body.size() > (4u << 20)) break;
           }
           std::vector<FlowRow> rows;
-          if (parse_connections(body, rows)) {
+          std::size_t untracked = 0;
+          if (parse_connections(body, rows, &untracked)) {
             out.rows = std::move(rows);
+            out.untracked = untracked;
             ok = true;
           }
         } else {

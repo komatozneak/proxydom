@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -12,6 +13,7 @@
 
 // One row of the clash api /connections list, reduced to what the journal prints.
 struct FlowRow {
+  std::string id;  // connection id, stable for the life of the flow
   std::string network;  // "udp" or "tcp" as sing-box reports it
   std::string chain;    // last element of chains[]: "proxy", "direct", ...
   std::string destination;
@@ -22,6 +24,10 @@ struct FlowRow {
 
 struct FlowSample {
   std::vector<FlowRow> rows;
+  // Connections the body carried but that carried no id. They are left out of
+  // `rows` because they cannot be told apart from the next poll's; the session
+  // reports the count once rather than banking bytes it cannot attribute.
+  std::size_t untracked = 0;
 };
 
 class FlowProbe {
@@ -43,7 +49,14 @@ std::string journal_token(const std::string& value);
 
 // Parses a clash api /connections body. Unknown fields are skipped, a truncated
 // body yields whatever parsed cleanly instead of failing the whole sample.
-bool parse_connections(const std::string& body, std::vector<FlowRow>& out);
+//
+// `upload` and `download` are each connection's own cumulative counters, so a
+// total has to be built from per-id deltas. A connection carrying no id cannot
+// be told apart from the next poll's, so it is left out of `out` and counted in
+// `untracked` when the caller wants to know: banking it would put the same
+// bytes into the total once per poll.
+bool parse_connections(const std::string& body, std::vector<FlowRow>& out,
+                       std::size_t* untracked = nullptr);
 
 // Loopback clash api client. Null off Windows; the unit test supplies its own.
 std::unique_ptr<FlowProbe> make_flow_probe(unsigned short port, const std::string& secret);
