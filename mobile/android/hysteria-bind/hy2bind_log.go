@@ -23,7 +23,7 @@ var tunnelLevel = zap.NewAtomicLevelAt(zapcore.InfoLevel)
 
 func applyTunnelLogLevel(configJSON string) {
 	var env struct {
-		Level string `json:"teremokLogLevel"`
+		Level string `json:"proxydomLogLevel"`
 	}
 	_ = json.Unmarshal([]byte(configJSON), &env)
 	setTunnelLogLevel(env.Level)

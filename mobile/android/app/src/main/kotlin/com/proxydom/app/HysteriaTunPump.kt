@@ -1,4 +1,4 @@
-package com.teremok.connect.teremok_connect
+package com.proxydom.app
 
 /**
  * Dummy SOCKS HTTPS probe JSON for Hy2 PathHealth (not a live core config).

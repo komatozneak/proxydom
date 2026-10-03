@@ -48,19 +48,9 @@
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
-                <data android:scheme="teremokconnect" android:host="join"/>
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW"/>
-                <category android:name="android.intent.category.DEFAULT"/>
-                <category android:name="android.intent.category.BROWSABLE"/>
-                <data android:scheme="teremokconnect" android:host="ref"/>
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW"/>
-                <category android:name="android.intent.category.DEFAULT"/>
-                <category android:name="android.intent.category.BROWSABLE"/>
-                <data android:scheme="teremokconnect" android:host="pair"/>
+                <data android:scheme="proxydom" android:host="add"/>
+                <data android:scheme="proxydom" android:host="import"/>
+                <data android:scheme="proxydom" android:host="sub"/>
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.VIEW"/>
@@ -86,14 +76,14 @@
         <!-- VpnService as FGS specialUse (targetSdk 34+). systemExempted requires
              privileged FOREGROUND_SERVICE_SYSTEM_EXEMPTED — crashes on normal apps. -->
         <service
-            android:name=".TeremokVpnService"
+            android:name=".ProxyDomVpnService"
             android:permission="android.permission.BIND_VPN_SERVICE"
             android:exported="false"
             android:foregroundServiceType="specialUse">
             <intent-filter>
                 <action android:name="android.net.VpnService"/>
             </intent-filter>
-            <!-- ADR 020: Ogon-style opt-out — grey Always-on / lockdown for Teremok. -->
+            <!-- ADR 020: Ogon-style opt-out — grey Always-on / lockdown for Proxy Dom. -->
             <meta-data
                 android:name="android.net.VpnService.SUPPORTS_ALWAYS_ON"
                 android:value="false"/>
@@ -107,7 +97,7 @@
             android:exported="false" />
 
         <service
-            android:name=".TeremokTileService"
+            android:name=".ProxyDomTileService"
             android:exported="true"
             android:icon="@drawable/ic_qs_vpn"
             android:label="@string/qs_tile_label"

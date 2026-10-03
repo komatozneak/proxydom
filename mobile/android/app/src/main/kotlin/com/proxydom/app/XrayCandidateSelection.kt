@@ -1,4 +1,4 @@
-package com.teremok.connect.teremok_connect
+package com.proxydom.app
 
 /**
  * Dummy SOCKS HTTPS probe DTO for Hy2 PathHealth (not a live Xray document).
@@ -37,7 +37,7 @@ fun fastestCandidate(
 
 /** Hy2 core switch (ADR 018): exact string `"hysteria"` only. */
 internal fun isHysteriaCore(params: Map<String, Any?>): Boolean =
-    params["vpnCore"] == TeremokVpnService.VPN_CORE_HYSTERIA
+    params["vpnCore"] == ProxyDomVpnService.VPN_CORE_HYSTERIA
 
 /** Pasted non-Hy2 profile. Same gomobile runtime as Hy2 (ADR 026). */
 internal fun isXrayShareCore(params: Map<String, Any?>): Boolean =

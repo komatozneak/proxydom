@@ -1,15 +1,15 @@
-package com.teremok.connect.teremok_connect.session
+package com.proxydom.app.session
 
 import android.os.SystemClock
 import android.util.Log
-import com.teremok.connect.teremok_connect.DiagnosticRing
-import com.teremok.connect.teremok_connect.GvisorTun2Socks
-import com.teremok.connect.teremok_connect.VpnPingMonitor
-import com.teremok.connect.teremok_connect.XRAY_SOCKS_PROBE_ATTEMPTS
-import com.teremok.connect.teremok_connect.XRAY_SOCKS_PROBE_RETRY_SLEEP_MS
-import com.teremok.connect.teremok_connect.XRAY_SOCKS_PROBE_TIMEOUT_MS
-import com.teremok.connect.teremok_connect.XRAY_SOCKS_WARMUP_BUDGET_MS
-import com.teremok.connect.teremok_connect.XRAY_SOCKS_WARMUP_POLL_MS
+import com.proxydom.app.DiagnosticRing
+import com.proxydom.app.GvisorTun2Socks
+import com.proxydom.app.VpnPingMonitor
+import com.proxydom.app.XRAY_SOCKS_PROBE_ATTEMPTS
+import com.proxydom.app.XRAY_SOCKS_PROBE_RETRY_SLEEP_MS
+import com.proxydom.app.XRAY_SOCKS_PROBE_TIMEOUT_MS
+import com.proxydom.app.XRAY_SOCKS_WARMUP_BUDGET_MS
+import com.proxydom.app.XRAY_SOCKS_WARMUP_POLL_MS
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -193,7 +193,7 @@ class PathHealth {
     }
 
     /**
-     * Continuous SOCKS CONNECT while the TUN is up. [TeremokVpnService] must
+     * Continuous SOCKS CONNECT while the TUN is up. [ProxyDomVpnService] must
      * start this after ConnectedHealthy — otherwise a dead Hy2 path still
      * paints Nest connected (screen-off Doze).
      */
@@ -234,7 +234,7 @@ class PathHealth {
                         }
                     }
                 },
-                "teremok-path-health",
+                "proxydom-path-health",
             ).apply { isDaemon = true }
             continuousThread?.start()
             return
@@ -273,7 +273,7 @@ class PathHealth {
                     }
                 }
             },
-            "teremok-path-health",
+            "proxydom-path-health",
         ).apply { isDaemon = true }
         continuousThread?.start()
     }

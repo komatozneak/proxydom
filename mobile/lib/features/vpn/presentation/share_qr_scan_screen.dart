@@ -42,7 +42,7 @@ class _ShareQrScanScreenState extends ConsumerState<ShareQrScanScreen> {
     try {
       await Hy2ImportStore.instance.saveInput(raw);
       if (!mounted) return;
-      showTeremokSnackBar(context, AppL10n.of(context).freeServerAdded);
+      showProxyDomSnackBar(context, AppL10n.of(context).freeServerAdded);
       final status = ref.read(vpnProvider);
       if (status is VpnConnected || status is VpnConnecting) {
         await ref.read(vpnProvider.notifier).disconnect(reason: 'import');

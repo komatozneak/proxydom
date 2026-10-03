@@ -1,6 +1,8 @@
 #include "session_supervisor.h"
 
+#include <algorithm>
 #include <iostream>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -361,6 +363,43 @@ class FakeSleep : public Sleeper {
  public:
   void sleep_ms(int) override {}
 };
+
+// Stands in for the engine's clash api. The rows are what the owner reads the
+// session verdict from: a game's UDP landing on "direct" means it left the
+// tunnel on the physical interface, "proxy" means it is still being carried.
+struct FlowState {
+  bool reachable = true;
+  int polls = 0;
+  std::vector<FlowRow> rows;
+};
+
+// The supervisor owns the probe for the length of a session, so the test keeps
+// its own handle through shared state rather than through the object itself.
+class FakeFlows : public FlowProbe {
+ public:
+  explicit FakeFlows(std::shared_ptr<FlowState> state) : state_(std::move(state)) {}
+  bool poll(FlowSample& out) override {
+    ++state_->polls;
+    if (!state_->reachable) return false;
+    out.rows = state_->rows;
+    return true;
+  }
+  unsigned long last_error() const override { return 0; }
+
+ private:
+  std::shared_ptr<FlowState> state_;
+};
+
+FlowRow flow_row(std::string network, std::string chain, std::string destination,
+                 std::uint64_t up, std::uint64_t down) {
+  FlowRow row;
+  row.network = std::move(network);
+  row.chain = std::move(chain);
+  row.destination = std::move(destination);
+  row.upload = up;
+  row.download = down;
+  return row;
+}
 
 struct Harness {
   FakeRoutes routes;
@@ -887,6 +926,105 @@ void test_resolve_and_route_table_failures() {
 
 }  // namespace
 
+// The counters are the only thing in the journal that can say whether a game's
+// UDP left the tunnel or was carried inside the proxy stream. Without them the
+// owner is guessing from packet loss alone.
+void test_flow_counters_record_the_outbound() {
+  Harness h;
+  auto state = std::make_shared<FlowState>();
+  state->rows = {
+      flow_row("udp", "direct", "10.20.30.40:27015", 900 * 1024, 4 * 1024 * 1024),
+      flow_row("udp", "proxy", "142.250.1.1:443", 200 * 1024, 300 * 1024),
+      flow_row("tcp", "proxy", "104.16.0.1:443", 2048, 2048),
+  };
+  unsigned short seen_port = 0;
+  std::string seen_secret;
+  h.supervisor.set_flow_factory(
+      [&state, &seen_port, &seen_secret](unsigned short port,
+                                         const std::string& secret) -> std::unique_ptr<FlowProbe> {
+        seen_port = port;
+        seen_secret = secret;
+        return std::unique_ptr<FlowProbe>(new FakeFlows(state));
+      });
+
+  const auto connected = h.connect();
+  expect(connected.phase == TunnelPhase::Connected, "flow session connects");
+  expect(seen_port == 17890, "the controller port comes from the free-port pick");
+  expect(seen_secret.size() == 48, "the controller carries a per-session secret");
+  expect(h.files.config_body.find("\"external_controller\":\"127.0.0.1:17890\"") != std::string::npos,
+         "the engine is told where to answer");
+
+  h.supervisor.watchdog(h.cancel);
+  const bool announced_direct =
+      std::any_of(h.log.lines.begin(), h.log.lines.end(), [](const FakeLog::Line& line) {
+        return line.event == "flow_seen" && line.code.find("chain=direct") != std::string::npos &&
+               line.code.find("dst=10.20.30.40:27015") != std::string::npos;
+      });
+  const bool announced_proxy =
+      std::any_of(h.log.lines.begin(), h.log.lines.end(), [](const FakeLog::Line& line) {
+        return line.event == "flow_seen" && line.code.find("chain=proxy") != std::string::npos;
+      });
+  expect(announced_direct, "a direct udp flow is announced with its destination");
+  expect(announced_proxy, "a proxied udp flow is announced too, so the two are comparable");
+
+  h.supervisor.disconnect(h.cancel);
+  const bool totals =
+      std::any_of(h.log.lines.begin(), h.log.lines.end(), [](const FakeLog::Line& line) {
+        return line.event == "flow_total" && line.code.find("udp:direct=dn:") != std::string::npos &&
+               line.code.find("udp:proxy=dn:") != std::string::npos;
+      });
+  expect(totals, "the closing line carries a total per network and outbound");
+
+  // A controller that answers nothing must not cost the session or spam the log.
+  Harness blind;
+  auto dead = std::make_shared<FlowState>();
+  dead->reachable = false;
+  blind.supervisor.set_flow_factory([dead](unsigned short, const std::string&) {
+    return std::unique_ptr<FlowProbe>(new FakeFlows(dead));
+  });
+  const auto still_up = blind.connect();
+  for (int tick = 0; tick < 3; ++tick) blind.supervisor.watchdog(blind.cancel);
+  blind.supervisor.disconnect(blind.cancel);
+  expect(still_up.phase == TunnelPhase::Connected, "an unreadable controller does not fail connect");
+  int complaints = 0;
+  for (const auto& line : blind.log.lines) {
+    if (line.event == "flow" && line.code == "api_unreachable") ++complaints;
+  }
+  expect(complaints == 1, "an unreachable controller is reported once, not every tick");
+}
+
+void test_connections_body_parses() {
+  const std::string body =
+      R"({"downloadTotal":9,"uploadTotal":3,"connections":[)"
+      R"({"id":"a","metadata":{"network":"udp","type":"","sourceIP":"198.18.0.1",)"
+      R"("destinationIP":"10.20.30.40","destinationPort":"27015","host":"",)"
+      R"("processPath":"C:\\Games\\dota 2\\bin\\dota2.exe"},"upload":120,"download":4096,)"
+      R"("start":"2026-10-03T10:00:00Z","chains":["tun-in","direct"],"rule":"udp-bypass"},)"
+      R"({"id":"b","metadata":{"network":"tcp","destinationIP":"1.1.1.1","destinationPort":"443"},)"
+      R"("upload":10,"download":20,"chains":["proxy"],"rule":"final"}]})";
+  std::vector<FlowRow> rows;
+  expect(parse_connections(body, rows), "the clash api body parses");
+  expect(rows.size() == 2, "both connections are read");
+  if (rows.size() != 2) return;
+  expect(rows[0].network == "udp" && rows[0].chain == "direct", "network and last hop are taken");
+  expect(rows[0].destination == "10.20.30.40:27015", "a destination is ip plus port");
+  expect(rows[0].process == "dota2.exe", "the owning process is named by its leaf");
+  expect(rows[0].upload == 120 && rows[0].download == 4096, "byte counts survive");
+  expect(rows[1].chain == "proxy", "the other hop is not mistaken");
+
+  // A member the engine has never heard of must not cost us the counts.
+  const std::string future =
+      R"({"connections":[{"metadata":{"network":"udp","destinationIP":"1.2.3.4","destinationPort":"5",)"
+      R"("somethingNew":{"nested":[1,2,3]}},"upload":1,"download":2,"brandNew":true,)"
+      R"("chains":["direct"]}],"extra":42})";
+  expect(parse_connections(future, rows), "an unknown field does not fail the parse");
+  expect(rows.size() == 1, "the row still arrives");
+  expect(!rows.empty() && rows[0].download == 2 && rows[0].chain == "direct",
+         "the counts still come through");
+  expect(!parse_connections("", rows) && rows.empty(), "an empty body is not a sample");
+  expect(!parse_connections("{\"downloadTotal\":1}", rows), "a body without connections is refused");
+}
+
 int main() {
   test_route_policy();
   test_slash_port_connects_and_junk_does_not_launch();
@@ -910,6 +1048,8 @@ int main() {
   test_tun_timeout_log_names_the_adapter();
   test_stderr_after_info_is_not_cut();
   test_resolve_and_route_table_failures();
+  test_flow_counters_record_the_outbound();
+  test_connections_body_parses();
   if (g_failed != 0) {
     std::cerr << g_failed << " failed\n";
     return 1;

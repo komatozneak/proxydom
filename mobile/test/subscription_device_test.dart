@@ -1,10 +1,10 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/features/vpn/data/hy2_import_store.dart';
-import 'package:teremok_connect/features/vpn/data/share_link_parser.dart';
-import 'package:teremok_connect/features/vpn/data/subscription_device.dart';
-import 'package:teremok_connect/features/vpn/data/subscription_label.dart';
+import 'package:proxydom/features/vpn/data/hy2_import_store.dart';
+import 'package:proxydom/features/vpn/data/share_link_parser.dart';
+import 'package:proxydom/features/vpn/data/subscription_device.dart';
+import 'package:proxydom/features/vpn/data/subscription_label.dart';
 
 void main() {
   tearDown(() {

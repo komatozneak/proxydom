@@ -1,4 +1,4 @@
-package com.teremok.connect.teremok_connect
+package com.proxydom.app
 
 /**
  * Local SOCKS listen used by official Hy2 (`hysteriaSocksListen`) and PathHealth

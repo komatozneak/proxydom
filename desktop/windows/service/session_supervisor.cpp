@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
 #include <map>
 #include <sstream>
 
@@ -194,7 +195,7 @@ std::string user_message(TunnelCode code, const std::string& extra) {
     case TunnelCode::TunNotReady:
       return "Виртуальный адаптер недоступен";
     case TunnelCode::EgressFailed:
-      return "Связь через выбранную строку не подтверждена";
+      return "Не удалось подтвердить доступность узла. Попробуйте другой сервер";
     case TunnelCode::CleanupFailed:
       return "Ошибка восстановления сети. Перезапустите службу";
     case TunnelCode::Busy:
@@ -355,6 +356,78 @@ void TunnelSupervisor::set_observer(std::function<void(const TunnelSnapshot&)> o
 }
 
 void TunnelSupervisor::set_hook(std::function<void(ConnectStep)> hook) { hook_ = std::move(hook); }
+
+void TunnelSupervisor::set_flow_factory(
+    std::function<std::unique_ptr<FlowProbe>(unsigned short, const std::string&)> factory) {
+  flow_factory_ = std::move(factory);
+}
+
+namespace {
+
+// Enough traffic to mean "this is a real flow", not a DNS reply or a TLS hello.
+constexpr std::uint64_t kFlowNoticeBytes = 64u * 1024u;
+constexpr std::uint64_t kFlowSampleMs = 5000;
+constexpr std::uint64_t kFlowSummaryMs = 15000;
+
+std::uint64_t now_ms() {
+  return static_cast<std::uint64_t>(
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::steady_clock::now().time_since_epoch())
+          .count());
+}
+
+}  // namespace
+
+void TunnelSupervisor::sample_flows() {
+  if (!flows_) return;
+  const std::uint64_t stamp = now_ms();
+  // The service loop ticks about every two seconds; polling on its own clock
+  // keeps the sample rate independent of how often the pipe wakes us.
+  if (stamp - flow_last_sample_ms_ < kFlowSampleMs) return;
+  flow_last_sample_ms_ = stamp;
+
+  FlowSample sample;
+  if (!flows_->poll(sample)) {
+    // One line per session: the engine may not be listening yet right after start.
+    if (!flow_api_reported_) {
+      flow_api_reported_ = true;
+      log_.write(ledger_.generation, "flow", "api_unreachable", flows_->last_error());
+    }
+    return;
+  }
+  flow_api_reported_ = false;
+
+  for (const auto& row : sample.rows) {
+    const std::string key = row.network + ":" + row.chain;
+    flow_up_[key] += row.upload;
+    flow_down_[key] += row.download;
+
+    const std::string notice = key + "|" + row.destination + "|" + row.process;
+    if (row.upload + row.download < kFlowNoticeBytes) continue;
+    if (!flow_announced_.insert(notice).second) continue;
+    log_.write(ledger_.generation, "flow_seen",
+               "net=" + journal_token(row.network) + " chain=" + journal_token(row.chain) +
+                   " dst=" + journal_token(row.destination) + " proc=" + journal_token(row.process) +
+                   " up=" + std::to_string(row.upload) + " dn=" + std::to_string(row.download),
+               0);
+  }
+
+  if (stamp - flow_last_summary_ms_ >= kFlowSummaryMs) {
+    flow_last_summary_ms_ = stamp;
+    emit_flow_summary("flow_summary");
+  }
+}
+
+void TunnelSupervisor::emit_flow_summary(const char* event) {
+  if (flow_up_.empty() && flow_down_.empty()) return;
+  std::string code;
+  for (const auto& entry : flow_down_) {
+    if (!code.empty()) code += " ";
+    code += journal_token(entry.first) + "=dn:" + std::to_string(entry.second) + "/up:" +
+            std::to_string(flow_up_[entry.first]);
+  }
+  log_.write(ledger_.generation, event, code, 0);
+}
 
 void TunnelSupervisor::set_ready_observer(std::function<void(std::int64_t)> observer) {
   ready_observer_ = std::move(observer);
@@ -520,6 +593,11 @@ bool TunnelSupervisor::restore_resources() {
 }
 
 TunnelSnapshot TunnelSupervisor::finish(TunnelCode code, const std::string& message, bool quiet) {
+  if (ledger_.phase == TunnelPhase::Connected) {
+    flow_last_sample_ms_ = 0;  // the closing sample is not a periodic one
+    sample_flows();
+    emit_flow_summary("flow_total");
+  }
   const bool clean = restore_resources();
   if (!clean) return publish(TunnelCode::CleanupFailed, user_message(TunnelCode::CleanupFailed, {}), false);
   if (quiet || code == TunnelCode::None) return publish(TunnelCode::None, message, true);
@@ -651,11 +729,32 @@ TunnelSnapshot TunnelSupervisor::run_connect(const ConnectRequest& request, Canc
   if (stop_requested(ConnectStep::Resolved, cancel)) return finish(TunnelCode::None, {}, true);
 
   gate("core", nullptr);
-  const std::string config = build_singbox_config(line, server_ip, request.direct_domains);
+  // The loopback controller is what tells us, per connection, whether a game's
+  // UDP left direct or inside the proxy stream. It carries a per-session secret
+  // and is only reachable on 127.0.0.1.
+  unsigned short api_port = 0;
+  std::string api_secret;
+  flows_.reset();
+  flow_up_.clear();
+  flow_down_.clear();
+  flow_announced_.clear();
+  flow_last_sample_ms_ = 0;
+  flow_last_summary_ms_ = 0;
+  flow_api_reported_ = false;
+  if (flow_factory_ && probe_.pick_loopback_port(api_port)) {
+    api_secret = make_api_secret();
+    flows_ = flow_factory_(api_port, api_secret);
+  }
+  const std::string config =
+      build_singbox_config(line, server_ip, request.direct_domains, request.force_proxy_domains,
+                           request.udp_direct, flows_ ? api_port : 0, api_secret);
   if (config.empty() || !files_.write_config(config)) {
     const unsigned long win32 = config.empty() ? 13u : files_.last_error();
     log_.write(ledger_.generation, "core_config_failed", "", win32);
     return finish(TunnelCode::CoreStartFailed, {}, false);
+  }
+  if (flows_) {
+    log_.write(ledger_.generation, "flow", "api_port=" + std::to_string(api_port), 0);
   }
   remember([&] { ledger_.config_written = true; });
   if (stop_requested(ConnectStep::ConfigWritten, cancel)) return finish(TunnelCode::None, {}, true);
@@ -818,6 +917,7 @@ TunnelSnapshot TunnelSupervisor::watchdog(CancelFlag& cancel) {
       return finish(TunnelCode::None, kChanged, false);
     }
   }
+  sample_flows();
   return snapshot();
 }
 

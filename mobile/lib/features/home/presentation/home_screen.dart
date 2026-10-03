@@ -23,11 +23,9 @@ import '../../vpn/application/imported_profiles_provider.dart';
 import '../../vpn/data/hy2_import_store.dart';
 import '../../vpn/data/subscription_label.dart';
 import '../../vpn/data/subscription_traffic.dart';
-import '../../vpn/data/node_auto_selector.dart';
 import '../../vpn/data/node_display.dart';
 import '../../vpn/data/vpn_controller.dart';
 import '../../vpn/data/windows_tunnel_protocol.dart';
-import '../../vpn/data/vpn_node.dart';
 import '../../vpn/domain/vpn_connect_error.dart';
 import '../../vpn/presentation/free_client_chrome.dart';
 import '../../vpn/presentation/vpn_disclosure_dialog.dart';
@@ -59,9 +57,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   bool _selectionIsAuto = true;
   List<String> _autoPoolFlags = const [kFlagGlobe];
 
-  /// Sticky key for last good Server card (selected id or egress).
-  String? _placeStickyKey;
-
   int _noVpnEnabled = 0;
   int _noVpnTotal = 0;
   bool _openingSubscription = false;
@@ -92,7 +87,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Future<void> _maybeAskBattery() async {
-    if (!freeKeyClient) return;
     if (defaultTargetPlatform != TargetPlatform.android) return;
     if (await BatteryPromptPrefs.isDismissed()) return;
     if (!mounted) return;
@@ -205,15 +199,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Future<void> _refreshServerCardBody() async {
-    if (freeKeyClient) {
-      final selected = await Hy2ImportStore.instance.selected();
+    final selected = await Hy2ImportStore.instance.selected();
       final trafficMeta = await Hy2ImportStore.instance.selectedTrafficMeta();
       if (!mounted) return;
       final ru = Localizations.localeOf(context).languageCode == 'ru';
       setState(() {
         _selectionIsAuto = false;
         _autoPoolFlags = const [];
-        _placeStickyKey = selected?.name ?? 'import:empty';
         _trafficMeta = selected == null ? null : trafficMeta;
         if (selected == null) {
           _serverTitle = ru ? 'Нет ссылки' : 'No link';
@@ -229,195 +221,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           _serverFlag = label.flag.isEmpty ? kFlagGlobe : label.flag;
         }
       });
-      return;
-    }
-    final l = AppL10n.of(context);
-    final locale = Localizations.localeOf(context).languageCode;
-    try {
-      if (!mounted) return;
-      final vpnStatus = ref.read(vpnProvider);
-      final config = ref.read(vpnProvider.notifier).config;
-      final egressHost = config?.expectedEgressHost;
-      final displayLabel = ref.read(vpnProvider.notifier).displayLabel;
-      final nodesRepo = ref.read(vpnNodesRepositoryProvider);
-      final selectedId = await nodesRepo.getSelectedNodeId() ?? kRegionAutoId;
-      final isAuto = selectedId.isEmpty || selectedId == kRegionAutoId;
-
-      List<VpnNode> catalog = const [];
-      try {
-        catalog = await nodesRepo.loadCachedNodes() ?? const [];
-        if (catalog.isEmpty) {
-          catalog = await nodesRepo.listNodes();
-        }
-      } catch (_) {
-        catalog = await nodesRepo.loadCachedNodes() ?? const [];
-      }
-      const premium = false;
-      final poolFlags = uniqueAutoPoolFlags(
-        autoPoolFor(catalog, isPremium: premium),
-      );
-
-      NodePlace? place;
-      VpnNode? placeNode;
-      String stickyKey;
-
-      if (!isAuto) {
-        for (final n in catalog) {
-          if (n.id == selectedId) {
-            placeNode = n;
-            break;
-          }
-        }
-        if (placeNode != null) {
-          place = placeForNode(placeNode);
-          stickyKey = 'selected:${placeNode.id}';
-        } else {
-          stickyKey = 'selected:$selectedId';
-        }
-      } else if (vpnStatus is VpnConnecting) {
-        // Keep «Автоматически» while Auto proves; ServerCard cycles pool flags.
-        stickyKey = 'auto:connecting';
-        placeNode = null;
-        place = NodePlace(
-          title: l.regionAutoTitle,
-          subtitle: l.regionAutoSubtitle,
-          flag: poolFlags.isNotEmpty ? poolFlags.first : kFlagGlobe,
-        );
-      } else {
-        final winnerId = ref.read(vpnProvider.notifier).autoWinnerId;
-        stickyKey = 'auto:${winnerId ?? egressHost ?? displayLabel ?? 'none'}';
-        placeNode = autoWinnerNode(catalog, winnerId);
-        placeNode ??= catalogNodeForHost(catalog, egressHost);
-        if (placeNode != null) {
-          place = placeForNode(placeNode);
-        }
-      }
-
-      if (place == null) {
-        final sanitized =
-            displayLabel == null ? '' : sanitizeHomeLabel(displayLabel);
-        final fallbackLabel = sanitized.isNotEmpty
-            ? sanitized
-            : (vpnStatus is VpnConnected
-                ? sanitizeHomeLabel(vpnStatus.serverName)
-                : '');
-        if (fallbackLabel.isNotEmpty && !_looksLikeRawHost(fallbackLabel)) {
-          final productFlag = flagForProductLabel(fallbackLabel);
-          place = placeFromProductLabel(
-            fallbackLabel,
-            flag: productFlag == kFlagGlobe && poolFlags.isNotEmpty
-                ? poolFlags.first
-                : productFlag,
-          );
-        } else if (egressHost != null && egressHost.isNotEmpty) {
-          place = await resolvePlaceForHost(
-            egressHost,
-            index: 0,
-            fallbackLabel: fallbackLabel.isNotEmpty ? fallbackLabel : null,
-          );
-          // Keep title free of · Premium if resolve used unsanitized meta.
-          final cleaned = sanitizeHomeLabel(place.title);
-          if (cleaned.isNotEmpty && cleaned != place.title) {
-            place = NodePlace(
-              title: cleaned,
-              subtitle: place.subtitle,
-              titleEn: place.titleEn,
-              subtitleEn: place.subtitleEn,
-              flag: place.flag,
-            );
-          }
-        } else {
-          place = NodePlace(
-            title: sanitized.isNotEmpty ? sanitized : l.homeRegionAuto,
-            subtitle: '',
-            flag: autoSelectionDisplayFlag(
-              catalog: catalog,
-              winnerId:
-                  isAuto ? ref.read(vpnProvider.notifier).autoWinnerId : null,
-              poolFlags: poolFlags,
-            ),
-          );
-        }
-      }
-
-      if (!mounted) return;
-
-      final selectionChanged = _placeStickyKey != stickyKey;
-      if (!isResolvedPlace(place) &&
-          !selectionChanged &&
-          isResolvedPlace(
-            NodePlace(
-              title: _serverTitle,
-              subtitle: _serverSubtitle,
-              flag: _serverFlag,
-            ),
-          )) {
-        return;
-      }
-
-      setState(() {
-        _selectionIsAuto = isAuto;
-        if (isAuto && (placeNode == null || vpnStatus is VpnConnecting)) {
-          _serverTitle = l.regionAutoTitle;
-          _serverSubtitle = l.regionAutoSubtitle;
-          _serverFlag = autoSelectionDisplayFlag(
-            catalog: catalog,
-            winnerId: vpnStatus is VpnConnecting
-                ? null
-                : ref.read(vpnProvider.notifier).autoWinnerId,
-            poolFlags: poolFlags,
-          );
-        } else if (place != null) {
-          _serverTitle = place.displayTitle(locale);
-          final city = place.displaySubtitle(locale).trim();
-          if (placeNode != null) {
-            _serverSubtitle =
-                city.isNotEmpty ? city : displaySubtitleForNode(placeNode, l);
-          } else {
-            _serverSubtitle = city;
-          }
-          _serverFlag = place.flag;
-        }
-        _autoPoolFlags = poolFlags;
-        if (isAuto && placeNode == null) {
-          _placeStickyKey = stickyKey;
-        } else if (place != null &&
-            (isResolvedPlace(place) ||
-                place.title.isNotEmpty && place.title != '…')) {
-          _placeStickyKey = stickyKey;
-        }
-      });
-    } catch (_) {
-      if (!mounted) return;
-      if (isResolvedPlace(
-        NodePlace(
-          title: _serverTitle,
-          subtitle: _serverSubtitle,
-          flag: _serverFlag,
-        ),
-      )) {
-        return;
-      }
-      setState(() {
-        _serverTitle = l.homeRegion;
-        _serverSubtitle = l.homeStatServer;
-        _serverFlag = kFlagGlobe;
-        _placeStickyKey = null;
-        _selectionIsAuto = true;
-        _autoPoolFlags = const [kFlagGlobe];
-      });
-    }
-  }
-
-  static bool _looksLikeRawHost(String raw) {
-    final t = raw.trim().toLowerCase();
-    if (t.contains('.')) return true;
-    if (RegExp(r'^\d{1,3}(\.\d{1,3}){3}$').hasMatch(t)) return true;
-    return false;
   }
 
   Future<void> _onNestTap() async {
-    if (windowsDesktop && VpnController.instance.windowsNestLocked) {
+    if (windowsDesktop && VpnController.instance.windowsBrokerCooling) {
       UiLog.action(
         'home',
         'nest',
@@ -460,7 +267,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     }
 
     if (status is VpnDisconnected || status is VpnError) {
-      if (freeKeyClient && _importedScheme == null) {
+      if (_importedScheme == null) {
         UiLog.action('home', 'nest', result: 'import', extra: {'ui': ui});
         context.push('/import');
         return;
@@ -499,15 +306,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   @override
   Widget build(BuildContext context) {
     final l = AppL10n.of(context);
-    final theme = Theme.of(context);
     final vpnStatus = ref.watch(vpnProvider);
 
-    if (freeKeyClient) {
-      ref.listen(importedProfilesProvider, (previous, next) {
-        if (next.valueOrNull == null) return;
-        unawaited(_refreshServerCard());
-      });
-    }
+    ref.listen(importedProfilesProvider, (previous, next) {
+      if (next.valueOrNull == null) return;
+      unawaited(_refreshServerCard());
+    });
 
     ref.listen(vpnProvider, (prev, next) {
       if (prev is! VpnConnected && next is VpnConnected) {
@@ -523,8 +327,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     });
 
     return Scaffold(
-      backgroundColor:
-          freeKeyClient ? Colors.transparent : theme.colorScheme.surface,
+      backgroundColor: Colors.transparent,
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -675,18 +478,13 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
     final showVpnSettingsCta =
         status is VpnError && status.code == kVpnConflictErrorCode;
 
-    final nestSize = freeKeyClient
-        ? math.min(
-            340.0,
-            math.min(
-              size.width * 0.88,
-              math.max(200.0, widget.maxHeight - 340),
-            ),
-          )
-        : math.min(
-            320.0,
-            math.min(size.width * 0.78, widget.maxHeight * 0.46),
-          );
+    final nestSize = math.min(
+      340.0,
+      math.min(
+        size.width * 0.88,
+        math.max(200.0, widget.maxHeight - 340),
+      ),
+    );
 
     return _FreeClientHome(
       nestSize: nestSize,
@@ -700,6 +498,55 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
       noVpnTotal: widget.noVpnTotal,
       onOpenNoVpn: widget.onOpenNoVpn,
     );
+  }
+}
+
+Future<void> _refreshHomeDocuments(BuildContext context) async {
+  UiLog.action('home', 'refresh', level: ProductLogLevel.info);
+  final l = AppL10n.of(context);
+  try {
+    final catalogs = await Hy2ImportStore.instance.catalogs();
+    final remote = [
+      for (final catalog in catalogs)
+        if (catalog.url != null && catalog.url!.isNotEmpty) catalog,
+    ];
+    var failed = 0;
+    for (final catalog in remote) {
+      try {
+        await Hy2ImportStore.instance.refreshCatalog(catalog.id);
+      } on Exception {
+        failed++;
+      }
+    }
+    final links = await Hy2ImportStore.instance.load();
+    if (!context.mounted) return;
+    if (remote.isNotEmpty && failed == remote.length) {
+      UiLog.action(
+        'home',
+        'refresh',
+        level: ProductLogLevel.warn,
+        result: 'fail',
+      );
+      showProxyDomSnackBar(context, l.freeRefreshFail);
+      return;
+    }
+    UiLog.action(
+      'home',
+      'refresh',
+      level: ProductLogLevel.info,
+      result: 'ok',
+      extra: {'links': links.length, 'failed': failed},
+    );
+    showProxyDomSnackBar(context, l.freeRefreshDone(links.length));
+  } catch (_) {
+    if (!context.mounted) return;
+    UiLog.action(
+      'home',
+      'refresh',
+      level: ProductLogLevel.warn,
+      result: 'fail',
+    );
+    showProxyDomSnackBar(context, l.freeRefreshFail);
   }
 }
 
@@ -862,7 +709,7 @@ class _FreeClientHome extends StatelessWidget {
               );
               if (!context.mounted) return;
               if (!opened) {
-                showTeremokSnackBar(
+                showProxyDomSnackBar(
                   context,
                   settingsKillSwitchOpenFailedForPlatform(l),
                 );
@@ -890,6 +737,7 @@ class _FreeClientHome extends StatelessWidget {
             UiLog.action('home', 'scan');
             openFreeClientCapture(context);
           },
+          onRefresh: () => _refreshHomeDocuments(context),
         ),
       ],
     );

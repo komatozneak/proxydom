@@ -4,15 +4,15 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:teremok_connect/core/diagnostics/diagnostics_service.dart';
-import 'package:teremok_connect/core/diagnostics/egress_verify.dart';
-import 'package:teremok_connect/features/home/application/vpn_status.dart';
-import 'package:teremok_connect/features/vpn/data/vpn_controller.dart';
+import 'package:proxydom/core/diagnostics/diagnostics_service.dart';
+import 'package:proxydom/core/diagnostics/egress_verify.dart';
+import 'package:proxydom/features/home/application/vpn_status.dart';
+import 'package:proxydom/features/vpn/data/vpn_controller.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  const vpnChannel = MethodChannel('teremok/vpn');
+  const vpnChannel = MethodChannel('proxydom/vpn');
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
 

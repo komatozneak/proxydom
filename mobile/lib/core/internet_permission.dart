@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 /// MethodChannel shared with VPN native (see [VpnChannelRegistry]).
-const MethodChannel kInternetPermissionChannel = MethodChannel('teremok/vpn');
+const MethodChannel kInternetPermissionChannel = MethodChannel('proxydom/vpn');
 
 /// Android 17 treats [INTERNET] as a dangerous runtime permission on Pixel.
 /// Missing grant → Dart sockets fail with errno 13 (EACCES) even when Chrome
@@ -29,7 +29,7 @@ Future<bool> ensureInternetPermissionGranted({
   }
 }
 
-/// Route Dart sockets via Wi‑Fi/LTE, not a leftover Teremok tun0.
+/// Route Dart sockets via Wi‑Fi/LTE, not a leftover tun0.
 ///
 /// Native Hy2 uses [VpnService.protect]; Dio does not. While TUN / lockdown
 /// is up, unprotected connect to the API IP fails with errno 13.

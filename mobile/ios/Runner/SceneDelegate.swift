@@ -11,6 +11,6 @@ class SceneDelegate: FlutterSceneDelegate {
     guard let controller = window?.rootViewController as? FlutterViewController else {
       return
     }
-    TeremokVpnChannel.register(messenger: controller.binaryMessenger)
+    ProxyDomVpnChannel.register(messenger: controller.binaryMessenger)
   }
 }

@@ -1,6 +1,6 @@
 {
   "@@locale": "en",
-  "appTitle": "Teremok Connect",
+  "appTitle": "Proxy Dom",
   "@appTitle": {
     "description": "Title shown in app bar and OS task switcher"
   },
@@ -11,16 +11,16 @@
   "loginErrorTimeout": "Server did not respond",
   "loginErrorNetwork": "No connection to server",
   "loginErrorGeneric": "Request failed",
-  "homeTitle": "Teremok",
+  "homeTitle": "Proxy Dom",
   "@homeTitle": {},
   "homeVpnHint": "VPN UI — comes in step 9+",
   "@homeVpnHint": {},
   "homeDisconnected": "Not connected",
   "homeConnecting": "Connecting...",
   "homeConnected": "Connected",
-  "homeTapHint": "Tap Teremok to connect",
-  "homeConnectingHint": "Hold on — Teremok is opening the door…",
-  "homeConnectedHint": "Teremok is online",
+  "homeTapHint": "Tap the house to connect",
+  "homeConnectingHint": "Hold on — the house is opening the door…",
+  "homeConnectedHint": "The house is online",
   "homeProtected": "Protected",
   "@homeProtected": {},
   "homeError": "Connection failed",
@@ -36,49 +36,23 @@
   "@navLocations": {},
   "navModes": "Modes",
   "@navModes": {},
-  "navSubscription": "Subscription",
-  "@navSubscription": {},
-  "navPremium": "Premium",
-  "@navPremium": {},
   "homeTrafficRemainder": "Data left",
   "@homeTrafficRemainder": {},
-  "homeQuotaUnlimitedTeaser": "Unlimited with Premium",
-  "@homeQuotaUnlimitedTeaser": {},
-  "homeQuotaUnlimitedCta": "Get unlimited",
-  "@homeQuotaUnlimitedCta": {},
   "homeTrafficExhausted": "Traffic used up",
   "@homeTrafficExhausted": {},
   "homeTrafficAmount": "{remaining} / {limit} GB",
   "@homeTrafficAmount": {
     "placeholders": {
-      "remaining": {"type": "String"},
-      "limit": {"type": "String"}
+      "remaining": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "String"
+      }
     }
   },
   "homeNoVpnRow": "Allowlists",
   "@homeNoVpnRow": {},
-  "premiumHeadline": "More locations",
-  "@premiumHeadline": {},
-  "premiumBody": "Premium unlocks extra locations, up to 5 devices, and removes the free 4.20 GB cap.",
-  "@premiumBody": {},
-  "premiumFeatureYt": "Extra locations for streaming",
-  "@premiumFeatureYt": {},
-  "premiumFeatureSpeed": "Priority exits for streaming",
-  "@premiumFeatureSpeed": {},
-  "premiumUnlimitedTraffic": "Unlimited traffic",
-  "@premiumUnlimitedTraffic": {},
-  "premiumCta": "Get Premium",
-  "@premiumCta": {},
-  "premiumOpenLocations": "Open locations",
-  "@premiumOpenLocations": {},
-  "subscriptionTabHint": "Manage plans and promo codes. Premium unlocks extra locations.",
-  "@subscriptionTabHint": {},
-  "subscriptionPay": "Pay",
-  "@subscriptionPay": {},
-  "locationsPremiumLocked": "Premium",
-  "@locationsPremiumLocked": {},
-  "locationsPremiumUnavailable": "Available with Premium",
-  "@locationsPremiumUnavailable": {},
   "settingsNoVpn": "Allowlists",
   "@settingsNoVpn": {},
   "settingsNoVpnHint": "Apps and sites that go around",
@@ -139,12 +113,6 @@
   "@homeErrorFriendly": {},
   "homePathIncompatibleHint": "Couldn’t reach a server. Tap again or pick a location yourself.",
   "@homePathIncompatibleHint": {},
-  "homeQuotaExceededTitle": "Free traffic used up",
-  "@homeQuotaExceededTitle": {},
-  "homeQuotaExceededHint": "You’ve used this month’s 4.20 GB. Upgrade to Premium for unlimited traffic.",
-  "@homeQuotaExceededHint": {},
-  "homeQuotaUpgradeCta": "Upgrade",
-  "@homeQuotaUpgradeCta": {},
   "homeTtProvisionFailedTitle": "Server unavailable",
   "@homeTtProvisionFailedTitle": {},
   "homeTtProvisionFailedHint": "Couldn’t prepare this location. Try again later or pick another.",
@@ -167,13 +135,17 @@
   "homeVpnConflictHintNamed": "Turn off “{app}” in Android settings, then connect again.",
   "@homeVpnConflictHintNamed": {
     "placeholders": {
-      "app": {"type": "String"}
+      "app": {
+        "type": "String"
+      }
     }
   },
   "homeVpnConflictHintNamedIos": "Turn off “{app}” in Settings → VPN.",
   "@homeVpnConflictHintNamedIos": {
     "placeholders": {
-      "app": {"type": "String"}
+      "app": {
+        "type": "String"
+      }
     }
   },
   "homeVpnPermissionHint": "Allow the VPN in the Android system prompt, then tap connect again.",
@@ -198,12 +170,8 @@
   "@settingsProBadge": {},
   "settingsActiveBadge": "Active",
   "@settingsActiveBadge": {},
-  "settingsAccessEarlyTitle": "Premium",
-  "@settingsAccessEarlyTitle": {},
   "settingsAccessEarlySubtitle": "Access is by invite.",
   "@settingsAccessEarlySubtitle": {},
-  "settingsAccessBetaTitle": "Premium",
-  "@settingsAccessBetaTitle": {},
   "settingsAccessBetaSubtitle": "Invite access · Free limits lifted.",
   "@settingsAccessBetaSubtitle": {},
   "settingsAccessNoneTitle": "No access",
@@ -212,20 +180,32 @@
   "@settingsAccessNoneSubtitle": {},
   "settingsAccessFreeTitle": "Free",
   "@settingsAccessFreeTitle": {},
-  "settingsAccessFreeSubtitle": "1 device · up to 4.20 GB per month.",
-  "@settingsAccessFreeSubtitle": {},
   "settingsAccessActiveUntil": "Valid until {date}.",
-  "@settingsAccessActiveUntil": {"placeholders": {"date": {"type": "String"}}},
+  "@settingsAccessActiveUntil": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
   "settingsAccessCancelledSubtitle": "Auto-renewal is off.",
   "@settingsAccessCancelledSubtitle": {},
   "settingsSubscriptionActiveUntil": "Active until {date}",
-  "@settingsSubscriptionActiveUntil": {"placeholders": {"date": {"type": "String"}}},
+  "@settingsSubscriptionActiveUntil": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
   "settingsSubscriptionTrialUntil": "Trial until {date}",
-  "@settingsSubscriptionTrialUntil": {"placeholders": {"date": {"type": "String"}}},
-  "settingsSubscriptionAlpha": "Premium",
-  "@settingsSubscriptionAlpha": {},
-  "settingsSubscriptionExpired": "Subscription expired",
-  "@settingsSubscriptionExpired": {},
+  "@settingsSubscriptionTrialUntil": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
   "settingsSubscriptionLoadError": "Couldn’t load status",
   "@settingsSubscriptionLoadError": {},
   "settingsServerRegion": "Server region",
@@ -251,7 +231,9 @@
   "devicesCreated": "Created: {date}",
   "@devicesCreated": {
     "placeholders": {
-      "date": {"type": "String"}
+      "date": {
+        "type": "String"
+      }
     }
   },
   "devicesCurrentDevice": "Current device",
@@ -262,15 +244,21 @@
   "devicesGroupEmpty": "One device so far · {count} slots left",
   "@devicesGroupEmpty": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "devicesLimitReached": "Device limit reached",
   "devicesCount": "{active} of {max}",
   "@devicesCount": {
     "placeholders": {
-      "active": {"type": "int"},
-      "max": {"type": "int"}
+      "active": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
     }
   },
   "devicesEmpty": "No devices yet — connect VPN to register this one.",
@@ -293,8 +281,6 @@
   "@devicesRenameFailed": {},
   "devicesThisDevice": "You",
   "@devicesThisDevice": {},
-  "devicesOwnerLabel": "Subscription owner",
-  "@devicesOwnerLabel": {},
   "devicesInvitedLabel": "Invited device",
   "@devicesInvitedLabel": {},
   "devicesRevoke": "Remove",
@@ -312,12 +298,6 @@
   "devicesRevokeFailed": "Could not revoke device",
   "@devicesRevokeFailed": {},
   "devicesLeaveHint": "This install becomes its own Free account",
-  "devicesLeave": "Leave external subscription",
-  "@devicesLeave": {},
-  "devicesLeaveTitle": "Leave this subscription?",
-  "@devicesLeaveTitle": {},
-  "devicesLeaveBody": "This install becomes its own Free account. The paid subscription stays with the owner. Save the new recovery code if shown.",
-  "@devicesLeaveBody": {},
   "devicesLeaveConfirm": "Leave",
   "@devicesLeaveConfirm": {},
   "devicesLeft": "Device left the account",
@@ -342,7 +322,7 @@
   "@splitTunnelSearchHint": {},
   "splitTunnelBundledSection": "Ready-made list",
   "@splitTunnelBundledSection": {},
-  "splitTunnelBundledLead": "Listed sites use your usual connection, not the protected one. Everything else still goes through Teremok.",
+  "splitTunnelBundledLead": "Listed sites use your usual connection, not the protected one. Everything else still goes through Proxy Dom.",
   "@splitTunnelBundledLead": {},
   "splitTunnelBundledRuTitle": "Ready-made lists",
   "@splitTunnelBundledRuTitle": {},
@@ -350,11 +330,11 @@
   "@splitTunnelBundledRuSubtitle": {},
   "splitTunnelBundledInfoTitle": "How it works",
   "@splitTunnelBundledInfoTitle": {},
-  "splitTunnelBundledInfoBody": "Listed sites use your usual connection, not the protected one. Everything else still goes through Teremok.\n\nOn iPhone you cannot take a whole app out of the VPN — only a website by address. Safari usually follows the list. A bank or marketplace app may stay in the VPN.\n\nBig services use many servers. Some pages or video may still go through the VPN with the switch on. If a site should stay protected, turn it off here.\n\nTap Reconnect after you change the list.",
+  "splitTunnelBundledInfoBody": "Listed sites use your usual connection, not the protected one. Everything else still goes through Proxy Dom.\n\nOn iPhone you cannot take a whole app out of the VPN — only a website by address. Safari usually follows the list. A bank or marketplace app may stay in the VPN.\n\nBig services use many servers. Some pages or video may still go through the VPN with the switch on. If a site should stay protected, turn it off here.\n\nTap Reconnect after you change the list.",
   "@splitTunnelBundledInfoBody": {},
   "splitTunnelBundledInfoClose": "Got it",
   "@splitTunnelBundledInfoClose": {},
-  "splitTunnelSitesLead": "Listed sites use your usual connection, not the protected one. Everything else still goes through Teremok.",
+  "splitTunnelSitesLead": "Listed sites use your usual connection, not the protected one. Everything else still goes through Proxy Dom.",
   "@splitTunnelSitesLead": {},
   "splitTunnelSitesIosNote": "On iPhone only exact hostnames leave the VPN (not all subdomains). Whole apps cannot leave the tunnel.",
   "@splitTunnelSitesIosNote": {},
@@ -363,7 +343,9 @@
   "splitTunnelCustomCount": "{count}",
   "@splitTunnelCustomCount": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "splitTunnelAddSite": "Add site",
@@ -441,7 +423,13 @@
   "settingsDiagnosticsHint": "Check connection",
   "@settingsDiagnosticsHint": {},
   "settingsVersion": "Version {version}",
-  "@settingsVersion": {"placeholders": {"version": {"type": "String"}}},
+  "@settingsVersion": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
   "settingsTitle": "Settings",
   "settingsSendReport": "Send diagnostic report",
   "tunnelLogsTitle": "Tunnel logs",
@@ -456,7 +444,7 @@
   "tunnelLogsUi": "Interface",
   "tunnelLogsCore": "Core",
   "tunnelLogsDns": "DNS",
-  "tunnelLogsFetch": "Subscription",
+  "tunnelLogsFetch": "Document",
   "tunnelLogsNetwork": "Network",
   "tunnelLogsRefresh": "Refresh",
   "tunnelLogsCopy": "Copy",
@@ -466,7 +454,9 @@
   "tunnelLogsDebugFile": "File to send: {path}",
   "@tunnelLogsDebugFile": {
     "placeholders": {
-      "path": {"type": "String"}
+      "path": {
+        "type": "String"
+      }
     }
   },
   "tunnelLogsEmpty": "No entries",
@@ -479,12 +469,13 @@
   "settingsReportSaved": "Report saved: {id}. Copied to clipboard.",
   "@settingsReportSaved": {
     "placeholders": {
-      "id": {"type": "String"}
+      "id": {
+        "type": "String"
+      }
     }
   },
   "settingsReportFailed": "Couldn't build the report",
   "@settingsReportFailed": {},
-  "settingsReportTelegramFailed": "Couldn't send via the bot. The report is copied.",
   "settingsReportUnauthorized": "Session expired — sign in again and retry",
   "@settingsReportUnauthorized": {},
   "settingsReportNetworkError": "Can't reach the server — try again later",
@@ -506,15 +497,39 @@
   "settingsQsTileNotAdded": "The tile was not added",
   "homeAbout": "About",
   "homeConfigError": "Failed to get config: {message}",
-  "@homeConfigError": {"placeholders": {"message": {"type": "String"}}},
+  "@homeConfigError": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
   "homeFetchConfig": "Fetch config",
   "homeUptime": "Session: {time}",
-  "@homeUptime": {"placeholders": {"time": {"type": "String"}}},
+  "@homeUptime": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
   "homeSessionLabel": "Session",
   "homeServer": "Server: {name}",
-  "@homeServer": {"placeholders": {"name": {"type": "String"}}},
+  "@homeServer": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "homeIp": "Your IP: {ip}",
-  "@homeIp": {"placeholders": {"ip": {"type": "String"}}},
+  "@homeIp": {
+    "placeholders": {
+      "ip": {
+        "type": "String"
+      }
+    }
+  },
   "homeIpLoading": "Your IP: …",
   "homeIpUnavailable": "Your IP: unavailable — tunnel has no internet",
   "homeRegionAuto": "Auto",
@@ -527,9 +542,6 @@
   "regionSelected": "Selected",
   "regionSectionServers": "Servers",
   "regionSectionGeneral": "General",
-  "regionSectionYoutube": "Premium",
-  "regionSectionYoutubeIos": "Services",
-  "@regionSectionYoutubeIos": {},
   "regionSectionFree": "Free",
   "regionSectionEurope": "Latvia",
   "regionSectionUsa": "USA",
@@ -545,15 +557,33 @@
   "regionFree": "Available",
   "regionNoneOnline": "No servers online — try again later",
   "regionLoadError": "Failed to load servers: {error}",
-  "@regionLoadError": {"placeholders": {"error": {"type": "String"}}},
+  "@regionLoadError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "regionLoadErrorAbort": "Cannot reach API — turn off Always-on VPN (and “Block without VPN”), then reopen the region list",
   "regionCachedHint": "Showing a saved list — network is unstable right now",
   "@regionCachedHint": {},
   "regionEmpty": "No servers available",
   "regionChanged": "Region: {name}",
-  "@regionChanged": {"placeholders": {"name": {"type": "String"}}},
+  "@regionChanged": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "regionChangeFailed": "Failed to change region: {error}",
-  "@regionChangeFailed": {"placeholders": {"error": {"type": "String"}}},
+  "@regionChangeFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "regionSwitchingTitle": "Switching location…",
   "regionSwitchingBody": "Connecting to the selected server",
   "regionSwitchedTitle": "Done",
@@ -574,26 +604,19 @@
   },
   "updateAvailableTitle": "Update available",
   "updateAvailableBody": "Version {version} is available. Please update.",
-  "@updateAvailableBody": {"placeholders": {"version": {"type": "String"}}},
+  "@updateAvailableBody": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
   "updateNow": "Update",
   "updateLater": "Later",
   "welcomeHeadline": "A warm house on a cold internet",
   "welcomeBody": "An account is created automatically. Then one tap for a protected connection.",
   "welcomeContinue": "Continue",
   "welcomeSkip": "Skip",
-  "promoTitle": "Invite code",
-  "promoHeadline": "Enter your personal code",
-  "promoBody": "If you have a code, enter it here.",
-  "promoCodeLabel": "Code",
-  "promoCodeHint": "Your invite code",
-  "promoCodeEmpty": "Enter a code",
-  "promoSubmit": "Continue",
-  "promoOutcomeInvalid": "Code not found. Check it and try again.",
-  "promoOutcomeExpired": "This code has expired.",
-  "promoOutcomeExhausted": "This code has already been used.",
-  "promoOutcomeRevoked": "This code is no longer valid.",
-  "promoOutcomeRateLimited": "Too many attempts. Please wait a minute.",
-  "promoOutcomeUnknown": "Couldn’t apply the code. Try again.",
   "referralShareTitle": "Invite a friend",
   "referralShareBody": "They enter your code after install. Extra days land after they pay, not after install.",
   "referralCopy": "Copy link",
@@ -615,63 +638,38 @@
   "betaGateContinueAnyway": "Continue anyway",
   "lockedTitle": "Activation",
   "lockedHeadline": "Welcome!",
-  "lockedBody": "Get a subscription — then connect in one tap.",
-  "lockedCta": "Get a subscription or enter a promo code",
   "lockedRefreshAccess": "Refresh access",
   "settingsSupport": "Support",
-  "settingsSupportHint": "Telegram — transfer after reinstall",
-  "settingsSupportHintIos": "Questions in the Telegram bot",
-  "@settingsSupportHintIos": {},
-  "lockedPay1m": "Pay 1 month",
-  "lockedPay3m": "Pay 3 months",
   "lockedPlan1m": "1 month",
   "lockedPlan3m": "3 months",
   "lockedPlan6m": "6 months",
   "lockedPlan12m": "12 months",
-  "lockedPayAmount": "Pay {price} ₽",
-  "@lockedPayAmount": {
-    "placeholders": {
-      "price": {"type": "int"}
-    }
-  },
-  "lockedPerMonth": "{price} ₽/mo",
-  "@lockedPerMonth": {
-    "placeholders": {
-      "price": {"type": "int"}
-    }
-  },
   "lockedSavePercent": "−{percent}%",
   "@lockedSavePercent": {
     "placeholders": {
-      "percent": {"type": "int"}
+      "percent": {
+        "type": "int"
+      }
     }
   },
   "lockedVerifyCode": "Verification code: {code}",
   "@lockedVerifyCode": {
     "placeholders": {
-      "code": {"type": "String"}
+      "code": {
+        "type": "String"
+      }
     }
   },
   "settingsTerms": "Agreement",
-  "settingsPricing": "Pricing",
   "settingsDeleteAccount": "Delete account",
-  "lockedOrPromo": "Or enter a promo code",
-  "lockedPayFailed": "Couldn’t start payment. Try again or contact support.",
-  "lockedPayReturnTitle": "Payment opened",
-  "lockedPayReturnBody": "After you finish paying in the browser, tap Check access.",
-  "lockedPayReturnCheck": "Check access",
   "recoveryCodeTitle": "Recovery code",
   "recoveryCodeHeadline": "Recovery code",
-  "recoveryCodeBody": "Save this code — you’ll need it after reinstall. Without it you can restore via Telegram.",
   "recoveryCodeCopy": "Copy code",
   "recoveryCodeCopied": "Code copied",
   "recoveryCodeConfirm": "Continue",
   "recoveryCodeContinue": "Continue",
   "restoreTitle": "Restore access",
   "restoreHeadline": "Enter recovery code",
-  "restoreBody": "Enter the recovery code or open Telegram.",
-  "restoreBodyIos": "Enter the recovery code or open Telegram.",
-  "@restoreBodyIos": {},
   "restorePaymentLabel": "Payment ID",
   "restorePaymentHint": "UUID from the payment receipt",
   "restorePaymentEmpty": "Enter the payment ID",
@@ -690,10 +688,6 @@
   "restoreDeviceLimitPickFailed": "Couldn’t free a device slot. Try again.",
   "restoreSettingsHint": "After reinstall — enter your recovery code",
   "restoreHeadlineCode": "Enter recovery code",
-  "restoreBodyCode": "After reinstall, enter the recovery code or open Telegram.",
-  "restoreBodyCodeIos": "After reinstall, enter the recovery code or open Telegram.",
-  "@restoreBodyCodeIos": {},
-  "settingsInviteDevice": "Add device to my subscription",
   "settingsInviteDeviceHint": "Create a code to join your group",
   "settingsAcceptSeat": "Join group",
   "settingsAcceptSeatHint": "Join a subscription by invitation",
@@ -701,16 +695,12 @@
   "settingsSeatCodeCopied": "Code copied",
   "settingsSeatInviteFailed": "Couldn’t create an invitation code",
   "settingsAcceptSeatOk": "Device added to the group",
-  "settingsSeatPremiumRequired": "Adding devices requires Premium",
   "settingsSeatCodeNotFound": "Code not found or expired",
-  "settingsSeatDeviceLimit": "Device limit reached for this subscription",
   "settingsSeatOwnCode": "You can’t accept your own code — enter it on another device",
   "settingsSeatAcceptFailed": "Couldn’t join the group",
   "settingsSeatCodeTtl": "Code is valid for 30 minutes",
   "settingsSeatShowQr": "Show code",
   "settingsSeatScanHint": "Scan the QR code or follow the link",
-  "settingsPayOwnerOnly": "Only the subscription owner can pay",
-  "settingsSeatForbidden": "Only the subscription owner can do this",
   "seatAcceptConsentTitle": "Join this group?",
   "seatAcceptConsentBody": "The account owner will see this device’s name, platform, and the date it was added. You can leave the group later.",
   "seatAcceptConsentConfirm": "Join",
@@ -718,36 +708,6 @@
   "settingsRecoverAccess": "Restore access",
   "settingsRecoverAccessHint": "Use recovery code after reinstall",
   "bootstrapFailed": "Couldn’t start the session. Check your connection.",
-  "accountHubTitle": "Account",
-  "accountHubGuestLead": "This account is on this device. Recovery code — after reinstall. Telegram — the same account.",
-  "accountHubLinkedLead": "Telegram is linked. The bot is the same account: subscription and restore.",
-  "accountHubLinkedLeadIos": "Telegram is linked. The bot is the same account and restore.",
-  "@accountHubLinkedLeadIos": {},
-  "accountHubRecoveryMissing": "This phone already saved the code. After reinstall, open Telegram with the same account.",
-  "@accountHubRecoveryMissing": {},
-  "accountHubLinkTelegram": "Telegram",
-  "accountHubLinkTelegramHint": "Subscription and restore in the bot",
-  "accountHubLinkEmail": "Email",
-  "accountHubLinkEmailHint": "Link with a code from email",
-  "accountHubRecovery": "Recovery code",
-  "accountHubRecoveryHint": "Restore access after reinstall",
-  "accountHubRecoverySaveBanner": "Save your recovery code — you’ll need it after reinstall.",
-  "accountHubRecoverySaveCta": "Save code",
-  "accountHubPromo": "Promo code",
-  "accountHubPromoHint": "Redeem a code",
-  "accountHubAccessSection": "Your access",
-  "accountHubContact": "Contact",
-  "accountHubLoadError": "Couldn’t load account",
-  "accountTelegramLead": "Open the bot and confirm. Come back — status updates automatically.",
-  "accountTelegramOpenBot": "Open Telegram",
-  "accountTelegramWaiting": "Waiting for confirmation…",
-  "accountTelegramWaitingHint": "After /start in the bot, return here.",
-  "accountTelegramStartFailed": "Couldn’t start Telegram linking",
-  "accountTelegramVpnRequired": "Connect first.",
-  "restoreTelegramCta": "Restore via Telegram",
-  "restoreTelegramVpnRequired": "Connect first.",
-  "homeTelegramRestoreCta": "Had Teremok before? Restore via Telegram",
-  "homeTelegramRestoreConnectFirst": "Connect first.",
   "accountEmailLead": "Enter your email — we’ll send a one-time code.",
   "accountEmailLabel": "Email",
   "accountEmailSendCode": "Send code",
@@ -775,20 +735,6 @@
   "vpnDisclosureNotBody": "It does not keep a history of sites and it does not read an advertising ID. It does not sell access or hand out servers: you bring the line.",
   "vpnDisclosureAccept": "Accept and continue",
   "vpnDisclosureDecline": "Not now",
-  "accountTelegramLinkedTitle": "{handle} is linked",
-  "@accountTelegramLinkedTitle": {
-    "placeholders": {
-      "handle": {"type": "String"}
-    }
-  },
-  "accountTelegramLinkedBody": "After reinstall, restore access with this Telegram. Subscription is in the bot too.",
-  "accountTelegramOwnerRestoredTitle": "Your account is restored",
-  "accountTelegramOwnerRestoredBody": "You can manage the subscription and restore access via Telegram.",
-  "accountTelegramMemberRestoredTitle": "You’re back in the subscription",
-  "accountTelegramMemberRestoredBody": "The owner hasn’t changed. Access will refresh in the app.",
-  "accountTelegramDone": "Done",
-  "restoreTelegramSlotRevoked": "The owner removed this device. Ask for a new invite code.",
-  "restoreTelegramSubscriptionInactive": "The subscription is not active. After it is renewed you can restore this seat.",
   "freeAdd": "Add",
   "freePaste": "Paste",
   "freeQr": "QR",
@@ -808,7 +754,7 @@
   "freePreview": "Found",
   "freeServerAdded": "Server added",
   "freeLinkInvalid": "Could not read that link",
-  "freeSubscriptionLoadFail": "The subscription did not load. The document host did not answer.",
+  "freeSubscriptionLoadFail": "The document did not load. The host did not answer.",
   "freeSubscriptionMissing": "That address has no document.",
   "freeSubscriptionDeviceLimit": "This document has no free device slots. Free one and refresh the list.",
   "freeSubscriptionClientRefused": "The document sent a placeholder instead of a server.",
@@ -843,7 +789,9 @@
   "freeRefreshDone": "Updated: {count}",
   "@freeRefreshDone": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "freeRefreshFail": "Could not refresh"

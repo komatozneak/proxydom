@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/core/theme.dart';
-import 'package:teremok_connect/core/widgets/notebook_paper.dart';
+import 'package:proxydom/core/theme.dart';
+import 'package:proxydom/core/widgets/notebook_paper.dart';
 
 void main() {
   test('notebook sheet stays in the house family, not blue ink', () {

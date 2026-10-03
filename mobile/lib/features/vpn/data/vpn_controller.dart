@@ -14,20 +14,22 @@ import 'vpn_session_snapshot.dart';
 import 'windows_tunnel.dart';
 
 bool get _isIosSplit => !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
+bool get _isAndroidNative =>
+    !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
 /// Bridge between Flutter UI and Android VpnService (Hysteria2, ADR 018).
 ///
-/// Uses [MethodChannel] `teremok/vpn` for commands and [EventChannel]
-/// `teremok/vpn/status` for live status updates from native code.
+/// Uses [MethodChannel] `proxydom/vpn` for commands and [EventChannel]
+/// `proxydom/vpn/status` for live status updates from native code.
 class VpnController {
   VpnController._();
   static final VpnController instance = VpnController._();
 
-  static const _methodChannel = MethodChannel('teremok/vpn');
-  static const _eventChannel = EventChannel('teremok/vpn/status');
-  static const _sessionEventChannel = EventChannel('teremok/vpn/session');
-  static const _trafficEventChannel = EventChannel('teremok/vpn/traffic');
-  static const _pingEventChannel = EventChannel('teremok/vpn/ping');
+  static const _methodChannel = MethodChannel('proxydom/vpn');
+  static const _eventChannel = EventChannel('proxydom/vpn/status');
+  static const _sessionEventChannel = EventChannel('proxydom/vpn/session');
+  static const _trafficEventChannel = EventChannel('proxydom/vpn/traffic');
+  static const _pingEventChannel = EventChannel('proxydom/vpn/ping');
 
   static const Duration stopTimeout = Duration(seconds: 5);
 
@@ -42,7 +44,15 @@ class VpnController {
 
   bool get windowsNestLocked => WindowsTunnel.instance.nestLocked;
 
+  /// Pipe closed or the controller binary is missing. Not a live connect.
+  bool get windowsBrokerCooling => WindowsTunnel.instance.brokerCooling;
+
   /// One share line through the Windows broker (ADR 031).
+  ///
+  /// Games reach their servers over UDP to bare addresses that change, so no
+  /// domain rule can keep them off the tunnel and no IP list survives a patch.
+  /// Windows therefore bypasses UDP by protocol, and the force-proxy hosts are
+  /// sent separately so their QUIC does not leave through that same rule.
   Future<bool> startWindowsShare(String uri) async {
     final domains = stripForceProxySuffixes(
       await SplitTunnelPrefs.enabledDomainSuffixes(),
@@ -50,6 +60,8 @@ class VpnController {
     final result = await WindowsTunnel.instance.connect(
       uri,
       directDomains: domains,
+      forceProxyDomains: kSmartProxyForceSuffixes,
+      udpDirect: true,
     );
     windowsNotice = result.notice;
     windowsCode = result.code;
@@ -151,9 +163,6 @@ class VpnController {
         'startAuto',
         {'candidatesJson': paramsJsonList},
       );
-      if (result == true) {
-        await SplitTunnelPrefs.markApplied();
-      }
       return result ?? false;
     } on PlatformException catch (e) {
       throw VpnControllerException('auto start failed: ${e.code} ${e.message}');
@@ -219,9 +228,6 @@ class VpnController {
         'start',
         {'paramsJson': paramsJson},
       );
-      if (result == true) {
-        await SplitTunnelPrefs.markApplied();
-      }
       return result ?? false;
     } on PlatformException catch (e) {
       throw VpnControllerException(
@@ -308,6 +314,14 @@ class VpnController {
     }
     return false;
   }
+
+  /// True only where the native side answers `getProvenEgress`.
+  ///
+  /// [provenEgressIp] returns null when the channel has no case for the method,
+  /// and null used to be read as "no egress", so the post-connect probe tore
+  /// down live sessions on iOS and Windows. Those platforms prove the tunnel in
+  /// their own layer — the iOS OS route set and the Windows broker gate.
+  bool get egressProbeSupported => _isAndroidNative;
 
   Future<String?> provenEgressIp() async {
     try {
@@ -622,7 +636,7 @@ class VpnController {
   }
 }
 
-/// Parses EventChannel `teremok/vpn/ping` payloads.
+/// Parses EventChannel `proxydom/vpn/ping` payloads.
 ///
 /// Explicit `delayMs: null` clears a stale RTT (native consecutive probe fail).
 @visibleForTesting

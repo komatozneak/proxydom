@@ -95,6 +95,7 @@ struct App {
   Win32TunnelLog log;
   Win32Sleeper sleeper;
   TunnelSupervisor supervisor;
+  std::int64_t last_hello_log_ms_ = 0;
   CancelFlag cancel;
   std::mutex queue_mu;
   std::condition_variable queue_cv;
@@ -152,6 +153,10 @@ struct App {
   void start() {
     supervisor.set_observer([this](const TunnelSnapshot& snap) { emit(snap); });
     supervisor.set_ready_observer([this](std::int64_t generation) { enqueue(tun_ready_event(generation)); });
+    // Only the broker knows the per-session secret, so the client the supervisor
+    // builds can read the engine's connection list and nothing else can.
+    supervisor.set_flow_factory(
+        [](unsigned short port, const std::string& secret) { return make_flow_probe(port, secret); });
     worker = std::thread([this] { loop(); });
   }
 
@@ -189,7 +194,8 @@ struct App {
       ok = GetOverlappedResult(client, &ov, &wrote, TRUE) == TRUE;
     }
     CloseHandle(ov.hEvent);
-    if (ok) log.write(0, "pipe_tx", "ok", wrote);
+    // The byte count of our own ack carries nothing the ack itself does not.
+    // Journalling it once per frame buried every lifecycle event in noise.
     return ok && wrote == frame.size();
   }
 
@@ -295,15 +301,25 @@ struct App {
       ack("connect", false, supervisor.snapshot().generation, "protocol", user_message(TunnelCode::Protocol, {}));
       return true;
     }
-    log.write(supervisor.snapshot().generation, command.command, "rx", 0);
     if (command.protocol_version != 3) {
       ack(command.command, false, supervisor.snapshot().generation, "protocol", user_message(TunnelCode::Protocol, {}));
       return true;
     }
+    // The controller pings every couple of seconds to hold the pipe lease.
+    // Journalling each ping made 84% of the log heartbeat, which is how a
+    // connect failure and a flow counter both end up invisible.
     if (command.command == "hello") {
+      const auto stamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+                             std::chrono::steady_clock::now().time_since_epoch())
+                             .count();
+      if (stamp - last_hello_log_ms_ >= 30000) {
+        last_hello_log_ms_ = stamp;
+        log.write(supervisor.snapshot().generation, "hello", "rx", 0);
+      }
       emit(supervisor.snapshot());
       return true;
     }
+    log.write(supervisor.snapshot().generation, command.command, "rx", 0);
     if (command.command == "prove") {
       const auto now = supervisor.snapshot();
       if (command.generation != now.generation || now.phase != TunnelPhase::Connecting) {
@@ -342,6 +358,13 @@ struct App {
     ConnectRequest request;
     request.uri = command.uri;
     request.direct_domains = command.direct_domains;
+    request.force_proxy_domains = command.force_proxy_domains;
+    request.udp_direct = command.udp_direct;
+    if (command.direct_domains_truncated) {
+      // A dropped exclusion row routes its site through the proxy and looks
+      // like a routing bug. Say so in the log the app exports.
+      log.write(begin.snap.generation, "connect", "direct_domains_truncated", 0);
+    }
     post([this, request] { supervisor.run_connect(request, cancel); });
     ack("connect", true, begin.snap.generation, {}, {});
     return true;

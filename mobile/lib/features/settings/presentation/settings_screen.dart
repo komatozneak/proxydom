@@ -127,7 +127,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
       'not_added' => l.settingsQsTileNotAdded,
       _ => l.settingsQsTileManual,
     };
-    showTeremokSnackBar(context, message);
+    showProxyDomSnackBar(context, message);
   }
 
   Future<void> _showQsTileRemoveDialog() async {
@@ -256,7 +256,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     final localeLabel = _localeLabel(l, locale);
     return Scaffold(
       backgroundColor:
-          freeKeyClient ? Colors.transparent : theme.colorScheme.surface,
+          Colors.transparent,
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
@@ -306,11 +306,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
         rows: [
           if (AppConfig.authAnonymous)
             _SettingsRow(
-              icon: AppIcons.siteTelegram,
+              icon: AppIcons.siteCustom,
               title: l.settingsSupport,
-              subtitle: l.settingsSupportHintIos,
+              subtitle: AppConfig.supportEmail,
               onTap: () {
-                SupportContact.open(screen: 'Настройки');
+                SupportContact.open();
               },
             ),
         ],

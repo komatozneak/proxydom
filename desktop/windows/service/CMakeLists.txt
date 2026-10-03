@@ -4,7 +4,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_executable(protocol_test protocol_test.cpp protocol.cpp)
-add_executable(supervisor_test supervisor_test.cpp session_supervisor.cpp protocol.cpp log_sanitizer.cpp)
+add_executable(supervisor_test supervisor_test.cpp session_supervisor.cpp protocol.cpp log_sanitizer.cpp
+               flow_probe.cpp)
 
 if (WIN32)
   add_executable(ProxyDomBroker
@@ -15,8 +16,9 @@ if (WIN32)
     process_host.cpp
     session_store.cpp
     log_sanitizer.cpp
+    flow_probe.cpp
   )
-  target_link_libraries(ProxyDomBroker PRIVATE ws2_32 iphlpapi setupapi advapi32 shell32)
+  target_link_libraries(ProxyDomBroker PRIVATE ws2_32 iphlpapi setupapi advapi32 shell32 winhttp)
   target_compile_definitions(ProxyDomBroker PRIVATE UNICODE _UNICODE)
   target_compile_options(ProxyDomBroker PRIVATE /utf-8)
   set_target_properties(ProxyDomBroker PROPERTIES WIN32_EXECUTABLE TRUE)
@@ -34,10 +36,14 @@ if (WIN32)
   target_compile_definitions(controller_test PRIVATE UNICODE _UNICODE)
   target_compile_options(controller_test PRIVATE /utf-8)
 
-  add_executable(route_probe route_probe.cpp network_owner.cpp protocol.cpp session_supervisor.cpp log_sanitizer.cpp)
-  target_link_libraries(route_probe PRIVATE ws2_32 iphlpapi setupapi advapi32)
+  add_executable(route_probe route_probe.cpp network_owner.cpp protocol.cpp session_supervisor.cpp
+                 log_sanitizer.cpp flow_probe.cpp)
+  target_link_libraries(route_probe PRIVATE ws2_32 iphlpapi setupapi advapi32 winhttp)
   target_compile_definitions(route_probe PRIVATE UNICODE _UNICODE)
   target_compile_options(route_probe PRIVATE /utf-8)
+
+  # flow_probe.cpp carries the winhttp client next to the portable parser.
+  target_link_libraries(supervisor_test PRIVATE winhttp)
 endif()
 
 if (MSVC)

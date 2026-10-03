@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/features/vpn/data/vpn_session_snapshot.dart';
+import 'package:proxydom/features/vpn/data/vpn_session_snapshot.dart';
 
 void main() {
   group('cold-start idle demotion gate', () {

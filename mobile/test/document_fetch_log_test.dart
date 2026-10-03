@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/core/diagnostics/app_log_buffer.dart';
-import 'package:teremok_connect/core/diagnostics/tunnel_log_level.dart';
-import 'package:teremok_connect/core/diagnostics/product_log.dart';
-import 'package:teremok_connect/features/vpn/data/document_fetch_log.dart';
+import 'package:proxydom/core/diagnostics/app_log_buffer.dart';
+import 'package:proxydom/core/diagnostics/tunnel_log_level.dart';
+import 'package:proxydom/core/diagnostics/product_log.dart';
+import 'package:proxydom/features/vpn/data/document_fetch_log.dart';
 
 void main() {
   setUp(() {

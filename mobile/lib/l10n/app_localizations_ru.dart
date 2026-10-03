@@ -9,7 +9,7 @@ class AppL10nRu extends AppL10n {
   AppL10nRu([String locale = 'ru']) : super(locale);
 
   @override
-  String get appTitle => 'Teremok Connect';
+  String get appTitle => 'Прокси Дом';
 
   @override
   String get loginTitle => 'Вход';
@@ -27,7 +27,7 @@ class AppL10nRu extends AppL10n {
   String get loginErrorGeneric => 'Не удалось выполнить запрос';
 
   @override
-  String get homeTitle => 'Теремок';
+  String get homeTitle => 'Прокси Дом';
 
   @override
   String get homeVpnHint => 'VPN UI — в шагах 9+';
@@ -42,13 +42,13 @@ class AppL10nRu extends AppL10n {
   String get homeConnected => 'Подключено';
 
   @override
-  String get homeTapHint => 'Нажмите на Теремок, чтобы войти';
+  String get homeTapHint => 'Нажмите на дом, чтобы войти';
 
   @override
-  String get homeConnectingHint => 'Подождите, Теремок открывает дверь…';
+  String get homeConnectingHint => 'Подождите, дом открывает дверь…';
 
   @override
-  String get homeConnectedHint => 'Теремок на связи';
+  String get homeConnectedHint => 'Дом на связи';
 
   @override
   String get homeProtected => 'Защищено';
@@ -81,19 +81,7 @@ class AppL10nRu extends AppL10n {
   String get navModes => 'Режимы';
 
   @override
-  String get navSubscription => 'Подписка';
-
-  @override
-  String get navPremium => 'Премиум';
-
-  @override
   String get homeTrafficRemainder => 'Остаток трафика';
-
-  @override
-  String get homeQuotaUnlimitedTeaser => 'Безлимит с Premium';
-
-  @override
-  String get homeQuotaUnlimitedCta => 'Подключить безлимит';
 
   @override
   String get homeTrafficExhausted => 'Трафик закончился';
@@ -105,41 +93,6 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get homeNoVpnRow => 'Белые списки';
-
-  @override
-  String get premiumHeadline => 'Расширенные локации';
-
-  @override
-  String get premiumBody =>
-      'Премиум открывает дополнительные локации, до 5 устройств и снимает лимит 4,20 ГБ.';
-
-  @override
-  String get premiumFeatureYt => 'Дополнительные локации для просмотра';
-
-  @override
-  String get premiumFeatureSpeed => 'Приоритетные выходы для стриминга';
-
-  @override
-  String get premiumUnlimitedTraffic => 'Безлимитный трафик';
-
-  @override
-  String get premiumCta => 'Оформить Премиум';
-
-  @override
-  String get premiumOpenLocations => 'Открыть локации';
-
-  @override
-  String get subscriptionTabHint =>
-      'Тарифы и промокоды. Премиум открывает дополнительные локации.';
-
-  @override
-  String get subscriptionPay => 'Оплатить';
-
-  @override
-  String get locationsPremiumLocked => 'Премиум';
-
-  @override
-  String get locationsPremiumUnavailable => 'Доступно в Premium';
 
   @override
   String get settingsNoVpn => 'Белые списки';
@@ -285,16 +238,6 @@ class AppL10nRu extends AppL10n {
       'Не вышло проверить сервер. Нажмите ещё раз или выберите локацию вручную.';
 
   @override
-  String get homeQuotaExceededTitle => 'Лимит Free исчерпан';
-
-  @override
-  String get homeQuotaExceededHint =>
-      'В этом месяце израсходованы 4,20 ГБ. Оформите Premium — без лимита трафика.';
-
-  @override
-  String get homeQuotaUpgradeCta => 'Оформить Premium';
-
-  @override
   String get homeTtProvisionFailedTitle => 'Сервер недоступен';
 
   @override
@@ -367,13 +310,7 @@ class AppL10nRu extends AppL10n {
   String get settingsActiveBadge => 'Активна';
 
   @override
-  String get settingsAccessEarlyTitle => 'Премиум';
-
-  @override
   String get settingsAccessEarlySubtitle => 'Доступ по приглашению.';
-
-  @override
-  String get settingsAccessBetaTitle => 'Премиум';
 
   @override
   String get settingsAccessBetaSubtitle =>
@@ -387,9 +324,6 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get settingsAccessFreeTitle => 'Бесплатный';
-
-  @override
-  String get settingsAccessFreeSubtitle => '1 устройство · до 4,20 ГБ в месяц.';
 
   @override
   String settingsAccessActiveUntil(String date) {
@@ -408,12 +342,6 @@ class AppL10nRu extends AppL10n {
   String settingsSubscriptionTrialUntil(String date) {
     return 'Пробный период до $date';
   }
-
-  @override
-  String get settingsSubscriptionAlpha => 'Премиум';
-
-  @override
-  String get settingsSubscriptionExpired => 'Подписка истекла';
 
   @override
   String get settingsSubscriptionLoadError => 'Не удалось загрузить статус';
@@ -517,9 +445,6 @@ class AppL10nRu extends AppL10n {
   String get devicesThisDevice => 'Вы';
 
   @override
-  String get devicesOwnerLabel => 'Владелец подписки';
-
-  @override
   String get devicesInvitedLabel => 'Приглашённое устройство';
 
   @override
@@ -547,16 +472,6 @@ class AppL10nRu extends AppL10n {
   @override
   String get devicesLeaveHint =>
       'Это устройство станет отдельным бесплатным аккаунтом';
-
-  @override
-  String get devicesLeave => 'Покинуть чужую подписку';
-
-  @override
-  String get devicesLeaveTitle => 'Покинуть чужую подписку?';
-
-  @override
-  String get devicesLeaveBody =>
-      'Это устройство станет отдельным бесплатным аккаунтом. Оплаченная подписка останется у владельца. Сохраните новый код восстановления, если он появится.';
 
   @override
   String get devicesLeaveConfirm => 'Покинуть';
@@ -598,7 +513,7 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get splitTunnelBundledLead =>
-      'Сайты из списка открываются обычным интернетом, не через защиту. Остальное — через Теремок.';
+      'Сайты из списка открываются обычным интернетом, не через защиту. Остальное — через Прокси Дом.';
 
   @override
   String get splitTunnelBundledRuTitle => 'Готовые списки';
@@ -612,14 +527,14 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get splitTunnelBundledInfoBody =>
-      'Сайты из списка открываются обычным интернетом, не через защиту. Остальное по-прежнему через Теремок.\n\nНа iPhone нельзя вытащить из VPN целое приложение — только сайт по адресу. В Safari обычно срабатывает. Приложение банка или маркетплейса может остаться в VPN: у них свои адреса.\n\nКрупные сервисы сидят на куче серверов. Часть страниц или видео может идти через защиту, даже если тумблер включён. Если сайт должен быть под защитой — выключите его здесь.\n\nПосле изменения нажмите «Переподключить».';
+      'Сайты из списка открываются обычным интернетом, не через защиту. Остальное по-прежнему через Прокси Дом.\n\nНа iPhone нельзя вытащить из VPN целое приложение — только сайт по адресу. В Safari обычно срабатывает. Приложение банка или маркетплейса может остаться в VPN: у них свои адреса.\n\nКрупные сервисы сидят на куче серверов. Часть страниц или видео может идти через защиту, даже если тумблер включён. Если сайт должен быть под защитой — выключите его здесь.\n\nПосле изменения нажмите «Переподключить».';
 
   @override
   String get splitTunnelBundledInfoClose => 'Понятно';
 
   @override
   String get splitTunnelSitesLead =>
-      'Сайты из списка открываются обычным интернетом, не через защиту. Остальное — через Теремок.';
+      'Сайты из списка открываются обычным интернетом, не через защиту. Остальное — через Прокси Дом.';
 
   @override
   String get splitTunnelSitesIosNote =>
@@ -791,7 +706,7 @@ class AppL10nRu extends AppL10n {
   String get tunnelLogsDns => 'DNS';
 
   @override
-  String get tunnelLogsFetch => 'Подписка';
+  String get tunnelLogsFetch => 'Документ';
 
   @override
   String get tunnelLogsNetwork => 'Сеть';
@@ -840,10 +755,6 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get settingsReportFailed => 'Не удалось собрать отчёт';
-
-  @override
-  String get settingsReportTelegramFailed =>
-      'Не удалось отправить через бота. Текст отчёта скопирован.';
 
   @override
   String get settingsReportUnauthorized =>
@@ -970,12 +881,6 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get regionSectionGeneral => 'Общего назначения';
-
-  @override
-  String get regionSectionYoutube => 'Премиум';
-
-  @override
-  String get regionSectionYoutubeIos => 'Сервис';
 
   @override
   String get regionSectionFree => 'Бесплатно';
@@ -1116,48 +1021,6 @@ class AppL10nRu extends AppL10n {
   String get welcomeSkip => 'Пропустить';
 
   @override
-  String get promoTitle => 'Код доступа';
-
-  @override
-  String get promoHeadline => 'Введите персональный код';
-
-  @override
-  String get promoBody => 'Если есть код — введите его здесь.';
-
-  @override
-  String get promoCodeLabel => 'Код';
-
-  @override
-  String get promoCodeHint => 'Ваш промокод';
-
-  @override
-  String get promoCodeEmpty => 'Введите код';
-
-  @override
-  String get promoSubmit => 'Продолжить';
-
-  @override
-  String get promoOutcomeInvalid =>
-      'Код не найден. Проверьте и попробуйте снова.';
-
-  @override
-  String get promoOutcomeExpired => 'Срок действия кода истёк.';
-
-  @override
-  String get promoOutcomeExhausted => 'Этот код уже использован.';
-
-  @override
-  String get promoOutcomeRevoked => 'Код больше не действует.';
-
-  @override
-  String get promoOutcomeRateLimited =>
-      'Слишком много попыток. Подождите минуту.';
-
-  @override
-  String get promoOutcomeUnknown =>
-      'Не удалось применить код. Попробуйте ещё раз.';
-
-  @override
   String get referralShareTitle => 'Пригласить друга';
 
   @override
@@ -1227,28 +1090,10 @@ class AppL10nRu extends AppL10n {
   String get lockedHeadline => 'Добро пожаловать!';
 
   @override
-  String get lockedBody => 'Оформите подписку — и подключайтесь в один тап.';
-
-  @override
-  String get lockedCta => 'Оформить подписку или введите промокод';
-
-  @override
   String get lockedRefreshAccess => 'Обновить доступ';
 
   @override
   String get settingsSupport => 'Поддержка';
-
-  @override
-  String get settingsSupportHint => 'Telegram — перенос после переустановки';
-
-  @override
-  String get settingsSupportHintIos => 'Вопросы в Telegram-боте';
-
-  @override
-  String get lockedPay1m => 'Оплатить 1 месяц';
-
-  @override
-  String get lockedPay3m => 'Оплатить 3 месяца';
 
   @override
   String get lockedPlan1m => '1 месяц';
@@ -1261,16 +1106,6 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get lockedPlan12m => '12 месяцев';
-
-  @override
-  String lockedPayAmount(int price) {
-    return 'Оплатить $price ₽';
-  }
-
-  @override
-  String lockedPerMonth(int price) {
-    return '$price ₽/мес';
-  }
 
   @override
   String lockedSavePercent(int percent) {
@@ -1286,37 +1121,13 @@ class AppL10nRu extends AppL10n {
   String get settingsTerms => 'Соглашение';
 
   @override
-  String get settingsPricing => 'Тарифы';
-
-  @override
   String get settingsDeleteAccount => 'Удаление аккаунта';
-
-  @override
-  String get lockedOrPromo => 'Или введите промокод';
-
-  @override
-  String get lockedPayFailed =>
-      'Не удалось начать оплату. Попробуйте снова или напишите в поддержку.';
-
-  @override
-  String get lockedPayReturnTitle => 'Оплата открыта';
-
-  @override
-  String get lockedPayReturnBody =>
-      'После оплаты в браузере нажмите «Проверить доступ».';
-
-  @override
-  String get lockedPayReturnCheck => 'Проверить доступ';
 
   @override
   String get recoveryCodeTitle => 'Код восстановления';
 
   @override
   String get recoveryCodeHeadline => 'Код восстановления';
-
-  @override
-  String get recoveryCodeBody =>
-      'Сохраните код — понадобится после переустановки. Без кода можно восстановить через Telegram.';
 
   @override
   String get recoveryCodeCopy => 'Скопировать';
@@ -1335,13 +1146,6 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get restoreHeadline => 'Восстановить доступ';
-
-  @override
-  String get restoreBody => 'Введите код восстановления или откройте Telegram.';
-
-  @override
-  String get restoreBodyIos =>
-      'Введите код восстановления или откройте Telegram.';
 
   @override
   String get restorePaymentLabel => 'Номер платежа';
@@ -1402,17 +1206,6 @@ class AppL10nRu extends AppL10n {
   String get restoreHeadlineCode => 'Введите код восстановления';
 
   @override
-  String get restoreBodyCode =>
-      'После переустановки введите код восстановления или откройте Telegram.';
-
-  @override
-  String get restoreBodyCodeIos =>
-      'После переустановки введите код восстановления или откройте Telegram.';
-
-  @override
-  String get settingsInviteDevice => 'Добавить устройство в подписку';
-
-  @override
   String get settingsInviteDeviceHint => 'Код для входа в группу';
 
   @override
@@ -1434,14 +1227,7 @@ class AppL10nRu extends AppL10n {
   String get settingsAcceptSeatOk => 'Устройство добавлено в группу';
 
   @override
-  String get settingsSeatPremiumRequired =>
-      'Добавление устройств доступно в Premium';
-
-  @override
   String get settingsSeatCodeNotFound => 'Код не найден или истёк';
-
-  @override
-  String get settingsSeatDeviceLimit => 'Достигнут лимит устройств на подписке';
 
   @override
   String get settingsSeatOwnCode =>
@@ -1459,13 +1245,6 @@ class AppL10nRu extends AppL10n {
   @override
   String get settingsSeatScanHint =>
       'Отсканируйте QR-код или перейдите по ссылке';
-
-  @override
-  String get settingsPayOwnerOnly => 'Оплату оформляет владелец подписки';
-
-  @override
-  String get settingsSeatForbidden =>
-      'Это может сделать только владелец подписки';
 
   @override
   String get seatAcceptConsentTitle => 'Войти в эту группу?';
@@ -1489,100 +1268,6 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get bootstrapFailed => 'Не удалось начать сессию. Проверьте связь.';
-
-  @override
-  String get accountHubTitle => 'Аккаунт';
-
-  @override
-  String get accountHubGuestLead =>
-      'Аккаунт на этом устройстве. Код восстановления — после переустановки. Telegram — тот же аккаунт.';
-
-  @override
-  String get accountHubLinkedLead =>
-      'Telegram привязан. Бот — тот же аккаунт: подписка и восстановление.';
-
-  @override
-  String get accountHubLinkedLeadIos =>
-      'Telegram привязан. Бот — тот же аккаунт и восстановление.';
-
-  @override
-  String get accountHubRecoveryMissing =>
-      'Код на этом телефоне уже сохраняли. После переустановки откройте Telegram с тем же аккаунтом.';
-
-  @override
-  String get accountHubLinkTelegram => 'Telegram';
-
-  @override
-  String get accountHubLinkTelegramHint => 'Подписка и восстановление в боте';
-
-  @override
-  String get accountHubLinkEmail => 'Почта';
-
-  @override
-  String get accountHubLinkEmailHint => 'Привязать по коду из письма';
-
-  @override
-  String get accountHubRecovery => 'Код восстановления';
-
-  @override
-  String get accountHubRecoveryHint =>
-      'Восстановить доступ после переустановки';
-
-  @override
-  String get accountHubRecoverySaveBanner =>
-      'Сохраните код восстановления — он понадобится после переустановки.';
-
-  @override
-  String get accountHubRecoverySaveCta => 'Сохранить код';
-
-  @override
-  String get accountHubPromo => 'Промокод';
-
-  @override
-  String get accountHubPromoHint => 'Активировать код';
-
-  @override
-  String get accountHubAccessSection => 'Ваш доступ';
-
-  @override
-  String get accountHubContact => 'Контакт';
-
-  @override
-  String get accountHubLoadError => 'Не удалось загрузить аккаунт';
-
-  @override
-  String get accountTelegramLead =>
-      'Откройте бота и подтвердите привязку. Вернитесь в приложение — статус обновится автоматически.';
-
-  @override
-  String get accountTelegramOpenBot => 'Открыть Telegram';
-
-  @override
-  String get accountTelegramWaiting => 'Ждём подтверждения…';
-
-  @override
-  String get accountTelegramWaitingHint =>
-      'После /start в боте вернитесь сюда.';
-
-  @override
-  String get accountTelegramStartFailed =>
-      'Не удалось начать привязку Telegram';
-
-  @override
-  String get accountTelegramVpnRequired => 'Сначала подключитесь.';
-
-  @override
-  String get restoreTelegramCta => 'Восстановить через Telegram';
-
-  @override
-  String get restoreTelegramVpnRequired => 'Сначала подключитесь.';
-
-  @override
-  String get homeTelegramRestoreCta =>
-      'Уже был Теремок? Восстановите через Telegram';
-
-  @override
-  String get homeTelegramRestoreConnectFirst => 'Сначала подключитесь.';
 
   @override
   String get accountEmailLead => 'Укажите почту — пришлём одноразовый код.';
@@ -1673,40 +1358,6 @@ class AppL10nRu extends AppL10n {
   String get vpnDisclosureDecline => 'Не сейчас';
 
   @override
-  String accountTelegramLinkedTitle(String handle) {
-    return '$handle привязан';
-  }
-
-  @override
-  String get accountTelegramLinkedBody =>
-      'После переустановки доступ восстанавливается через этот Telegram. Подписка тоже в боте.';
-
-  @override
-  String get accountTelegramOwnerRestoredTitle => 'Аккаунт восстановлен';
-
-  @override
-  String get accountTelegramOwnerRestoredBody =>
-      'Теперь можно управлять подпиской и восстанавливать доступ через Telegram.';
-
-  @override
-  String get accountTelegramMemberRestoredTitle => 'Вернулись в подписку';
-
-  @override
-  String get accountTelegramMemberRestoredBody =>
-      'Владелец не изменился. Доступ подтянется в приложении.';
-
-  @override
-  String get accountTelegramDone => 'Готово';
-
-  @override
-  String get restoreTelegramSlotRevoked =>
-      'Владелец удалил это устройство. Попросите новый код приглашения.';
-
-  @override
-  String get restoreTelegramSubscriptionInactive =>
-      'Подписка сейчас не активна. После продления место можно восстановить снова.';
-
-  @override
   String get freeAdd => 'Добавить';
 
   @override
@@ -1765,7 +1416,7 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get freeSubscriptionLoadFail =>
-      'Подписка не загрузилась. Адрес документа не ответил.';
+      'Документ не загрузился. Адрес не ответил.';
 
   @override
   String get freeSubscriptionMissing => 'По этому адресу документа нет.';

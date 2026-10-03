@@ -1,8 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:teremok_connect/features/settings/data/split_tunnel_prefs.dart';
-import 'package:teremok_connect/features/vpn/data/vpn_route_policy.dart';
+import 'package:proxydom/features/settings/data/split_tunnel_prefs.dart';
+import 'package:proxydom/features/vpn/data/vpn_route_policy.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

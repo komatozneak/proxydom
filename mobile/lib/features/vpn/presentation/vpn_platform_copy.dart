@@ -29,21 +29,6 @@ String vpnDisclosureVpnBodyForPlatform(AppL10n l) =>
 String vpnDisclosureDataBodyForPlatform(AppL10n l) =>
     isIosTargetPlatform ? l.vpnDisclosureDataBodyIos : l.vpnDisclosureDataBody;
 
-String regionSectionYoutubeForPlatform(AppL10n l) =>
-    isIosTargetPlatform ? l.regionSectionYoutubeIos : l.regionSectionYoutube;
-
-String settingsSupportHintForPlatform(AppL10n l) =>
-    isIosTargetPlatform ? l.settingsSupportHintIos : l.settingsSupportHint;
-
-String accountHubLinkedLeadForPlatform(AppL10n l) =>
-    isIosTargetPlatform ? l.accountHubLinkedLeadIos : l.accountHubLinkedLead;
-
-String restoreBodyForPlatform(AppL10n l) =>
-    isIosTargetPlatform ? l.restoreBodyIos : l.restoreBody;
-
-String restoreBodyCodeForPlatform(AppL10n l) =>
-    isIosTargetPlatform ? l.restoreBodyCodeIos : l.restoreBodyCode;
-
 /// Strings Home / gate / disclosure actually paint for the current platform.
 List<String> visibleVpnGuidanceCopy(AppL10n l) => [
       homeVpnConflictHintForPlatform(l),

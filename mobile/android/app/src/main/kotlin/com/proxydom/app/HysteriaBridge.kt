@@ -1,4 +1,4 @@
-package com.teremok.connect.teremok_connect
+package com.proxydom.app
 
 import android.net.VpnService
 import android.util.Log
@@ -12,7 +12,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Sole dataplane (ADR 018). TUN is [startTun] inside hy2bind.
  *
  * Fails closed when `libs/hysteria-client.aar` is not bundled — never soft-pass
- * "QUIC up". SOCKS prove stays in [TeremokVpnService]. [ProtectGuard.protect]
+ * "QUIC up". SOCKS prove stays in [ProxyDomVpnService]. [ProtectGuard.protect]
  * is required so QUIC sockets do not loop into TUN.
  *
  * UnsatisfiedLinkError is an Error, not Exception — catch [Throwable] on the

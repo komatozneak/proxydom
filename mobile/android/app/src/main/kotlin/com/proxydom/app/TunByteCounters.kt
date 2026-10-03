@@ -1,4 +1,4 @@
-package com.teremok.connect.teremok_connect
+package com.proxydom.app
 
 import android.net.TrafficStats
 import android.util.Log

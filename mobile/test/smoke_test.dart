@@ -4,40 +4,19 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:teremok_connect/core/api_client.dart';
-import 'package:teremok_connect/core/app_locale.dart';
-import 'package:teremok_connect/core/config.dart';
-import 'package:teremok_connect/core/result.dart';
-import 'package:teremok_connect/core/retry_policy.dart';
-import 'package:teremok_connect/core/theme.dart';
-import 'package:teremok_connect/core/extensions.dart';
-import 'package:teremok_connect/core/token_storage.dart';
-import 'package:teremok_connect/features/home/application/vpn_provider.dart';
-import 'package:teremok_connect/features/home/presentation/home_screen.dart';
-import 'package:teremok_connect/features/home/presentation/widgets/server_card.dart';
-import 'package:teremok_connect/features/settings/data/split_tunnel_prefs.dart';
-import 'package:teremok_connect/features/vpn/data/vpn_config.dart';
-import 'package:teremok_connect/features/vpn/data/vpn_controller.dart';
-import 'package:teremok_connect/features/vpn/data/vpn_node.dart';
-import 'package:teremok_connect/features/vpn/data/vpn_nodes_repository.dart';
-import 'package:teremok_connect/features/vpn/data/vpn_service_config.dart';
-import 'package:teremok_connect/l10n/app_localizations.dart';
-
-/// Instant nodes catalog — home init must not hit the real VPS in CI.
-class _FakeVpnNodesRepository extends VpnNodesRepository {
-  @override
-  Future<List<VpnNode>> listNodes({bool allowCacheFallback = true}) async =>
-      const [];
-
-  @override
-  Future<({List<VpnNode> nodes, bool fromCache})> listNodesDetailed({
-    bool allowCacheFallback = true,
-  }) async =>
-      (nodes: <VpnNode>[], fromCache: false);
-
-  @override
-  Future<String?> getSelectedNodeId() async => null;
-}
+import 'package:proxydom/core/app_locale.dart';
+import 'package:proxydom/core/config.dart';
+import 'package:proxydom/core/result.dart';
+import 'package:proxydom/core/retry_policy.dart';
+import 'package:proxydom/core/theme.dart';
+import 'package:proxydom/core/extensions.dart';
+import 'package:proxydom/features/home/presentation/home_screen.dart';
+import 'package:proxydom/features/home/presentation/widgets/server_card.dart';
+import 'package:proxydom/features/settings/data/split_tunnel_prefs.dart';
+import 'package:proxydom/features/vpn/data/vpn_config.dart';
+import 'package:proxydom/features/vpn/data/vpn_controller.dart';
+import 'package:proxydom/features/vpn/data/vpn_service_config.dart';
+import 'package:proxydom/l10n/app_localizations.dart';
 
 /// Minimal valid Reality candidate for smoke fixtures (schema_version 1).
 Map<String, dynamic> _xrayCandidate({
@@ -92,7 +71,7 @@ void main() {
   testWidgets('Home screen shows Connect button when not connected',
       (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
-    const vpnChannel = MethodChannel('teremok/vpn');
+    const vpnChannel = MethodChannel('proxydom/vpn');
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(vpnChannel, (call) async {
       if (call.method == 'getStatus') return 'idle';
@@ -112,14 +91,10 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     AppLocale.set(const Locale('ru'));
 
-    final container = ProviderContainer(
-      overrides: [
-        vpnNodesRepositoryProvider.overrideWithValue(_FakeVpnNodesRepository()),
-      ],
-    );
+    final container = ProviderContainer();
     addTearDown(container.dispose);
 
-    // Pump Home directly — full TeremokApp + anonymous bootstrap races in tests
+    // Pump Home directly — full ProxyDomApp + anonymous bootstrap races in tests
     // (HttpClient mocked to 400) and redirects away from /home.
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -156,7 +131,7 @@ void main() {
 
   testWidgets('iOS Home hides NoVPN row and Apps pin', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
-    const vpnChannel = MethodChannel('teremok/vpn');
+    const vpnChannel = MethodChannel('proxydom/vpn');
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(vpnChannel, (call) async {
       if (call.method == 'getStatus') return 'idle';
@@ -176,11 +151,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     AppLocale.set(const Locale('ru'));
 
-    final container = ProviderContainer(
-      overrides: [
-        vpnNodesRepositoryProvider.overrideWithValue(_FakeVpnNodesRepository()),
-      ],
-    );
+    final container = ProviderContainer();
     addTearDown(container.dispose);
 
     await tester.pumpWidget(
@@ -233,7 +204,7 @@ void main() {
   });
 
   group('VpnController', () {
-    const channel = MethodChannel('teremok/vpn');
+    const channel = MethodChannel('proxydom/vpn');
     final List<MethodCall> log = <MethodCall>[];
 
     setUp(() {
@@ -550,22 +521,6 @@ void main() {
       expect(scheme.vpnStatusColor('error'), AppBrand.destructive);
       expect(scheme.vpnStatusColor('unknown'), scheme.outline);
     });
-  });
-
-  test('ApiClient has correct base URL', () {
-    expect(ApiClient.instance.options.baseUrl, AppConfig.baseUrl);
-  });
-
-  test('TokenStorage can be cleared safely on empty storage', () async {
-    const channel =
-        MethodChannel('plugins.it_nomads.com/flutter_secure_storage');
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(channel, (call) async => null);
-    addTearDown(() {
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(channel, null);
-    });
-    await TokenStorage.instance.clear();
   });
 
   group('RetryPolicy', () {

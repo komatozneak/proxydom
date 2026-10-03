@@ -7,8 +7,8 @@ import 'app_icon.dart';
 ///
 /// Do not [ColorFilter] the asset (would crush tones).
 /// Selected: full opacity; idle: muted. The selection ring lives on the button.
-class TeremokNavIcon extends StatelessWidget {
-  const TeremokNavIcon({
+class ProxyDomNavIcon extends StatelessWidget {
+  const ProxyDomNavIcon({
     super.key,
     this.selected = false,
     /// Side glyphs are ~20dp; mark should clearly dominate (~2.8×).

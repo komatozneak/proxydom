@@ -118,7 +118,7 @@ Future<Map<String, String>> loadSubscriptionDeviceHeaders() async {
   );
 }
 
-/// Stable id sent only to a document the person pasted. Not a Teremok seat.
+/// Stable id sent only to a document the person pasted. Not an account seat.
 class SubscriptionDeviceId {
   SubscriptionDeviceId._();
 
@@ -129,8 +129,8 @@ class SubscriptionDeviceId {
   final FlutterSecureStorage _storage = const FlutterSecureStorage(
     aOptions: AndroidOptions(
       encryptedSharedPreferences: true,
-      sharedPreferencesName: 'teremok_secure_tokens',
-      preferencesKeyPrefix: 'tc_',
+      sharedPreferencesName: 'proxydom_secure_tokens',
+      preferencesKeyPrefix: 'pd_',
     ),
     iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
   );

@@ -3,9 +3,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/core/theme.dart';
-import 'package:teremok_connect/features/home/presentation/home_screen.dart';
-import 'package:teremok_connect/l10n/app_localizations.dart';
+import 'package:proxydom/core/theme.dart';
+import 'package:proxydom/features/home/presentation/home_screen.dart';
+import 'package:proxydom/l10n/app_localizations.dart';
 
 const _screenSources = [
   'lib/features/home/presentation/home_screen.dart',

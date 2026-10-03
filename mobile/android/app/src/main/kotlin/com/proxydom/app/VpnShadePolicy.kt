@@ -1,4 +1,4 @@
-package com.teremok.connect.teremok_connect
+package com.proxydom.app
 
 /**
  * Shade + QS tile: one connection state, two projections.

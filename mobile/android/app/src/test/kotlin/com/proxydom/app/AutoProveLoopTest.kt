@@ -1,7 +1,7 @@
-package com.teremok.connect.teremok_connect
+package com.proxydom.app
 
-import com.teremok.connect.teremok_connect.session.AutoCandidate
-import com.teremok.connect.teremok_connect.session.AutoProveLoop
+import com.proxydom.app.session.AutoCandidate
+import com.proxydom.app.session.AutoProveLoop
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test

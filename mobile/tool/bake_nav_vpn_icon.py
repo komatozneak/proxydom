@@ -33,7 +33,7 @@ def punch_vpn(mono: Image.Image) -> Image.Image:
     alpha = out.split()[-1]
     bbox = alpha.getbbox()
     if not bbox:
-        raise SystemExit("mono_teremok has empty alpha")
+        raise SystemExit("mono_proxydom has empty alpha")
     left, top, right, bottom = bbox
     content_w, content_h = right - left, bottom - top
     cx = left + content_w // 2

@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/features/vpn/data/vpn_config.dart';
+import 'package:proxydom/features/vpn/data/vpn_config.dart';
 
 Map<String, dynamic> _candidate({
   required String id,

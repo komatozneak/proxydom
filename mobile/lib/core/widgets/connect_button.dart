@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 import '../theme.dart';
 
 /// ============================================================================
-/// TEREMOK CONNECT BUTTON — Signal Nest (CustomPainter)
+/// PROXY DOM CONNECT BUTTON — Signal Nest (CustomPainter)
 /// ============================================================================
 /// Real motion (not PNG / not broken Rive timeline swap):
 ///   1. Idle — muted nest, soft slow pulse

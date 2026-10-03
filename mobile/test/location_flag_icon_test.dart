@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/core/theme.dart';
-import 'package:teremok_connect/core/widgets/app_icon.dart';
-import 'package:teremok_connect/core/widgets/location_flag_icon.dart';
-import 'package:teremok_connect/l10n/app_localizations.dart';
+import 'package:proxydom/core/theme.dart';
+import 'package:proxydom/core/widgets/app_icon.dart';
+import 'package:proxydom/core/widgets/location_flag_icon.dart';
+import 'package:proxydom/l10n/app_localizations.dart';
 
 void main() {
   test('locationFlagKey maps emoji and product tiles', () {

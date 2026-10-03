@@ -3,7 +3,7 @@ import Foundation
 import NetworkExtension
 import UIKit
 
-/// iOS side of MethodChannel `teremok/vpn` (same name as Android).
+/// iOS side of MethodChannel `proxydom/vpn` (same name as Android).
 /// Starts `NETunnelProviderManager` → Packet Tunnel appex (ADR 019).
 private final class TunnelHealthOnce {
   var done = false
@@ -22,12 +22,12 @@ private final class TunnelHealthOnce {
   }
 }
 
-enum TeremokVpnChannel {
-  static let methodChannelName = "teremok/vpn"
-  static let statusEventChannelName = "teremok/vpn/status"
-  static let sessionEventChannelName = "teremok/vpn/session"
-  static let trafficEventChannelName = "teremok/vpn/traffic"
-  static let pingEventChannelName = "teremok/vpn/ping"
+enum ProxyDomVpnChannel {
+  static let methodChannelName = "proxydom/vpn"
+  static let statusEventChannelName = "proxydom/vpn/status"
+  static let sessionEventChannelName = "proxydom/vpn/session"
+  static let trafficEventChannelName = "proxydom/vpn/traffic"
+  static let pingEventChannelName = "proxydom/vpn/ping"
   static let appGroupId = "group.su.proxydom.app"
   static let tunnelBundleId = "su.proxydom.app.VpnTunnelProvider"
   static let paramsKey = "vpn.paramsJson"
@@ -86,15 +86,15 @@ enum TeremokVpnChannel {
         result(s)
       case "hasActiveSession":
         // Parity with Android KEY_ACTIVE — not live NEVPN (idle+session → reconnect).
-        let active = TeremokVpnShared.isSessionActive()
-        TeremokVpnShared.appendNativeLog(
+        let active = ProxyDomVpnShared.isSessionActive()
+        ProxyDomVpnShared.appendNativeLog(
           "channel.hasActiveSession=\(active) status=\(resolveStatus(log: false))"
         )
         result(active)
       case "getLastError":
         result(UserDefaults(suiteName: appGroupId)?.string(forKey: lastErrorKey))
       case "getNativeLogTail":
-        result(TeremokVpnShared.nativeLogTail())
+        result(ProxyDomVpnShared.nativeLogTail())
       case "requestPermission":
         // Android: VpnService.prepare. iOS consent is the system VPN dialog on
         // startVPNTunnel — do not block Connect with MissingPluginException.
@@ -199,7 +199,7 @@ enum TeremokVpnChannel {
       out = "idle"
     }
     if log {
-      TeremokVpnShared.appendNativeLog(
+      ProxyDomVpnShared.appendNativeLog(
         "channel.resolve nevpn=\(cachedNEVPNStatus.rawValue) group=\(group) out=\(out)"
       )
     }
@@ -222,7 +222,7 @@ enum TeremokVpnChannel {
       guard let connection = note.object as? NEVPNConnection else { return }
       cachedNEVPNStatus = connection.status
       let mapped = mapNEVPNStatus(connection.status)
-      TeremokVpnShared.appendNativeLog(
+      ProxyDomVpnShared.appendNativeLog(
         "NEVPNStatusDidChange raw=\(connection.status.rawValue) mapped=\(mapped)"
       )
       // Keep App Group honest when iOS drops the tunnel without channel.stop.
@@ -265,17 +265,17 @@ enum TeremokVpnChannel {
       )
       return
     }
-    TeremokVpnShared.appendNativeLog("channel.startTunnel")
+    ProxyDomVpnShared.appendNativeLog("channel.startTunnel")
     bumpGeneration()
     defaults()?.set(paramsJson, forKey: paramsKey)
     defaults()?.removeObject(forKey: lastErrorKey)
-    TeremokVpnShared.setSessionActive(true)
+    ProxyDomVpnShared.setSessionActive(true)
     publishStatus("connecting")
 
     loadManager(paramsJson: paramsJson) { manager, error in
       if let error {
         defaults()?.set(error.localizedDescription, forKey: lastErrorKey)
-        TeremokVpnShared.setSessionActive(false)
+        ProxyDomVpnShared.setSessionActive(false)
         publishStatus("idle")
         result(
           FlutterError(
@@ -287,7 +287,7 @@ enum TeremokVpnChannel {
         return
       }
       guard let manager else {
-        TeremokVpnShared.setSessionActive(false)
+        ProxyDomVpnShared.setSessionActive(false)
         result(
           FlutterError(code: "manager", message: "nil manager", details: nil)
         )
@@ -302,7 +302,7 @@ enum TeremokVpnChannel {
               "previous tunnel still disconnecting",
               forKey: lastErrorKey
             )
-            TeremokVpnShared.setSessionActive(false)
+            ProxyDomVpnShared.setSessionActive(false)
             publishStatus("idle")
             result(
               FlutterError(
@@ -320,7 +320,7 @@ enum TeremokVpnChannel {
           result(true)
         } catch {
           defaults()?.set(error.localizedDescription, forKey: lastErrorKey)
-          TeremokVpnShared.setSessionActive(false)
+          ProxyDomVpnShared.setSessionActive(false)
           publishStatus("idle")
           result(
             FlutterError(
@@ -341,12 +341,12 @@ enum TeremokVpnChannel {
   ) {
     let tag = reason?.trimmingCharacters(in: .whitespacesAndNewlines)
     let reasonTag = (tag?.isEmpty == false) ? tag! : (wipe ? "wipe" : "user_tap")
-    TeremokVpnShared.setLastStopReason(reasonTag)
-    TeremokVpnShared.appendNativeLog(
+    ProxyDomVpnShared.setLastStopReason(reasonTag)
+    ProxyDomVpnShared.appendNativeLog(
       "channel.stopTunnel wipe=\(wipe) reason=\(reasonTag)"
     )
     // User-initiated stop — do not auto-reconnect.
-    TeremokVpnShared.setSessionActive(false)
+    ProxyDomVpnShared.setSessionActive(false)
     NETunnelProviderManager.loadAllFromPreferences { managers, _ in
       nevpnPreferencesLoaded = true
       let ours = managers?.filter {
@@ -361,7 +361,7 @@ enum TeremokVpnChannel {
       }
       for manager in ours {
         let status = manager.connection.status
-        TeremokVpnShared.appendNativeLog(
+        ProxyDomVpnShared.appendNativeLog(
           "channel.stopTunnel nevpn=\(status.rawValue)"
         )
         if status == .connected || status == .connecting || status == .reasserting {
@@ -389,7 +389,7 @@ enum TeremokVpnChannel {
   private static func fetchTunnelHealth(result: @escaping FlutterResult) {
     let once = TunnelHealthOnce(result)
     DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-      let persisted = TeremokVpnShared.lastTunnelHealth()
+      let persisted = ProxyDomVpnShared.lastTunnelHealth()
       once.finish(persisted.isEmpty ? nil : persisted)
     }
     NETunnelProviderManager.loadAllFromPreferences { managers, _ in
@@ -405,7 +405,7 @@ enum TeremokVpnChannel {
           || manager.connection.status == .connecting
           || manager.connection.status == .reasserting
       else {
-        let persisted = TeremokVpnShared.lastTunnelHealth()
+        let persisted = ProxyDomVpnShared.lastTunnelHealth()
         once.finish(persisted.isEmpty ? nil : persisted)
         return
       }
@@ -416,11 +416,11 @@ enum TeremokVpnChannel {
             once.finish(s)
             return
           }
-          let persisted = TeremokVpnShared.lastTunnelHealth()
+          let persisted = ProxyDomVpnShared.lastTunnelHealth()
           once.finish(persisted.isEmpty ? nil : persisted)
         }
       } catch {
-        let persisted = TeremokVpnShared.lastTunnelHealth()
+        let persisted = ProxyDomVpnShared.lastTunnelHealth()
         once.finish(persisted.isEmpty ? nil : persisted)
       }
     }
@@ -481,12 +481,12 @@ enum TeremokVpnChannel {
       let manager = existing ?? NETunnelProviderManager()
       let proto = NETunnelProviderProtocol()
       proto.providerBundleIdentifier = tunnelBundleId
-      proto.serverAddress = hostFromParams(paramsJson) ?? "Teremok VPN"
+      proto.serverAddress = hostFromParams(paramsJson) ?? "Прокси Дом"
       if #available(iOS 14.2, *) {
         proto.excludeLocalNetworks = true
       }
       manager.protocolConfiguration = proto
-      manager.localizedDescription = "Teremok VPN"
+      manager.localizedDescription = "Прокси Дом"
       manager.isEnabled = true
       manager.saveToPreferences { saveError in
         if let saveError {
@@ -540,14 +540,14 @@ private final class StatusStreamHandler: NSObject, FlutterStreamHandler {
     -> FlutterError?
   {
     sink = events
-    events(TeremokVpnChannel.readStatusPublic())
+    events(ProxyDomVpnChannel.readStatusPublic())
     observer = NotificationCenter.default.addObserver(
       forName: .NEVPNStatusDidChange,
       object: nil,
       queue: .main
     ) { [weak self] note in
       guard let connection = note.object as? NEVPNConnection else { return }
-      let mapped = TeremokVpnChannel.mapNEVPNStatus(connection.status)
+      let mapped = ProxyDomVpnChannel.mapNEVPNStatus(connection.status)
       self?.sink?(mapped)
     }
     return nil
@@ -574,7 +574,7 @@ private final class SessionStreamHandler: NSObject, FlutterStreamHandler {
     -> FlutterError?
   {
     sink = events
-    events(Self.snapshot(for: TeremokVpnChannel.readStatusPublic()))
+    events(Self.snapshot(for: ProxyDomVpnChannel.readStatusPublic()))
     return nil
   }
 
@@ -630,7 +630,7 @@ private final class StubMapStreamHandler: NSObject, FlutterStreamHandler {
   }
 }
 
-extension TeremokVpnChannel {
+extension ProxyDomVpnChannel {
   fileprivate static func readStatusPublic() -> String {
     resolveStatus(log: false)
   }

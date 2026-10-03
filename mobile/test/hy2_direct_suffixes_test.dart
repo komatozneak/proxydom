@@ -4,10 +4,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:teremok_connect/features/settings/data/split_tunnel_prefs.dart';
-import 'package:teremok_connect/features/vpn/data/vpn_config.dart';
-import 'package:teremok_connect/features/vpn/data/vpn_controller.dart';
-import 'package:teremok_connect/features/vpn/data/vpn_route_policy.dart';
+import 'package:proxydom/features/settings/data/split_tunnel_prefs.dart';
+import 'package:proxydom/features/vpn/data/vpn_config.dart';
+import 'package:proxydom/features/vpn/data/vpn_controller.dart';
+import 'package:proxydom/features/vpn/data/vpn_route_policy.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -16,7 +16,7 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
-      const MethodChannel('teremok/vpn'),
+      const MethodChannel('proxydom/vpn'),
       null,
     );
   });
@@ -120,7 +120,7 @@ void main() {
     String? captured;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
-      const MethodChannel('teremok/vpn'),
+      const MethodChannel('proxydom/vpn'),
       (call) async {
         if (call.method == 'start') {
           final args = Map<Object?, Object?>.from(call.arguments as Map);
@@ -187,7 +187,7 @@ Future<Map<String, dynamic>> _captureStartParams(
   String? captured;
   TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
       .setMockMethodCallHandler(
-    const MethodChannel('teremok/vpn'),
+    const MethodChannel('proxydom/vpn'),
     (call) async {
       if (call.method == 'start') {
         final args = Map<Object?, Object?>.from(call.arguments as Map);

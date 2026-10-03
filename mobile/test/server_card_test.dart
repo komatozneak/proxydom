@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/core/theme.dart';
-import 'package:teremok_connect/core/widgets/location_flag_icon.dart';
-import 'package:teremok_connect/features/home/application/vpn_provider.dart';
-import 'package:teremok_connect/features/home/application/vpn_status.dart';
-import 'package:teremok_connect/features/home/presentation/widgets/server_card.dart';
-import 'package:teremok_connect/features/vpn/data/node_display.dart';
-import 'package:teremok_connect/l10n/app_localizations.dart';
+import 'package:proxydom/core/theme.dart';
+import 'package:proxydom/core/widgets/location_flag_icon.dart';
+import 'package:proxydom/features/home/application/vpn_provider.dart';
+import 'package:proxydom/features/home/application/vpn_status.dart';
+import 'package:proxydom/features/home/presentation/widgets/server_card.dart';
+import 'package:proxydom/features/vpn/data/node_display.dart';
+import 'package:proxydom/l10n/app_localizations.dart';
 
 class _FixedVpnNotifier extends VpnNotifier {
   _FixedVpnNotifier(this._status);

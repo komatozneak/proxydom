@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/features/vpn/data/hy2_link_parser.dart';
+import 'package:proxydom/features/vpn/data/hy2_link_parser.dart';
 
 void main() {
   test('parseHy2Link keeps plus in the password', () {

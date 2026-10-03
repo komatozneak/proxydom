@@ -1,4 +1,4 @@
-package com.teremok.connect.teremok_connect
+package com.proxydom.app
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -12,6 +12,6 @@ class HysteriaCoreSelectionTest {
         assertFalse(isHysteriaCore(emptyMap()))
         assertFalse(isHysteriaCore(mapOf("vpnCore" to "xray")))
         assertFalse(isHysteriaCore(mapOf("vpnCore" to "trusttunnel")))
-        assertEquals("hysteria", TeremokVpnService.VPN_CORE_HYSTERIA)
+        assertEquals("hysteria", ProxyDomVpnService.VPN_CORE_HYSTERIA)
     }
 }

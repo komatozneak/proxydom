@@ -1,10 +1,10 @@
-package com.teremok.connect.teremok_connect
+package com.proxydom.app
 
-import com.teremok.connect.teremok_connect.session.PathTransport
-import com.teremok.connect.teremok_connect.session.SessionPhase
-import com.teremok.connect.teremok_connect.session.SessionReason
-import com.teremok.connect.teremok_connect.session.SessionSnapshot
-import com.teremok.connect.teremok_connect.session.VpnSessionEngine
+import com.proxydom.app.session.PathTransport
+import com.proxydom.app.session.SessionPhase
+import com.proxydom.app.session.SessionReason
+import com.proxydom.app.session.SessionSnapshot
+import com.proxydom.app.session.VpnSessionEngine
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue

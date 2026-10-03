@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/core/device_platform.dart';
+import 'package:proxydom/core/device_platform.dart';
 
 void main() {
   tearDown(() {

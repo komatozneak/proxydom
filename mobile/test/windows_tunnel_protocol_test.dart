@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/features/vpn/data/windows_tunnel_protocol.dart';
+import 'package:proxydom/features/vpn/data/windows_tunnel_protocol.dart';
 
 void main() {
   test('controller contract is protocol v3 newline JSON', () {
@@ -19,6 +19,24 @@ void main() {
     expect(message['protocol_version'], 3);
     expect(message.containsKey('outbounds'), isFalse);
     expect(message['direct_domains'], ['lan.example']);
+  });
+
+  test('connect carries the udp bypass and the force-proxy hosts', () {
+    final message = tunnelConnect(
+      uri: 'hy2://secret@cdn.example:443',
+      directDomains: ['steamserver.net'],
+      forceProxyDomains: ['youtube.com', 'bad host'],
+      udpDirect: true,
+    );
+    expect(message['force_proxy_domains'], ['youtube.com']);
+    expect(message['udp_direct'], 1);
+
+    final off = tunnelConnect(
+      uri: 'hy2://secret@cdn.example:443',
+      directDomains: const [],
+    );
+    expect(off['force_proxy_domains'], isEmpty);
+    expect(off['udp_direct'], 0);
   });
 
   test('state parser preserves authoritative broker fields', () {
@@ -153,6 +171,14 @@ void main() {
     expect(
       windowsGateCaption('egress_timeout', '', generic),
       'Узел недоступен',
+    );
+    expect(
+      windowsGateCaption(
+        'egress_failed',
+        'Не удалось подтвердить доступность узла. Попробуйте другой сервер',
+        generic,
+      ),
+      'Не удалось подтвердить доступность узла. Попробуйте другой сервер',
     );
     expect(
       windowsGateCaption('route_failed', 'Сбой применения маршрутов', generic),

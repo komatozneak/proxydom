@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/core/theme.dart';
-import 'package:teremok_connect/core/widgets/app_icon.dart';
+import 'package:proxydom/core/theme.dart';
+import 'package:proxydom/core/widgets/app_icon.dart';
 
 void main() {
   testWidgets('AppIcon uses Phosphor static icons under AppTheme',

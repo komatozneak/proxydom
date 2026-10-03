@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:teremok_connect/features/vpn/data/share_link_parser.dart';
-import 'package:teremok_connect/features/vpn/data/subscription_label.dart';
+import 'package:proxydom/features/vpn/data/share_link_parser.dart';
+import 'package:proxydom/features/vpn/data/subscription_label.dart';
 
 void main() {
   test('subscription title and server remarks keep emoji flags', () {

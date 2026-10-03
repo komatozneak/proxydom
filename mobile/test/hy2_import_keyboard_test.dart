@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:teremok_connect/features/vpn/presentation/hy2_import_screen.dart';
-import 'package:teremok_connect/l10n/app_localizations.dart';
+import 'package:proxydom/features/vpn/presentation/hy2_import_screen.dart';
+import 'package:proxydom/l10n/app_localizations.dart';
 
 void main() {
   testWidgets('add screen stays inside the keyboard inset', (tester) async {

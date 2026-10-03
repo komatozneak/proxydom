@@ -210,7 +210,7 @@ int session(HANDLE pipe) {
   });
 
   std::string inbound;
-  bool prove_sent = false;
+  std::int64_t last_proved_gen = 0;
   while (stdin_open.load()) {
     DWORD avail = 0;
     if (!PeekNamedPipe(pipe, nullptr, 0, nullptr, &avail, nullptr)) break;
@@ -228,15 +228,20 @@ int session(HANDLE pipe) {
           break;
         }
         std::cout << response << std::endl;
-        if (prove_sent || response.find("\"event\":\"tun_ready\"") == std::string::npos) continue;
-        prove_sent = true;
-        const bool ok = user_ingress_204();
+        if (response.find("\"event\":\"state\"") != std::string::npos &&
+            response.find("\"state\":\"idle\"") != std::string::npos) {
+          last_proved_gen = 0;
+        }
+        if (response.find("\"event\":\"tun_ready\"") == std::string::npos) continue;
         const auto generation = generation_of(response);
+        if (!prove_generation_due(last_proved_gen, generation)) continue;
+        const bool ok = user_ingress_204();
         if (!write_json(pipe, std::string("{\"command\":\"prove\",\"protocol_version\":3,\"generation\":") +
                                   std::to_string(generation) + ",\"message\":\"" + (ok ? "ok" : "fail") + "\"}")) {
           stdin_open.store(false);
           break;
         }
+        last_proved_gen = generation;
       }
     }
 

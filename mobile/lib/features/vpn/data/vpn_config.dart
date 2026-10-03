@@ -36,7 +36,7 @@ class VpnConfig {
   /// Hysteria2 core profile. Required when [activeCore] is hysteria.
   final HysteriaProfile? hysteriaProfile;
 
-  /// Egress VPS host from `GET /vpn/config` (`node_host`).
+  /// Egress host carried on a parsed profile (`node_host`).
   final String? nodeHost;
 
   bool get isTrustTunnelSession => activeCore == VpnActiveCore.trusttunnel;
