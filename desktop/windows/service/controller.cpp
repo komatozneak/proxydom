@@ -141,19 +141,25 @@ bool user_ingress_204() {
   return body.find(" 204") != std::string::npos;
 }
 
-bool read_json(HANDLE pipe, std::string& json) {
-  std::string buffer;
+// The buffer is the caller's because the broker answers one command with more
+// than one frame, and a frame split across two reads must survive between them.
+bool read_json(HANDLE pipe, std::string& inbound, std::string& json) {
   char bytes[8192];
   while (true) {
     DWORD got = 0;
     const BOOL ok = ReadFile(pipe, bytes, sizeof(bytes), &got, nullptr);
     if (!ok && GetLastError() != ERROR_MORE_DATA) return false;
     if (got == 0) return false;
-    buffer.append(bytes, got);
+    inbound.append(bytes, got);
     std::string error;
-    if (take_frame(buffer, json, error)) return error.empty();
-    if (!error.empty() || buffer.size() > kFrameMaxBody + 4) return false;
+    if (take_frame(inbound, json, error)) return error.empty();
+    if (!error.empty() || inbound.size() > kFrameMaxBody + 4) return false;
   }
+}
+
+bool read_json(HANDLE pipe, std::string& json) {
+  std::string inbound;
+  return read_json(pipe, inbound, json);
 }
 
 void print_client_error(const std::string& code) {
@@ -179,6 +185,51 @@ void print_unavailable(DWORD error) {
          "\"message\":\"Служба Прокси Дом недоступна. Переустановите приложение\","
          "\"cleanup_verified\":true,\"win32\":"
       << error << "}" << std::endl;
+}
+
+int disconnect_once(HANDLE pipe) {
+  // Generation 0 skips the generation check on purpose: the session this stops
+  // may have been started by a window that has since closed, and that window
+  // is exactly the case there is no other way to stop.
+  if (!write_json(pipe,
+                  "{\"command\":\"disconnect\",\"protocol_version\":3,\"generation\":0}")) {
+    return 3;
+  }
+  const ULONGLONG deadline = GetTickCount64() + 20000;
+  std::string inbound;
+  for (;;) {
+    DWORD avail = 0;
+    if (!PeekNamedPipe(pipe, nullptr, 0, nullptr, &avail, nullptr)) return 4;
+    if (avail == 0) {
+      if (GetTickCount64() >= deadline) {
+        std::cout
+            << "{\"event\":\"state\",\"generation\":0,\"state\":\"disconnecting\","
+               "\"code\":\"disconnect_timeout\",\"message\":null,"
+               "\"cleanup_verified\":false}"
+            << std::endl;
+        return 5;
+      }
+      Sleep(20);
+      continue;
+    }
+    char bytes[8192];
+    DWORD got = 0;
+    const DWORD want = avail > sizeof(bytes) ? static_cast<DWORD>(sizeof(bytes)) : avail;
+    if (!ReadFile(pipe, bytes, want, &got, nullptr) || got == 0) return 4;
+    inbound.append(bytes, got);
+    for (;;) {
+      std::string response;
+      std::string error;
+      if (!take_frame(inbound, response, error)) {
+        if (!error.empty()) return 5;
+        break;
+      }
+      std::cout << response << std::endl;
+      // The ack says the command was taken; only a state event says the
+      // routes are back, and that is the exit code the caller cares about.
+      if (response.find("\"event\":\"state\"") != std::string::npos) return 0;
+    }
+  }
 }
 
 int status_once(HANDLE pipe) {
@@ -281,10 +332,11 @@ int session(HANDLE pipe) {
 #ifndef PROXY_DOM_CTL_LIBRARY
 int wmain(int argc, wchar_t** argv) {
   const bool status = argc >= 2 && wcscmp(argv[1], L"status") == 0;
+  const bool stop = argc >= 2 && wcscmp(argv[1], L"disconnect") == 0;
   const bool interactive =
       argc == 1 || (argc >= 2 && wcscmp(argv[1], L"session") == 0);
-  if (!status && !interactive) {
-    std::cerr << "usage: ProxyDomCtl.exe [session|status]\n";
+  if (!status && !stop && !interactive) {
+    std::cerr << "usage: ProxyDomCtl.exe [session|status|disconnect]\n";
     return 64;
   }
 
@@ -295,6 +347,11 @@ int wmain(int argc, wchar_t** argv) {
   }
   if (status) {
     const int code = status_once(pipe);
+    CloseHandle(pipe);
+    return code;
+  }
+  if (stop) {
+    const int code = disconnect_once(pipe);
     CloseHandle(pipe);
     return code;
   }

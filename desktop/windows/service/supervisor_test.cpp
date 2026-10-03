@@ -1025,6 +1025,22 @@ void test_connections_body_parses() {
   expect(!parse_connections("{\"downloadTotal\":1}", rows), "a body without connections is refused");
 }
 
+// ADR 034. The pipe is a channel, not a lease. Only a lost client is allowed
+// to leave the tunnel up; every other reason must still stop it, so a later
+// edit cannot quietly turn another teardown path into a keep-alive.
+void test_only_a_lost_client_keeps_the_tunnel() {
+  expect(!tunnel_should_stop(TeardownReason::ClientGone),
+         "a closed pipe is not a stop request");
+  expect(tunnel_should_stop(TeardownReason::Explicit), "the user can still stop the tunnel");
+  expect(tunnel_should_stop(TeardownReason::ServiceStop), "a service stop tears the tunnel down");
+  expect(tunnel_should_stop(TeardownReason::Suspend), "sleep tears the tunnel down");
+  expect(tunnel_should_stop(TeardownReason::Lost), "a lost engine tears the tunnel down");
+  expect(std::string(reason_name(TeardownReason::ClientGone)) == "client_gone",
+         "the journal names the reason");
+  expect(std::string(reason_name(TeardownReason::Suspend)) == "suspend",
+         "every reason has a name");
+}
+
 int main() {
   test_route_policy();
   test_slash_port_connects_and_junk_does_not_launch();
@@ -1050,6 +1066,7 @@ int main() {
   test_resolve_and_route_table_failures();
   test_flow_counters_record_the_outbound();
   test_connections_body_parses();
+  test_only_a_lost_client_keeps_the_tunnel();
   if (g_failed != 0) {
     std::cerr << g_failed << " failed\n";
     return 1;

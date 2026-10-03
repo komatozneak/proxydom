@@ -36,8 +36,9 @@ class WindowsConnectResult {
 ///
 /// Flutter never opens the LocalSystem named pipe. The sibling native
 /// controller owns Windows IPC and exchanges newline-delimited JSON over its
-/// standard streams. Closing the window closes that controller lease, which
-/// makes the broker restore its owned routes.
+/// standard streams. The controller is a channel, not a lease: closing the
+/// window closes the channel and the service keeps the tunnel, so this side
+/// asks for the live state with `hello` on every attach (ADR 034).
 class WindowsTunnel {
   WindowsTunnel._();
 
@@ -141,6 +142,17 @@ class WindowsTunnel {
         }
       }),
     );
+
+    // The tunnel outlives the window, so attaching is not the same as
+    // starting: ask what the service already owns before the user touches
+    // anything. Without this a window reopened over a live session shows idle
+    // while traffic is still being routed.
+    try {
+      _commands!.writeln(jsonEncode(tunnelHello()));
+      await _commands!.flush().timeout(const Duration(seconds: 3));
+    } catch (_) {
+      // A courtesy frame. connect() and refresh() each send their own.
+    }
   }
 
   String _localFailure(

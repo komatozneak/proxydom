@@ -248,6 +248,25 @@ TunWaitClass classify_tun_wait(const TunWaitView& view);
 // Empty when Connect may proceed. The name is the blocking adapter.
 std::string active_foreign_tunnel(const std::vector<RouteView>& routes);
 
+// Why the broker is looking at the tunnel again.
+//
+// The pipe is a channel, not a lease. The service owns the session and the
+// next window re-attaches to it with `hello`, so a closed client channel is
+// listed here as a reason that leaves the tunnel alone. Reading a lost pipe as
+// a stop request is what made the tunnel die with the window, and what let a
+// flapping pipe kill a live session.
+enum class TeardownReason {
+  ClientGone,
+  Explicit,
+  ServiceStop,
+  Suspend,
+  Lost,
+};
+
+// The single rule: only a lost client keeps the tunnel running.
+bool tunnel_should_stop(TeardownReason reason);
+const char* reason_name(TeardownReason reason);
+
 std::string encode_ledger(const Ledger& ledger);
 bool decode_ledger(const std::string& text, Ledger& ledger);
 
