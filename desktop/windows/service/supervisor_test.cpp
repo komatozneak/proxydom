@@ -1104,15 +1104,15 @@ void test_connection_ids_make_the_total_monotonic() {
 void test_a_lull_is_journalled_as_a_number() {
   Harness h;
   auto state = std::make_shared<FlowState>();
-  // Poll 1 establishes the baseline. Polls 2-4 move nothing, which is fifteen
-  // seconds of stillness. Poll 5 moves again, which must clear the lull.
+  // Poll 1 establishes the baseline. Polls 2-3 move nothing, which is ten seconds
+  // of stillness and closes the first window. Poll 4 moves again, which ends it.
   state->script = {
-      {flow_row("game", "udp", "direct", "162.254.1.1:27015", 1000, 100000)},
       {flow_row("game", "udp", "direct", "162.254.1.1:27015", 1000, 100000)},
       {flow_row("game", "udp", "direct", "162.254.1.1:27015", 1000, 100000)},
       {flow_row("game", "udp", "direct", "162.254.1.1:27015", 1000, 100000)},
       {flow_row("game", "udp", "direct", "162.254.1.1:27015", 2000, 200000)},
       {flow_row("game", "udp", "direct", "162.254.1.1:27015", 3000, 300000)},
+      {flow_row("game", "udp", "direct", "162.254.1.1:27015", 4000, 400000)},
   };
   std::uint64_t now = 0;
   h.supervisor.set_clock([&now] { return now; });
@@ -1133,22 +1133,121 @@ void test_a_lull_is_journalled_as_a_number() {
   expect(rates.size() == 2, "one rate line per summary window");
 
   if (rates.size() == 2) {
-    // Window one closed while the flow was already still.
+    // Window one closed while the lull was still running, so it has no completed
+    // stall yet and says so with a running figure instead of a zero that would
+    // read as "nothing happened".
     expect(rates[0].find("quiet_ms=10000") != std::string::npos,
            "the lull in progress is journalled");
+    expect(rates[0].find("stall_ms:0 stalls:0") != std::string::npos,
+           "a lull that has not ended yet is not counted as a completed one");
     expect(rates[0].find("udp:direct=dn_kbps:0") != std::string::npos,
            "a window with no bytes reads zero rather than nothing");
-    // Window two spans the stall and the recovery, so the worst lull is the
-    // full fifteen seconds and the running one has been cleared.
-    expect(rates[1].find("worst_quiet_ms=15000") != std::string::npos,
-           "the longest lull of the session is journalled");
-    expect(rates[1].find("quiet_ms=0") != std::string::npos,
+    // Window two is where the lull ended, so it is this window's stall.
+    expect(rates[1].find("stall_ms:10000 stalls:1") != std::string::npos,
+           "the longest lull of the window is journalled, and how many there were");
+    expect(rates[1].find("quiet_ms:0") != std::string::npos,
            "traffic resuming clears the lull in progress");
-    expect(rates[1].find("live_udp:direct:1") != std::string::npos,
+    expect(rates[1].find("live:1") != std::string::npos,
            "the number of live udp connections is journalled, so a re-established "
            "flow is distinguishable from a stall");
-    expect(rates[1].find("udp:direct=dn_kbps:13") != std::string::npos,
+    expect(rates[1].find("udp:direct=dn_kbps:19") != std::string::npos,
            "the rate is measured over the window, not inferred from totals");
+  }
+}
+
+// The flaw this replaces: worst_quiet_ms was a record for the whole session. It
+// was set during the first lull and could never move again without exceeding
+// it, so in a real session it froze while four later stalls went past unseen.
+void test_a_later_dip_is_not_hidden_by_the_session_record() {
+  Harness h;
+  auto state = std::make_shared<FlowState>();
+  // A twenty-second stall, then a ten-second one. Both are real dips; the second
+  // is smaller, and a record could not show it. Ten-second steps put two polls
+  // in each summary window.
+  state->script = {
+      {flow_row("game", "udp", "direct", "162.254.1.1:27015", 1000, 100000)},
+      {flow_row("game", "udp", "direct", "162.254.1.1:27015", 1000, 100000)},
+      {flow_row("game", "udp", "direct", "162.254.1.1:27015", 1000, 100000)},
+      {flow_row("game", "udp", "direct", "162.254.1.1:27015", 2000, 200000)},
+      {flow_row("game", "udp", "direct", "162.254.1.1:27015", 2000, 200000)},
+      {flow_row("game", "udp", "direct", "162.254.1.1:27015", 3000, 300000)},
+  };
+  std::uint64_t now = 0;
+  h.supervisor.set_clock([&now] { return now; });
+  h.supervisor.set_flow_factory([state](unsigned short, const std::string&) {
+    return std::unique_ptr<FlowProbe>(new FakeFlows(state));
+  });
+
+  h.connect();
+  for (int step = 0; step < 6; ++step) {
+    now += 10000;
+    h.supervisor.watchdog(h.cancel);
+  }
+
+  std::vector<std::string> rates;
+  for (const auto& line : h.log.lines) {
+    if (line.event == "flow_rate") rates.push_back(line.code);
+  }
+  expect(rates.size() == 3, "three windows at ten-second steps");
+
+  if (rates.size() == 3) {
+    expect(rates[1].find("stall_ms:20000 stalls:1") != std::string::npos,
+           "the first stall is reported in the window it ended in");
+    expect(rates[2].find("stall_ms:10000 stalls:1") != std::string::npos,
+           "the later, smaller dip is still reported, even though the record is larger");
+    expect(rates[2].find("worst_quiet_ms=20000") != std::string::npos,
+           "the session record is still carried, as history");
+  }
+}
+
+// Two chains, one quiet. "Nothing moved anywhere" is not the question; whether
+// the chain carrying the game went quiet while another kept dripping is.
+void test_silence_is_counted_per_chain() {
+  Harness h;
+  auto state = std::make_shared<FlowState>();
+  // The tunnel chain dribbles on every poll. The game chain is still from the
+  // second poll to the fourth, so a single global counter would be reset by the
+  // tunnel on every sample and would report a healthy network.
+  state->script = {
+      {flow_row("game", "udp", "direct", "162.254.1.1:27015", 1000, 100000),
+       flow_row("web", "tcp", "proxy", "142.250.1.1:443", 1000, 100000)},
+      {flow_row("game", "udp", "direct", "162.254.1.1:27015", 1000, 100000),
+       flow_row("web", "tcp", "proxy", "142.250.1.1:443", 2000, 200200)},
+      {flow_row("game", "udp", "direct", "162.254.1.1:27015", 1000, 100000),
+       flow_row("web", "tcp", "proxy", "142.250.1.1:443", 3000, 300300)},
+      {flow_row("game", "udp", "direct", "162.254.1.1:27015", 2000, 200000),
+       flow_row("web", "tcp", "proxy", "142.250.1.1:443", 4000, 400400)},
+      {flow_row("game", "udp", "direct", "162.254.1.1:27015", 3000, 300000),
+       flow_row("web", "tcp", "proxy", "142.250.1.1:443", 5000, 500500)},
+      {flow_row("game", "udp", "direct", "162.254.1.1:27015", 4000, 400000),
+       flow_row("web", "tcp", "proxy", "142.250.1.1:443", 6000, 600600)},
+  };
+  std::uint64_t now = 0;
+  h.supervisor.set_clock([&now] { return now; });
+  h.supervisor.set_flow_factory([state](unsigned short, const std::string&) {
+    return std::unique_ptr<FlowProbe>(new FakeFlows(state));
+  });
+
+  h.connect();
+  for (int step = 0; step < 6; ++step) {
+    now += 5000;
+    h.supervisor.watchdog(h.cancel);
+  }
+
+  std::vector<std::string> rates;
+  for (const auto& line : h.log.lines) {
+    if (line.event == "flow_rate") rates.push_back(line.code);
+  }
+  expect(rates.size() == 2, "one rate line per summary window");
+
+  if (rates.size() == 2) {
+    expect(rates[1].find("udp:direct=dn_kbps:19/up_kbps:0 stall_ms:10000 stalls:1") !=
+               std::string::npos,
+           "the game chain is shown stalled while the tunnel keeps carrying the window");
+    expect(rates[1].find("tcp:proxy=dn_kbps:") != std::string::npos &&
+               rates[1].find("tcp:proxy=") != std::string::npos &&
+               rates[1].find("stall_ms:0 stalls:0 quiet_ms:0 live:") != std::string::npos,
+           "the tunnel chain is reported on its own terms, and is not stalled");
   }
 }
 
@@ -1231,6 +1330,8 @@ int main() {
   test_connections_body_parses();
   test_connection_ids_make_the_total_monotonic();
   test_a_lull_is_journalled_as_a_number();
+  test_a_later_dip_is_not_hidden_by_the_session_record();
+  test_silence_is_counted_per_chain();
   test_an_unattributable_row_is_reported_once();
   test_only_a_lost_client_keeps_the_tunnel();
   if (g_failed != 0) {
