@@ -14,6 +14,8 @@ import 'vpn_session_snapshot.dart';
 import 'windows_tunnel.dart';
 
 bool get _isIosSplit => !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
+bool get _isAndroidNative =>
+    !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
 /// Bridge between Flutter UI and Android VpnService (Hysteria2, ADR 018).
 ///
@@ -161,9 +163,6 @@ class VpnController {
         'startAuto',
         {'candidatesJson': paramsJsonList},
       );
-      if (result == true) {
-        await SplitTunnelPrefs.markApplied();
-      }
       return result ?? false;
     } on PlatformException catch (e) {
       throw VpnControllerException('auto start failed: ${e.code} ${e.message}');
@@ -229,9 +228,6 @@ class VpnController {
         'start',
         {'paramsJson': paramsJson},
       );
-      if (result == true) {
-        await SplitTunnelPrefs.markApplied();
-      }
       return result ?? false;
     } on PlatformException catch (e) {
       throw VpnControllerException(
@@ -318,6 +314,14 @@ class VpnController {
     }
     return false;
   }
+
+  /// True only where the native side answers `getProvenEgress`.
+  ///
+  /// [provenEgressIp] returns null when the channel has no case for the method,
+  /// and null used to be read as "no egress", so the post-connect probe tore
+  /// down live sessions on iOS and Windows. Those platforms prove the tunnel in
+  /// their own layer — the iOS OS route set and the Windows broker gate.
+  bool get egressProbeSupported => _isAndroidNative;
 
   Future<String?> provenEgressIp() async {
     try {
