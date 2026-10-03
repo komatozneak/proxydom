@@ -592,11 +592,14 @@ class VpnNotifier extends Notifier<VpnStatus> {
       protocol: protocol,
       connectedSince: since,
     );
+    await _markSplitTunnelApplied();
     SessionTrace.mark('connected');
     _rememberFreeSession(sessionKey);
     unawaited(_persistConnectedUi());
-    final probeToken = ++_egressProbeToken;
-    unawaited(_logEgressProbe(token: probeToken));
+    if (VpnController.instance.egressProbeSupported) {
+      final probeToken = ++_egressProbeToken;
+      unawaited(_logEgressProbe(token: probeToken));
+    }
     unawaited(
       VpnController.instance.getUnderlyingNetworkInterface().then((iface) {
         final name = iface?.trim();
@@ -886,6 +889,20 @@ class VpnNotifier extends Notifier<VpnStatus> {
     );
   }
 
+  /// Exclusion rules are live from the moment the session is Connected, so the
+  /// draft revision is spent there — not when the start command was accepted.
+  ///
+  /// Marking on command acceptance was wrong on Android (a start that never
+  /// establishes still spent the draft) and absent on Windows (the banner never
+  /// cleared). Both paint sites call this.
+  Future<void> _markSplitTunnelApplied() async {
+    try {
+      await SplitTunnelPrefs.markApplied();
+    } catch (e) {
+      _vpnLog('[VPN] markApplied failed: $e');
+    }
+  }
+
   /// Explicit stop → start so route-mode / site prefs enter the next runtime config.
   Future<bool> reconnectToApplyRouting() async {
     final wasConnected = state is VpnConnected || state is VpnConnecting;
@@ -909,6 +926,9 @@ class VpnNotifier extends Notifier<VpnStatus> {
     await _clearConnectedSince();
     state = const VpnDisconnected();
     await connect(forceRestart: true);
+    // connect() owns the native channels; the cancel above must not be the last
+    // word, or the resumed session never repaints and Nest spins forever.
+    _subscribeToStatus();
     return state is VpnConnected;
   }
 
@@ -1193,6 +1213,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
             protocol: imported.scheme,
             connectedSince: DateTime.now(),
           );
+          await _markSplitTunnelApplied();
           return;
         }
         SessionTrace.mark('vpn_service');
