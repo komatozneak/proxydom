@@ -1,5 +1,7 @@
 #include "win32_window.h"
 
+#include <windowsx.h>
+
 #include <dwmapi.h>
 #include <flutter_windows.h>
 
@@ -17,6 +19,11 @@ namespace {
 #endif
 
 constexpr const wchar_t kWindowClassName[] = L"FLUTTER_RUNNER_WIN32_WINDOW";
+
+// Smallest frame the desktop layout stays honest in. Below it the rail, the
+// status plate and the action keys stop fitting side by side.
+constexpr int kMinWindowWidth = 940;
+constexpr int kMinWindowHeight = 640;
 
 /// Registry key for app theme preference.
 ///
@@ -134,8 +141,16 @@ bool Win32Window::Create(const std::wstring& title,
   UINT dpi = FlutterDesktopGetDpiForMonitor(monitor);
   double scale_factor = dpi / 96.0;
 
+  // The window has to be resizable and maximizable: a fixed-size frame is the
+  // loudest non-desktop signal there is, and the desktop layout is designed to
+  // use extra width instead of stretching a phone column.
+  //
+  // No system caption: Flutter draws it. WS_THICKFRAME stays so the window keeps
+  // a resize border and the Aero snap layout, and WM_NCCALCSIZE below gives the
+  // whole window to the client area — without that the invisible system frame
+  // would still steal the top 30px the lockup is drawn into.
   constexpr DWORD kFixedWindowStyle =
-      WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
+      WS_POPUP | WS_THICKFRAME | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
   HWND window = CreateWindow(
       window_class, title.c_str(), kFixedWindowStyle,
       Scale(origin.x, scale_factor), Scale(origin.y, scale_factor),
@@ -181,6 +196,96 @@ Win32Window::MessageHandler(HWND hwnd,
                             WPARAM const wparam,
                             LPARAM const lparam) noexcept {
   switch (message) {
+    case WM_NCCALCSIZE: {
+      // wParam is TRUE when the window is being resized; returning 0 there makes
+      // the client area cover the entire window including what would have been
+      // the caption.
+      //
+      // The cost of that: DefWindowProc's own hit test now sees no frame at all
+      // and answers HTCLIENT everywhere, so the resize border and the snap
+      // layout have to be answered by hand in WM_NCHITTEST below. They are.
+      if (wparam == TRUE) {
+        return 0;
+      }
+      break;
+    }
+
+    case WM_NCHITTEST: {
+      if (caption_height_ <= 0) {
+        break;
+      }
+      POINT point{GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
+      ScreenToClient(hwnd, &point);
+
+      RECT client{};
+      GetClientRect(hwnd, &client);
+
+      // GetSystemMetrics is the physical border width, so this holds at any DPI
+      // without the caller having to scale anything.
+      const int border = GetSystemMetrics(SM_CXSIZEFRAME) +
+                         GetSystemMetrics(SM_CXPADDEDBORDER);
+      const bool left = point.x < border;
+      const bool right = point.x >= (client.right - border);
+      const bool top = point.y < border;
+      const bool bottom = point.y >= (client.bottom - border);
+
+      // The resize frame, over the whole window — not just beside the caption.
+      // Order matters: corners win over edges, so the diagonal cursors appear
+      // exactly at the corners.
+      if (top && left) return HTTOPLEFT;
+      if (top && right) return HTTOPRIGHT;
+      if (bottom && left) return HTBOTTOMLEFT;
+      if (bottom && right) return HTBOTTOMRIGHT;
+      if (left) return HTLEFT;
+      if (right) return HTRIGHT;
+      if (top) return HTTOP;
+      if (bottom) return HTBOTTOM;
+
+      if (point.y < caption_height_) {
+        // The buttons are ours to click, so they must not start a drag.
+        if (PtInRect(&caption_buttons_, point)) {
+          return HTCLIENT;
+        }
+        // The caption itself. Returning HTCAPTION is what gives the window its
+        // drag, its double-click-to-maximize and its snap layouts back.
+        return HTCAPTION;
+      }
+      break;
+    }
+
+    case kSetCaptionHitTestRectMsg: {
+      caption_height_ = static_cast<LONG>(wparam);
+      caption_buttons_ = *reinterpret_cast<RECT*>(lparam);
+      return 0;
+    }
+
+    case WM_GETMINMAXINFO: {
+      // Below this the rail, the status plate and the keys stop fitting: the
+      // layout would fall back to the phone column inside a window frame.
+      MINMAXINFO* info = reinterpret_cast<MINMAXINFO*>(lparam);
+      HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+      UINT dpi = FlutterDesktopGetDpiForMonitor(monitor);
+      double scale = dpi / 96.0;
+      info->ptMinTrackSize.x = static_cast<LONG>(Scale(kMinWindowWidth, scale));
+      info->ptMinTrackSize.y = static_cast<LONG>(Scale(kMinWindowHeight, scale));
+
+      // With no non-client area, the system's idea of "maximized" is the whole
+      // monitor — taskbar included. The work area is the honest answer, and it
+      // is also what makes maximize land on the right monitor of a multi-monitor
+      // set rather than on the primary one.
+      MONITORINFO monitor_info = {};
+      monitor_info.cbSize = sizeof(monitor_info);
+      if (monitor != nullptr && GetMonitorInfo(monitor, &monitor_info)) {
+        const RECT& work = monitor_info.rcWork;
+        const RECT& full = monitor_info.rcMonitor;
+        info->ptMaxPosition.x = work.left - full.left;
+        info->ptMaxPosition.y = work.top - full.top;
+        info->ptMaxSize.x = work.right - work.left;
+        info->ptMaxSize.y = work.bottom - work.top;
+      }
+      return 0;
+    }
+
     case WM_DESTROY:
       window_handle_ = nullptr;
       Destroy();
@@ -255,6 +360,11 @@ RECT Win32Window::GetClientArea() {
   RECT frame;
   GetClientRect(window_handle_, &frame);
   return frame;
+}
+
+void Win32Window::SetCaptionRegion(LONG height, const RECT& buttons) {
+  caption_height_ = height;
+  caption_buttons_ = buttons;
 }
 
 HWND Win32Window::GetHandle() {

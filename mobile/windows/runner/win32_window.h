@@ -10,6 +10,14 @@
 // A class abstraction for a high DPI-aware Win32 Window. Intended to be
 // inherited from by classes that wish to specialize with custom
 // rendering and input handling
+// The window draws its own caption: Flutter paints the lockup and the three
+// window buttons, so the system frame is off. Everything the frame used to do
+// — dragging, snap layouts, resizing, the system menu — is still done by the OS,
+// not reimplemented: WM_NCCALCSIZE hands the whole window to the client area,
+// and WM_NCHITTEST answers HTCAPTION over the band the way it would have
+// answered over the real caption.
+constexpr UINT kSetCaptionHitTestRectMsg = WM_APP + 1;
+
 class Win32Window {
  public:
   struct Point {
@@ -55,6 +63,10 @@ class Win32Window {
   // Return a RECT representing the bounds of the current client area.
   RECT GetClientArea();
 
+  // Hands the caption band to Flutter: |height| pixels at the top of the client
+  // area become draggable, except inside |buttons| which stay clickable.
+  void SetCaptionRegion(LONG height, const RECT& buttons);
+
  protected:
   // Processes and route salient window messages for mouse handling,
   // size change and DPI. Delegates handling of these to member overloads that
@@ -91,6 +103,15 @@ class Win32Window {
   static void UpdateTheme(HWND const window);
 
   bool quit_on_close_ = false;
+
+  // How tall the self-drawn caption is, in physical pixels, 0 disables the
+  // caption behaviour entirely and leaves the window as a plain frame.
+  LONG caption_height_ = 0;
+
+  // The part of the caption Flutter has claimed for itself — the window buttons.
+  // Everything there answers HTCLIENT so the buttons stay clickable; the rest of
+  // the caption keeps answering HTCAPTION and stays draggable.
+  RECT caption_buttons_ = {0, 0, 0, 0};
 
   // Outer window size in physical pixels. Min and max track stay here so the
   // phone frame cannot be dragged to another size.

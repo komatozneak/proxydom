@@ -197,6 +197,18 @@ class AppBrand {
   static const Color inkMutedDark = Color(0xFFC8C8D0);
   static const Color lineDark = Color(0xFF73737C);
 
+  /// Hover on a window-caption button. The bar sits on the night, so the mark
+  /// is a light wash rather than a fill — a filled chip reads as a button in an
+  /// app and breaks the illusion that the caption is the window itself.
+  static const Color hoverCaption = Color(0x1AFFFFFF);
+
+  /// Painted under a caption button that is not hovered: nothing, explicitly.
+  static const Color idleCaption = Color(0x00000000);
+
+  /// Hover on the close button, which is the one button that carries an
+  /// outcome rather than an action. Windows says that in red.
+  static const Color hoverCloseCaption = Color(0xFFE81123);
+
   static const Color info = Color(0xFF558B2F);
 
   static const Color onSurfaceVariantDark = Color(0xFFC8C8D0);
