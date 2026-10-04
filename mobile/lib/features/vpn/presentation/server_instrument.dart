@@ -223,41 +223,55 @@ class ProfileInstrument extends StatelessWidget {
                     ),
                   ),
                   if (selectedNodeTitle != null) ...[
+                    // One flexible child, not two. The Spacer and the name
+                    // were both flexible, so they split the slack down the
+                    // middle and the pair floated in the centre of the rule
+                    // instead of sitting on its right end.
                     const Spacer(),
-                    const SizedBox(width: 10),
-                    // Which node is live. Labelled, not implied: a bare name
-                    // beside a count reads as one word run together.
-                    Text(
-                      l.locationsActive,
-                      style: TextStyle(
-                        fontSize: 9.5,
-                        letterSpacing: 1.6,
-                        fontWeight: FontWeight.w700,
-                        color: mute.withValues(alpha: 0.7),
-                      ),
-                    ),
-                    const SizedBox(width: 7),
-                    Container(
-                      width: 4,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: AppBrand.mascotGold,
-                      ),
-                    ),
-                    const SizedBox(width: 7),
-                    Flexible(
-                      child: Text(
-                        selectedNodeTitle!.toUpperCase(),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 10,
-                          letterSpacing: 1.4,
-                          fontWeight: FontWeight.w700,
-                          color: AppBrand.mascotGoldLit,
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(width: 10),
+                        // Which node is live. Labelled, not implied: a bare
+                        // name beside a count reads as one word run together.
+                        Text(
+                          l.locationsActive,
+                          style: TextStyle(
+                            fontSize: 9.5,
+                            letterSpacing: 1.6,
+                            fontWeight: FontWeight.w700,
+                            color: mute.withValues(alpha: 0.7),
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 7),
+                        Container(
+                          width: 4,
+                          height: 4,
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: AppBrand.mascotGold,
+                          ),
+                        ),
+                        const SizedBox(width: 7),
+                        ConstrainedBox(
+                          // Room for the name, but never more than the rule
+                          // has: a long one ellipsises instead of pushing the
+                          // count off the left end.
+                          constraints: const BoxConstraints(maxWidth: 140),
+                          child: Text(
+                            selectedNodeTitle!.toUpperCase(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.right,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              letterSpacing: 1.4,
+                              fontWeight: FontWeight.w700,
+                              color: AppBrand.mascotGoldLit,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ],

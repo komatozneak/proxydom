@@ -241,12 +241,16 @@ TextStyle _mono(
               style: _mono(
                 context,
                 size: 13,
-                // The block mark names the screen, not the state. It wore the
-                // accent, so on a connected tunnel the word «ПОДКЛЮЧЕНИЕ» at
-                // the top went green along with the status — the label and the
-                // reading sharing one colour, which is the one thing a label
-                // must never do.
-                color: AppBrand.mascotGold.withValues(alpha: 0.75),
+                // The block is a lamp, the word is a name.
+                //
+                // It has been both wrong ways round: first it wore the state
+                // colour and made the word «ПОДКЛЮЧЕНИЕ» look like a reading,
+                // then it was pinned to the house gold and stayed gold through
+                // an error — a lit lamp on a screen whose own text said the
+                // service was down. Now it carries the state and the word keeps
+                // the muted ink of a label, so the colour is always the truth
+                // and the name is never a second opinion.
+                color: accent,
                 weight: 700,
                 spacing: 0,
               ),
