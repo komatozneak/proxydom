@@ -139,33 +139,59 @@ class ProfileInstrument extends StatelessWidget {
                   // split one short text into two boxes and the link became a
                   // button floating on the far side of the card; here the note
                   // and the way to act on it are the same object.
-                  _Block(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            description,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              fontSize: 13.5,
-                              height: 1.45,
-                              fontWeight: FontWeight.w600,
-                              color: theme.colorScheme.onSurface
-                                  .withValues(alpha: 0.88),
-                            ),
-                          ),
+                  LayoutBuilder(
+                    builder: (context, box) {
+                      final note = Text(
+                        description,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontSize: 13.5,
+                          height: 1.45,
+                          fontWeight: FontWeight.w600,
+                          color: theme.colorScheme.onSurface
+                              .withValues(alpha: 0.88),
                         ),
-                        if (onTelegram != null) ...[
-                          const SizedBox(width: 12),
-                          ToolAction(
-                            icon: AppIcons.paperPlane,
-                            label: telegramLabel ?? l.freeTelegram,
-                            onTap: onTelegram,
-                            tone: AppActionTone.link,
-                          ),
-                        ],
-                      ],
-                    ),
+                      );
+                      final link = onTelegram == null
+                          ? null
+                          : ToolAction(
+                              icon: AppIcons.paperPlane,
+                              label: telegramLabel ?? l.freeTelegram,
+                              onTap: onTelegram,
+                              tone: AppActionTone.link,
+                            );
+                      // Beside the note while there is room, under it when
+                      // there is not. On a phone the row squeezed the seller's
+                      // text into a two-word column with the key taking the
+                      // rest of the line, which made the note look like a
+                      // caption for the button.
+                      final side = box.hasBoundedWidth &&
+                          box.maxWidth >= 460 &&
+                          link != null;
+                      return _Block(
+                        child: side
+                            ? Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Expanded(child: note),
+                                  const SizedBox(width: 12),
+                                  link,
+                                ],
+                              )
+                            : Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  note,
+                                  if (link != null) ...[
+                                    const SizedBox(height: 12),
+                                    Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: link,
+                                    ),
+                                  ],
+                                ],
+                              ),
+                      );
+                    },
                   ),
                 ],
               ],
@@ -351,7 +377,24 @@ List<String> profileFacts({
   final traffic = parseSubscriptionTraffic(trafficMeta);
   final label = formatSubscriptionTraffic(traffic, russian: russian);
   if (label.trim().isNotEmpty) out.add(label.trim());
-  final updated = lastUpdated?.trim();
-  if (updated != null && updated.isNotEmpty) out.add(updated);
+  final updated = _updatedLabel(lastUpdated, russian: russian);
+  if (updated != null) out.add(updated);
   return out;
+}
+
+/// `обновлено 04.10` — never the raw stamp.
+///
+/// The store keeps the moment of the last refresh as an ISO string, and it was
+/// printed straight into a chip: `2026-10-04T12:22:09.665032Z`, twenty-seven
+/// characters of fraction that pushed the whole chip row onto a second line and
+/// told a person nothing they could read. The day and the month is the fact.
+String? _updatedLabel(String? raw, {required bool russian}) {
+  final stamp = raw?.trim();
+  if (stamp == null || stamp.isEmpty) return null;
+  final at = DateTime.tryParse(stamp);
+  if (at == null) return stamp;
+  final local = at.toLocal();
+  final day = local.day.toString().padLeft(2, '0');
+  final month = local.month.toString().padLeft(2, '0');
+  return russian ? 'обновлено $day.$month' : 'updated $day.$month';
 }

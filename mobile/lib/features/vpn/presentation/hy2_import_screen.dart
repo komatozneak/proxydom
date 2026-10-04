@@ -7,6 +7,7 @@ import '../../../core/diagnostics/ui_log.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/app_action_button.dart';
+import '../../../core/widgets/proxydom_ground.dart';
 import '../../../core/widgets/app_surface.dart';
 import '../../../core/widgets/proxydom_snackbar.dart';
 import '../../../l10n/app_localizations.dart';
@@ -257,7 +258,8 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
     // measure. On a phone that is the whole width; in a window it is 640px,
     // because a link field stretched across 1400px is the phone layout wearing
     // a big coat.
-    return Scaffold(
+    return NightBackdrop(
+      child: Scaffold(
       backgroundColor: Colors.transparent,
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
@@ -492,6 +494,7 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
             ),
           ),
         ),
+      ),
       ),
     );
   }

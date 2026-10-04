@@ -6,6 +6,7 @@ import '../../../core/widgets/app_action_button.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/app_surface.dart';
 import '../../../l10n/app_localizations.dart';
+import 'server_glyph.dart';
 
 /// Paste, and on the phone a matching QR. Windows has no camera and no QR.
 ///
@@ -254,125 +255,124 @@ TextStyle _mono(
           ],
         ),
         const SizedBox(height: 14),
-        // Where, what, how long — spread across the width on a desktop, stacked
-        // on a phone. Three columns in 360dp is not a terminal head, it is a
-        // line of three truncated words reading as one.
-        if (windowsDesktop) ...[
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+        // Where you are, in the middle and large.
+        //
+        // The middle used to be the state word — «НЕ ПОДКЛЮЧЕНО» — which is
+        // the one fact the house behind it already says with its whole body:
+        // dark house, no light, not connected. The thing the head was not
+        // saying is *where*, and a country is a picture, so it gets the size
+        // and the centre.
+        Center(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Flexible(flex: 4, child: _nameField(context, mute, ink)),
-              Flexible(flex: 7, child: _statusField(context, accent)),
-              Flexible(flex: 3, child: _uptimeField(context, ink, mute, uptime)),
-            ],
-          ),
-        ] else ...[
-          _nameField(context, mute, ink),
-          const SizedBox(height: 12),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Expanded(
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: _statusField(context, accent),
+              if (serverFlag != null && serverFlag!.isNotEmpty) ...[
+                FlagMark(flag: serverFlag!, width: 38),
+                const SizedBox(width: 12),
+              ] else ...[
+                Icon(AppIcons.globe, size: 22, color: mute),
+                const SizedBox(width: 12),
+              ],
+              Flexible(
+                child: Text(
+                  serverName.toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: _mono(
+                    context,
+                    size: 21,
+                    color: ink,
+                    weight: 700,
+                    spacing: 1.6,
+                  ),
                 ),
               ),
-              _uptimeField(context, ink, mute, uptime),
             ],
           ),
-        ],
-        const SizedBox(height: 16),
-        // The rail the traffic runs on.
-        _TrafficRail(
-          label: trafficLabel ?? '--',
-          value: capped ? trafficUsed.clamp(0.0, 1.0) : 0.0,
-          capped: capped,
-          color: trafficColor ?? accent,
-          mono: _mono,
         ),
-      ],
-    );
-  }
-
-  /// Where we are: a flag and the server's name, one line.
-  Widget _nameField(BuildContext context, Color mute, Color ink) {
-    return Row(
-      children: [
-        if (serverFlag != null && serverFlag!.isNotEmpty) ...[
-          Text(serverFlag!, style: const TextStyle(fontSize: 15)),
-          const SizedBox(width: 6),
-        ] else ...[
-          Icon(AppIcons.globe, size: 14, color: mute),
-          const SizedBox(width: 6),
-        ],
-        Flexible(
-          child: Text(
-            serverName.toUpperCase(),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: _mono(
-              context,
-              size: 11.5,
-              color: ink.withValues(alpha: 0.8),
-              spacing: 0.6,
-            ),
+        const SizedBox(height: 10),
+        // The state under it, small: the lamp is the signal, the word is the
+        // caption. Centred, because everything above it is.
+        Center(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _Lamp(color: accent, size: 8),
+              const SizedBox(width: 9),
+              Flexible(
+                child: Text(
+                  status.toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: _mono(
+                    context,
+                    size: 11,
+                    color: accent,
+                    weight: 700,
+                    spacing: 2.2,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
-      ],
-    );
-  }
-
-  /// What is happening: the lamp and the state under it.
-  Widget _statusField(BuildContext context, Color accent) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _Lamp(color: accent, size: 9),
-        const SizedBox(height: 6),
-        Text(
-          status.toUpperCase(),
-          maxLines: 1,
-          textAlign: TextAlign.center,
-          overflow: TextOverflow.ellipsis,
-          style: _mono(
-            context,
-            size: 14,
-            color: accent,
-            weight: 700,
-            spacing: 0.4,
-          ).copyWith(height: 1.15),
+        const SizedBox(height: 16),
+        // The rail the traffic runs on, the spent GB at its end, and the clock
+        // turned on its side beside them.
+        //
+        // Uptime used to sit in the same row as the state, where it read as
+        // part of the state — «подключено 00:12:04» — which is a lie: uptime is
+        // how long, not whether. Turned against the GB count it is clearly a
+        // second measurement, not a longer sentence.
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: _TrafficRail(
+                label: trafficLabel ?? '--',
+                value: capped ? trafficUsed.clamp(0.0, 1.0) : 0.0,
+                capped: capped,
+                color: trafficColor ?? accent,
+                mono: _mono,
+              ),
+            ),
+            if (windowsDesktop) ...[
+              const SizedBox(width: 10),
+              _uptimeField(context, ink, mute, uptime),
+            ],
+          ],
         ),
       ],
     );
   }
 
-  /// How long: the clock, right-aligned so the digits do not dance.
+  /// How long, turned on its side.
+  ///
+  /// Perpendicular to the GB count it stands beside: two measurements at right
+  /// angles read as two measurements, while two numbers in one row read as one
+  /// number with a strange tail.
   Widget _uptimeField(
     BuildContext context,
     Color ink,
     Color mute,
     String? uptime,
   ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          'UPTIME',
-          style: _mono(
-            context,
-            size: 9,
-            color: mute.withValues(alpha: 0.7),
-            spacing: 1.4,
+    return RotatedBox(
+      quarterTurns: 1,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'UPTIME',
+            style: _mono(
+              context,
+              size: 9,
+              color: mute.withValues(alpha: 0.7),
+              spacing: 1.4,
+            ),
           ),
-        ),
-        const SizedBox(height: 5),
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerRight,
-          child: Text(
+          const SizedBox(width: 7),
+          Text(
             uptime ?? '--:--:--',
             style: _mono(
               context,
@@ -380,8 +380,8 @@ TextStyle _mono(
               color: ink.withValues(alpha: 0.78),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -433,7 +433,11 @@ class _TrafficRail extends StatelessWidget {
                   duration: const Duration(milliseconds: 700),
                   curve: Curves.easeOutCubic,
                   builder: (context, v, _) => CustomPaint(
-                    painter: _SegmentBarPainter(value: v, color: color),
+                    painter: _SegmentBarPainter(
+                      value: v,
+                      color: color,
+                      night: dark,
+                    ),
                     isComplex: true,
                   ),
                 ),
@@ -470,10 +474,22 @@ class _TrafficRail extends StatelessWidget {
 }
 
 class _SegmentBarPainter extends CustomPainter {
-  _SegmentBarPainter({required this.value, required this.color});
+  _SegmentBarPainter({
+    required this.value,
+    required this.color,
+    required this.night,
+  });
 
   final double value;
   final Color color;
+
+  /// The two themes need two different rails, not one rail at two opacities.
+  /// On the night the empty cells are the same colour, nearly out: a dark
+  /// groove with light in part of it. On paper that trick disappears — 12% of
+  /// gold on cream is nothing — so the empty cells become ink instead, a real
+  /// groove cut into the sheet, and the filled ones go almost solid because
+  /// there is no dark background to make them glow.
+  final bool night;
 
   static const int _cells = 26;
   static const double _gap = 2.4;
@@ -496,15 +512,17 @@ class _SegmentBarPainter extends CustomPainter {
           ..color = i < filled
               ? (isHead
                     ? color
-                    : color.withValues(alpha: 0.55))
-              : color.withValues(alpha: 0.12),
+                    : color.withValues(alpha: night ? 0.55 : 0.88))
+              : (night
+                    ? color.withValues(alpha: 0.12)
+                    : AppBrand.inkLight.withValues(alpha: 0.16)),
       );
     }
   }
 
   @override
   bool shouldRepaint(covariant _SegmentBarPainter old) =>
-      old.value != value || old.color != color;
+      old.value != value || old.color != color || old.night != night;
 }
 
 /// The status light. A ring around a filled core, lit by the state colour.

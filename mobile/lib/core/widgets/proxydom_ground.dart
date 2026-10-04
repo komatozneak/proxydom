@@ -111,14 +111,53 @@ class _ProxydomGroundState extends State<ProxydomGround>
   }
 }
 
+/// The yard on its own, for a route that lives outside the shell.
+///
+/// A pushed screen — import, QR, onboarding — has no shell above it, so
+/// nothing paints behind its cards. In the dark theme that reads as "night",
+/// which is why it went unnoticed; in the light theme it left dark ink on a
+/// black window, and the title of the screen could not be read at all. This
+/// gives such a screen the same ground the shell has, with the house out of
+/// frame: no glow to publish, so the painter draws the quiet yard.
+class NightBackdrop extends StatefulWidget {
+  const NightBackdrop({super.key, required this.child, this.seed = 7});
+
+  final Widget child;
+  final int seed;
+
+  @override
+  State<NightBackdrop> createState() => _NightBackdropState();
+}
+
+class _NightBackdropState extends State<NightBackdrop> {
+  final GroundGlow _glow = GroundGlow();
+
+  @override
+  void dispose() {
+    _glow.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GroundGlowScope(
+      notifier: _glow,
+      child: ProxydomGround(
+        state: _glow,
+        seed: widget.seed,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
 class _GroundPainter extends CustomPainter {
   _GroundPainter({
     required Listenable repaint,
     required this.clock,
     required this.state,
     required this.seed,
-    required this.night,
-  })  : _lit = state.value,
+    required this.night,  })  : _lit = state.value,
         super(repaint: repaint);
 
   final AnimationController clock;

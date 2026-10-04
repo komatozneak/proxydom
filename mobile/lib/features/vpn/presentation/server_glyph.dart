@@ -91,6 +91,51 @@ class ServerGlyph extends StatelessWidget {
   }
 }
 
+/// A country flag on its own, at any size.
+///
+/// The terminal head wants the flag big — it is the one thing on the home
+/// screen that says *where* you are — and an emoji blown up to 30px is a
+/// different picture on every platform, or a tofu box where the platform has
+/// no emoji font. The repo ships the flags as SVG; this is how anything gets
+/// one.
+class FlagMark extends StatelessWidget {
+  const FlagMark({super.key, required this.flag, this.width = 34});
+
+  final String flag;
+  final double width;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final iso = ServerGlyph.isoFromFlag(flag);
+    if (iso == null) {
+      return Icon(
+        AppIcons.globe,
+        size: width * 0.6,
+        color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+      );
+    }
+    // A flag is 2:3. Drawing it in a square would stretch the cross on every
+    // Nordic flag and the stripes on every other one.
+    return Container(
+      width: width,
+      height: width * 0.66,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(3),
+        border: Border.all(
+          color: theme.colorScheme.onSurface.withValues(alpha: 0.18),
+        ),
+      ),
+      child: SvgPicture.asset(
+        'assets/flags/$iso.svg',
+        fit: BoxFit.cover,
+        placeholderBuilder: (_) => const SizedBox.shrink(),
+      ),
+    );
+  }
+}
+
 class _Tile extends StatelessWidget {
   const _Tile({
     required this.size,
