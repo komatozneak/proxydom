@@ -106,6 +106,53 @@ if (-not (Test-Path (Join-Path $bin "ProxyDomBroker.exe"))) { $bin = $build }
 Copy-Item (Join-Path $bin "ProxyDomBroker.exe") (Join-Path $Payload "ProxyDomBroker.exe") -Force
 Copy-Item (Join-Path $bin "ProxyDomCtl.exe") (Join-Path $Payload "ProxyDomCtl.exe") -Force
 
+# A release build that already exists is not evidence that it is current. The
+# Flutter window used to be built only when proxy_dom.exe was missing, so any
+# build after the first packaged whatever binary was already sitting there — a
+# merge could land in mobile/lib and the next MSI would ship the old AOT without
+# a word. The build now always runs, and this is the backstop for the day someone
+# reintroduces a skip.
+#
+# The check is on content, not on timestamps. Timestamps looked right and were
+# wrong: a branch switch rewrites the mtime of every file in the tree, so the
+# first version of this guard failed a build whose sources had not changed by a
+# byte. What matters is whether the snapshot was made from the sources now on
+# disk, and only a hash of those sources can answer that.
+function Get-DartSourceStamp {
+    param([string]$Root)
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    $files = @(Get-ChildItem (Join-Path $Root "lib") -Recurse -File -Filter *.dart)
+    foreach ($name in @("pubspec.yaml", "pubspec.lock")) {
+        $item = Get-Item (Join-Path $Root $name) -ErrorAction SilentlyContinue
+        if ($item) { $files += $item }
+    }
+    $lines = foreach ($file in ($files | Sort-Object FullName)) {
+        $relative = $file.FullName.Substring($Root.Length).Replace('\', '/')
+        $digest = [System.BitConverter]::ToString(
+            $sha.ComputeHash([System.IO.File]::ReadAllBytes($file.FullName))).Replace('-', '')
+        "$relative $digest"
+    }
+    $body = [System.Text.Encoding]::UTF8.GetBytes(($lines -join "`n"))
+    return [System.BitConverter]::ToString($sha.ComputeHash($body)).Replace('-', '')
+}
+
+$stampFile = Join-Path $Mobile "build\.pd_source_stamp"
+$stamp = Get-DartSourceStamp -Root $Mobile
+$aot = Join-Path $FlutterRelease "data\app.so"
+if (Test-Path $aot) {
+    if (-not (Test-Path $stampFile)) {
+        throw ("A Flutter build is present but nothing records which sources it came " +
+               "from, so it cannot be vouched for. Run 'flutter clean' in mobile and " +
+               "build again.")
+    }
+    $built = (Get-Content $stampFile -Raw).Trim()
+    if ($built -ne $stamp) {
+        throw ("Flutter snapshot is stale: data\app.so was built from sources with " +
+               "stamp $built, and mobile now hashes to $stamp. The window would ship " +
+               "code that no longer matches the repository. Run 'flutter clean' in " +
+               "mobile and build again.")
+    }
+}
 Write-Host "Building Flutter window"
 Push-Location $Mobile
 try {
@@ -113,37 +160,11 @@ try {
 } finally {
     Pop-Location
 }
-
-# A release build that already exists is not evidence that it is current. The
-# Flutter window used to be built only when proxy_dom.exe was missing, so any
-# build after the first packaged whatever binary was already sitting there — a
-# merge could land in mobile/lib and the next MSI would ship the old AOT without
-# a word. The build now always runs, and this is the backstop for the day someone
-# reintroduces a skip: the snapshot must not be older than the sources it claims
-# to come from.
-$aot = Join-Path $FlutterRelease "data\app.so"
 if (-not (Test-Path $aot)) {
     throw "Flutter build produced no data\app.so, so there is nothing to package."
 }
-$newestSource = [datetime]::MinValue
-foreach ($path in @((Join-Path $Mobile "lib"), (Join-Path $Mobile "pubspec.yaml"),
-                   (Join-Path $Mobile "pubspec.lock"))) {
-    if (-not (Test-Path $path)) { continue }
-    $item = Get-Item $path
-    $files = if ($item.PSIsContainer) { Get-ChildItem $path -Recurse -File } else { $item }
-    foreach ($file in $files) {
-        if ($file.LastWriteTime -gt $newestSource) { $newestSource = $file.LastWriteTime }
-    }
-}
-$aotTime = (Get-Item $aot).LastWriteTime
-if ($aotTime -lt $newestSource) {
-    throw ("Flutter snapshot is stale: data\app.so is from {0}, but mobile sources " +
-           "changed at {1}. The window would ship code that no longer matches the " +
-           "repository. Run 'flutter clean' in mobile and build again.") -f `
-          $aotTime.ToString("yyyy-MM-dd HH:mm:ss"), $newestSource.ToString("yyyy-MM-dd HH:mm:ss")
-}
-Write-Host ("Flutter snapshot checked: {0} is newer than the newest source ({1})" -f `
-            $aotTime.ToString("HH:mm:ss"), $newestSource.ToString("HH:mm:ss"))
+Set-Content -LiteralPath $stampFile -Value $stamp -NoNewline
+Write-Host "Flutter snapshot checked: sources hash $stamp"
 
 Write-Host "Staging payload"
 Get-ChildItem $Payload -Exclude "ProxyDomBroker.exe","ProxyDomCtl.exe" | Remove-Item -Recurse -Force
