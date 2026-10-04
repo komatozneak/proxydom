@@ -4,10 +4,10 @@
 //
 // Renders the real screens at phone size and at window size, and writes PNGs to
 // ../.scratch/ui/, so a design pass can be judged from the actual pixels
-// instead of from code. Fonts are loaded from the asset bundle — the default
+// instead of from code. Fonts are loaded from the asset bundle вЂ” the default
 // test font would draw boxes and hide every type decision.
 //
-// Known: the run exits non-zero with "A Timer is still pending" — the screens
+// Known: the run exits non-zero with "A Timer is still pending" вЂ” the screens
 // keep 1s timers alive through singletons that outlive the tree. The PNGs are
 // written before that check, so the output is good; ignore the exit code.
 import 'dart:convert';
@@ -25,9 +25,12 @@ import 'package:proxydom/core/widgets/proxydom_ground.dart';
 import 'package:proxydom/features/home/presentation/home_screen.dart';
 import 'package:proxydom/features/settings/presentation/settings_screen.dart';
 import 'package:proxydom/features/shell/presentation/main_shell.dart';
+import 'package:proxydom/features/vpn/data/subscription_label.dart';
+import 'package:proxydom/features/vpn/presentation/server_instrument.dart';
+import 'package:proxydom/features/vpn/presentation/server_instrument_parts.dart';
 import 'package:proxydom/l10n/app_localizations.dart';
 
-/// Logical 360x780 at DPR 3 — the same framing as the owner's device captures.
+/// Logical 360x780 at DPR 3 вЂ” the same framing as the owner's device captures.
 const Size _phone = Size(360, 780);
 const double _phoneDpr = 3;
 
@@ -137,7 +140,7 @@ Future<void> _capture(
   // Two frames: the first settles the tree, the second paints animations that
   // started on the first. Settle() would hang on the breathing house animation.
   // A few more let asynchronously decoded row assets (the QS tile glyph) land
-  // before the shutter — one pump renders them as an empty chip.
+  // before the shutter вЂ” one pump renders them as an empty chip.
   await tester.pump();
   // Image decoding is real async work: without a runAsync round trip the marks
   // are still blank when the shutter opens. Precache every asset the screens
@@ -227,5 +230,75 @@ void main() {
     await _capture(tester, 'windows-settings', const SettingsScreen(),
         brightness: Brightness.dark, desktop: true);
   });
+
+  // The Servers tab reads a profile document off the device and refreshes it over
+  // the network on boot, so it cannot be driven from a widget test. The card
+  // itself can: this is the instrument as a person sees it, fed sample facts.
+  testWidgets('server instrument', (tester) async {
+    const nodes = [
+      PoolServerLabel(
+        title: 'РњРѕСЃРєРІР°',
+        subtitle: 'eu1.proxydom.su:443',
+        tile: PoolTile.flag,
+        flag: 'рџ‡·рџ‡є',
+      ),
+      PoolServerLabel(
+        title: 'РќРёРґРµСЂР»Р°РЅРґС‹',
+        subtitle: 'nl3.proxydom.su:443',
+        tile: PoolTile.flag,
+        flag: 'рџ‡ірџ‡±',
+      ),
+      PoolServerLabel(
+        title: 'РРіСЂРѕРІРѕР№',
+        subtitle: 'РЅРёР·РєРёР№ РїРёРЅРі',
+        tile: PoolTile.gaming,
+        flag: '',
+      ),
+    ];
+    await _capture(
+      tester,
+      'server-instrument',
+      Scaffold(
+        body: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: ProfileInstrument(
+                title: 'РўРµСЂРµРјРѕРє',
+                description: 'Р—РЅР°С‡РѕРє СЃРїСЂР°РІР° РІРµРґС‘С‚ РІ Р±РѕС‚Р°',
+                facts: ['2aq93K0', '15 Р“Р‘ РёР· 100 Р“Р‘', 'РѕР±РЅРѕРІР»РµРЅРѕ 04.10'],
+                selected: true,
+                selectedNodeTitle: 'РњРѕСЃРєРІР°',
+                onSelect: _ignore,
+                onNodeTap: _ignoreIndex,
+                telegramLabel: 'Telegram',
+                onTelegram: _ignore,
+                onRefresh: _ignore,
+                onShare: _ignore,
+                onDelete: _ignore,
+                nodes: [
+                  for (final node in nodes)
+                    NodeLine(
+                      label: node,
+                      endpoint: node.subtitle,
+                      selected: node.title == 'РњРѕСЃРєРІР°',
+                      onTap: _ignore,
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+      brightness: Brightness.dark,
+      desktop: true,
+    );
+  });
 }
+
+void _ignore() {}
+
+void _ignoreIndex(int index) {}
+
 

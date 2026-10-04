@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:meta/meta.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'document_fetch_log.dart';
@@ -156,6 +157,15 @@ class Hy2ImportStore {
 
   void _changed() {
     if (!_changes.isClosed) _changes.add(null);
+  }
+
+  /// Seeds the store from a test. The capture harness needs a profile document
+  /// to draw; on a device there is none, and the store is private on purpose —
+  /// nothing in the app writes catalogs directly, only documents do.
+  @visibleForTesting
+  Future<void> seedForTest(List<ShareCatalog> catalogs) async {
+    final blob = await _read();
+    await _write(blob.copyWith(catalogs: catalogs));
   }
 
   Future<List<ShareCatalog>> catalogs() async {

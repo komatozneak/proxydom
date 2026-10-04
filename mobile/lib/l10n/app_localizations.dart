@@ -2827,6 +2827,54 @@ abstract class AppL10n {
   /// **'Search servers'**
   String get freeSearch;
 
+  /// No description provided for @locationsNodes.
+  ///
+  /// In en, this message translates to:
+  /// **'Nodes'**
+  String get locationsNodes;
+
+  /// No description provided for @locationsSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'IN USE'**
+  String get locationsSelected;
+
+  /// No description provided for @locationsNotUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'NOT USED'**
+  String get locationsNotUsed;
+
+  /// No description provided for @locationsUseIt.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect'**
+  String get locationsUseIt;
+
+  /// No description provided for @locationsInUse.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected'**
+  String get locationsInUse;
+
+  /// No description provided for @locationsShareKey.
+  ///
+  /// In en, this message translates to:
+  /// **'Key'**
+  String get locationsShareKey;
+
+  /// No description provided for @freeTelegram.
+  ///
+  /// In en, this message translates to:
+  /// **'Telegram'**
+  String get freeTelegram;
+
+  /// No description provided for @locationsKeyHandle.
+  ///
+  /// In en, this message translates to:
+  /// **'key'**
+  String get locationsKeyHandle;
+
   /// No description provided for @freeDelete.
   ///
   /// In en, this message translates to:

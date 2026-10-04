@@ -141,7 +141,6 @@ class _GroundPainter extends CustomPainter {
     final lit = _lit.clamp(0.0, 1.0);
     final t = clock.value;
     final houseCenter = state.houseCenter;
-    final houseRadius = state.houseRadius;
 
     // The night itself. Everything that follows lives under 8% luminance except
     // the house's own halo: a background that competes with the words on top of

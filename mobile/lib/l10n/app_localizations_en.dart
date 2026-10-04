@@ -1498,6 +1498,30 @@ class AppL10nEn extends AppL10n {
   String get freeSearch => 'Search servers';
 
   @override
+  String get locationsNodes => 'Nodes';
+
+  @override
+  String get locationsSelected => 'IN USE';
+
+  @override
+  String get locationsNotUsed => 'NOT USED';
+
+  @override
+  String get locationsUseIt => 'Connect';
+
+  @override
+  String get locationsInUse => 'Connected';
+
+  @override
+  String get locationsShareKey => 'Key';
+
+  @override
+  String get freeTelegram => 'Telegram';
+
+  @override
+  String get locationsKeyHandle => 'key';
+
+  @override
   String get freeDelete => 'Remove';
 
   @override

@@ -1503,6 +1503,30 @@ class AppL10nRu extends AppL10n {
   String get freeSearch => 'Поиск серверов';
 
   @override
+  String get locationsNodes => 'Узлы';
+
+  @override
+  String get locationsSelected => 'ВЫБРАН';
+
+  @override
+  String get locationsNotUsed => 'НЕ ВЫБРАН';
+
+  @override
+  String get locationsUseIt => 'Подключить';
+
+  @override
+  String get locationsInUse => 'Подключено';
+
+  @override
+  String get locationsShareKey => 'Ключ';
+
+  @override
+  String get freeTelegram => 'Telegram';
+
+  @override
+  String get locationsKeyHandle => 'ключ';
+
+  @override
   String get freeDelete => 'Удалить';
 
   @override
