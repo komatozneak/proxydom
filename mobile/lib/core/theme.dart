@@ -365,12 +365,21 @@ class AppTheme {
         ),
       ),
       switchTheme: SwitchThemeData(
-        thumbColor: WidgetStateProperty.resolveWith(
-          (s) => AppBrand.surfaceElevatedLight,
-        ),
+        thumbColor: WidgetStateProperty.resolveWith((s) {
+          // On, the thumb takes the moss that grows in the light of the rail's
+          // lip; off, it stays the plain plate. A switch is a lamp, and the
+          // lamp in this app is never a colour the palette does not own.
+          if (s.contains(WidgetState.selected) && isDark) {
+            return AppBrand.mossLight;
+          }
+          return AppBrand.surfaceElevatedLight;
+        }),
         trackColor: WidgetStateProperty.resolveWith((s) {
           if (s.contains(WidgetState.selected)) {
-            return AppBrand.secondary;
+            // Deep moss, not the old bright #558B2F: that green was the last
+            // Material colour left in the app and it read as a default switch
+            // sitting on a hand-made night.
+            return AppBrand.moss;
           }
           return isDark ? AppBrand.switchTrackOffDark : AppBrand.inkMutedLight;
         }),
