@@ -143,6 +143,102 @@ class _MossyStonePainter extends CustomPainter {
   bool shouldRepaint(covariant _MossyStonePainter old) => old.light != light;
 }
 
+/// The phone's counterpart of [MossyRail]: the same stone, lying flat.
+///
+/// A bottom bar used to be a rule and nothing else — a gold hairline over a
+/// transparent box, which is the phone's version of saying "there is a bar
+/// here". This is the slab the rail is cut from, turned on its side: the damp
+/// stone, the lit lip along its top edge where the screen light falls, and
+/// moss along that same top edge, because that is the face a thumb touches and
+/// water sits on the face that points up.
+class MossySlab extends StatelessWidget {
+  const MossySlab({super.key, required this.child, this.light = false});
+
+  final Widget child;
+  final bool light;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _SlabPainter(light: light),
+      child: child,
+    );
+  }
+}
+
+class _SlabPainter extends CustomPainter {
+  const _SlabPainter({required this.light});
+
+  final bool light;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: light
+              ? [AppBrand.stoneLight, AppBrand.stoneShade.withValues(alpha: 0.5)]
+              : [AppBrand.forestDark, AppBrand.forestDeep],
+        ).createShader(rect),
+    );
+
+    // The lit lip: light comes from above, so it lands on the top edge and dies
+    // within a fifth of the way down.
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            (light ? AppBrand.inkLight : AppBrand.lightSource)
+                .withValues(alpha: light ? 0.10 : 0.08),
+            Colors.transparent,
+          ],
+          stops: const [0, 0.20],
+        ).createShader(rect),
+    );
+
+    // Moss creeping along the top edge in uneven tufts — one seeded field, so
+    // the same tufts every frame.
+    final rng = math.Random(97);
+    final path = Path()..moveTo(0, 0);
+    for (var i = 0; i <= 14; i++) {
+      final f = i / 14;
+      final x = f * size.width;
+      final y = math.sin(f * math.pi * 3.2) * 1.6 +
+          (rng.nextDouble() - 0.5) * 2.2;
+      path.lineTo(x, math.max(0, y));
+    }
+    path
+      ..lineTo(size.width, 0)
+      ..close();
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = (light ? AppBrand.moss : AppBrand.mossLight)
+            .withValues(alpha: light ? 0.18 : 0.12),
+    );
+
+    // The seam under the lip, where the slab meets the night.
+    canvas.drawLine(
+      Offset(0, 0.5),
+      Offset(size.width, 0.5),
+      Paint()
+        ..strokeWidth = 1
+        ..color = (light ? AppBrand.moss : AppBrand.mossLight)
+            .withValues(alpha: light ? 0.22 : 0.16),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _SlabPainter old) => old.light != light;
+}
+
 /// The edge of a moss patch, for the rail's selected item: the same green the
 /// moss is painted with, so the selection belongs to the stone.
 class MossEdge extends StatelessWidget {

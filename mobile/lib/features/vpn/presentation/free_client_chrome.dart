@@ -244,93 +244,34 @@ TextStyle _mono(
           ],
         ),
         const SizedBox(height: 14),
-        // The three fields, spread across the width with the state in the
-        // middle: where, what, how long.
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Flexible(
-              flex: 4,
-              child: Row(
-                children: [
-                  if (serverFlag != null && serverFlag!.isNotEmpty) ...[
-                    Text(serverFlag!, style: const TextStyle(fontSize: 15)),
-                    const SizedBox(width: 6),
-                  ] else ...[
-                    Icon(AppIcons.globe, size: 14, color: mute),
-                    const SizedBox(width: 6),
-                  ],
-                  Flexible(
-                    child: Text(
-                      serverName.toUpperCase(),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: _mono(
-                        context,
-                        size: 11.5,
-                        color: ink.withValues(alpha: 0.8),
-                        spacing: 0.6,
-                      ),
-                    ),
-                  ),
-                ],
+        // Where, what, how long — spread across the width on a desktop, stacked
+        // on a phone. Three columns in 360dp is not a terminal head, it is a
+        // line of three truncated words reading as one.
+        if (windowsDesktop) ...[
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Flexible(flex: 4, child: _nameField(context, mute, ink)),
+              Flexible(flex: 7, child: _statusField(context, accent)),
+              Flexible(flex: 3, child: _uptimeField(context, ink, mute, uptime)),
+            ],
+          ),
+        ] else ...[
+          _nameField(context, mute, ink),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: _statusField(context, accent),
+                ),
               ),
-            ),
-            Flexible(
-              flex: 7,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  _Lamp(color: accent, size: 9),
-                  const SizedBox(height: 6),
-                  Text(
-                    status.toUpperCase(),
-                    maxLines: 1,
-                    textAlign: TextAlign.center,
-                    overflow: TextOverflow.ellipsis,
-                    style: _mono(
-                      context,
-                      size: 14,
-                      color: accent,
-                      weight: 700,
-                      spacing: 0.4,
-                    ).copyWith(height: 1.15),
-                  ),
-                ],
-              ),
-            ),
-            Flexible(
-              flex: 3,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    'UPTIME',
-                    style: _mono(
-                      context,
-                      size: 9,
-                      color: mute.withValues(alpha: 0.7),
-                      spacing: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerRight,
-                    child: Text(
-                      uptime ?? '--:--:--',
-                      style: _mono(
-                        context,
-                        size: 12.5,
-                        color: ink.withValues(alpha: 0.78),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+              _uptimeField(context, ink, mute, uptime),
+            ],
+          ),
+        ],
         const SizedBox(height: 16),
         // The rail the traffic runs on.
         _TrafficRail(
@@ -343,9 +284,97 @@ TextStyle _mono(
       ],
     );
   }
-}
 
-/// A segmented rail of traffic. Blocks, not a smooth bar: this is the one
+  /// Where we are: a flag and the server's name, one line.
+  Widget _nameField(BuildContext context, Color mute, Color ink) {
+    return Row(
+      children: [
+        if (serverFlag != null && serverFlag!.isNotEmpty) ...[
+          Text(serverFlag!, style: const TextStyle(fontSize: 15)),
+          const SizedBox(width: 6),
+        ] else ...[
+          Icon(AppIcons.globe, size: 14, color: mute),
+          const SizedBox(width: 6),
+        ],
+        Flexible(
+          child: Text(
+            serverName.toUpperCase(),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: _mono(
+              context,
+              size: 11.5,
+              color: ink.withValues(alpha: 0.8),
+              spacing: 0.6,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// What is happening: the lamp and the state under it.
+  Widget _statusField(BuildContext context, Color accent) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _Lamp(color: accent, size: 9),
+        const SizedBox(height: 6),
+        Text(
+          status.toUpperCase(),
+          maxLines: 1,
+          textAlign: TextAlign.center,
+          overflow: TextOverflow.ellipsis,
+          style: _mono(
+            context,
+            size: 14,
+            color: accent,
+            weight: 700,
+            spacing: 0.4,
+          ).copyWith(height: 1.15),
+        ),
+      ],
+    );
+  }
+
+  /// How long: the clock, right-aligned so the digits do not dance.
+  Widget _uptimeField(
+    BuildContext context,
+    Color ink,
+    Color mute,
+    String? uptime,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'UPTIME',
+          style: _mono(
+            context,
+            size: 9,
+            color: mute.withValues(alpha: 0.7),
+            spacing: 1.4,
+          ),
+        ),
+        const SizedBox(height: 5),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerRight,
+          child: Text(
+            uptime ?? '--:--:--',
+            style: _mono(
+              context,
+              size: 12.5,
+              color: ink.withValues(alpha: 0.78),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
 /// place on the screen where a number moves, and it should look like it is
 /// being counted rather than like a progress animation.
 class _TrafficRail extends StatelessWidget {

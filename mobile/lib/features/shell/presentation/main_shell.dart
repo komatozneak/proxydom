@@ -38,7 +38,6 @@ const double _sideGap = 2 * _sideScale;
 const double _sideLabelSize = 13 * _sideScale;
 
 /// Top rule thickness on the nav sheet.
-const double _navBarRuleWidth = 2.5;
 
 /// DOM mark, larger than the nav band and centered on Сервера / Настройки.
 const double _domButtonSize = 62;
@@ -187,15 +186,8 @@ class _MainShellState extends ConsumerState<MainShell> {
           Scaffold(
             backgroundColor: Colors.transparent,
             body: _StatusBarStyle(dark: dark, child: page),
-            bottomNavigationBar: DecoratedBox(
-              decoration: BoxDecoration(
-                border: Border(
-                  top: BorderSide(
-                    color: AppBrand.mascotGold.withValues(alpha: 0.22),
-                    width: _navBarRuleWidth,
-                  ),
-                ),
-              ),
+            bottomNavigationBar: MossySlab(
+              light: !dark,
               child: bar,
             ),
           ),
@@ -517,8 +509,11 @@ class _SideNavGlyph extends StatelessWidget {
     final theme = Theme.of(context);
     final dark = theme.brightness == Brightness.dark;
     final ink = dark ? AppBrand.inkDark : AppBrand.inkLight;
-    final chip =
-        dark ? AppBrand.surfaceVariantDark : AppBrand.surfaceElevatedLight;
+    // The active place wears moss, like the rail's selected item: the
+    // selection belongs to the slab, not to the house above it.
+    final tint = selected
+        ? (dark ? AppBrand.mossLight : AppBrand.moss)
+        : ink.withValues(alpha: 0.72);
 
     return InkWell(
       onTap: onTap,
@@ -533,15 +528,20 @@ class _SideNavGlyph extends StatelessWidget {
               vertical: _sidePadV,
             ),
             decoration: BoxDecoration(
-              color: chip,
+              color: selected
+                  ? (dark
+                        ? AppBrand.mossDeep.withValues(alpha: 0.92)
+                        : AppBrand.mossLight.withValues(alpha: 0.12))
+                  : Colors.transparent,
               borderRadius: BorderRadius.circular(AppBrand.radiusNavPill),
               border: Border.all(
-                color:
-                    selected ? AppBrand.paperMargin : theme.colorScheme.outline,
-                width: selected ? 1.6 : 1,
+                color: selected
+                    ? AppBrand.moss.withValues(alpha: 0.4)
+                    : Colors.transparent,
+                width: 1,
               ),
             ),
-            child: AppIcon(icon, size: _sideIconSize, color: ink),
+            child: AppIcon(icon, size: _sideIconSize, color: tint),
           ),
           const SizedBox(height: _sideGap),
           Text(
@@ -549,7 +549,7 @@ class _SideNavGlyph extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: theme.textTheme.labelSmall?.copyWith(
-              color: ink,
+              color: tint,
               fontSize: _sideLabelSize,
               height: 1,
               fontWeight: FontWeight.w700,

@@ -566,9 +566,12 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
     // frame, otherwise a tall window leaves the bottom half empty.
     final nestSize = windowsDesktop
         ? math.min(440.0, math.max(300.0, size.height * 0.50))
+        // A phone has no room to be generous: the house takes a little over half
+        // the width and lets the night show around it. At 0.98 of the width it
+        // became the wallpaper and the yard behind it stopped existing.
         : math.min(
-            size.width * 0.98,
-            math.max(260.0, widget.maxHeight * 0.46),
+            size.width * 0.78,
+            math.max(210.0, widget.maxHeight * 0.34),
           );
     // Tell the night where the house is, so the bloom belongs to it and the
     // orbit clears the roof. Published during layout: the ground repaints from
@@ -813,7 +816,10 @@ class _FreeClientHome extends StatelessWidget {
                 curve: Curves.easeOut,
                 opacity: charged ? 1.0 : 0.74,
                 child: Transform.scale(
-                  scale: 1.45,
+                  // The artwork is drawn inside a frame with its own margin, so
+                  // the scale that fills a window's empty column would eat a
+                  // phone whole.
+                  scale: windowsDesktop ? 1.45 : 1.28,
                   child: SignalNestHero(
                     key: kHomeSignalNestKey,
                     state: treeState,
