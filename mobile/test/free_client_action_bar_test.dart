@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:proxydom/core/theme.dart';
+import 'package:proxydom/core/widgets/app_action_button.dart';
 import 'package:proxydom/core/widgets/app_icon.dart';
 import 'package:proxydom/features/vpn/presentation/free_client_chrome.dart';
 import 'package:proxydom/l10n/app_localizations.dart';
@@ -32,11 +33,11 @@ void main() {
 
     expect(find.text('Добавить'), findsNothing);
     expect(find.text('QR'), findsOneWidget);
-    final buttons = tester.widgetList<FilledButton>(
-      find.byWidgetPredicate((widget) => widget is FilledButton),
-    );
-    final colors = buttons
-        .map((button) => button.style?.backgroundColor?.resolve({}))
+    final colors = tester
+        .widgetList<AppActionButton>(
+          find.byWidgetPredicate((widget) => widget is AppActionButton),
+        )
+        .map((button) => button.color)
         .toList();
     expect(colors, [AppBrand.secondary, AppBrand.actionAmber]);
     debugDefaultTargetPlatformOverride = null;
@@ -65,8 +66,8 @@ void main() {
     expect(find.text('Вставить'), findsOneWidget);
     expect(find.text('Добавьте ссылку, ключ или QR-код.'), findsNothing);
     expect(find.text('Вставьте ссылку или ключ.'), findsOneWidget);
-    final buttons = tester.widgetList<FilledButton>(
-      find.byWidgetPredicate((widget) => widget is FilledButton),
+    final buttons = tester.widgetList<AppActionButton>(
+      find.byWidgetPredicate((widget) => widget is AppActionButton),
     );
     expect(buttons.length, 1);
     debugDefaultTargetPlatformOverride = null;
@@ -89,12 +90,10 @@ void main() {
     // notebook-margin orange that also paints the nav.
     expect(
       tester
-          .widget<IconButton>(
-            find.byWidgetPredicate((widget) => widget is IconButton),
+          .widget<AppRingButton>(
+            find.byWidgetPredicate((widget) => widget is AppRingButton),
           )
-          .style
-          ?.backgroundColor
-          ?.resolve({}),
+          .color,
       AppBrand.actionSky,
     );
     debugDefaultTargetPlatformOverride = null;
@@ -143,10 +142,15 @@ void main() {
     expect(find.text('Вставить'), findsOneWidget);
     expect(find.text('Обновить'), findsOneWidget);
     expect(find.byTooltip('Обновить'), findsNothing);
-    final buttons = tester.widgetList<FilledButton>(
-      find.byWidgetPredicate((widget) => widget is FilledButton),
+    final buttons = tester.widgetList<AppActionButton>(
+      find.byWidgetPredicate((widget) => widget is AppActionButton),
     );
     expect(buttons.length, 2);
+    // Windows has no ring control: the reload is a full key there.
+    expect(
+      find.byWidgetPredicate((widget) => widget is AppRingButton),
+      findsNothing,
+    );
     debugDefaultTargetPlatformOverride = null;
   });
 }

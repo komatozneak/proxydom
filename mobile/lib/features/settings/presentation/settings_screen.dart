@@ -12,6 +12,8 @@ import '../../../core/ios_store_gates.dart';
 import '../../../core/support_contact.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
+import '../../../core/widgets/app_surface.dart';
+import '../../../core/widgets/app_switch.dart';
 import '../../../core/widgets/proxydom_snackbar.dart';
 import '../../../l10n/app_localizations.dart';
 import '../application/locale_provider.dart';
@@ -255,8 +257,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
         Localizations.localeOf(context);
     final localeLabel = _localeLabel(l, locale);
     return Scaffold(
-      backgroundColor:
-          Colors.transparent,
+      backgroundColor: Colors.transparent,
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
@@ -333,7 +334,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
               icon: AppIcons.notifications,
               title: l.settingsVpnNotificationTitle,
               subtitle: l.settingsVpnNotificationHint,
-              trailing: Switch(
+              trailing: AppSwitch(
                 value: notifOn,
                 onChanged: _notifLoading || _notifEnabled == null
                     ? null
@@ -357,12 +358,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                   : _qsTileAdded
                       ? Text(
                           l.settingsQsTileRemove,
-                          style:
-                              Theme.of(context).textTheme.labelLarge?.copyWith(
-                                    color:
-                                        Theme.of(context).colorScheme.primary,
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                          style: Theme.of(context)
+                              .textTheme
+                              .labelLarge
+                              ?.copyWith(
+                                color: Theme.of(context).colorScheme.primary,
+                                fontWeight: FontWeight.w700,
+                              ),
                         )
                       : null,
             ),
@@ -445,14 +447,8 @@ class _SettingsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Material(
-      color: theme.colorScheme.surfaceContainerHighest,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppBrand.radiusCard),
-        side: BorderSide(color: theme.colorScheme.outline),
-      ),
-      clipBehavior: Clip.antiAlias,
+    return AppSurface(
+      clip: true,
       child: Column(children: children),
     );
   }
@@ -463,12 +459,15 @@ class _CardDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Divider(
-      height: 1,
-      thickness: 1,
-      indent: 56,
-      color:
-          Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.5),
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.only(left: 62),
+      child: Container(
+        height: 1,
+        color: dark
+            ? AppBrand.lightSource.withValues(alpha: 0.06)
+            : AppBrand.shadeSource.withValues(alpha: 0.07),
+      ),
     );
   }
 }
@@ -493,55 +492,91 @@ class _SettingsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    // The subtitle was allowed to run to four lines under a floating switch,
+    // which broke the row rhythm on every card. Two lines, then it stops.
+    const maxLines = 2;
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            leading ??
-                Container(
-                  width: 36,
-                  height: 36,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: AppBrand.oakWithOpacity(0.08),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: AppIcon(icon!, size: 20),
-                ),
-            const SizedBox(width: 12),
+            leading ?? _RowGlyph(child: AppIcon(icon!, size: 19)),
+            const SizedBox(width: 13),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.titleSmall?.copyWith(
+                      fontSize: 15.5,
+                      height: 1.2,
                       fontWeight: FontWeight.w600,
+                      letterSpacing: -0.2,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 3),
                   Text(
                     subtitle,
+                    maxLines: maxLines,
+                    overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+                      color:
+                          dark ? AppBrand.inkMutedDark : AppBrand.inkMutedLight,
+                      height: 1.3,
                     ),
                   ),
                 ],
               ),
             ),
             if (trailing != null) ...[
-              const SizedBox(width: 8),
+              const SizedBox(width: 12),
               trailing!,
             ] else if (onTap != null) ...[
-              const SizedBox(width: 8),
-              const AppIcon(AppIcons.chevronRight, size: 18),
+              const SizedBox(width: 10),
+              AppIcon(
+                AppIcons.chevronRight,
+                size: 16,
+                color:
+                    theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.55),
+              ),
             ],
           ],
         ),
       ),
+    );
+  }
+}
+
+/// The icon plate every settings row carries. A milled chip, not a flat tint.
+class _RowGlyph extends StatelessWidget {
+  const _RowGlyph({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    return Container(
+      width: 36,
+      height: 36,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: dark ? AppBrand.surfaceSunkDark : AppBrand.honeySurface,
+        borderRadius: BorderRadius.circular(11),
+        border: Border.all(
+          color: dark
+              ? AppBrand.lightSource.withValues(alpha: 0.06)
+              : AppBrand.shadeSource.withValues(alpha: 0.05),
+        ),
+      ),
+      child: child,
     );
   }
 }
@@ -556,20 +591,13 @@ class _QsTileMonoIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final color = theme.iconTheme.color ?? theme.colorScheme.onSurface;
-    return Container(
-      width: 36,
-      height: 36,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: AppBrand.oakWithOpacity(0.08),
-        borderRadius: BorderRadius.circular(10),
-      ),
+    return _RowGlyph(
       child: ColorFiltered(
         colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
         child: Image.asset(
           _asset,
-          width: 20,
-          height: 20,
+          width: 19,
+          height: 19,
           filterQuality: FilterQuality.medium,
           excludeFromSemantics: true,
         ),

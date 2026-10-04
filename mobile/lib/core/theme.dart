@@ -92,6 +92,49 @@ class AppBrand {
   /// Dark elevated cards — enough lift off [surfaceDark] so numbers read.
   static const Color surfaceVariantDark = Color(0xFF2C2C32);
 
+  // ── Material pass: the depth ramp ──────────────────────────────────────────
+  //
+  // A card drawn as `one fill + a 1px outline` has no light source and no
+  // distance from the page, so every screen reads flat. These four tokens let
+  // AppSurface and AppActionButton put one consistent light over the whole app:
+  // a lit top edge, a floor one step darker, and a key shadow underneath.
+
+  /// Floor of a raised plate in dark — a step above [surfaceVariantDark] so a
+  /// card does not vanish into the sheet.
+  static const Color surfaceRaisedDark = Color(0xFF232328);
+
+  /// Recessed wells (inputs, tracks, code blocks): below the card, not on it.
+  static const Color surfaceSunkDark = Color(0xFF1A1A1E);
+
+  /// Hairline on a raised plate. Stronger than [lineDark]: the edge of a lit
+  /// object reads sharper than a rule printed on the page.
+  static const Color edgeDark = Color(0xFF3C3C45);
+
+  /// The same edge on the cream sheet — quieter than [lineLight].
+  static const Color edgeLight = Color(0xFFD9D9DF);
+
+  /// Key shadow under a raised plate (dark). Wide and soft.
+  static const Color shadowKeyDark = Color(0x7A000000);
+
+  /// The same shadow on the light sheet — it needs far less weight.
+  static const Color shadowKeyLight = Color(0x1F1A1A1A);
+
+  /// White/black used only as a light or shade *source* when mixing surfaces —
+  /// never as a fill on its own.
+  static const Color lightSource = Color(0xFFFFFFFF);
+
+  static const Color shadeSource = Color(0xFF000000);
+
+  /// Motion. One spring for anything the finger drives, one ease for anything
+  /// the screen does on its own.
+  static const Duration motionPress = Duration(milliseconds: 120);
+
+  static const Curve motionPressCurve = Curves.easeOutCubic;
+
+  static const Duration motionReveal = Duration(milliseconds: 260);
+
+  static const Curve motionRevealCurve = Curves.easeOutCubic;
+
   /// Unselected Material switch track in dark — lighter than card zinc.
   static const Color switchTrackOffDark = Color(0xFFB0B0B8);
 
@@ -229,9 +272,15 @@ class AppTheme {
               isDark ? AppBrand.primary : AppBrand.surfaceElevatedLight,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           shape: const StadiumBorder(),
+          // The family has to be repeated here: a ButtonStyle textStyle
+          // REPLACES the ambient default instead of merging with it, so without
+          // it every button label silently falls back to the platform font and
+          // the app ends up with two typefaces on one screen.
           textStyle: const TextStyle(
+            fontFamily: 'Inter',
             fontSize: 16,
             fontWeight: FontWeight.w700,
+            letterSpacing: -0.2,
           ),
         ),
       ),
@@ -240,6 +289,12 @@ class AppTheme {
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           shape: const StadiumBorder(),
           side: BorderSide(color: line, width: 1),
+          textStyle: const TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            letterSpacing: -0.1,
+          ),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -247,6 +302,11 @@ class AppTheme {
           foregroundColor: onSurface,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           shape: const StadiumBorder(),
+          textStyle: const TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
       cardTheme: CardThemeData(

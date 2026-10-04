@@ -2,16 +2,20 @@ import 'package:flutter/material.dart';
 
 import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
+import '../../../core/widgets/app_action_button.dart';
 import '../../../core/widgets/app_icon.dart';
+import '../../../core/widgets/app_surface.dart';
 import '../../../l10n/app_localizations.dart';
 
 /// Paste, and on the phone a matching QR. Windows has no camera and no QR.
 ///
 /// [onRefresh] reloads saved subscription documents. On the phone it is a
-/// small circular-arrow control beside QR. On Windows it is a labeled button
-/// beside Paste. Three roles, three colours: paste stays moss ([AppBrand.secondary]),
-/// QR takes the house amber ([AppBrand.actionAmber]), refresh the sky
+/// small ring control beside QR; on Windows it is a full key beside Paste.
+/// Three roles, three colours: paste stays moss ([AppBrand.secondary]), QR takes
+/// the house amber ([AppBrand.actionAmber]), refresh the sky
 /// ([AppBrand.actionSky]) — none of them borrows the notebook-margin orange.
+/// Every key is an [AppActionButton], so the bar is pressed and lit the same
+/// way everywhere in the app.
 class FreeClientActionBar extends StatelessWidget {
   const FreeClientActionBar({
     super.key,
@@ -27,41 +31,34 @@ class FreeClientActionBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppL10n.of(context);
-    final shape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(AppBrand.radiusPill),
-    );
-    const pad = EdgeInsets.symmetric(horizontal: 12, vertical: 14);
-    const barHeight = 52.0;
-    final paste = _action(
+    const barHeight = 56.0;
+    const gap = SizedBox(width: 10);
+    final paste = AppActionButton(
       onPressed: onPaste,
       icon: AppIcons.clipboard,
       label: l.freePaste,
-      background: AppBrand.secondary,
-      foreground: AppBrand.surfaceElevatedLight,
-      shape: shape,
-      pad: pad,
+      color: AppBrand.secondary,
       height: barHeight,
     );
     final refresh = onRefresh;
     if (windowsDesktop) {
+      // Windows has no camera, so the reload takes the free slot as a full key.
       if (refresh == null) {
-        return SizedBox(height: barHeight, width: double.infinity, child: paste);
+        return SizedBox(
+            height: barHeight, width: double.infinity, child: paste);
       }
       return SizedBox(
         height: barHeight,
         child: Row(
           children: [
             Expanded(child: paste),
-            const SizedBox(width: 8),
+            gap,
             Expanded(
-              child: _action(
+              child: AppActionButton(
                 onPressed: refresh,
                 icon: AppIcons.refresh,
                 label: l.freeRefresh,
-                background: AppBrand.actionSky,
-                foreground: AppBrand.inkLight,
-                shape: shape,
-                pad: pad,
+                color: AppBrand.actionSky,
                 height: barHeight,
               ),
             ),
@@ -74,89 +71,29 @@ class FreeClientActionBar extends StatelessWidget {
       child: Row(
         children: [
           Expanded(child: paste),
-          const SizedBox(width: 8),
+          gap,
           Expanded(
-            child: _action(
+            child: AppActionButton(
               onPressed: onScan,
               icon: AppIcons.qrCode,
               label: l.freeQr,
-              background: AppBrand.actionAmber,
-              foreground: AppBrand.inkLight,
-              shape: shape,
-              pad: pad,
+              color: AppBrand.actionAmber,
               height: barHeight,
             ),
           ),
           if (refresh != null) ...[
-            const SizedBox(width: 8),
-            _PhoneRefreshButton(onPressed: refresh, tooltip: l.freeRefresh),
+            gap,
+            // Ring, not a slab: the reload is the quiet action of the three and
+            // a saturated disc used to pull the eye off the paste key.
+            AppRingButton(
+              icon: AppIcons.refresh,
+              color: AppBrand.actionSky,
+              onPressed: refresh,
+              tooltip: l.freeRefresh,
+              size: barHeight,
+            ),
           ],
         ],
-      ),
-    );
-  }
-
-  Widget _action({
-    required VoidCallback onPressed,
-    required IconData icon,
-    required String label,
-    required Color background,
-    required Color foreground,
-    required OutlinedBorder shape,
-    required EdgeInsets pad,
-    required double height,
-  }) {
-    return SizedBox(
-      height: height,
-      width: double.infinity,
-      child: FilledButton.icon(
-        onPressed: onPressed,
-        icon: AppIcon(icon, size: 18, color: foreground),
-        label: Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        style: FilledButton.styleFrom(
-          padding: pad,
-          minimumSize: Size(double.infinity, height),
-          fixedSize: Size.fromHeight(height),
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          shape: shape,
-          backgroundColor: background,
-          foregroundColor: foreground,
-        ),
-      ),
-    );
-  }
-}
-
-/// Phone-only reload. No caption: the circular arrows are the label.
-/// Sky fill, so the reload reads as its own thing next to the amber QR.
-class _PhoneRefreshButton extends StatelessWidget {
-  const _PhoneRefreshButton({
-    required this.onPressed,
-    required this.tooltip,
-  });
-
-  final VoidCallback onPressed;
-  final String tooltip;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 40,
-      height: 40,
-      child: IconButton(
-        tooltip: tooltip,
-        onPressed: onPressed,
-        padding: EdgeInsets.zero,
-        style: IconButton.styleFrom(
-          backgroundColor: AppBrand.actionSky,
-          foregroundColor: AppBrand.inkLight,
-          shape: const CircleBorder(),
-        ),
-        icon: const AppIcon(AppIcons.refresh, size: 20, color: AppBrand.inkLight),
       ),
     );
   }
@@ -236,98 +173,62 @@ class ConnectionStatusPanel extends StatelessWidget {
     final l = AppL10n.of(context);
     final theme = Theme.of(context);
     final dark = theme.brightness == Brightness.dark;
-    final rule = AppBrand.paperMargin.withValues(alpha: dark ? 0.55 : 0.72);
-    final mute = theme.colorScheme.onSurfaceVariant;
-    final sessionColor = dark ? AppBrand.accentOnDark : AppBrand.inkLight;
+    final mute = dark ? AppBrand.inkMutedDark : AppBrand.inkMutedLight;
 
-    final rows = <({
-      String label,
-      String value,
-      bool underline,
-      bool emphasize,
-      Color? valueColor,
-    })>[
-      (
-        label: l.freeStatus,
-        value: status,
-        underline: true,
-        emphasize: true,
-        valueColor: accent,
-      ),
-      (
-        label: l.freeProfile,
-        value: profile,
-        underline: true,
-        emphasize: false,
-        valueColor: null,
-      ),
+    // The panel stopped being a ruled notebook table and became an instrument:
+    // the label is a caption, the value is the only thing set at reading size,
+    // and the numbers use tabular figures so a ticking clock does not shuffle
+    // the row while it runs.
+    final rows = <({String label, String value, bool numeric, Color? color})>[
+      (label: l.freeStatus, value: status, numeric: false, color: accent),
+      (label: l.freeProfile, value: profile, numeric: false, color: null),
       (
         label: l.freeTrafficLeft,
         value: traffic,
-        underline: uptime != null,
-        emphasize: false,
-        valueColor: trafficColor,
+        numeric: true,
+        color: trafficColor,
       ),
       if (uptime != null)
-        (
-          label: l.freeUptime,
-          value: uptime!,
-          underline: false,
-          emphasize: false,
-          valueColor: sessionColor,
-        ),
+        (label: l.freeUptime, value: uptime!, numeric: true, color: mute),
     ];
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(AppBrand.radiusCard),
-        border: Border.all(color: theme.colorScheme.outline),
-      ),
+    return AppSurface(
+      padding: const EdgeInsets.fromLTRB(16, 11, 16, 11),
       child: IntrinsicHeight(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(
-              child: Column(
-                children: [
-                  for (final row in rows)
-                    _NotebookHalf(
-                      text: row.label,
-                      align: TextAlign.start,
-                      underline: row.underline,
-                      rule: rule,
-                      leadingDot: true,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: mute,
-                      ),
-                    ),
+            // The status light sits on the edge of the plate: the colour reads
+            // before the words do, and every row stays on one baseline.
+            Container(
+              width: 3,
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.75),
+                borderRadius: BorderRadius.circular(2),
+                boxShadow: [
+                  BoxShadow(
+                    color: accent.withValues(alpha: 0.35),
+                    blurRadius: 10,
+                    spreadRadius: -2,
+                  ),
                 ],
               ),
             ),
-            Container(
-              width: 1.2,
-              margin: const EdgeInsets.symmetric(vertical: 2),
-              color: rule,
-            ),
+            const SizedBox(width: 15),
             Expanded(
               child: Column(
                 children: [
-                  for (final row in rows)
-                    _NotebookHalf(
-                      text: row.value,
-                      align: TextAlign.end,
-                      underline: row.underline,
-                      rule: rule,
-                      trailingDot: true,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight:
-                            row.emphasize ? FontWeight.w800 : FontWeight.w700,
-                        color: row.valueColor,
-                      ),
+                  for (final (index, row) in rows.indexed) ...[
+                    if (index > 0) const _PanelRule(),
+                    _InstrumentRow(
+                      label: row.label,
+                      value: row.value,
+                      numeric: row.numeric,
+                      color: row.color,
+                      mute: mute,
+                      emphasize: index == 0,
                     ),
+                  ],
                 ],
               ),
             ),
@@ -338,76 +239,90 @@ class ConnectionStatusPanel extends StatelessWidget {
   }
 }
 
-class _NotebookHalf extends StatelessWidget {
-  const _NotebookHalf({
-    required this.text,
-    required this.align,
-    required this.underline,
-    required this.rule,
-    required this.style,
-    this.leadingDot = false,
-    this.trailingDot = false,
-  });
-
-  final String text;
-  final TextAlign align;
-  final bool underline;
-  final Color rule;
-  final TextStyle? style;
-  final bool leadingDot;
-  final bool trailingDot;
+/// Hairline between instrument rows — a printed rule on the plate, not the
+/// orange margin rule the notebook sheet uses.
+class _PanelRule extends StatelessWidget {
+  const _PanelRule();
 
   @override
   Widget build(BuildContext context) {
-    final mute = Theme.of(context).colorScheme.onSurfaceVariant;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-      decoration: underline
-          ? BoxDecoration(
-              border: Border(
-                bottom: BorderSide(color: rule, width: 1.2),
-              ),
-            )
-          : null,
-      child: Row(
-        children: [
-          if (leadingDot) ...[
-            _NotebookDot(color: mute),
-            const SizedBox(width: 6),
-          ],
-          Expanded(
-            child: Text(
-              text,
-              textAlign: align,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: style,
-            ),
-          ),
-          if (trailingDot) ...[
-            const SizedBox(width: 6),
-            _NotebookDot(color: mute),
-          ],
-        ],
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      // The rule is a printed line, not a band: it borrows no vertical budget
+      // of its own, so three rows stay as short as they were before the panel
+      // became an instrument. Anything else overflows on a 600pt window.
+      padding: const EdgeInsets.symmetric(vertical: 1),
+      child: Container(
+        height: 1,
+        color: dark
+            ? AppBrand.lightSource.withValues(alpha: 0.07)
+            : AppBrand.shadeSource.withValues(alpha: 0.07),
       ),
     );
   }
 }
 
-class _NotebookDot extends StatelessWidget {
-  const _NotebookDot({required this.color});
+class _InstrumentRow extends StatelessWidget {
+  const _InstrumentRow({
+    required this.label,
+    required this.value,
+    required this.numeric,
+    required this.mute,
+    required this.emphasize,
+    this.color,
+  });
 
-  final Color color;
+  final String label;
+  final String value;
+  final bool numeric;
+  final Color mute;
+  final bool emphasize;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 5,
-      height: 5,
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.85),
-        shape: BoxShape.circle,
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        // Caption and value share the row by weight, not 50/50: a status like
+        // «Не подключено» needs more than half the line to set at 16.5pt.
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
+        children: [
+          Flexible(
+            flex: 2,
+            child: Text(
+              label.toUpperCase(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: mute,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.0,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            flex: 3,
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleSmall?.copyWith(
+                color: color ?? theme.colorScheme.onSurface,
+                fontSize: emphasize ? 16.5 : 15.5,
+                fontWeight: emphasize ? FontWeight.w800 : FontWeight.w600,
+                letterSpacing: -0.2,
+                fontFeatures:
+                    numeric ? const [FontFeature.tabularFigures()] : null,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -446,9 +361,8 @@ class ImportedProfileCard extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppBrand.radiusCard),
         side: BorderSide(
-          color: selected
-              ? theme.colorScheme.primary
-              : theme.colorScheme.outline,
+          color:
+              selected ? theme.colorScheme.primary : theme.colorScheme.outline,
           width: selected ? 1.6 : 1,
         ),
       ),
@@ -485,7 +399,8 @@ class ImportedProfileCard extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (connected)
-              const Icon(AppIcons.checkCircleFill, color: AppBrand.success, size: 18),
+              const Icon(AppIcons.checkCircleFill,
+                  color: AppBrand.success, size: 18),
             if (onDelete != null)
               SheetTintTrashButton(
                 tooltip: l.freeDelete,

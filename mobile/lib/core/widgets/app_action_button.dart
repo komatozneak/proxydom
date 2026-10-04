@@ -1,0 +1,263 @@
+import 'package:flutter/material.dart';
+
+import '../theme.dart';
+import 'app_icon.dart';
+
+/// The house key.
+///
+/// Material's [FilledButton] is one flat fill: no lit top edge, no shadow, no
+/// press travel — which is why a row of them reads as cheap plastic at any
+/// size. This is a milled key instead:
+///
+/// * the top face is a step lighter than the sides,
+/// * a rim runs along the bottom edge so the key has thickness,
+/// * pressing drops it 1px and collapses the shadow, then releases.
+///
+/// [color] is a role colour from [AppBrand] (moss for paste, amber for QR); the
+/// key mixes its own light from it. The label is always charcoal on top, which
+/// is why the roles are chosen light.
+class AppActionButton extends StatefulWidget {
+  const AppActionButton({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.color,
+    this.onPressed,
+    this.height = 56,
+    this.expand = true,
+    this.tooltip,
+    this.iconSize = 19,
+  });
+
+  final IconData icon;
+
+  final String label;
+
+  /// Role colour. Mixed by the key, never used raw.
+  final Color color;
+
+  final VoidCallback? onPressed;
+
+  final double height;
+
+  final bool expand;
+
+  final String? tooltip;
+
+  final double iconSize;
+
+  @override
+  State<AppActionButton> createState() => _AppActionButtonState();
+}
+
+class _AppActionButtonState extends State<AppActionButton> {
+  bool _down = false;
+
+  void _setDown(bool value) {
+    if (_down == value || !mounted) return;
+    setState(() => _down = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    final enabled = widget.onPressed != null;
+
+    final base = enabled
+        ? widget.color
+        : dark
+            ? AppBrand.surfaceSunkDark
+            : AppBrand.honeySurface;
+    final ink =
+        enabled ? AppBrand.inkLight : theme.colorScheme.onSurfaceVariant;
+
+    final face = _down
+        ? Color.lerp(base, AppBrand.shadeSource, 0.16)!
+        : Color.lerp(base, AppBrand.lightSource, dark ? 0.10 : 0.16)!;
+    final floor = _down
+        ? Color.lerp(base, AppBrand.shadeSource, 0.30)!
+        : Color.lerp(base, AppBrand.shadeSource, 0.08)!;
+    final rim = Color.lerp(base, AppBrand.shadeSource, enabled ? 0.45 : 0.2)!;
+    final radius = BorderRadius.circular(widget.height / 2);
+
+    Widget key = AnimatedContainer(
+      duration: AppBrand.motionPress,
+      curve: AppBrand.motionPressCurve,
+      transform: Matrix4.translationValues(0, _down ? 1.5 : 0, 0),
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        // The rim is part of the same box as the face: a separate overlay
+        // decor detached from the key when the press transform moved it.
+        border: Border.all(color: rim.withValues(alpha: 0.55)),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [face, floor],
+          stops: const [0.0, 0.62],
+        ),
+        boxShadow: enabled
+            ? [
+                BoxShadow(
+                  color: Color.lerp(base, AppBrand.shadeSource, 0.55)!,
+                  blurRadius: _down ? 4 : 14,
+                  spreadRadius: -2,
+                  offset: Offset(0, _down ? 1 : 6),
+                ),
+              ]
+            : null,
+      ),
+      child: ClipRRect(
+        borderRadius: radius,
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            onTap: widget.onPressed,
+            onTapDown: enabled ? (_) => _setDown(true) : null,
+            onTapUp: enabled ? (_) => _setDown(false) : null,
+            onTapCancel: enabled ? () => _setDown(false) : null,
+            splashColor: AppBrand.lightSource.withValues(alpha: 0.14),
+            highlightColor: AppBrand.lightSource.withValues(alpha: 0.06),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize:
+                    widget.expand ? MainAxisSize.max : MainAxisSize.min,
+                children: [
+                  AppIcon(widget.icon, size: widget.iconSize, color: ink),
+                  const SizedBox(width: 8),
+                  // Scale down instead of ellipsising: a key that reads
+                  // "Вста…" is worse than one with a slightly smaller label.
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        widget.label,
+                        maxLines: 1,
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color: ink,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: widget.label,
+      child: SizedBox(
+        height: widget.height,
+        width: widget.expand ? double.infinity : null,
+        child: widget.tooltip == null
+            ? key
+            : Tooltip(message: widget.tooltip!, child: key),
+      ),
+    );
+  }
+}
+
+/// A quiet round control: ring, no slab.
+///
+/// Used where the action is secondary (reload). A solid circle in a saturated
+/// role colour shouts louder than the primary key next to it; a ring with the
+/// same hue keeps the accent and gives the eye back to the primary action.
+class AppRingButton extends StatefulWidget {
+  const AppRingButton({
+    super.key,
+    required this.icon,
+    required this.color,
+    required this.onPressed,
+    this.tooltip,
+    this.size = 44,
+    this.iconSize = 20,
+  });
+
+  final IconData icon;
+
+  final Color color;
+
+  final VoidCallback? onPressed;
+
+  final String? tooltip;
+
+  final double size;
+
+  final double iconSize;
+
+  @override
+  State<AppRingButton> createState() => _AppRingButtonState();
+}
+
+class _AppRingButtonState extends State<AppRingButton> {
+  bool _down = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final ring =
+        Color.lerp(widget.color, AppBrand.lightSource, dark ? 0.15 : 0)!;
+
+    Widget button = AnimatedContainer(
+      duration: AppBrand.motionPress,
+      curve: AppBrand.motionPressCurve,
+      width: widget.size,
+      height: widget.size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: _down
+            ? widget.color.withValues(alpha: dark ? 0.26 : 0.20)
+            : widget.color.withValues(alpha: dark ? 0.12 : 0.10),
+        border: Border.all(
+          color: ring.withValues(alpha: dark ? 0.85 : 0.95),
+          width: 1.6,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: widget.color.withValues(alpha: dark ? 0.22 : 0.18),
+            blurRadius: 10,
+            spreadRadius: -4,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Material(
+        type: MaterialType.transparency,
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: widget.onPressed,
+          onTapDown: (_) => setState(() => _down = true),
+          onTapUp: (_) => setState(() => _down = false),
+          onTapCancel: () => setState(() => _down = false),
+          child: Center(
+            child: AppIcon(widget.icon, size: widget.iconSize, color: ring),
+          ),
+        ),
+      ),
+    );
+
+    return Semantics(
+      button: true,
+      label: widget.tooltip,
+      child: SizedBox(
+        width: widget.size,
+        height: widget.size,
+        child: widget.tooltip == null
+            ? button
+            : Tooltip(message: widget.tooltip!, child: button),
+      ),
+    );
+  }
+}
