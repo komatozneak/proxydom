@@ -5,6 +5,7 @@
 
 int disconnect_stops_a_session_no_window_owns();
 int only_our_own_starting_service_is_worth_waiting_for();
+int a_busy_pipe_is_not_the_same_as_an_absent_one();
 
 int main() {
   const std::wstring pipe_name =
@@ -119,8 +120,40 @@ int disconnect_stops_a_session_no_window_owns() {
     return 1;
   }
   std::cerr << "ok disconnect\n";
-  return only_our_own_starting_service_is_worth_waiting_for();
+  if (only_our_own_starting_service_is_worth_waiting_for() != 0) return 1;
+  return a_busy_pipe_is_not_the_same_as_an_absent_one();
 }
+
+// A pipe that is not there yet means the service is still starting, and that
+// resolves by waiting. A busy pipe means the broker is up and the window holds
+// its one client — waiting cannot free it, and "reinstall" is the wrong answer.
+int a_busy_pipe_is_not_the_same_as_an_absent_one() {
+  int failures = 0;
+  auto expect = [&failures](bool ok, const char* what) {
+    if (!ok) {
+      ++failures;
+      std::cerr << "FAIL " << what << "\n";
+    }
+  };
+  expect(open_is_retryable(ERROR_FILE_NOT_FOUND),
+         "a pipe that has not been created yet is worth retrying");
+  expect(open_is_retryable(ERROR_SEM_TIMEOUT), "so is a pipe still being published");
+  expect(open_is_retryable(ERROR_PIPE_BUSY), "a busy pipe is at least worth a short try");
+  expect(!open_is_retryable(ERROR_ACCESS_DENIED),
+         "a refused pipe is not going to open on its own");
+  expect(open_budget(ERROR_FILE_NOT_FOUND) == kOpenAbsentAttempts,
+         "an absent pipe gets the long budget, because a starting service publishes it");
+  expect(open_budget(ERROR_PIPE_BUSY) == kOpenBusyAttempts,
+         "a busy pipe gets a short one, because the window keeps it for as long as the user wants");
+  expect(kOpenBusyAttempts * kOpenBackoffMs <= 2000,
+         "a busy pipe must not hold the caller for the startup budget");
+  if (failures == 0) std::cerr << "ok busy pipe\n";
+  return failures == 0 ? 0 : 1;
+}
+
+// A pipe that answers while our own service is still starting is the broker
+// arriving. A pipe held by any other process is not something to wait for: the
+// name is being worn by something that is not the broker.
 
 // A pipe that answers while our own service is still starting is the broker
 // arriving. A pipe held by any other process is not something to wait for: the
