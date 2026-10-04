@@ -3,9 +3,14 @@
 #include <atomic>
 #include <cstdint>
 #include <functional>
+#include <map>
+#include <memory>
 #include <mutex>
+#include <set>
 #include <string>
 #include <vector>
+
+#include "flow_probe.h"
 
 // Service-owned TUN session. Win32 is behind the interfaces below so a fake
 // network can prove that Idle is emitted only after a verified restore.
@@ -104,11 +109,40 @@ struct TunnelSnapshot {
 struct ConnectRequest {
   std::string uri;
   std::vector<std::string> direct_domains;
+  std::vector<std::string> force_proxy_domains;
+  bool udp_direct = false;
 };
 
 struct BeginResult {
   bool accepted = false;
   TunnelSnapshot snap;
+};
+
+// One live clash api connection, as last seen.
+//
+// The api reports each connection's own cumulative counters, so a session total
+// has to be the sum of per-id deltas. Adding the raw counters instead re-counts
+// every live connection's entire history on every poll, which is what made the
+// journal report gigabytes for a lobby that never moved a packet.
+struct FlowLive {
+  std::string key;  // "network:chain"
+  std::uint64_t upload = 0;
+  std::uint64_t download = 0;
+};
+
+// What one "network:chain" has done about silence, since the last rate line.
+//
+// The two figures are per window, not for the session. A session-long worst case
+// is set once and then cannot answer "was there a dip just now?" — it went blind
+// after the first lull of the session and stayed blind for the rest of it. The
+// window is the unit a person means by "did it just stutter", so it is the unit
+// the stall is measured in. The session record survives in worst_quiet_ms, but
+// only as history.
+struct FlowStall {
+  bool seeded = false;        // first sighting only sets the baseline
+  std::uint64_t running_ms = 0;  // lull in progress, not yet closed
+  std::uint64_t worst_ms = 0;    // longest lull that ended inside the window
+  std::uint64_t count = 0;       // how many lulls ended inside the window
 };
 
 class CancelFlag {
@@ -241,6 +275,25 @@ TunWaitClass classify_tun_wait(const TunWaitView& view);
 // Empty when Connect may proceed. The name is the blocking adapter.
 std::string active_foreign_tunnel(const std::vector<RouteView>& routes);
 
+// Why the broker is looking at the tunnel again.
+//
+// The pipe is a channel, not a lease. The service owns the session and the
+// next window re-attaches to it with `hello`, so a closed client channel is
+// listed here as a reason that leaves the tunnel alone. Reading a lost pipe as
+// a stop request is what made the tunnel die with the window, and what let a
+// flapping pipe kill a live session.
+enum class TeardownReason {
+  ClientGone,
+  Explicit,
+  ServiceStop,
+  Suspend,
+  Lost,
+};
+
+// The single rule: only a lost client keeps the tunnel running.
+bool tunnel_should_stop(TeardownReason reason);
+const char* reason_name(TeardownReason reason);
+
 std::string encode_ledger(const Ledger& ledger);
 bool decode_ledger(const std::string& text, Ledger& ledger);
 
@@ -257,6 +310,13 @@ class TunnelSupervisor {
   void set_observer(std::function<void(const TunnelSnapshot&)> observer);
   void set_ready_observer(std::function<void(std::int64_t)> observer);
   void set_hook(std::function<void(ConnectStep)> hook);
+  // Builds the loopback client for the engine's clash api. Left unset, the
+  // session starts with no controller and the journal carries no counters.
+  void set_flow_factory(
+      std::function<std::unique_ptr<FlowProbe>(unsigned short, const std::string&)> factory);
+  // Sample and summary clocks. Production leaves it unset and the supervisor
+  // reads the steady clock; a test drives it to place windows by hand.
+  void set_clock(std::function<std::uint64_t()> clock);
   // Medium controller reports gate 3. A mismatched generation is ignored.
   void note_user_proof(bool ok, std::int64_t generation);
   // Unit tests skip the real controller. Production leaves this false.
@@ -283,6 +343,14 @@ class TunnelSupervisor {
   void gate(const char* step, const char* outcome);
   // Names the adapter wait in the service log. Connect still ends as tun_init_timeout.
   void note_tun_timeout();
+  // Reads the engine's connection list and folds it into the running totals.
+  void sample_flows();
+  // Per chain, for the window just closed: bytes per second, the longest lull
+  // that ended inside it, how many lulls that was, and the live connection
+  // count. Every dip is therefore visible the moment it happens, and no earlier
+  // one can mask a later one.
+  void emit_flow_rate();
+  void emit_flow_summary(const char* event);
 
   RouteTable& routes_;
   EngineHost& engine_;
@@ -297,6 +365,29 @@ class TunnelSupervisor {
   std::function<void(const TunnelSnapshot&)> observer_;
   std::function<void(std::int64_t)> ready_observer_;
   std::function<void(ConnectStep)> hook_;
+  std::function<std::unique_ptr<FlowProbe>(unsigned short, const std::string&)> flow_factory_;
+  std::unique_ptr<FlowProbe> flows_;
+  std::function<std::uint64_t()> clock_;
+  // Running totals per "network:chain", and the last seen counters per
+  // connection id. The journal answers "did game UDP leave direct" from the
+  // former and "did the flow stall" from the latter.
+  std::map<std::string, FlowLive> flow_live_;
+  std::map<std::string, std::uint64_t> flow_up_;
+  std::map<std::string, std::uint64_t> flow_down_;
+  // Bytes banked since the last flow_rate line, so a rate is a measured value.
+  std::map<std::string, std::uint64_t> rate_up_;
+  std::map<std::string, std::uint64_t> rate_down_;
+  // Silence, per chain. Silences are counted per chain because "nothing moved"
+  // for the whole session is not the question: what matters is whether the chain
+  // carrying the game went quiet while some other chain kept dribbling bytes.
+  std::map<std::string, FlowStall> stalls_;
+  std::uint64_t flow_window_ms_ = 0;
+  std::uint64_t flow_worst_quiet_ms_ = 0;
+  std::set<std::string> flow_announced_;
+  std::uint64_t flow_last_sample_ms_ = 0;
+  std::uint64_t flow_last_summary_ms_ = 0;
+  bool flow_api_reported_ = false;
+  bool flow_untracked_reported_ = false;
   std::int64_t proof_generation_ = 0;
   int proof_result_ = 0;
   bool test_user_proof_ = false;

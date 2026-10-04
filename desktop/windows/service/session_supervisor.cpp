@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
 #include <map>
 #include <sstream>
 
@@ -247,6 +248,26 @@ std::string active_foreign_tunnel(const std::vector<RouteView>& routes) {
   return {};
 }
 
+bool tunnel_should_stop(TeardownReason reason) {
+  return reason != TeardownReason::ClientGone;
+}
+
+const char* reason_name(TeardownReason reason) {
+  switch (reason) {
+    case TeardownReason::ClientGone:
+      return "client_gone";
+    case TeardownReason::Explicit:
+      return "explicit";
+    case TeardownReason::ServiceStop:
+      return "service_stop";
+    case TeardownReason::Suspend:
+      return "suspend";
+    case TeardownReason::Lost:
+      return "lost";
+  }
+  return "unknown";
+}
+
 std::string encode_ledger(const Ledger& ledger) {
   std::ostringstream out;
   out << "v1\n"
@@ -332,6 +353,19 @@ bool decode_ledger(const std::string& text, Ledger& ledger) {
   return true;
 }
 
+namespace {
+
+// The steady clock, behind a seam: sample windows and lulls are time-based, so
+// a test has to be able to place them by hand.
+std::uint64_t now_ms() {
+  return static_cast<std::uint64_t>(
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::steady_clock::now().time_since_epoch())
+          .count());
+}
+
+}  // namespace
+
 TunnelSupervisor::TunnelSupervisor(RouteTable& routes,
                                    EngineHost& engine,
                                    NameResolver& names,
@@ -348,6 +382,7 @@ TunnelSupervisor::TunnelSupervisor(RouteTable& routes,
       sleeper_(sleeper) {
   published_.phase = TunnelPhase::Idle;
   published_.cleanup_verified = true;
+  clock_ = now_ms;
 }
 
 void TunnelSupervisor::set_observer(std::function<void(const TunnelSnapshot&)> observer) {
@@ -356,8 +391,205 @@ void TunnelSupervisor::set_observer(std::function<void(const TunnelSnapshot&)> o
 
 void TunnelSupervisor::set_hook(std::function<void(ConnectStep)> hook) { hook_ = std::move(hook); }
 
+void TunnelSupervisor::set_flow_factory(
+    std::function<std::unique_ptr<FlowProbe>(unsigned short, const std::string&)> factory) {
+  flow_factory_ = std::move(factory);
+}
+
+namespace {
+
+// Enough traffic to mean "this is a real flow", not a DNS reply or a TLS hello.
+constexpr std::uint64_t kFlowNoticeBytes = 64u * 1024u;
+constexpr std::uint64_t kFlowSampleMs = 5000;
+constexpr std::uint64_t kFlowSummaryMs = 15000;
+
+}  // namespace
+
+void TunnelSupervisor::sample_flows() {
+  if (!flows_) return;
+  const std::uint64_t stamp = clock_();
+  // The service loop ticks about every two seconds; polling on its own clock
+  // keeps the sample rate independent of how often the pipe wakes us.
+  if (stamp - flow_last_sample_ms_ < kFlowSampleMs) return;
+  const std::uint64_t window =
+      flow_last_sample_ms_ == 0 ? kFlowSampleMs : stamp - flow_last_sample_ms_;
+  flow_last_sample_ms_ = stamp;
+
+  FlowSample sample;
+  if (!flows_->poll(sample)) {
+    // One line per session: the engine may not be listening yet right after start.
+    if (!flow_api_reported_) {
+      flow_api_reported_ = true;
+      log_.write(ledger_.generation, "flow", "api_unreachable", flows_->last_error());
+    }
+    return;
+  }
+  flow_api_reported_ = false;
+
+  if (sample.untracked > 0 && !flow_untracked_reported_) {
+    // Without an id the counters cannot be attributed, so the totals will read
+    // low. Say so once: silent zeros would be worse than no counters at all.
+    flow_untracked_reported_ = true;
+    log_.write(ledger_.generation, "flow", "no_connection_id", 0);
+  }
+
+  // Each row carries that connection's own cumulative counters, so the bytes
+  // this poll adds are the difference from the last poll. Without the id there
+  // is nothing to take a difference against, so such a row is skipped rather
+  // than banked: adding its whole history every five seconds is how a quiet
+  // lobby ends up looking like it moved seven gigabytes.
+  std::map<std::string, std::uint64_t> up_now;
+  std::map<std::string, std::uint64_t> down_now;
+  std::map<std::string, FlowLive> live;
+
+  for (const auto& row : sample.rows) {
+    if (row.id.empty()) continue;
+    const std::string key = row.network + ":" + row.chain;
+    FlowLive entry;
+    entry.key = key;
+    entry.upload = row.upload;
+    entry.download = row.download;
+
+    const auto previous = flow_live_.find(row.id);
+    if (previous != flow_live_.end() && previous->second.key == key &&
+        row.upload >= previous->second.upload && row.download >= previous->second.download) {
+      up_now[key] += row.upload - previous->second.upload;
+      down_now[key] += row.download - previous->second.download;
+    }
+    // A counter that went backwards means the id was reused for a different
+    // flow. Banking the difference would invent traffic, so nothing is added
+    // and the new counters simply become the baseline.
+    live.emplace(row.id, entry);
+  }
+  // Connections that closed are forgotten. Their bytes were banked on the last
+  // poll that saw them, so dropping them loses nothing and keeps the id map
+  // the size of the live connection list.
+  flow_live_.swap(live);
+
+  std::map<std::string, std::uint64_t> moved_by_key;
+  for (const auto& item : up_now) {
+    flow_up_[item.first] += item.second;
+    rate_up_[item.first] += item.second;
+    moved_by_key[item.first] += item.second;
+  }
+  for (const auto& item : down_now) {
+    flow_down_[item.first] += item.second;
+    rate_down_[item.first] += item.second;
+    moved_by_key[item.first] += item.second;
+  }
+
+  // Silence, per chain. A chain's first sighting only sets its baseline: having
+  // nothing to compare against is not the same as having seen nothing move. A
+  // chain that disappears has whatever lull it was in closed out here, so a
+  // connection tearing down at the end of a silent stretch still reports it.
+  std::set<std::string> present;
+  for (const auto& entry : flow_live_) present.insert(entry.second.key);
+  for (const auto& key : present) {
+    FlowStall& stall = stalls_[key];
+    if (!stall.seeded) {
+      stall.seeded = true;
+      continue;
+    }
+    const auto moved = moved_by_key.find(key);
+    if (moved != moved_by_key.end() && moved->second > 0) {
+      if (stall.running_ms > 0) {
+        ++stall.count;
+        if (stall.running_ms > stall.worst_ms) stall.worst_ms = stall.running_ms;
+        stall.running_ms = 0;
+      }
+    } else {
+      stall.running_ms += window;
+      if (stall.running_ms > flow_worst_quiet_ms_) flow_worst_quiet_ms_ = stall.running_ms;
+    }
+  }
+  for (auto& entry : stalls_) {
+    if (present.count(entry.first) != 0) continue;
+    if (entry.second.running_ms == 0) continue;
+    ++entry.second.count;
+    if (entry.second.running_ms > entry.second.worst_ms) entry.second.worst_ms = entry.second.running_ms;
+    entry.second.running_ms = 0;
+  }
+
+  flow_window_ms_ += window;
+
+  for (const auto& row : sample.rows) {
+    if (row.id.empty()) continue;
+    if (row.upload + row.download < kFlowNoticeBytes) continue;
+    // Keyed by id so a flow that is torn down and re-established is announced
+    // again, while a long-lived one is announced once.
+    if (!flow_announced_.insert(row.id).second) continue;
+    log_.write(ledger_.generation, "flow_seen",
+               "net=" + journal_token(row.network) + " chain=" + journal_token(row.chain) +
+                   " dst=" + journal_token(row.destination) + " proc=" + journal_token(row.process) +
+                   " up=" + std::to_string(row.upload) + " dn=" + std::to_string(row.download),
+               0);
+  }
+
+  if (stamp - flow_last_summary_ms_ >= kFlowSummaryMs) {
+    flow_last_summary_ms_ = stamp;
+    emit_flow_rate();
+    emit_flow_summary("flow_summary");
+  }
+}
+
+void TunnelSupervisor::emit_flow_rate() {
+  const std::uint64_t seconds = flow_window_ms_ / 1000;
+  std::map<std::string, std::uint64_t> live_counts;
+  std::set<std::string> live_keys;
+  for (const auto& entry : flow_live_) {
+    ++live_counts[entry.second.key];
+    live_keys.insert(entry.second.key);
+  }
+
+  std::string code = "win_ms=" + std::to_string(flow_window_ms_) +
+                     " worst_quiet_ms=" + std::to_string(flow_worst_quiet_ms_);
+  for (const auto& entry : stalls_) {
+    const std::string& key = entry.first;
+    const FlowStall& stall = entry.second;
+    // A chain that is gone reports once, so its final lull is not lost, and is
+    // then forgotten.
+    if (live_keys.count(key) == 0 && stall.count == 0 && stall.running_ms == 0) continue;
+    const std::uint64_t down = seconds == 0 ? 0 : rate_down_[key] / 1024 / seconds;
+    const std::uint64_t up = seconds == 0 ? 0 : rate_up_[key] / 1024 / seconds;
+    code += " " + journal_token(key) + "=dn_kbps:" + std::to_string(down) +
+            "/up_kbps:" + std::to_string(up) +
+            " stall_ms:" + std::to_string(stall.worst_ms) +
+            " stalls:" + std::to_string(stall.count) +
+            " quiet_ms:" + std::to_string(stall.running_ms);
+    if (live_counts.count(key) != 0) code += " live:" + std::to_string(live_counts[key]);
+  }
+  log_.write(ledger_.generation, "flow_rate", code, 0);
+
+  rate_up_.clear();
+  rate_down_.clear();
+  flow_window_ms_ = 0;
+  for (auto& entry : stalls_) {
+    entry.second.worst_ms = 0;
+    entry.second.count = 0;
+  }
+  for (auto it = stalls_.begin(); it != stalls_.end();) {
+    if (live_keys.count(it->first) == 0) it = stalls_.erase(it);
+    else ++it;
+  }
+}
+
+void TunnelSupervisor::emit_flow_summary(const char* event) {
+  if (flow_up_.empty() && flow_down_.empty()) return;
+  std::string code;
+  for (const auto& entry : flow_down_) {
+    if (!code.empty()) code += " ";
+    code += journal_token(entry.first) + "=dn:" + std::to_string(entry.second) + "/up:" +
+            std::to_string(flow_up_[entry.first]);
+  }
+  log_.write(ledger_.generation, event, code, 0);
+}
+
 void TunnelSupervisor::set_ready_observer(std::function<void(std::int64_t)> observer) {
   ready_observer_ = std::move(observer);
+}
+
+void TunnelSupervisor::set_clock(std::function<std::uint64_t()> clock) {
+  if (clock) clock_ = std::move(clock);
 }
 
 void TunnelSupervisor::note_user_proof(bool ok, std::int64_t generation) {
@@ -520,6 +752,11 @@ bool TunnelSupervisor::restore_resources() {
 }
 
 TunnelSnapshot TunnelSupervisor::finish(TunnelCode code, const std::string& message, bool quiet) {
+  if (ledger_.phase == TunnelPhase::Connected) {
+    flow_last_sample_ms_ = 0;  // the closing sample is not a periodic one
+    sample_flows();
+    emit_flow_summary("flow_total");
+  }
   const bool clean = restore_resources();
   if (!clean) return publish(TunnelCode::CleanupFailed, user_message(TunnelCode::CleanupFailed, {}), false);
   if (quiet || code == TunnelCode::None) return publish(TunnelCode::None, message, true);
@@ -651,11 +888,39 @@ TunnelSnapshot TunnelSupervisor::run_connect(const ConnectRequest& request, Canc
   if (stop_requested(ConnectStep::Resolved, cancel)) return finish(TunnelCode::None, {}, true);
 
   gate("core", nullptr);
-  const std::string config = build_singbox_config(line, server_ip, request.direct_domains);
+  // The loopback controller is what tells us, per connection, whether a game's
+  // UDP left direct or inside the proxy stream. It carries a per-session secret
+  // and is only reachable on 127.0.0.1.
+  unsigned short api_port = 0;
+  std::string api_secret;
+  flows_.reset();
+  flow_live_.clear();
+  flow_up_.clear();
+  flow_down_.clear();
+  rate_up_.clear();
+  rate_down_.clear();
+  stalls_.clear();
+  flow_window_ms_ = 0;
+  flow_worst_quiet_ms_ = 0;
+  flow_announced_.clear();
+  flow_last_sample_ms_ = 0;
+  flow_last_summary_ms_ = 0;
+  flow_api_reported_ = false;
+  flow_untracked_reported_ = false;
+  if (flow_factory_ && probe_.pick_loopback_port(api_port)) {
+    api_secret = make_api_secret();
+    flows_ = flow_factory_(api_port, api_secret);
+  }
+  const std::string config =
+      build_singbox_config(line, server_ip, request.direct_domains, request.force_proxy_domains,
+                           request.udp_direct, flows_ ? api_port : 0, api_secret);
   if (config.empty() || !files_.write_config(config)) {
     const unsigned long win32 = config.empty() ? 13u : files_.last_error();
     log_.write(ledger_.generation, "core_config_failed", "", win32);
     return finish(TunnelCode::CoreStartFailed, {}, false);
+  }
+  if (flows_) {
+    log_.write(ledger_.generation, "flow", "api_port=" + std::to_string(api_port), 0);
   }
   remember([&] { ledger_.config_written = true; });
   if (stop_requested(ConnectStep::ConfigWritten, cancel)) return finish(TunnelCode::None, {}, true);
@@ -818,6 +1083,7 @@ TunnelSnapshot TunnelSupervisor::watchdog(CancelFlag& cancel) {
       return finish(TunnelCode::None, kChanged, false);
     }
   }
+  sample_flows();
   return snapshot();
 }
 

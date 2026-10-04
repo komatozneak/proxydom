@@ -6,6 +6,24 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+# A native tool writing to stderr is not a failure. Under ErrorActionPreference
+# "Stop" PowerShell promotes every CMake or WiX warning to a terminating error
+# and the build dies on a harmless warning. Native calls are gated on
+# $LASTEXITCODE instead; cmdlet failures keep the strict behaviour above.
+function Invoke-Native {
+    param([scriptblock]$Command, [string]$What)
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        & $Command
+        $code = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previous
+    }
+    if ($code -ne 0) { throw "$What failed (exit $code)." }
+}
+
 $Installer = $PSScriptRoot
 $WindowsRoot = Split-Path $Installer -Parent
 $Repo = Split-Path (Split-Path $WindowsRoot -Parent) -Parent
@@ -82,23 +100,71 @@ if (Test-Path (Join-Path $build "CMakeCache.txt")) {
         Remove-Item -LiteralPath $build -Recurse -Force
     }
 }
-cmd /c "call `"$vcvars`" >nul && `"$cmake`" -S `"$Service`" -B `"$build`" -DCMAKE_BUILD_TYPE=Release && `"$cmake`" --build `"$build`" --config Release --target ProxyDomBroker ProxyDomCtl"
-if ($LASTEXITCODE -ne 0) { throw "CMake build failed." }
+Invoke-Native { cmd /c "call `"$vcvars`" >nul && `"$cmake`" -S `"$Service`" -B `"$build`" -DCMAKE_BUILD_TYPE=Release && `"$cmake`" --build `"$build`" --config Release --target ProxyDomBroker ProxyDomCtl" } "CMake build"
 $bin = Join-Path $build "Release"
 if (-not (Test-Path (Join-Path $bin "ProxyDomBroker.exe"))) { $bin = $build }
 Copy-Item (Join-Path $bin "ProxyDomBroker.exe") (Join-Path $Payload "ProxyDomBroker.exe") -Force
 Copy-Item (Join-Path $bin "ProxyDomCtl.exe") (Join-Path $Payload "ProxyDomCtl.exe") -Force
 
-if (-not (Test-Path (Join-Path $FlutterRelease "proxy_dom.exe"))) {
-    Write-Host "Building Flutter window"
-    Push-Location $Mobile
-    try {
-        flutter build windows --release
-        if ($LASTEXITCODE -ne 0) { throw "flutter build windows failed." }
-    } finally {
-        Pop-Location
+# A release build that already exists is not evidence that it is current. The
+# Flutter window used to be built only when proxy_dom.exe was missing, so any
+# build after the first packaged whatever binary was already sitting there — a
+# merge could land in mobile/lib and the next MSI would ship the old AOT without
+# a word. The build now always runs, and this is the backstop for the day someone
+# reintroduces a skip.
+#
+# The check is on content, not on timestamps. Timestamps looked right and were
+# wrong: a branch switch rewrites the mtime of every file in the tree, so the
+# first version of this guard failed a build whose sources had not changed by a
+# byte. What matters is whether the snapshot was made from the sources now on
+# disk, and only a hash of those sources can answer that.
+function Get-DartSourceStamp {
+    param([string]$Root)
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    $files = @(Get-ChildItem (Join-Path $Root "lib") -Recurse -File -Filter *.dart)
+    foreach ($name in @("pubspec.yaml", "pubspec.lock")) {
+        $item = Get-Item (Join-Path $Root $name) -ErrorAction SilentlyContinue
+        if ($item) { $files += $item }
+    }
+    $lines = foreach ($file in ($files | Sort-Object FullName)) {
+        $relative = $file.FullName.Substring($Root.Length).Replace('\', '/')
+        $digest = [System.BitConverter]::ToString(
+            $sha.ComputeHash([System.IO.File]::ReadAllBytes($file.FullName))).Replace('-', '')
+        "$relative $digest"
+    }
+    $body = [System.Text.Encoding]::UTF8.GetBytes(($lines -join "`n"))
+    return [System.BitConverter]::ToString($sha.ComputeHash($body)).Replace('-', '')
+}
+
+$stampFile = Join-Path $Mobile "build\.pd_source_stamp"
+$stamp = Get-DartSourceStamp -Root $Mobile
+$aot = Join-Path $FlutterRelease "data\app.so"
+if (Test-Path $aot) {
+    if (-not (Test-Path $stampFile)) {
+        throw ("A Flutter build is present but nothing records which sources it came " +
+               "from, so it cannot be vouched for. Run 'flutter clean' in mobile and " +
+               "build again.")
+    }
+    $built = (Get-Content $stampFile -Raw).Trim()
+    if ($built -ne $stamp) {
+        throw ("Flutter snapshot is stale: data\app.so was built from sources with " +
+               "stamp $built, and mobile now hashes to $stamp. The window would ship " +
+               "code that no longer matches the repository. Run 'flutter clean' in " +
+               "mobile and build again.")
     }
 }
+Write-Host "Building Flutter window"
+Push-Location $Mobile
+try {
+    Invoke-Native { flutter build windows --release } "flutter build windows"
+} finally {
+    Pop-Location
+}
+if (-not (Test-Path $aot)) {
+    throw "Flutter build produced no data\app.so, so there is nothing to package."
+}
+Set-Content -LiteralPath $stampFile -Value $stamp -NoNewline
+Write-Host "Flutter snapshot checked: sources hash $stamp"
 
 Write-Host "Staging payload"
 Get-ChildItem $Payload -Exclude "ProxyDomBroker.exe","ProxyDomCtl.exe" | Remove-Item -Recurse -Force
@@ -126,6 +192,5 @@ $wixArgs = @(
 )
 if ($Quiet) { }
 Write-Host "Building MSI"
-& wix @wixArgs
-if ($LASTEXITCODE -ne 0) { throw "wix build failed." }
+Invoke-Native { & wix @wixArgs } "wix build"
 Write-Host "MSI: $msi"

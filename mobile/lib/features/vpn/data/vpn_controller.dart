@@ -48,6 +48,11 @@ class VpnController {
   bool get windowsBrokerCooling => WindowsTunnel.instance.brokerCooling;
 
   /// One share line through the Windows broker (ADR 031).
+  ///
+  /// Games reach their servers over UDP to bare addresses that change, so no
+  /// domain rule can keep them off the tunnel and no IP list survives a patch.
+  /// Windows therefore bypasses UDP by protocol, and the force-proxy hosts are
+  /// sent separately so their QUIC does not leave through that same rule.
   Future<bool> startWindowsShare(String uri) async {
     final domains = stripForceProxySuffixes(
       await SplitTunnelPrefs.enabledDomainSuffixes(),
@@ -55,6 +60,8 @@ class VpnController {
     final result = await WindowsTunnel.instance.connect(
       uri,
       directDomains: domains,
+      forceProxyDomains: kSmartProxyForceSuffixes,
+      udpDirect: true,
     );
     windowsNotice = result.notice;
     windowsCode = result.code;
