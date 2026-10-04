@@ -12,6 +12,7 @@ import '../../../core/diagnostics/ui_log.dart';
 import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
+import '../../../core/widgets/app_surface.dart';
 import '../../../core/widgets/connect_button.dart';
 import '../../../core/widgets/house_pulsar.dart';
 import '../../../core/widgets/signal_nest_hero.dart';
@@ -638,11 +639,14 @@ class _FreeClientHome extends StatelessWidget {
       _ => null,
     };
 
-    final accent = status is VpnConnected
-        ? AppBrand.success
-        : status is VpnConnecting
-            ? AppBrand.warning
-            : AppBrand.destructive;
+    // Disconnected is a normal state, not a failure: painting it alarm red
+    // made the resting screen look broken. Red is reserved for VpnError.
+    final accent = switch (status) {
+      VpnConnected() => AppBrand.success,
+      VpnConnecting() => AppBrand.warning,
+      VpnError() => AppBrand.destructive,
+      _ => theme.colorScheme.onSurfaceVariant,
+    };
 
     return Column(
       children: [
@@ -779,7 +783,6 @@ class _NoVpnHomeRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final elevated = theme.colorScheme.surfaceContainerHighest;
     final line = theme.colorScheme.outline;
     final showAppsPin = !iosAppsSplitUnsupported;
     final mute = theme.colorScheme.onSurfaceVariant;
@@ -787,16 +790,15 @@ class _NoVpnHomeRow extends StatelessWidget {
         ? AppBrand.inkDark
         : AppBrand.inkLight;
 
-    return Material(
-      color: elevated,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppBrand.radiusPill),
-        side: BorderSide(color: line),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppBrand.radiusPill),
-        child: ConstrainedBox(
+    return AppSurface(
+      radius: AppBrand.radiusPill,
+      clip: true,
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(AppBrand.radiusPill),
+          child: ConstrainedBox(
           constraints: const BoxConstraints(minHeight: 48),
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 10),
@@ -890,6 +892,7 @@ class _NoVpnHomeRow extends StatelessWidget {
               ],
             ),
           ),
+        ),
         ),
       ),
     );
