@@ -226,7 +226,7 @@ abstract class AppL10n {
   /// No description provided for @navVpn.
   ///
   /// In en, this message translates to:
-  /// **'VPN'**
+  /// **'Tunnel'**
   String get navVpn;
 
   /// No description provided for @navLocations.

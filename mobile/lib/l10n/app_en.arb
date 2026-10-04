@@ -30,7 +30,7 @@
   "homeSettings": "Settings",
   "navHome": "Home",
   "@navHome": {},
-  "navVpn": "VPN",
+  "navVpn": "Tunnel",
   "@navVpn": {},
   "navLocations": "Locations",
   "@navLocations": {},
