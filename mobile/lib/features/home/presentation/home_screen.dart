@@ -775,7 +775,6 @@ class _FreeClientHome extends StatelessWidget {
     // Nothing is scattered across the screen — the eye has one place to land,
     // and that place is the power button.
     final readout = ConnectionTerminal(
-      label: l.navVpn,
       status: statusText,
       serverName: profile,
       serverFlag: serverFlag,

@@ -165,7 +165,6 @@ class FreeClientEmptyState extends StatelessWidget {
 class ConnectionTerminal extends StatelessWidget {
   const ConnectionTerminal({
     super.key,
-    required this.label,
     required this.status,
     required this.serverName,
     required this.accent,
@@ -178,8 +177,6 @@ class ConnectionTerminal extends StatelessWidget {
     this.trafficColor,
   });
 
-  /// What this screen is.
-  final String label;
   final String status;
 
   /// The server, with its flag, inside the terminal next to the state.
@@ -234,62 +231,15 @@ TextStyle _mono(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Text(
-              '▌',
-              style: _mono(
-                context,
-                size: 13,
-                // The block is a lamp, the word is a name.
-                //
-                // It has been both wrong ways round: first it wore the state
-                // colour and made the word «ПОДКЛЮЧЕНИЕ» look like a reading,
-                // then it was pinned to the house gold and stayed gold through
-                // an error — a lit lamp on a screen whose own text said the
-                // service was down. Now it carries the state and the word keeps
-                // the muted ink of a label, so the colour is always the truth
-                // and the name is never a second opinion.
-                color: accent,
-                weight: 700,
-                spacing: 0,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                label.toUpperCase(),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: _mono(
-                  context,
-                  size: 11.5,
-                  color: mute,
-                  weight: 700,
-                  spacing: 2.6,
-                ),
-              ),
-            ),
-            // Uptime on the counter, where a terminal puts a reading that
-            // belongs to the screen rather than to the state: the label at one
-            // end of the line and the clock at the other, the same measure the
-            // traffic rail keeps below. Turned on its side beside the GB it was
-            // a second measurement in a different alphabet — clever, and the
-            // first thing a person had to decode.
-            if (windowsDesktop && uptime != null) ...[
-              const Spacer(),
-              _uptimeField(context, ink, mute, uptime),
-            ],
-          ],
-        ),
-        const SizedBox(height: 14),
-        // Where you are, in the middle and large.
+        // No label line.
         //
-        // The middle used to be the state word — «НЕ ПОДКЛЮЧЕНО» — which is
-        // the one fact the house behind it already says with its whole body:
-        // dark house, no light, not connected. The thing the head was not
-        // saying is *where*, and a country is a picture, so it gets the size
-        // and the centre.
+        // It said «ПОДКЛЮЧЕНИЕ», which is the name of the tab the person is
+        // already standing on — the rail and the bottom bar both say it — and
+        // it put the word «подключение» three lines above the word
+        // «подключено». One screen, one name, one state: the head opens with
+        // the node.
+        //
+        // Where you are, in the middle and large.
         Center(
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -331,29 +281,41 @@ TextStyle _mono(
         ),
         const SizedBox(height: 10),
         // The state under it, small: the lamp is the signal, the word is the
-        // caption. Centred, because everything above it is.
-        Center(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _Lamp(color: accent, size: 8),
-              const SizedBox(width: 9),
-              Flexible(
-                child: Text(
-                  status.toUpperCase(),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: _mono(
-                    context,
-                    size: 11,
-                    color: accent,
-                    weight: 700,
-                    spacing: 2.2,
-                  ),
+        // caption. Centred, because everything above it is — and the clock on
+        // the counter at the right, the one other reading that belongs to the
+        // screen rather than to the state.
+        Row(
+          children: [
+            Expanded(
+              child: Center(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _Lamp(color: accent, size: 8),
+                    const SizedBox(width: 9),
+                    Flexible(
+                      child: Text(
+                        status.toUpperCase(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: _mono(
+                          context,
+                          size: 11,
+                          color: accent,
+                          weight: 700,
+                          spacing: 2.2,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
+            ),
+            if (windowsDesktop && uptime != null) ...[
+              const SizedBox(width: 10),
+              _uptimeField(context, ink, mute, uptime),
             ],
-          ),
+          ],
         ),
         const SizedBox(height: 16),
         // The rail the traffic runs on, with the spent GB at its end.
