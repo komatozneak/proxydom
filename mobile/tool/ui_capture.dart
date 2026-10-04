@@ -2,10 +2,10 @@
 //
 //   cd mobile && flutter test tool/ui_capture.dart
 //
-// Renders the real screens at phone size and writes PNGs to ../.scratch/ui/,
-// so a design pass can be judged from the actual pixels instead of from code.
-// Fonts are loaded from the asset bundle — the default test font would draw
-// boxes and hide every type decision.
+// Renders the real screens at phone size and at window size, and writes PNGs to
+// ../.scratch/ui/, so a design pass can be judged from the actual pixels
+// instead of from code. Fonts are loaded from the asset bundle — the default
+// test font would draw boxes and hide every type decision.
 //
 // Known: the run exits non-zero with "A Timer is still pending" — the screens
 // keep 1s timers alive through singletons that outlive the tree. The PNGs are
@@ -14,6 +14,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -23,11 +24,16 @@ import 'package:proxydom/core/theme.dart';
 import 'package:proxydom/core/widgets/notebook_paper.dart';
 import 'package:proxydom/features/home/presentation/home_screen.dart';
 import 'package:proxydom/features/settings/presentation/settings_screen.dart';
+import 'package:proxydom/features/shell/presentation/main_shell.dart';
 import 'package:proxydom/l10n/app_localizations.dart';
 
 /// Logical 360x780 at DPR 3 — the same framing as the owner's device captures.
-const Size _logical = Size(360, 780);
-const double _dpr = 3;
+const Size _phone = Size(360, 780);
+const double _phoneDpr = 3;
+
+/// A resized window, not a phone in a frame. DPR 2 keeps the text crisp.
+const Size _desktop = Size(1120, 780);
+const double _desktopDpr = 2;
 
 final _outDir = Directory('../.scratch/ui');
 
@@ -52,7 +58,35 @@ Future<void> _loadFonts() async {
   }
 }
 
-Widget _app(Widget child, {required Brightness brightness}) {
+/// Puts a bare screen body the way the shell does: on paper + grid, and on
+/// Windows inside the rail.
+Widget _frame(
+  Widget child,
+  BuildContext context, {
+  required bool desktop,
+}) {
+  final dark = Theme.of(context).brightness == Brightness.dark;
+  Widget content = Scaffold(
+    backgroundColor: dark ? AppBrand.paperDark : AppBrand.paperLight,
+    body: NotebookPaper(marginRule: !desktop, child: child),
+  );
+  if (!desktop) return content;
+  return Scaffold(
+    backgroundColor: dark ? AppBrand.paperDark : AppBrand.paperLight,
+    body: Row(
+      children: [
+        WindowsNavRail(selected: MainShell.homeIndex, onSelect: (_) {}),
+        Expanded(child: content),
+      ],
+    ),
+  );
+}
+
+Widget _app(
+  Widget child, {
+  required Brightness brightness,
+  required bool desktop,
+}) {
   return ProviderScope(
     child: MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -60,17 +94,7 @@ Widget _app(Widget child, {required Brightness brightness}) {
       localizationsDelegates: AppL10n.localizationsDelegates,
       supportedLocales: AppL10n.supportedLocales,
       locale: const Locale('ru'),
-      // The screens are bare bodies — MainShell puts them on paper + grid.
-      // Reproduce that here, otherwise the capture is a white void.
-      home: Builder(
-        builder: (context) {
-          final dark = Theme.of(context).brightness == Brightness.dark;
-          return Scaffold(
-            backgroundColor: dark ? AppBrand.paperDark : AppBrand.paperLight,
-            body: NotebookPaper(child: child),
-          );
-        },
-      ),
+      home: Builder(builder: (context) => _frame(child, context, desktop: desktop)),
     ),
   );
 }
@@ -80,18 +104,25 @@ Future<void> _capture(
   String name,
   Widget child, {
   required Brightness brightness,
-  Size size = _logical,
+  bool desktop = false,
 }) async {
+  final size = desktop ? _desktop : _phone;
+  final dpr = desktop ? _desktopDpr : _phoneDpr;
   tester.view
-    ..physicalSize = size * _dpr
-    ..devicePixelRatio = _dpr;
+    ..physicalSize = size * dpr
+    ..devicePixelRatio = dpr;
   addTearDown(tester.view.reset);
+  if (desktop) {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+  } else {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+  }
 
   final boundaryKey = GlobalKey();
   await tester.pumpWidget(
     RepaintBoundary(
       key: boundaryKey,
-      child: _app(child, brightness: brightness),
+      child: _app(child, brightness: brightness, desktop: desktop),
     ),
   );
   // Two frames: the first settles the tree, the second paints animations that
@@ -99,6 +130,20 @@ Future<void> _capture(
   // A few more let asynchronously decoded row assets (the QS tile glyph) land
   // before the shutter — one pump renders them as an empty chip.
   await tester.pump();
+  // Image decoding is real async work: without a runAsync round trip the marks
+  // are still blank when the shutter opens. Precache every asset the screens
+  // draw, then let the tree settle again.
+  await tester.runAsync(() async {
+    final context = tester.element(find.byType(Navigator).first);
+    for (final asset in const [
+      'assets/icon/logo_mark_nav.png',
+      'assets/icon/logo_mark_nav_light.png',
+      'assets/icon/ic_launcher_monochrome.png',
+      'assets/icon/nav_vpn_proxydom.png',
+    ]) {
+      await precacheImage(AssetImage(asset), context);
+    }
+  });
   for (var i = 0; i < 4; i++) {
     await tester.pump(const Duration(milliseconds: 200));
   }
@@ -108,7 +153,7 @@ Future<void> _capture(
   // Image encoding is real async work: inside a widget test it only completes
   // under runAsync, otherwise the next pumpWidget deadlocks on the pending one.
   await tester.runAsync(() async {
-    final image = await boundary.toImage(pixelRatio: _dpr);
+    final image = await boundary.toImage(pixelRatio: dpr);
     final data = await image.toByteData(format: ui.ImageByteFormat.png);
     image.dispose();
     _outDir.createSync(recursive: true);
@@ -119,6 +164,7 @@ Future<void> _capture(
   // HomeScreen keeps a 1s uptime timer and the house never stops breathing.
   // Unmount or the fake clock drains forever and the test times out.
   await tester.pumpWidget(const SizedBox.shrink());
+  debugDefaultTargetPlatformOverride = null;
 }
 
 void main() {
@@ -161,5 +207,15 @@ void main() {
   testWidgets('settings light', (tester) async {
     await _capture(tester, 'settings-light', const SettingsScreen(),
         brightness: Brightness.light);
+  });
+
+  testWidgets('windows home', (tester) async {
+    await _capture(tester, 'windows-home', const HomeScreen(),
+        brightness: Brightness.dark, desktop: true);
+  });
+
+  testWidgets('windows settings', (tester) async {
+    await _capture(tester, 'windows-settings', const SettingsScreen(),
+        brightness: Brightness.dark, desktop: true);
   });
 }

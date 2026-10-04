@@ -332,39 +332,54 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
-              child: _DashboardBody(
-                status: vpnStatus,
-                maxHeight: constraints.maxHeight,
-                serverTitle: _serverTitle == '…' && _selectionIsAuto
-                    ? l.regionAutoTitle
-                    : _serverTitle,
-                serverSubtitle: _serverSubtitle.isEmpty
-                    ? (_selectionIsAuto
+            // A window has room to breathe and room to stop: cap the measure so
+            // the panel never stretches into a banner, and pad like a desktop
+            // rather than like a phone.
+            final content = _DashboardBody(
+              status: vpnStatus,
+              maxHeight: constraints.maxHeight,
+              serverTitle: _serverTitle == '…' && _selectionIsAuto
+                  ? l.regionAutoTitle
+                  : _serverTitle,
+              serverSubtitle: _serverSubtitle.isEmpty
+                  ? (_selectionIsAuto
                         ? l.regionAutoSubtitle
                         : l.homeStatServer)
-                    : _serverSubtitle,
-                trafficMeta: _trafficMeta,
-                serverFlag: _serverFlag,
-                selectionIsAuto: _selectionIsAuto,
-                autoPoolFlags: _autoPoolFlags,
-                noVpnEnabled: _noVpnEnabled,
-                noVpnTotal: _noVpnTotal,
-                onNestTap: _onNestTap,
-                onPlaceRefresh: _refreshServerCard,
-                onOpenLocations: () {
-                  UiLog.action('home', 'open', extra: {'route': '/locations'});
-                  context.go('/locations');
-                },
-                onOpenSubscription: _openSubscription,
-                onOpenNoVpn: () async {
-                  UiLog.action('home', 'open',
-                      extra: {'route': '/settings/no-vpn'});
-                  await context.push('/settings/no-vpn');
-                  if (mounted) unawaited(_refreshNoVpnCounter());
-                },
-              ),
+                  : _serverSubtitle,
+              trafficMeta: _trafficMeta,
+              serverFlag: _serverFlag,
+              selectionIsAuto: _selectionIsAuto,
+              autoPoolFlags: _autoPoolFlags,
+              noVpnEnabled: _noVpnEnabled,
+              noVpnTotal: _noVpnTotal,
+              onNestTap: _onNestTap,
+              onPlaceRefresh: _refreshServerCard,
+              onOpenLocations: () {
+                UiLog.action('home', 'open', extra: {'route': '/locations'});
+                context.go('/locations');
+              },
+              onOpenSubscription: _openSubscription,
+              onOpenNoVpn: () async {
+                UiLog.action('home', 'open',
+                    extra: {'route': '/settings/no-vpn'});
+                await context.push('/settings/no-vpn');
+                if (mounted) unawaited(_refreshNoVpnCounter());
+              },
+            );
+            if (windowsDesktop) {
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(32, 28, 36, 28),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1080),
+                    child: content,
+                  ),
+                ),
+              );
+            }
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
+              child: content,
             );
           },
         ),
@@ -479,13 +494,17 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
     final showVpnSettingsCta =
         status is VpnError && status.code == kVpnConflictErrorCode;
 
-    final nestSize = math.min(
-      340.0,
-      math.min(
-        size.width * 0.88,
-        math.max(200.0, widget.maxHeight - 340),
-      ),
-    );
+    // The house is the focal point. On a phone it fills the band between the
+    // panel and the keys; in a window it has its own column and can be larger.
+    final nestSize = windowsDesktop
+        ? math.min(420.0, math.max(240.0, size.height * 0.46))
+        : math.min(
+            340.0,
+            math.min(
+              size.width * 0.88,
+              math.max(200.0, widget.maxHeight - 340),
+            ),
+          );
 
     return _FreeClientHome(
       nestSize: nestSize,
@@ -648,16 +667,130 @@ class _FreeClientHome extends StatelessWidget {
       _ => theme.colorScheme.onSurfaceVariant,
     };
 
+    final panel = ConnectionStatusPanel(
+      status: statusText,
+      profile: profile,
+      traffic: traffic,
+      trafficColor: trafficColor,
+      uptime: uptime,
+      accent: accent,
+    );
+    final hero = Column(
+      mainAxisAlignment: windowsDesktop
+          ? MainAxisAlignment.start
+          : MainAxisAlignment.center,
+      children: [
+        if (_showsEmptyHint) ...[
+          const SizedBox(
+            height: 96,
+            width: double.infinity,
+            child: Center(child: FreeClientEmptyState(compact: true)),
+          ),
+          const SizedBox(height: 8),
+        ],
+        SizedBox(
+          width: nestSize,
+          height: nestSize,
+          child: Stack(
+            alignment: Alignment.center,
+            clipBehavior: Clip.none,
+            children: [
+              if (status is VpnConnecting || status is VpnConnected)
+                HousePulsar(diameter: nestSize),
+              SignalNestHero(
+                key: kHomeSignalNestKey,
+                state: treeState,
+                onTap: () => onNestTap(),
+                size: nestSize,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+    final actions = <Widget>[
+      if (showVpnSettingsCta) ...[
+        const SizedBox(height: 14),
+        FilledButton.tonal(
+          onPressed: () async {
+            final opened = await VpnController.instance.openVpnSettings();
+            UiLog.action(
+              'home',
+              'vpn_settings',
+              result: opened ? 'ok' : 'fail',
+            );
+            if (!context.mounted) return;
+            if (!opened) {
+              showProxyDomSnackBar(
+                context,
+                settingsKillSwitchOpenFailedForPlatform(l),
+              );
+            }
+          },
+          child: Text(l.settingsKillSwitchOpenVpn),
+        ),
+      ],
+      if (status is VpnConnected && androidPerAppSplit) ...[
+        const SizedBox(height: 10),
+        _NoVpnHomeRow(
+          label: l.homeNoVpnRow,
+          enabled: noVpnEnabled,
+          total: noVpnTotal,
+          onTap: onOpenNoVpn,
+        ),
+      ],
+      const SizedBox(height: 16),
+      FreeClientActionBar(
+        onPaste: () {
+          UiLog.action('home', 'paste');
+          context.push('/import?clipboard=1');
+        },
+        onScan: () {
+          UiLog.action('home', 'scan');
+          openFreeClientCapture(context);
+        },
+        onRefresh: () => _refreshHomeDocuments(context),
+      ),
+    ];
+
+    // A window is wider than it is tall-content: the house gets its own column
+    // instead of a band of empty paper between the panel and the keys.
+    if (windowsDesktop) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            flex: 11,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  panel,
+                  if (errorHint != null) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      errorHint,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.error,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 22),
+                  ...actions,
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 44),
+          Expanded(flex: 9, child: hero),
+        ],
+      );
+    }
+
     return Column(
       children: [
-        ConnectionStatusPanel(
-          status: statusText,
-          profile: profile,
-          traffic: traffic,
-          trafficColor: trafficColor,
-          uptime: uptime,
-          accent: accent,
-        ),
+        panel,
         if (errorHint != null) ...[
           const SizedBox(height: 8),
           Text(
@@ -668,81 +801,8 @@ class _FreeClientHome extends StatelessWidget {
             ),
           ),
         ],
-        Expanded(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (_showsEmptyHint) ...[
-                const SizedBox(
-                  height: 96,
-                  width: double.infinity,
-                  child: Center(child: FreeClientEmptyState(compact: true)),
-                ),
-                const SizedBox(height: 8),
-              ],
-              SizedBox(
-                width: nestSize,
-                height: nestSize,
-                child: Stack(
-                  alignment: Alignment.center,
-                  clipBehavior: Clip.none,
-                  children: [
-                    if (status is VpnConnecting || status is VpnConnected)
-                      HousePulsar(diameter: nestSize),
-                    SignalNestHero(
-                      key: kHomeSignalNestKey,
-                      state: treeState,
-                      onTap: () => onNestTap(),
-                      size: nestSize,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        if (showVpnSettingsCta) ...[
-          const SizedBox(height: 12),
-          FilledButton.tonal(
-            onPressed: () async {
-              final opened = await VpnController.instance.openVpnSettings();
-              UiLog.action(
-                'home',
-                'vpn_settings',
-                result: opened ? 'ok' : 'fail',
-              );
-              if (!context.mounted) return;
-              if (!opened) {
-                showProxyDomSnackBar(
-                  context,
-                  settingsKillSwitchOpenFailedForPlatform(l),
-                );
-              }
-            },
-            child: Text(l.settingsKillSwitchOpenVpn),
-          ),
-        ],
-        if (status is VpnConnected && androidPerAppSplit) ...[
-          const SizedBox(height: 8),
-          _NoVpnHomeRow(
-            label: l.homeNoVpnRow,
-            enabled: noVpnEnabled,
-            total: noVpnTotal,
-            onTap: onOpenNoVpn,
-          ),
-        ],
-        const SizedBox(height: 12),
-        FreeClientActionBar(
-          onPaste: () {
-            UiLog.action('home', 'paste');
-            context.push('/import?clipboard=1');
-          },
-          onScan: () {
-            UiLog.action('home', 'scan');
-            openFreeClientCapture(context);
-          },
-          onRefresh: () => _refreshHomeDocuments(context),
-        ),
+        Expanded(child: hero),
+        ...actions,
       ],
     );
   }

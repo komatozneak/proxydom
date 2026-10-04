@@ -256,39 +256,56 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     final locale = ref.watch(localeProvider).valueOrNull ??
         Localizations.localeOf(context);
     final localeLabel = _localeLabel(l, locale);
+    // A settings row is a line of text with a control on the right. Across a
+    // 1500px window that line is unreadable, so the page keeps a measure and
+    // the rest of the window stays empty paper — the way a desktop settings
+    // page behaves.
+    final page = ListView(
+      padding: EdgeInsets.fromLTRB(
+        windowsDesktop ? 40 : 20,
+        windowsDesktop ? 34 : 12,
+        windowsDesktop ? 40 : 20,
+        32,
+      ),
+      children: [
+        Text(
+          l.settingsTitle,
+          style: theme.textTheme.displayMedium?.copyWith(
+            fontWeight: FontWeight.w900,
+            letterSpacing: -0.3,
+          ),
+        ),
+        const SizedBox(height: 20),
+        ..._settingsSections(
+          l: l,
+          showNotif: showNotif,
+          showNoVpn: showNoVpn,
+          notifOn: notifOn,
+          localeLabel: localeLabel,
+          themeMode: themeMode,
+        ),
+        const SizedBox(height: 28),
+        if (_versionLabel.isNotEmpty)
+          Text(
+            l.settingsVersion(_versionLabel),
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+      ],
+    );
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-          children: [
-            Text(
-              l.settingsTitle,
-              style: theme.textTheme.displayMedium?.copyWith(
-                fontWeight: FontWeight.w900,
-                letterSpacing: -0.3,
-              ),
-            ),
-            const SizedBox(height: 20),
-            ..._settingsSections(
-              l: l,
-              showNotif: showNotif,
-              showNoVpn: showNoVpn,
-              notifOn: notifOn,
-              localeLabel: localeLabel,
-              themeMode: themeMode,
-            ),
-            const SizedBox(height: 28),
-            if (_versionLabel.isNotEmpty)
-              Text(
-                l.settingsVersion(_versionLabel),
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+        child: windowsDesktop
+            ? Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 780),
+                  child: page,
                 ),
-              ),
-          ],
-        ),
+              )
+            : page,
       ),
     );
   }

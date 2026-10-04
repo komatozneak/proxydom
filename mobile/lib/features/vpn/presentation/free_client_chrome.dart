@@ -310,7 +310,9 @@ class _InstrumentRow extends StatelessWidget {
             child: Text(
               value,
               textAlign: TextAlign.end,
-              maxLines: 1,
+              // The status can be a whole sentence («Служба недоступна»):
+              // one line clipped it. The other rows are short values.
+              maxLines: emphasize ? 2 : 1,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.titleSmall?.copyWith(
                 color: color ?? theme.colorScheme.onSurface,

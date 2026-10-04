@@ -8,12 +8,17 @@ class NotebookPaper extends StatelessWidget {
     super.key,
     required this.child,
     this.emphasized = false,
+    this.marginRule = true,
   });
 
   final Widget child;
 
   /// Bottom bar: same sheet, less blur, stronger lines.
   final bool emphasized;
+
+  /// The red margin rule belongs to the phone page. Beside a desktop rail it
+  /// is a stray line with no page to mark.
+  final bool marginRule;
 
   @override
   Widget build(BuildContext context) {
@@ -25,6 +30,7 @@ class NotebookPaper extends StatelessWidget {
         margin: AppBrand.paperMargin,
         emphasized: emphasized,
         dark: dark,
+        marginRule: marginRule,
       ),
       child: child,
     );
@@ -38,6 +44,7 @@ class _NotebookPaperPainter extends CustomPainter {
     required this.margin,
     required this.emphasized,
     required this.dark,
+    required this.marginRule,
   });
 
   final Color paper;
@@ -45,6 +52,7 @@ class _NotebookPaperPainter extends CustomPainter {
   final Color margin;
   final bool emphasized;
   final bool dark;
+  final bool marginRule;
 
   static const double _cell = 28;
 
@@ -77,11 +85,13 @@ class _NotebookPaperPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.butt
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 0.45);
-    canvas.drawLine(
-      const Offset(_cell, 0),
-      Offset(_cell, size.height),
-      marginPaint,
-    );
+    if (marginRule) {
+      canvas.drawLine(
+        const Offset(_cell, 0),
+        Offset(_cell, size.height),
+        marginPaint,
+      );
+    }
   }
 
   @override
@@ -90,6 +100,7 @@ class _NotebookPaperPainter extends CustomPainter {
         oldDelegate.grid != grid ||
         oldDelegate.margin != margin ||
         oldDelegate.emphasized != emphasized ||
+        oldDelegate.marginRule != marginRule ||
         oldDelegate.dark != dark;
   }
 }

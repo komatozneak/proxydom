@@ -6,11 +6,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/busy/busy_overlay.dart';
-import '../../../core/diagnostics/ui_log.dart';
 import '../../../core/busy/busy_overlay_host.dart';
+import '../../../core/diagnostics/ui_log.dart';
 import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
+import '../../../core/widgets/interaction.dart';
 import '../../../core/widgets/notebook_paper.dart';
 import '../../../core/widgets/proxydom_nav_icon.dart';
 import '../../../l10n/app_localizations.dart';
@@ -118,9 +119,35 @@ class _MainShellState extends ConsumerState<MainShell> {
     final l = AppL10n.of(context);
     final theme = Theme.of(context);
     final selected = widget.navigationShell.currentIndex;
-    final paper = theme.brightness == Brightness.dark
-        ? AppBrand.paperDark
-        : AppBrand.paperLight;
+    final dark = theme.brightness == Brightness.dark;
+    final paper = dark ? AppBrand.paperDark : AppBrand.paperLight;
+
+    // A window is not a phone. The bottom dock with a mark hanging off the
+    // bottom edge is a touch idiom: on the desktop the destinations live in a
+    // rail on the left, where a pointer expects a menu and where nothing has
+    // to hang below the window edge.
+    if (windowsDesktop) {
+      return Scaffold(
+        backgroundColor: paper,
+        body: Row(
+          children: [
+            WindowsNavRail(
+              selected: selected,
+              onSelect: _onTap,
+            ),
+            Expanded(
+              child: NotebookPaper(
+                // The rail is the left edge here; a margin rule beside it would
+                // be a line marking nothing.
+                marginRule: false,
+                child: widget.navigationShell,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     final bar = SafeArea(
       top: false,
       child: SizedBox(
@@ -194,6 +221,234 @@ class _MainShellState extends ConsumerState<MainShell> {
         ),
         const BusyOverlayHost(),
       ],
+    );
+  }
+}
+
+/// Desktop navigation rail.
+///
+/// Same three destinations as the phone dock, drawn the way a window draws
+/// them: a mark, then a vertical list of items where the selected one is a lit
+/// plate with an accent bar, and where the pointer gets hover and the keyboard
+/// gets a focus ring.
+///
+/// Public so the shell and the capture harness render the same widget.
+class WindowsNavRail extends StatelessWidget {
+  const WindowsNavRail({
+    super.key,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  final int selected;
+
+  final ValueChanged<int> onSelect;
+
+  static const double width = 212;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final l = AppL10n.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    final ink = dark ? AppBrand.inkDark : AppBrand.inkLight;
+    final mute = dark ? AppBrand.inkMutedDark : AppBrand.inkMutedLight;
+
+    final items = <({IconData icon, String label, int index})>[
+      (
+        icon: AppIcons.mapPin,
+        label: Localizations.localeOf(context).languageCode == 'ru'
+            ? 'Сервера'
+            : 'Servers',
+        index: MainShell.locationsIndex,
+      ),
+      (icon: AppIcons.house, label: l.navVpn, index: MainShell.homeIndex),
+      (
+        icon: AppIcons.settings,
+        label: l.navSettings,
+        index: MainShell.settingsIndex,
+      ),
+    ];
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        // The rail is furniture, not page: it sits a shade off the sheet.
+        color: dark
+            ? AppBrand.surfaceSunkDark
+            : AppBrand.paperLight.withValues(alpha: 0.72),
+        border: Border(
+          right: BorderSide(
+            color: dark
+                ? AppBrand.lightSource.withValues(alpha: 0.06)
+                : AppBrand.shadeSource.withValues(alpha: 0.07),
+          ),
+        ),
+      ),
+      child: SizedBox(
+        width: width,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 22, 14, 18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(left: 8, bottom: 26),
+                child: Row(
+                  children: [
+                    ProxyDomNavIcon(size: 34, selected: false),
+                    const SizedBox(width: 10),
+                    Flexible(
+                      child: Text(
+                        Localizations.localeOf(context).languageCode == 'ru'
+                            ? 'Прокси Дом'
+                            : 'Proxy Dom',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: ink,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              for (final item in items)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: _RailItem(
+                    icon: item.icon,
+                    label: item.label,
+                    selected: item.index == selected,
+                    onTap: () => onSelect(item.index),
+                  ),
+                ),
+              const Spacer(),
+              Padding(
+                padding: const EdgeInsets.only(left: 12, right: 4),
+                child: Text(
+                  Localizations.localeOf(context).languageCode == 'ru'
+                      ? 'Прокси Дом · утилита'
+                      : 'Proxy Dom · utility',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: mute.withValues(alpha: 0.65),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RailItem extends StatefulWidget {
+  const _RailItem({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  State<_RailItem> createState() => _RailItemState();
+}
+
+class _RailItemState extends State<_RailItem> {
+  final FocusNode _focus = FocusNode(debugLabel: 'RailItem');
+
+  @override
+  void dispose() {
+    _focus.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    final ink = dark ? AppBrand.inkDark : AppBrand.inkLight;
+
+    return Semantics(
+      button: true,
+      selected: widget.selected,
+      label: widget.label,
+      child: HoverBuilder(
+        onTap: widget.onTap,
+        focusNode: _focus,
+        onKeyActivate: widget.onTap,
+        builder: (context, hovered) {
+          final fill = widget.selected
+              ? (dark
+                    ? AppBrand.lightSource.withValues(alpha: 0.08)
+                    : AppBrand.inkLight.withValues(alpha: 0.06))
+              : hovered
+                  ? (dark
+                        ? AppBrand.lightSource.withValues(alpha: 0.05)
+                        : AppBrand.inkLight.withValues(alpha: 0.035))
+                  : null;
+          return AnimatedContainer(
+            duration: AppBrand.motionReveal,
+            curve: AppBrand.motionRevealCurve,
+            padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
+            decoration: BoxDecoration(
+              color: fill,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: widget.selected
+                    ? (dark
+                          ? AppBrand.lightSource.withValues(alpha: 0.10)
+                          : AppBrand.shadeSource.withValues(alpha: 0.10))
+                    : Colors.transparent,
+              ),
+            ),
+            child: Row(
+              children: [
+                // The accent bar is the same device as the status light on the
+                // home plate: colour marks the active place.
+                AnimatedContainer(
+                  duration: AppBrand.motionReveal,
+                  curve: AppBrand.motionRevealCurve,
+                  width: 3,
+                  height: 20,
+                  margin: const EdgeInsets.only(right: 11),
+                  decoration: BoxDecoration(
+                    color: widget.selected
+                        ? AppBrand.actionAmber
+                        : AppBrand.shadeSource.withValues(alpha: 0.0),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                AppIcon(widget.icon, size: 19, color: ink.withValues(alpha: 0.9)),
+                const SizedBox(width: 11),
+                Flexible(
+                  child: Text(
+                    widget.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: ink,
+                      fontSize: 14.5,
+                      fontWeight:
+                          widget.selected ? FontWeight.w700 : FontWeight.w600,
+                      letterSpacing: -0.1,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 }

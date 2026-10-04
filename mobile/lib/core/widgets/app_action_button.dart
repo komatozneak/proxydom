@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme.dart';
 import 'app_icon.dart';
+import 'interaction.dart';
 
 /// The house key.
 ///
@@ -53,6 +54,16 @@ class AppActionButton extends StatefulWidget {
 class _AppActionButtonState extends State<AppActionButton> {
   bool _down = false;
 
+  /// Keyboard focus has to live somewhere; without a node there is nothing to
+  /// traverse with Tab on a desktop.
+  final FocusNode _focus = FocusNode(debugLabel: 'AppActionButton');
+
+  @override
+  void dispose() {
+    _focus.dispose();
+    super.dispose();
+  }
+
   void _setDown(bool value) {
     if (_down == value || !mounted) return;
     setState(() => _down = value);
@@ -71,87 +82,7 @@ class _AppActionButtonState extends State<AppActionButton> {
             : AppBrand.honeySurface;
     final ink =
         enabled ? AppBrand.inkLight : theme.colorScheme.onSurfaceVariant;
-
-    final face = _down
-        ? Color.lerp(base, AppBrand.shadeSource, 0.16)!
-        : Color.lerp(base, AppBrand.lightSource, dark ? 0.10 : 0.16)!;
-    final floor = _down
-        ? Color.lerp(base, AppBrand.shadeSource, 0.30)!
-        : Color.lerp(base, AppBrand.shadeSource, 0.08)!;
-    final rim = Color.lerp(base, AppBrand.shadeSource, enabled ? 0.45 : 0.2)!;
     final radius = BorderRadius.circular(widget.height / 2);
-
-    Widget key = AnimatedContainer(
-      duration: AppBrand.motionPress,
-      curve: AppBrand.motionPressCurve,
-      transform: Matrix4.translationValues(0, _down ? 1.5 : 0, 0),
-      decoration: BoxDecoration(
-        borderRadius: radius,
-        // The rim is part of the same box as the face: a separate overlay
-        // decor detached from the key when the press transform moved it.
-        border: Border.all(color: rim.withValues(alpha: 0.55)),
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [face, floor],
-          stops: const [0.0, 0.62],
-        ),
-        boxShadow: enabled
-            ? [
-                BoxShadow(
-                  color: Color.lerp(base, AppBrand.shadeSource, 0.55)!,
-                  blurRadius: _down ? 4 : 14,
-                  spreadRadius: -2,
-                  offset: Offset(0, _down ? 1 : 6),
-                ),
-              ]
-            : null,
-      ),
-      child: ClipRRect(
-        borderRadius: radius,
-        child: Material(
-          type: MaterialType.transparency,
-          child: InkWell(
-            onTap: widget.onPressed,
-            onTapDown: enabled ? (_) => _setDown(true) : null,
-            onTapUp: enabled ? (_) => _setDown(false) : null,
-            onTapCancel: enabled ? () => _setDown(false) : null,
-            splashColor: AppBrand.lightSource.withValues(alpha: 0.14),
-            highlightColor: AppBrand.lightSource.withValues(alpha: 0.06),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize:
-                    widget.expand ? MainAxisSize.max : MainAxisSize.min,
-                children: [
-                  AppIcon(widget.icon, size: widget.iconSize, color: ink),
-                  const SizedBox(width: 8),
-                  // Scale down instead of ellipsising: a key that reads
-                  // "Вста…" is worse than one with a slightly smaller label.
-                  Flexible(
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        widget.label,
-                        maxLines: 1,
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          color: ink,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: -0.2,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
 
     return Semantics(
       button: true,
@@ -160,9 +91,100 @@ class _AppActionButtonState extends State<AppActionButton> {
       child: SizedBox(
         height: widget.height,
         width: widget.expand ? double.infinity : null,
-        child: widget.tooltip == null
-            ? key
-            : Tooltip(message: widget.tooltip!, child: key),
+        child: HoverBuilder(
+          onTap: widget.onPressed,
+          focusNode: _focus,
+          onKeyActivate: widget.onPressed,
+          builder: (context, hovered) {
+            // Hover lifts the key the way a pointer would expect it to: a
+            // shade lighter and a longer shadow, not a Material tint.
+            final lit = _down ? 0.0 : (hovered ? 0.07 : 0.0);
+            final face = _down
+                ? Color.lerp(base, AppBrand.shadeSource, 0.16)!
+                : Color.lerp(base, AppBrand.lightSource, (dark ? 0.10 : 0.16) + lit)!;
+            final floor = _down
+                ? Color.lerp(base, AppBrand.shadeSource, 0.30)!
+                : Color.lerp(base, AppBrand.shadeSource, hovered ? 0.04 : 0.08)!;
+            final rim = Color.lerp(base, AppBrand.shadeSource, enabled ? 0.45 : 0.2)!;
+
+            Widget key = AnimatedContainer(
+              duration: AppBrand.motionPress,
+              curve: AppBrand.motionPressCurve,
+              transform: Matrix4.translationValues(0, _down ? 1.5 : 0, 0),
+              decoration: BoxDecoration(
+                borderRadius: radius,
+                // The rim is part of the same box as the face: a separate
+                // overlay decor detached from the key when press moved it.
+                border: Border.all(color: rim.withValues(alpha: 0.55)),
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [face, floor],
+                  stops: const [0.0, 0.62],
+                ),
+                boxShadow: enabled
+                    ? [
+                        BoxShadow(
+                          color: Color.lerp(base, AppBrand.shadeSource, 0.55)!,
+                          blurRadius: _down ? 4 : (hovered ? 20 : 14),
+                          spreadRadius: -2,
+                          offset: Offset(0, _down ? 1 : (hovered ? 9 : 6)),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: ClipRRect(
+                borderRadius: radius,
+                child: Material(
+                  type: MaterialType.transparency,
+                  child: InkWell(
+                    onTap: widget.onPressed,
+                    onTapDown: enabled ? (_) => _setDown(true) : null,
+                    onTapUp: enabled ? (_) => _setDown(false) : null,
+                    onTapCancel: enabled ? () => _setDown(false) : null,
+                    splashColor: AppBrand.lightSource.withValues(alpha: 0.14),
+                    highlightColor: AppBrand.lightSource.withValues(alpha: 0.06),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: widget.expand
+                            ? MainAxisSize.max
+                            : MainAxisSize.min,
+                        children: [
+                          AppIcon(widget.icon, size: widget.iconSize, color: ink),
+                          const SizedBox(width: 8),
+                          // Scale down instead of ellipsising: a key that reads
+                          // "Вста…" is worse than one with a smaller label.
+                          Flexible(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                widget.label,
+                                maxLines: 1,
+                                style: theme.textTheme.labelLarge?.copyWith(
+                                  color: ink,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -0.2,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+
+            return widget.tooltip == null
+                ? key
+                : Tooltip(message: widget.tooltip!, child: key);
+          },
+        ),
       ),
     );
   }
@@ -203,50 +225,19 @@ class AppRingButton extends StatefulWidget {
 class _AppRingButtonState extends State<AppRingButton> {
   bool _down = false;
 
+  final FocusNode _focus = FocusNode(debugLabel: 'AppRingButton');
+
+  @override
+  void dispose() {
+    _focus.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final ring =
         Color.lerp(widget.color, AppBrand.lightSource, dark ? 0.15 : 0)!;
-
-    Widget button = AnimatedContainer(
-      duration: AppBrand.motionPress,
-      curve: AppBrand.motionPressCurve,
-      width: widget.size,
-      height: widget.size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: _down
-            ? widget.color.withValues(alpha: dark ? 0.26 : 0.20)
-            : widget.color.withValues(alpha: dark ? 0.12 : 0.10),
-        border: Border.all(
-          color: ring.withValues(alpha: dark ? 0.85 : 0.95),
-          width: 1.6,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: widget.color.withValues(alpha: dark ? 0.22 : 0.18),
-            blurRadius: 10,
-            spreadRadius: -4,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Material(
-        type: MaterialType.transparency,
-        shape: const CircleBorder(),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: widget.onPressed,
-          onTapDown: (_) => setState(() => _down = true),
-          onTapUp: (_) => setState(() => _down = false),
-          onTapCancel: () => setState(() => _down = false),
-          child: Center(
-            child: AppIcon(widget.icon, size: widget.iconSize, color: ring),
-          ),
-        ),
-      ),
-    );
 
     return Semantics(
       button: true,
@@ -254,9 +245,64 @@ class _AppRingButtonState extends State<AppRingButton> {
       child: SizedBox(
         width: widget.size,
         height: widget.size,
-        child: widget.tooltip == null
-            ? button
-            : Tooltip(message: widget.tooltip!, child: button),
+        child: HoverBuilder(
+          onTap: widget.onPressed,
+          focusNode: _focus,
+          onKeyActivate: widget.onPressed,
+          builder: (context, hovered) {
+            final fill = _down
+                ? (dark ? 0.26 : 0.20)
+                : hovered
+                    ? (dark ? 0.22 : 0.18)
+                    : (dark ? 0.12 : 0.10);
+            final button = AnimatedContainer(
+              duration: AppBrand.motionPress,
+              curve: AppBrand.motionPressCurve,
+              width: widget.size,
+              height: widget.size,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: widget.color.withValues(alpha: fill),
+                border: Border.all(
+                  color: ring.withValues(
+                    alpha: dark ? (hovered ? 1.0 : 0.85) : 0.95,
+                  ),
+                  width: hovered ? 2 : 1.6,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: widget.color.withValues(alpha: dark ? 0.22 : 0.18),
+                    blurRadius: hovered ? 14 : 10,
+                    spreadRadius: -4,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Material(
+                type: MaterialType.transparency,
+                shape: const CircleBorder(),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: widget.onPressed,
+                  onTapDown: (_) => setState(() => _down = true),
+                  onTapUp: (_) => setState(() => _down = false),
+                  onTapCancel: () => setState(() => _down = false),
+                  child: Center(
+                    child: AppIcon(
+                      widget.icon,
+                      size: widget.iconSize,
+                      color: ring,
+                    ),
+                  ),
+                ),
+              ),
+            );
+
+            return widget.tooltip == null
+                ? button
+                : Tooltip(message: widget.tooltip!, child: button);
+          },
+        ),
       ),
     );
   }
