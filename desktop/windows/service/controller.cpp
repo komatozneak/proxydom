@@ -60,40 +60,74 @@ bool server_verdict(HANDLE pipe, ServerVerdict& out) {
   return true;
 }
 
+// Why the broker could not be reached.
+enum class OpenOutcome {
+  Ready,        // connected
+  Busy,         // the pipe is there and every instance of it is taken
+  Unavailable,  // no service, or no pipe yet
+};
+
 // Ten seconds, in tenths. The broker sets SERVICE_RUNNING and only then creates
 // the pipe, so a controller launched in the same moment as the service has to
 // wait for the pipe to appear.
-constexpr int kOpenAttempts = 100;
+constexpr int kOpenAbsentAttempts = 100;
+// One second. A busy pipe is the window holding the single instance the broker
+// allows, and that window stays connected for as long as the user wants. Waiting
+// cannot free it, so this is not a case to spend ten seconds on.
+constexpr int kOpenBusyAttempts = 10;
 constexpr int kOpenBackoffMs = 100;
 
-HANDLE open_broker() {
-  for (int attempt = 0; attempt < kOpenAttempts; ++attempt) {
+// The broker publishes the pipe after SERVICE_RUNNING, so an absent pipe is a
+// service that is still starting and deserves the long budget. A busy pipe means
+// the broker is up and somebody already holds it. Anything else is neither.
+bool open_is_retryable(DWORD error) {
+  return error == ERROR_PIPE_BUSY || error == ERROR_FILE_NOT_FOUND ||
+         error == ERROR_SEM_TIMEOUT;
+}
+
+int open_budget(DWORD error) {
+  return error == ERROR_PIPE_BUSY ? kOpenBusyAttempts : kOpenAbsentAttempts;
+}
+
+OpenOutcome open_broker(HANDLE& out) {
+  out = INVALID_HANDLE_VALUE;
+  for (int attempt = 0; attempt < kOpenAbsentAttempts; ++attempt) {
     HANDLE pipe =
         CreateFileW(kPipeName, FILE_READ_DATA | FILE_WRITE_DATA | SYNCHRONIZE, 0, nullptr,
                     OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (pipe != INVALID_HANDLE_VALUE) {
       ServerVerdict verdict = ServerVerdict::Foreign;
-      if (server_verdict(pipe, verdict) && verdict == ServerVerdict::Trusted) return pipe;
+      if (server_verdict(pipe, verdict) && verdict == ServerVerdict::Trusted) {
+        out = pipe;
+        return OpenOutcome::Ready;
+      }
       CloseHandle(pipe);
       // Waiting is only right when the name belongs to our broker and it has not
       // finished starting. For anything else, waiting would be the wrong answer
       // to "this pipe is not the broker".
       if (verdict != ServerVerdict::Transient) {
         SetLastError(ERROR_SERVICE_NOT_ACTIVE);
-        return INVALID_HANDLE_VALUE;
+        return OpenOutcome::Unavailable;
       }
       Sleep(kOpenBackoffMs);
       continue;
     }
     const DWORD error = GetLastError();
-    if (error != ERROR_PIPE_BUSY && error != ERROR_FILE_NOT_FOUND && error != ERROR_SEM_TIMEOUT) break;
+    if (!open_is_retryable(error)) break;
     // WaitNamedPipe returns at once when the pipe is not there yet, so on its own
-    // it turns thirty attempts into a few milliseconds and gives up long before
+    // it turns the budget into a few milliseconds and gives up long before
     // a starting service has published the name. Back off explicitly.
-    if (error == ERROR_PIPE_BUSY) WaitNamedPipeW(kPipeName, kOpenBackoffMs);
-    else Sleep(kOpenBackoffMs);
+    if (error == ERROR_PIPE_BUSY) {
+      if (attempt + 1 >= open_budget(error)) {
+        SetLastError(ERROR_PIPE_BUSY);
+        return OpenOutcome::Busy;
+      }
+      WaitNamedPipeW(kPipeName, kOpenBackoffMs);
+    } else {
+      Sleep(kOpenBackoffMs);
+    }
   }
-  return INVALID_HANDLE_VALUE;
+  return OpenOutcome::Unavailable;
 }
 
 std::mutex g_write_mu;
@@ -221,6 +255,19 @@ void print_unavailable(DWORD error) {
          "\"message\":\"Служба Прокси Дом недоступна. Переустановите приложение\","
          "\"cleanup_verified\":true,\"win32\":"
       << error << "}" << std::endl;
+}
+
+// The broker takes one client at a time and the window is that client. Saying
+// "reinstall" here sends the user to destroy a working installation over a
+// condition that resolves by closing a window.
+void print_busy() {
+  std::cout
+      << "{\"event\":\"state\",\"generation\":0,\"state\":\"idle\","
+         "\"code\":\"broker_busy\","
+         "\"message\":\"Окно Прокси Дом уже подключено к службе. Закройте его, чтобы "
+         "управлять туннелем отсюда\","
+         "\"cleanup_verified\":true,\"win32\":"
+      << ERROR_PIPE_BUSY << "}" << std::endl;
 }
 
 int disconnect_once(HANDLE pipe) {
@@ -376,9 +423,11 @@ int wmain(int argc, wchar_t** argv) {
     return 64;
   }
 
-  HANDLE pipe = open_broker();
+  HANDLE pipe = INVALID_HANDLE_VALUE;
+  const OpenOutcome outcome = open_broker(pipe);
   if (pipe == INVALID_HANDLE_VALUE) {
-    print_unavailable(GetLastError());
+    if (outcome == OpenOutcome::Busy) print_busy();
+    else print_unavailable(GetLastError());
     return 2;
   }
   if (status) {
