@@ -106,15 +106,44 @@ if (-not (Test-Path (Join-Path $bin "ProxyDomBroker.exe"))) { $bin = $build }
 Copy-Item (Join-Path $bin "ProxyDomBroker.exe") (Join-Path $Payload "ProxyDomBroker.exe") -Force
 Copy-Item (Join-Path $bin "ProxyDomCtl.exe") (Join-Path $Payload "ProxyDomCtl.exe") -Force
 
-if (-not (Test-Path (Join-Path $FlutterRelease "proxy_dom.exe"))) {
-    Write-Host "Building Flutter window"
-    Push-Location $Mobile
-    try {
-        Invoke-Native { flutter build windows --release } "flutter build windows"
-    } finally {
-        Pop-Location
+Write-Host "Building Flutter window"
+Push-Location $Mobile
+try {
+    Invoke-Native { flutter build windows --release } "flutter build windows"
+} finally {
+    Pop-Location
+}
+
+# A release build that already exists is not evidence that it is current. The
+# Flutter window used to be built only when proxy_dom.exe was missing, so any
+# build after the first packaged whatever binary was already sitting there — a
+# merge could land in mobile/lib and the next MSI would ship the old AOT without
+# a word. The build now always runs, and this is the backstop for the day someone
+# reintroduces a skip: the snapshot must not be older than the sources it claims
+# to come from.
+$aot = Join-Path $FlutterRelease "data\app.so"
+if (-not (Test-Path $aot)) {
+    throw "Flutter build produced no data\app.so, so there is nothing to package."
+}
+$newestSource = [datetime]::MinValue
+foreach ($path in @((Join-Path $Mobile "lib"), (Join-Path $Mobile "pubspec.yaml"),
+                   (Join-Path $Mobile "pubspec.lock"))) {
+    if (-not (Test-Path $path)) { continue }
+    $item = Get-Item $path
+    $files = if ($item.PSIsContainer) { Get-ChildItem $path -Recurse -File } else { $item }
+    foreach ($file in $files) {
+        if ($file.LastWriteTime -gt $newestSource) { $newestSource = $file.LastWriteTime }
     }
 }
+$aotTime = (Get-Item $aot).LastWriteTime
+if ($aotTime -lt $newestSource) {
+    throw ("Flutter snapshot is stale: data\app.so is from {0}, but mobile sources " +
+           "changed at {1}. The window would ship code that no longer matches the " +
+           "repository. Run 'flutter clean' in mobile and build again.") -f `
+          $aotTime.ToString("yyyy-MM-dd HH:mm:ss"), $newestSource.ToString("yyyy-MM-dd HH:mm:ss")
+}
+Write-Host ("Flutter snapshot checked: {0} is newer than the newest source ({1})" -f `
+            $aotTime.ToString("HH:mm:ss"), $newestSource.ToString("HH:mm:ss"))
 
 Write-Host "Staging payload"
 Get-ChildItem $Payload -Exclude "ProxyDomBroker.exe","ProxyDomCtl.exe" | Remove-Item -Recurse -Force
