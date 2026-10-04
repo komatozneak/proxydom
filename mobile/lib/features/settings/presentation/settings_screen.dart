@@ -443,15 +443,35 @@ class _SectionLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
     return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 8),
-      child: Text(
-        text.toUpperCase(),
-        style: theme.textTheme.labelSmall?.copyWith(
-          color: theme.colorScheme.onSurfaceVariant,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.6,
-        ),
+      padding: const EdgeInsets.fromLTRB(4, 0, 4, 9),
+      child: Row(
+        children: [
+          // The same terminal voice as the home head: a rule and a tracked
+          // label. A title in sentence case here read as a different app.
+          Container(width: 2, height: 11, color: AppBrand.mascotGold.withValues(alpha: 0.75)),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              text.toUpperCase(),
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: dark ? AppBrand.inkMutedDark : AppBrand.inkMutedLight,
+                fontWeight: FontWeight.w700,
+                fontSize: 10.5,
+                letterSpacing: 2.2,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Container(
+              height: 1,
+              color: (dark ? AppBrand.inkMutedDark : AppBrand.inkMutedLight)
+                  .withValues(alpha: 0.16),
+            ),
+          ),
+        ],
       ),
     );
   }

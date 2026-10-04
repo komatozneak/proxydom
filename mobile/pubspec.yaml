@@ -50,6 +50,7 @@ flutter:
     # Directory entries are NOT recursive — nest paths must be listed.
     - assets/brand/
     - assets/brand/connect/s1-flat-launcher.png
+    # cut out of it. One path, so it themes with a colour filter.
     - assets/brand/sites/claude.png
     - assets/icon/mono_proxydom.png
     - assets/icon/ic_launcher_monochrome.png

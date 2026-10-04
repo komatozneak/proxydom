@@ -120,20 +120,21 @@ class AppBrand {
   /// Fireflies: the small warm points that drift over the ground.
   static const Color firefly = Color(0xFFE8B94A);
 
-  // The cold side — the ground the house stands on.
-  static const Color groundDark = Color(0xFF0E1116);
-
-  static const Color groundDeep = Color(0xFF07090C);
-
-  // ── The rail: a mossy stone in a forest night ─────────────────────────────
+  // ── One night, not two ─────────────────────────────────────────────────────
   //
-  // The house is warm; the thing it is bolted to is not. The rail is a stone
-  // slab at night, damp, with moss where the water sits — green-black and
-  // matte. Nothing here glows.
+  // The yard was blue-black, the rail green-black and the card a third grey:
+  // three backgrounds that did not come from the same night. Now there is one
+  // cold family with a green undertone — a forest at night. The rail is that
+  // family one step down, the plates are that family with light on them, and
+  // moss is an accent inside it, never a second ground.
 
-  static const Color forestDark = Color(0xFF0C1210);
+  static const Color groundDark = Color(0xFF0D1211);
 
-  static const Color forestDeep = Color(0xFF070B0A);
+  static const Color groundDeep = Color(0xFF080B0A);
+
+  static const Color forestDark = Color(0xFF0A100E);
+
+  static const Color forestDeep = Color(0xFF070A09);
 
   static const Color forestShade = Color(0xFF040706);
 
@@ -150,11 +151,11 @@ class AppBrand {
 
   static const Color stoneShade = Color(0xFFBDB6A8);
 
-  /// Cards on the night ground: cool charcoal, so a warm plate on top of them
-  /// still separates by light rather than only by value.
-  static const Color surfaceRaisedDark = Color(0xFF1E2127);
+  /// Cards on the night ground: the same slate, lifted and warmed a hair, so a
+  /// plate separates by light rather than only by value.
+  static const Color surfaceRaisedDark = Color(0xFF171C1A);
 
-  static const Color surfaceSunkDark = Color(0xFF14161B);
+  static const Color surfaceSunkDark = Color(0xFF101413);
 
   static const Color edgeDark = Color(0xFF353B47);
 

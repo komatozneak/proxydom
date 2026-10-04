@@ -14,6 +14,7 @@ import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/interaction.dart';
 import '../../../core/widgets/mossy_rail.dart';
 import '../../../core/widgets/proxydom_ground.dart';
+import '../../../core/widgets/proxydom_mark.dart';
 import '../../../core/widgets/proxydom_nav_icon.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../home/application/vpn_provider.dart';
@@ -304,11 +305,9 @@ class WindowsNavRail extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Padding(
-                padding: const EdgeInsets.only(left: 8, bottom: 26),
+                padding: const EdgeInsets.only(left: 6, bottom: 26),
                 child: Row(
                   children: [
-                    ProxyDomNavIcon(size: 34, selected: false),
-                    const SizedBox(width: 10),
                     Flexible(
                       child: Text(
                         Localizations.localeOf(context).languageCode == 'ru'
@@ -318,11 +317,19 @@ class WindowsNavRail extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.titleMedium?.copyWith(
                           color: ink,
+                          // The wordmark carries the weight the monogram used
+                          // to: the mark sits beside it now, not before it.
                           fontWeight: FontWeight.w800,
-                          letterSpacing: -0.3,
+                          letterSpacing: -0.6,
+                          fontSize: 17,
                         ),
                       ),
                     ),
+                    const SizedBox(width: 8),
+                    // The DOM mark beside the name: the mascot in monochrome
+                    // with the letters cut out of it. It was a badge before the
+                    // name; a mark after it reads as a signature.
+                    ProxyDomMark(size: 26, ink: ink),
                   ],
                 ),
               ),
