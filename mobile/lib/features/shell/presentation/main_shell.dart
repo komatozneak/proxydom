@@ -218,13 +218,32 @@ class _MainShellState extends ConsumerState<MainShell> {
 
   /// Puts the night behind a screen and publishes the glow to whatever is on
   /// top, so the home can wake the yard from inside a nested navigator.
+  ///
+  /// A window has a pointer, so the yard answers it: the background layers
+  /// shift at different rates with the cursor. A phone has no pointer, and
+  /// there the painter drifts on its own clock instead.
   Widget _yard(BuildContext context, {required Widget child}) {
-    return GroundGlowScope(
+    final body = GroundGlowScope(
       notifier: _glow,
       child: ListenableBuilder(
         listenable: _glow,
         builder: (context, _) => ProxydomGround(state: _glow, child: child),
       ),
+    );
+    if (!windowsDesktop) return body;
+    return MouseRegion(
+      onHover: (event) {
+        final box = context.findRenderObject() as RenderBox?;
+        if (box == null || !box.hasSize) return;
+        _glow
+          ..pointerDriven = true
+          ..pointer = Offset(
+            ((event.localPosition.dx / box.size.width) - 0.5).clamp(-1.0, 1.0),
+            ((event.localPosition.dy / box.size.height) - 0.5).clamp(-1.0, 1.0),
+          );
+      },
+      onExit: (_) => _glow.pointer = Offset.zero,
+      child: body,
     );
   }
 }

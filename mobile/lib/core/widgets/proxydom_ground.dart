@@ -20,6 +20,13 @@ class GroundGlow extends ChangeNotifier {
   /// Where the house sits on screen.
   Alignment houseCenter = Alignment.center;
 
+  /// Parallax driver, normalised to −1…1. On desktop the shell writes the
+  /// pointer here; on a phone it stays zero and the painter drifts on its own
+  /// clock instead.
+  Offset pointer = Offset.zero;
+
+  bool pointerDriven = false;
+
   void set(double next) {
     final clamped = next.clamp(0.0, 1.0);
     if ((clamped - _value).abs() < 0.001) return;
@@ -55,20 +62,16 @@ class ProxydomGround extends StatefulWidget {
     super.key,
     required this.child,
     required this.state,
-    this.fireflies,
     this.seed = 7,
   });
 
   final Widget child;
 
-  /// Lit level plus where the house stands. The screen that owns the house
-  /// writes into it.
+  /// Lit level, house geometry and the parallax pointer. The screen that owns
+  /// the house writes into it.
   final GroundGlow state;
 
-  /// Drifting lights. Defaults to fewer on a phone: they are decoration.
-  final int? fireflies;
-
-  /// Same page, same fireflies — the ground must not reshuffle on rebuild.
+  /// Same page, same yard — the ground must not reshuffle on rebuild.
   final int seed;
 
   @override
@@ -97,7 +100,6 @@ class _ProxydomGroundState extends State<ProxydomGround>
           repaint: _clock,
           clock: _clock,
           state: widget.state,
-          fireflies: widget.fireflies ?? (dark ? 26 : 10),
           seed: widget.seed,
           night: dark,
         ),
@@ -114,7 +116,6 @@ class _GroundPainter extends CustomPainter {
     required Listenable repaint,
     required this.clock,
     required this.state,
-    required this.fireflies,
     required this.seed,
     required this.night,
   })  : _lit = state.value,
@@ -129,7 +130,6 @@ class _GroundPainter extends CustomPainter {
   /// Eased toward the target on every frame, so the yard never snaps on.
   double _lit;
 
-  final int fireflies;
   final int seed;
   final bool night;
 
@@ -143,7 +143,9 @@ class _GroundPainter extends CustomPainter {
     final houseCenter = state.houseCenter;
     final houseRadius = state.houseRadius;
 
-    // The night itself: deep at the edges, a shade warmer under the house.
+    // The night itself. Everything that follows lives under 8% luminance except
+    // the house's own halo: a background that competes with the words on top of
+    // it is not a background.
     canvas.drawRect(
       Offset.zero & size,
       Paint()
@@ -162,87 +164,79 @@ class _GroundPainter extends CustomPainter {
       size.height * (0.5 + houseCenter.y),
     );
 
-    _bloom(canvas, house, size, night ? 0.55 + lit * 0.45 : 0.35 * lit);
-    if (!night) return;
+    // Parallax: the pointer on a window, a slow idle drift on a phone. Three
+    // layers, each moving faster than the one behind it, so the yard has depth
+    // without a single bright point in the middle of the screen.
+    final drive = state.pointerDriven
+        ? state.pointer
+        : Offset(
+            math.sin(t * math.pi * 2 * 0.06),
+            math.cos(t * math.pi * 2 * 0.045),
+          );
+    _pointer = Offset.lerp(_pointer, drive, 0.06)!;
+    final p = _pointer;
 
-    // Fireflies. Each drifts on its own loop and blinks on its own phase, so
-    // the field never pulses in unison and never looks like a grid.
-    final rng = math.Random(seed);
-    for (var i = 0; i < fireflies; i++) {
-      final fx = rng.nextDouble();
-      final fy = rng.nextDouble();
-      final phase = rng.nextDouble() * math.pi * 2;
-      final speed = 0.5 + rng.nextDouble() * 1.4;
-      final drift = 0.012 + rng.nextDouble() * 0.028;
-      final radius = 0.9 + rng.nextDouble() * 1.8;
-      final warm = rng.nextDouble();
-
-      final dx = math.sin(phase + t * math.pi * 2 * speed) * drift;
-      final dy =
-          math.cos(phase * 1.7 + t * math.pi * 2 * speed * 0.7) * drift * 0.55;
-      final blink = 0.45 + 0.55 * (0.5 + 0.5 * math.sin(phase * 2.3 + t * 3));
-      // Lit, the fireflies step forward: the whole yard wakes up.
-      final alpha = (0.14 + warm * 0.28) * blink * (0.75 + lit * 0.55);
-
-      final p = Offset(
-        (fx + dx) * size.width,
-        // Keep them low over the ground rather than filling the sky.
-        (0.25 + fy * 0.7 + dy) * size.height,
-      );
-      canvas.drawCircle(
-        p,
-        radius * 3.6,
-        Paint()
-          ..color = AppBrand.firefly.withValues(alpha: alpha * 0.20)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
-      );
-      canvas.drawCircle(
-        p,
-        radius,
-        Paint()..color = AppBrand.firefly.withValues(alpha: alpha),
-      );
+    if (night) {
+      _horizonHaze(canvas, size, p * 6, lit);
+      _ridge(canvas, size, p * 14, lit);
+      _motes(canvas, size, p * 26, lit);
     }
 
-    // The chain going round the orbit — the хоровод. Six lights on a ring,
-    // each a little behind the one before it, so it reads as a dance and not
-    // as a loading spinner.
-    if (lit > 0.03) {
-      // Clearly outside the roof: [houseRadius] is the house's half-size, and
-      // an orbit tucked under it would never be seen.
-      final orbit = math.max(houseRadius * 1.06, size.shortestSide * 0.24) +
-          lit * 12;
+    _bloom(canvas, house, size, night ? 0.18 + lit * 0.30 : 0.12 * lit);
+
+    // The orbit stays, but it belongs to the house, not to the wallpaper:
+    // a thread of light while the house burns.
+    if (night && lit > 0.03) {
+      final orbit =
+          math.max(houseRadius * 1.06, size.shortestSide * 0.24) + lit * 12;
       final spin = t * math.pi * 2 * 1.1;
-      // The path itself, faint: six dots alone read as more fireflies, the
-      // ring is what makes it a round dance.
       canvas.drawCircle(
         house,
         orbit,
         Paint()
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.2
-          ..color = AppBrand.mascotGoldLit.withValues(alpha: lit * 0.16),
+          ..strokeWidth = 1.1
+          ..color = AppBrand.mascotGoldLit.withValues(alpha: lit * 0.10),
       );
       for (var i = 0; i < 6; i++) {
         final a = spin + i * (math.pi * 2 / 6);
         final wobble = 1 + 0.05 * math.sin(a * 2 + i);
-        final p = house + Offset(math.cos(a), math.sin(a)) * orbit * wobble;
-        final trail = (0.42 + lit * 0.52 - i * 0.06).clamp(0.0, 1.0);
+        final at = house + Offset(math.cos(a), math.sin(a)) * orbit * wobble;
+        final trail = (0.16 + lit * 0.34 - i * 0.022).clamp(0.0, 1.0);
         canvas.drawCircle(
-          p,
-          11,
+          at,
+          9,
           Paint()
-            ..color = AppBrand.mascotGoldLit.withValues(alpha: trail * 0.34)
+            ..color = AppBrand.mascotGoldLit.withValues(alpha: trail * 0.30)
             ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 9),
         );
         canvas.drawCircle(
-          p,
-          3.4,
+          at,
+          2.6,
           Paint()..color = AppBrand.mascotGoldLit.withValues(alpha: trail),
         );
       }
     }
 
-    // Vignette: the yard falls away at the edges so the house owns the centre.
+    if (!night) return;
+
+    // The column of air the words stand in: a soft dark wash down the middle,
+    // so type keeps its contrast whatever the yard is doing behind it.
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()
+        ..shader = RadialGradient(
+          center: Alignment.center,
+          radius: 0.72,
+          colors: [
+            AppBrand.groundDeep.withValues(alpha: 0.34),
+            AppBrand.groundDeep.withValues(alpha: 0.0),
+          ],
+          stops: const [0.0, 1.0],
+        ).createShader(Offset.zero & size),
+    );
+
+    // Vignette: the yard falls away at the edges.
     canvas.drawRect(
       Offset.zero & size,
       Paint()
@@ -251,11 +245,84 @@ class _GroundPainter extends CustomPainter {
           radius: 0.95,
           colors: [
             AppBrand.groundDeep.withValues(alpha: 0.0),
-            AppBrand.groundDeep.withValues(alpha: 0.50 + lit * 0.18),
+            AppBrand.groundDeep.withValues(alpha: 0.62),
           ],
-          stops: const [0.55, 1.0],
+          stops: const [0.45, 1.0],
         ).createShader(Offset.zero & size),
     );
+  }
+
+  /// Slowed-down pointer, so the layers glide instead of snapping.
+  Offset _pointer = Offset.zero;
+
+  /// Layer 1 — the warm haze sitting on the horizon.
+  void _horizonHaze(Canvas canvas, Size size, Offset shift, double lit) {
+    final band = size.height * 0.30;
+    final top = size.height * 0.72 + shift.dy - band;
+    final rect = Rect.fromLTWH(0, top, size.width, band);
+    canvas.drawRect(
+      Rect.fromLTRB(-40 + shift.dx, top, size.width + 40, top + band),
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            AppBrand.mascotEmber.withValues(alpha: 0),
+            AppBrand.mascotEmber.withValues(alpha: 0.035 + lit * 0.02),
+            AppBrand.mascotEmber.withValues(alpha: 0),
+          ],
+          stops: const [0, 0.5, 1],
+        ).createShader(rect),
+    );
+  }
+
+  /// Layer 2 — the ridge behind the yard: one slow curve, no detail.
+  void _ridge(Canvas canvas, Size size, Offset shift, double lit) {
+    final base = size.height * 0.80 + shift.dy;
+    final path = Path()..moveTo(-20, size.height);
+    path.lineTo(-20, base);
+    for (var i = 0; i <= 8; i++) {
+      final f = i / 8;
+      final x = -20 + f * (size.width + 40) + shift.dx * (1 + f);
+      final y = base - math.sin(f * math.pi * 1.6 + seed) * size.height * 0.045;
+      path.lineTo(x, y);
+    }
+    path
+      ..lineTo(size.width + 20, size.height)
+      ..close();
+    canvas.drawPath(
+      path,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            AppBrand.groundDark.withValues(alpha: 0.55 + lit * 0.05),
+            AppBrand.groundDeep.withValues(alpha: 0.85),
+          ],
+        ).createShader(Rect.fromLTRB(0, base - 60, size.width, size.height)),
+    );
+  }
+
+  /// Layer 3 — dust in the near air. Barely there, and never in the middle.
+  void _motes(Canvas canvas, Size size, Offset shift, double lit) {
+    final rng = math.Random(seed + 11);
+    for (var i = 0; i < 9; i++) {
+      final fx = rng.nextDouble();
+      final fy = rng.nextDouble();
+      final phase = rng.nextDouble() * math.pi * 2;
+      final x = (fx + shift.dx * (0.6 + fx)) * size.width +
+          math.sin(phase + clock.value * math.pi * 2 * 0.05) * 10;
+      final y = (0.12 + fy * 0.82) * size.height +
+          math.cos(phase * 1.3 + clock.value * math.pi * 2 * 0.04) * 8 +
+          shift.dy * (0.4 + fy);
+      final a = (0.05 + rng.nextDouble() * 0.03) * (0.7 + lit * 0.3);
+      canvas.drawCircle(
+        Offset(x, y),
+        1.1 + rng.nextDouble() * 1.2,
+        Paint()..color = AppBrand.firefly.withValues(alpha: a),
+      );
+    }
   }
 
   void _bloom(Canvas canvas, Offset center, Size size, double strength) {
@@ -278,8 +345,5 @@ class _GroundPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _GroundPainter old) =>
-      old.fireflies != fireflies ||
-      old.seed != seed ||
-      old.state != state ||
-      old.night != night;
+      old.seed != seed || old.state != state || old.night != night;
 }
