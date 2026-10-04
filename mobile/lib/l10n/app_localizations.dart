@@ -2839,6 +2839,12 @@ abstract class AppL10n {
   /// **'IN USE'**
   String get locationsSelected;
 
+  /// No description provided for @locationsActive.
+  ///
+  /// In en, this message translates to:
+  /// **'active'**
+  String get locationsActive;
+
   /// No description provided for @locationsNotUsed.
   ///
   /// In en, this message translates to:

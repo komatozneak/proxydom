@@ -137,9 +137,13 @@ class AppBrand {
 
   static const Color forestShade = Color(0xFF040706);
 
-  static const Color moss = Color(0xFF3E6B45);
+  static const Color moss = Color(0xFF2F5238);
 
-  static const Color mossLight = Color(0xFF7FA06A);
+  /// Moss seen at night: the rail's selected plate, deep enough to sit under
+  /// text instead of shouting over it.
+  static const Color mossDeep = Color(0xFF1D3524);
+
+  static const Color mossLight = Color(0xFF6E8F5C);
 
   /// The slab in daylight: pale stone, still damp, still green at the foot.
   static const Color stoneLight = Color(0xFFF0EDE6);

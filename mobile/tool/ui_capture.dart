@@ -267,9 +267,9 @@ void main() {
               child: ProfileInstrument(
                 title: 'Теремок',
                 description: 'Значок справа ведёт в бота',
-                facts: ['2aq93K0', '15 Р“Р‘ РёР· 100 Р“Р‘', 'РѕР±РЅРѕРІР»Рµно 04.10'],
+                facts: ['2aq93K0', '15 ГБ из 100 ГБ', 'обновлено 04.10'],
                 selected: true,
-                selectedNodeTitle: 'РњРѕСЃРєРІР°',
+                selectedNodeTitle: 'Москва',
                 onSelect: _ignore,
                 onNodeTap: _ignoreIndex,
                 telegramLabel: 'Telegram',

@@ -782,6 +782,7 @@
   "freeSearch": "Search servers",
   "locationsNodes": "Nodes",
   "locationsSelected": "IN USE",
+  "locationsActive": "active",
   "locationsNotUsed": "NOT USED",
   "locationsUseIt": "Connect",
   "locationsInUse": "Connected",

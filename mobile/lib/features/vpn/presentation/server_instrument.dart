@@ -97,7 +97,6 @@ class ProfileInstrument extends StatelessWidget {
                     _Toolbar(
                       selected: selected,
                       busy: refreshing,
-                      onSelect: onSelect,
                       onRefresh: onRefresh,
                       onShare: onShare,
                       onDelete: onDelete,
@@ -197,7 +196,30 @@ class ProfileInstrument extends StatelessWidget {
                       color: AppBrand.mascotGoldLit,
                     ),
                   ),
-                  if (selectedNodeTitle != null)
+                  if (selectedNodeTitle != null) ...[
+                    const Spacer(),
+                    const SizedBox(width: 10),
+                    // Which node is live. Labelled, not implied: a bare name
+                    // beside a count reads as one word run together.
+                    Text(
+                      l.locationsActive,
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        letterSpacing: 1.6,
+                        fontWeight: FontWeight.w700,
+                        color: mute.withValues(alpha: 0.7),
+                      ),
+                    ),
+                    const SizedBox(width: 7),
+                    Container(
+                      width: 4,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppBrand.mascotGold,
+                      ),
+                    ),
+                    const SizedBox(width: 7),
                     Flexible(
                       child: Text(
                         selectedNodeTitle!.toUpperCase(),
@@ -207,10 +229,11 @@ class ProfileInstrument extends StatelessWidget {
                           fontSize: 10,
                           letterSpacing: 1.4,
                           fontWeight: FontWeight.w700,
-                          color: AppBrand.mascotGold.withValues(alpha: 0.9),
+                          color: AppBrand.mascotGoldLit,
                         ),
                       ),
                     ),
+                  ],
                 ],
               ),
             ),
@@ -232,14 +255,16 @@ class ProfileInstrument extends StatelessWidget {
   }
 }
 
-/// The actions, as a compact row of squares plus the one key that matters.
-/// They sit on the name's line: a profile and what you can do with it read as
-/// one object.
+/// The actions, as a compact row of squares.
+///
+/// There is no connect key here. It said "Подключено" in one place and
+/// "Подключить" in another, and it asked the card a question the node list
+/// already answers: the line you tap is the line you get. A card that repeats
+/// the answer is a card with one row too many.
 class _Toolbar extends StatelessWidget {
   const _Toolbar({
     required this.selected,
     required this.busy,
-    required this.onSelect,
     this.onRefresh,
     this.onShare,
     this.onDelete,
@@ -247,7 +272,6 @@ class _Toolbar extends StatelessWidget {
 
   final bool selected;
   final bool busy;
-  final VoidCallback onSelect;
   final VoidCallback? onRefresh;
   final VoidCallback? onShare;
   final VoidCallback? onDelete;
@@ -283,13 +307,6 @@ class _Toolbar extends StatelessWidget {
             tone: AppActionTone.danger,
             compact: true,
           ),
-        const SizedBox(width: 8),
-        ToolAction(
-          icon: selected ? AppIcons.check : AppIcons.play,
-          label: selected ? l.locationsInUse : l.locationsUseIt,
-          onTap: onSelect,
-          tone: AppActionTone.primary,
-        ),
       ],
     );
   }

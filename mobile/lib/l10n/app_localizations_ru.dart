@@ -1509,6 +1509,9 @@ class AppL10nRu extends AppL10n {
   String get locationsSelected => 'ВЫБРАН';
 
   @override
+  String get locationsActive => 'активен';
+
+  @override
   String get locationsNotUsed => 'НЕ ВЫБРАН';
 
   @override

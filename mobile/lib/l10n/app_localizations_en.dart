@@ -1504,6 +1504,9 @@ class AppL10nEn extends AppL10n {
   String get locationsSelected => 'IN USE';
 
   @override
+  String get locationsActive => 'active';
+
+  @override
   String get locationsNotUsed => 'NOT USED';
 
   @override

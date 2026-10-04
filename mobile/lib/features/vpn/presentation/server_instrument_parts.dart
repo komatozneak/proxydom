@@ -4,6 +4,7 @@ import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/interaction.dart';
 import '../data/subscription_label.dart';
+import 'server_glyph.dart';
 
 /// One node in the pool, drawn like a line on an instrument panel rather than
 /// like a list row: a mark, the name, where it lives, and the protocol.
@@ -49,7 +50,7 @@ class NodeLine extends StatelessWidget {
           ),
           child: Row(
             children: [
-              _Mark(label: label),
+              ServerGlyph(label: label, size: 34),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -107,46 +108,11 @@ class NodeLine extends StatelessWidget {
   }
 }
 
-/// The tile that says what kind of node this is: a country, a game service, or
-/// a forced proxy.
-class _Mark extends StatelessWidget {
-  const _Mark({required this.label});
-
-  final PoolServerLabel label;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final color = switch (label.tile) {
-      PoolTile.youtube => AppBrand.youtubePlay,
-      PoolTile.gaming => AppBrand.secondary,
-      PoolTile.flag => theme.colorScheme.onSurface.withValues(alpha: 0.08),
-    };
-    return Container(
-      width: 34,
-      height: 34,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(9),
-      ),
-      child: switch (label.tile) {
-        PoolTile.youtube => const AppIcon(AppIcons.play, size: 14),
-        PoolTile.gaming => const Text('🎮', style: TextStyle(fontSize: 17)),
-        PoolTile.flag => Text(
-            label.flag.isEmpty ? '🌐' : label.flag,
-            style: const TextStyle(fontSize: 18),
-          ),
-      },
-    );
-  }
-}
-
 /// One action, standing on its own.
 ///
 /// The old card crammed share, refresh, the seller link and the trash into one
-/// corner of coloured squares. These are either a labelled key or — when
-/// [compact] is set — a square with a tooltip, for the row beside the profile
+/// corner of coloured squares. These are either a labelled key or РІР‚вЂќ when
+/// [compact] is set РІР‚вЂќ a square with a tooltip, for the row beside the profile
 /// name where a word would crowd the name out.
 class ToolAction extends StatelessWidget {
   const ToolAction({

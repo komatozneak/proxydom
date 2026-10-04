@@ -610,6 +610,7 @@
   "freeSearch": "Поиск серверов",
   "locationsNodes": "Узлы",
   "locationsSelected": "ВЫБРАН",
+  "locationsActive": "активен",
   "locationsNotUsed": "НЕ ВЫБРАН",
   "locationsUseIt": "Подключить",
   "locationsInUse": "Подключено",

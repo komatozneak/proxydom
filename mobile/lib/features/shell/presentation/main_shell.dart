@@ -401,8 +401,8 @@ class _RailItemState extends State<_RailItem> {
         builder: (context, hovered) {
           final fill = widget.selected
               ? (dark
-                    ? AppBrand.moss.withValues(alpha: 0.16)
-                    : AppBrand.mossLight.withValues(alpha: 0.14))
+                    ? AppBrand.mossDeep.withValues(alpha: 0.92)
+                    : AppBrand.mossLight.withValues(alpha: 0.12))
               : hovered
                   ? (dark
                         ? AppBrand.lightSource.withValues(alpha: 0.045)
@@ -418,7 +418,7 @@ class _RailItemState extends State<_RailItem> {
               border: Border.all(
                 color: widget.selected
                     ? (dark
-                          ? AppBrand.mossLight.withValues(alpha: 0.28)
+                          ? AppBrand.moss.withValues(alpha: 0.35)
                           : AppBrand.moss.withValues(alpha: 0.28))
                     : Colors.transparent,
               ),
