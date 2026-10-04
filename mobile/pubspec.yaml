@@ -55,6 +55,9 @@ flutter:
     - assets/icon/mono_proxydom.png
     - assets/icon/ic_launcher_monochrome.png
     - assets/icon/nav_vpn_proxydom.png
+    # The wordmark's house: DOM cut out of it, traced from nav_vpn_proxydom.png
+    # by tool/build_logo_mark.py — the same file the landing paints as a mask.
+    - assets/icon/logo_mark_word.svg
     - assets/icon/logo_mark_nav.png
     - assets/icon/logo_mark_nav_light.png
     - assets/rive/signal_nest_connect.riv
