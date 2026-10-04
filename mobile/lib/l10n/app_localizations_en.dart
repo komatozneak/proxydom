@@ -1550,4 +1550,14 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get freeRefreshFail => 'Could not refresh';
+
+  @override
+  String get freeStepLink => 'LINK';
+
+  @override
+  String get freeStepFound => 'FOUND';
+
+  @override
+  String get freeFieldEmpty =>
+      'Empty for now. Paste a link and we will see what is inside.';
 }

@@ -1555,4 +1555,14 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get freeRefreshFail => 'Не удалось обновить';
+
+  @override
+  String get freeStepLink => 'Ссылка';
+
+  @override
+  String get freeStepFound => 'Найдено';
+
+  @override
+  String get freeFieldEmpty =>
+      'Пока пусто. Вставьте ссылку — и мир увидит что внутри.';
 }

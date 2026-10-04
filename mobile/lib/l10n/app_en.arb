@@ -803,5 +803,8 @@
       }
     }
   },
-  "freeRefreshFail": "Could not refresh"
+  "freeRefreshFail": "Could not refresh",
+  "freeStepLink": "LINK",
+  "freeStepFound": "FOUND",
+  "freeFieldEmpty": "Empty for now. Paste a link and we will see what is inside."
 }

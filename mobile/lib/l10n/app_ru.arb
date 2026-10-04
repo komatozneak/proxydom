@@ -631,5 +631,8 @@
       }
     }
   },
-  "freeRefreshFail": "Не удалось обновить"
+  "freeRefreshFail": "Не удалось обновить",
+  "freeStepLink": "Ссылка",
+  "freeStepFound": "Найдено",
+  "freeFieldEmpty": "Пока пусто. Вставьте ссылку — и мир увидит что внутри."
 }

@@ -2928,6 +2928,24 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Could not refresh'**
   String get freeRefreshFail;
+
+  /// No description provided for @freeStepLink.
+  ///
+  /// In en, this message translates to:
+  /// **'LINK'**
+  String get freeStepLink;
+
+  /// No description provided for @freeStepFound.
+  ///
+  /// In en, this message translates to:
+  /// **'FOUND'**
+  String get freeStepFound;
+
+  /// No description provided for @freeFieldEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Empty for now. Paste a link and we will see what is inside.'**
+  String get freeFieldEmpty;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {
