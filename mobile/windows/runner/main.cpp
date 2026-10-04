@@ -25,8 +25,32 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   project.set_dart_entrypoint_arguments(std::move(command_line_arguments));
 
   FlutterWindow window(project);
-  Win32Window::Point origin(10, 10);
-  Win32Window::Size size(824, 747);
+  // Centre the window on the primary monitor and open it at the size the
+  // desktop layout is drawn for: the rail plus the two-column home.
+  HMONITOR monitor = MonitorFromPoint({}, MONITOR_DEFAULTTOPRIMARY);
+  MONITORINFO monitor_info = {};
+  monitor_info.cbSize = sizeof(monitor_info);
+  // Size and Point are unsigned: every value here is already non-negative.
+  constexpr unsigned int kMinWidth = 940;
+  constexpr unsigned int kMinHeight = 640;
+  Win32Window::Point origin(80, 60);
+  Win32Window::Size size(1160, 820);
+  if (monitor != nullptr && GetMonitorInfo(monitor, &monitor_info)) {
+    const unsigned int work_width = static_cast<unsigned int>(
+        monitor_info.rcWork.right - monitor_info.rcWork.left);
+    const unsigned int work_height = static_cast<unsigned int>(
+        monitor_info.rcWork.bottom - monitor_info.rcWork.top);
+    // windows.h defines min/max as macros, so std::min is not usable here.
+    unsigned int width = work_width > 80 ? work_width - 80 : kMinWidth;
+    if (width < kMinWidth) width = kMinWidth;
+    if (width > size.width) width = size.width;
+    unsigned int height = work_height > 80 ? work_height - 80 : kMinHeight;
+    if (height < kMinHeight) height = kMinHeight;
+    if (height > size.height) height = size.height;
+    size = Win32Window::Size(width, height);
+    origin.x = monitor_info.rcWork.left + (work_width - width) / 2;
+    origin.y = monitor_info.rcWork.top + (work_height - height) / 2;
+  }
   if (!window.Create(L"Proxy Dom", origin, size)) {
     return EXIT_FAILURE;
   }

@@ -1,14 +1,14 @@
-import 'dart:ui' as ui;
-
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
-/// The DOM mark, drawn rather than loaded.
+/// The DOM mark — the house with DOM cut out of it, plus the door under the O.
 ///
-/// The shipped asset is an opaque dark square with a white house in it: on a
-/// dark rail the square is a hole, and a colour filter over it is a coin flip
-/// because the box is opaque rather than transparent. Drawing the mark is the
-/// only way to get what the brand wants — the mascot in one colour with DOM
-/// cut out of it — at any size, on any ground.
+/// It is traced, not drawn. The hand-painted version that used to live here was
+/// a roof triangle over a body rectangle with `BlendMode.dstOut` glyphs: it had
+/// no door, its corners were hard, and at any size past a favicon it read as a
+/// generic house icon rather than as the mascot. `tool/build_logo_mark.py`
+/// traces the same contour the landing paints as a CSS mask, from the same
+/// source icon, so the window header and the website header are one drawing.
 class ProxyDomMark extends StatelessWidget {
   const ProxyDomMark({
     super.key,
@@ -16,79 +16,94 @@ class ProxyDomMark extends StatelessWidget {
     this.size = 26,
   });
 
-  /// The colour the house is painted in. The letters stay whatever is behind.
+  /// The colour the house is painted in. The letters and the door stay whatever
+  /// is behind the mark, so it belongs to whatever ground it sits on.
   final Color ink;
   final double size;
+
+  static const String asset = 'assets/icon/logo_mark_word.svg';
 
   @override
   Widget build(BuildContext context) {
     return SizedBox.square(
       dimension: size,
-      child: CustomPaint(painter: _DomMarkPainter(ink)),
+      child: SvgPicture.asset(
+        asset,
+        // The file is a mask: everything opaque stays, so the knockouts are
+        // transparent pixels. Recolouring therefore means tinting the alpha,
+        // which leaves those holes exactly as they are.
+        colorFilter: ColorFilter.mode(ink, BlendMode.srcIn),
+      ),
     );
   }
 }
 
-class _DomMarkPainter extends CustomPainter {
-  const _DomMarkPainter(this.ink);
+/// The lockup: the word, then the mark that carries the second half of the name.
+///
+/// The two are one mark, so they are laid out as one. That means two things the
+/// sidebar never had: a gap small enough to read as a word space rather than a
+/// seam, and DOM's centre sitting on the word's cap centre.
+///
+/// That offset is arithmetic, not taste. DOM's centre lands at 59.3% of the
+/// house's height — the body of a house sits low, the roof does not — so a mark
+/// centred against the word would hang its letters under the baseline. The cap
+/// centre, meanwhile, is not the middle of the text box either: it sits
+/// 0.021 em above it, from Onest's own metrics (ascent 0.970, descent 0.305,
+/// cap 0.707 — `(asc+desc)/2 - asc + cap/2`). Both terms are in the offset
+/// below, so the two centres meet at any size.
+class ProxyDomLockup extends StatelessWidget {
+  const ProxyDomLockup({
+    super.key,
+    required this.ink,
+    required this.label,
+    this.markSize = 30,
+    this.fontSize = 17,
+  });
 
   final Color ink;
+  final String label;
+  final double markSize;
+  final double fontSize;
+
+  /// Where DOM's centre sits in the mark box, as a fraction of its height.
+  static const double _domCentre = 0.593;
+
+  /// How far the cap centre rises above the middle of the text box, in em.
+  /// Onest: (0.970 + 0.305) / 2 - 0.970 + 0.707 / 2.
+  static const double _capRise = 0.021;
+
+  /// Word space in the lockup, scaled off the mark so it holds at any size.
+  double get _gap => markSize * 0.115;
+
+  double get _markLift => markSize * (_domCentre - 0.5) + fontSize * _capRise;
 
   @override
-  void paint(Canvas canvas, Size size) {
-    // The house: a gabled roof over a body, filled solid like the mascot rather
-    // than outlined — an outline reads as a generic icon, and the mark has to
-    // be the same creature as the one on the home screen.
-    final w = size.width;
-    final h = size.height;
-    final roof = Path()
-      ..moveTo(w * 0.06, h * 0.54)
-      ..lineTo(w * 0.50, h * 0.08)
-      ..lineTo(w * 0.94, h * 0.54)
-      ..lineTo(w * 0.50, h * 0.40)
-      ..close();
-    final body = Path()
-      ..moveTo(w * 0.16, h * 0.50)
-      ..lineTo(w * 0.84, h * 0.50)
-      ..lineTo(w * 0.84, h * 0.92)
-      ..lineTo(w * 0.16, h * 0.92)
-      ..close();
-
-    canvas.drawPath(roof, Paint()..color = ink);
-    canvas.drawPath(body, Paint()..color = ink);
-
-    // DOM, cut out of it. A real hole, not a dark fill: the letters take
-    // whatever is behind the mark, so the mark belongs to the ground.
-    //
-    // `BlendMode.clear` on the layer itself wipes the whole layer, so the
-    // letters go through as a picture composited with `dstOut` — erase exactly
-    // where the glyphs are and nowhere else.
-    final text = TextPainter(
-      text: TextSpan(
-        text: 'DOM',
-        style: TextStyle(
-          fontFamily: 'Onest',
-          fontSize: h * 0.25,
-          fontWeight: FontWeight.w800,
-          letterSpacing: -0.5,
-          height: 1,
-        ),
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final word = Text(
+      label,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: theme.textTheme.titleMedium?.copyWith(
+        color: ink,
+        // The wordmark carries the weight the monogram used to: the mark sits
+        // beside it now, not before it.
+        fontWeight: FontWeight.w800,
+        letterSpacing: -0.6,
+        fontSize: fontSize,
       ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    final at = Offset(w * 0.5 - text.width / 2, h * 0.71 - text.height / 2);
-    final recorder = ui.PictureRecorder();
-    final pictureCanvas = Canvas(recorder);
-    text.paint(pictureCanvas, Offset.zero);
-    final picture = recorder.endRecording();
-
-    canvas.saveLayer(Offset.zero & size, Paint()..blendMode = BlendMode.dstOut);
-    canvas.translate(at.dx, at.dy);
-    canvas.drawPicture(picture);
-    canvas.restore();
-    picture.dispose();
+    );
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Flexible(child: word),
+        SizedBox(width: _gap),
+        Transform.translate(
+          offset: Offset(0, -_markLift),
+          child: ProxyDomMark(size: markSize, ink: ink),
+        ),
+      ],
+    );
   }
-
-  @override
-  bool shouldRepaint(covariant _DomMarkPainter old) => old.ink != ink;
 }

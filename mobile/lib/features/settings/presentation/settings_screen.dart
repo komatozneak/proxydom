@@ -262,9 +262,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     // page behaves.
     final page = ListView(
       padding: EdgeInsets.fromLTRB(
-        windowsDesktop ? 40 : 20,
+        windowsDesktop ? AppBrand.pageGutterWide : AppBrand.pageGutter,
         windowsDesktop ? 34 : 12,
-        windowsDesktop ? 40 : 20,
+        windowsDesktop ? AppBrand.pageGutterWide : AppBrand.pageGutter,
         32,
       ),
       children: [

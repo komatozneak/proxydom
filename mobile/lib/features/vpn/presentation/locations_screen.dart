@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/diagnostics/product_log.dart';
 import '../../../core/diagnostics/ui_log.dart';
+import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/proxydom_snackbar.dart';
@@ -73,7 +74,12 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
-        titleSpacing: 44,
+        // The heading shares the gutter with every other tab's page. It used to
+        // reserve 44px for a leading button that no longer exists
+        // (automaticallyImplyLeading is false below), which left this tab's
+        // title sitting further right than Settings' or Home's.
+        titleSpacing:
+            windowsDesktop ? AppBrand.pageGutterWide : AppBrand.pageGutter,
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [

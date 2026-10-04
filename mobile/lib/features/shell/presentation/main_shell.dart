@@ -14,8 +14,8 @@ import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/interaction.dart';
 import '../../../core/widgets/mossy_rail.dart';
 import '../../../core/widgets/proxydom_ground.dart';
-import '../../../core/widgets/proxydom_mark.dart';
 import '../../../core/widgets/proxydom_nav_icon.dart';
+import '../../../core/widgets/window_caption_bar.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../home/application/vpn_provider.dart';
 
@@ -132,10 +132,23 @@ class _MainShellState extends ConsumerState<MainShell> {
     Widget page = widget.navigationShell;
 
     if (windowsDesktop) {
-      page = Row(
+      // The window has no system caption, so the app draws its own and the
+      // lockup lives in it. The rail used to carry the name at its top; putting
+      // the same lockup in the caption is what makes the window read as one
+      // object instead of a frame with a sidebar that happens to say a name.
+      final rail = WindowsNavRail(selected: selected, onSelect: _onTap);
+      page = Column(
         children: [
-          WindowsNavRail(selected: selected, onSelect: _onTap),
-          Expanded(child: page),
+          WindowCaptionBar(
+            // Only "Прокси" / "Proxy": the second half of the name is already
+            // cut into the mark beside it, and spelling it out as well said it
+            // twice in one lockup.
+            label: Localizations.localeOf(context).languageCode == 'ru'
+                ? 'Прокси'
+                : 'Proxy',
+            ink: dark ? AppBrand.inkDark : AppBrand.inkLight,
+          ),
+          Expanded(child: Row(children: [rail, Expanded(child: page)])),
         ],
       );
       return _yard(
@@ -268,7 +281,6 @@ class WindowsNavRail extends StatelessWidget {
     final theme = Theme.of(context);
     final l = AppL10n.of(context);
     final dark = theme.brightness == Brightness.dark;
-    final ink = dark ? AppBrand.inkDark : AppBrand.inkLight;
     final mute = dark ? AppBrand.inkMutedDark : AppBrand.inkMutedLight;
 
     final items = <({IconData icon, String label, int index})>[
@@ -296,35 +308,9 @@ class WindowsNavRail extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Padding(
-                padding: const EdgeInsets.only(left: 6, bottom: 26),
-                child: Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        Localizations.localeOf(context).languageCode == 'ru'
-                            ? 'Прокси Дом'
-                            : 'Proxy Dom',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          color: ink,
-                          // The wordmark carries the weight the monogram used
-                          // to: the mark sits beside it now, not before it.
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.6,
-                          fontSize: 17,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    // The DOM mark beside the name: the mascot in monochrome
-                    // with the letters cut out of it. It was a badge before the
-                    // name; a mark after it reads as a signature.
-                    ProxyDomMark(size: 26, ink: ink),
-                  ],
-                ),
-              ),
+              // The name lives in the window caption now, so the rail starts
+              // with its first destination. A rail that repeats the title it
+              // already shows two inches above reads as two separate objects.
               for (final item in items)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 6),

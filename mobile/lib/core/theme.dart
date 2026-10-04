@@ -197,6 +197,18 @@ class AppBrand {
   static const Color inkMutedDark = Color(0xFFC8C8D0);
   static const Color lineDark = Color(0xFF73737C);
 
+  /// Hover on a window-caption button. The bar sits on the night, so the mark
+  /// is a light wash rather than a fill — a filled chip reads as a button in an
+  /// app and breaks the illusion that the caption is the window itself.
+  static const Color hoverCaption = Color(0x1AFFFFFF);
+
+  /// Painted under a caption button that is not hovered: nothing, explicitly.
+  static const Color idleCaption = Color(0x00000000);
+
+  /// Hover on the close button, which is the one button that carries an
+  /// outcome rather than an action. Windows says that in red.
+  static const Color hoverCloseCaption = Color(0xFFE81123);
+
   static const Color info = Color(0xFF558B2F);
 
   static const Color onSurfaceVariantDark = Color(0xFFC8C8D0);
@@ -210,6 +222,15 @@ class AppBrand {
   static const double radiusCard = 16;
   static const double radiusPill = 27;
   static const double radiusNavPill = 999;
+
+  /// The line a tab starts on: its heading and its content share this gutter.
+  ///
+  /// It is a token because it was three numbers. The Servers heading sat at 44,
+  /// Settings at 20 and Home at 24, so switching tabs shifted the page sideways
+  /// under the eye — the heading looked pushed to the right on one screen and
+  /// not on the next. A phone gets the narrow gutter, a window the wide one.
+  static const double pageGutter = 24;
+  static const double pageGutterWide = 32;
 
   static Color oakWithOpacity(double opacity) =>
       Color.fromRGBO(26, 26, 26, opacity);
