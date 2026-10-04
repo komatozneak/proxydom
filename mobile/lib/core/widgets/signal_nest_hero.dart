@@ -181,31 +181,11 @@ class _SignalNestHeroState extends State<SignalNestHero>
               );
 
               if (isError) {
-                house = ColorFiltered(
-                  colorFilter: const ColorFilter.matrix(<double>[
-                    0.2126,
-                    0.7152,
-                    0.0722,
-                    0,
-                    0,
-                    0.2126,
-                    0.7152,
-                    0.0722,
-                    0,
-                    0,
-                    0.2126,
-                    0.7152,
-                    0.0722,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0.92,
-                    0,
-                  ]),
-                  child: house,
-                );
+                // The house used to go grey on error — a greyscale matrix over
+                // the mascot. The mascot IS the button: it keeps its gold and
+                // only dims, and the state is carried by the lamp in the
+                // readout below, where a colour can actually be read.
+                house = Opacity(opacity: 0.62, child: house);
               }
 
               return Stack(

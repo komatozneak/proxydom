@@ -12,7 +12,7 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
-  testWidgets('paste and qr stay moss and amber, with no add button', (
+  testWidgets('paste and qr stay house gold and ember, with no add button', (
     tester,
   ) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
@@ -39,7 +39,7 @@ void main() {
         )
         .map((button) => button.color)
         .toList();
-    expect(colors, [AppBrand.secondary, AppBrand.actionAmber]);
+    expect(colors, [AppBrand.mascotGold, AppBrand.mascotEmber]);
     debugDefaultTargetPlatformOverride = null;
   });
 
@@ -86,15 +86,15 @@ void main() {
     expect(find.text('Обновить'), findsNothing);
     expect(find.byTooltip('Обновить'), findsOneWidget);
     expect(_refreshIcons, findsOneWidget);
-    // Refresh is the sky slot; QR beside it is amber. Neither borrows the
-    // notebook-margin orange that also paints the nav.
+    // Reload wears the same gold as the paste key, as a ring: it is the quiet
+    // action of the three and must not outshout the house itself.
     expect(
       tester
           .widget<AppRingButton>(
             find.byWidgetPredicate((widget) => widget is AppRingButton),
           )
           .color,
-      AppBrand.actionSky,
+      AppBrand.mascotGold,
     );
     debugDefaultTargetPlatformOverride = null;
   });

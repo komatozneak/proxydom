@@ -92,31 +92,51 @@ class AppBrand {
   /// Dark elevated cards — enough lift off [surfaceDark] so numbers read.
   static const Color surfaceVariantDark = Color(0xFF2C2C32);
 
-  // ── Material pass: the depth ramp ──────────────────────────────────────────
+  // ── The house in a cold night ──────────────────────────────────────────────
   //
-  // A card drawn as `one fill + a 1px outline` has no light source and no
-  // distance from the page, so every screen reads flat. These four tokens let
-  // AppSurface and AppActionButton put one consistent light over the whole app:
-  // a lit top edge, a floor one step darker, and a key shadow underneath.
+  // The mascot is the reference: a warm ochre house with a charcoal aperture,
+  // sampled straight off the mark. Everything warm in the app comes from it.
+  // Everything the house stands on is cold — «тёплый дом в холодном интернете»
+  // — so the gold reads as light rather than as a colour.
 
-  /// Floor of a raised plate in dark — a step above [surfaceVariantDark] so a
-  /// card does not vanish into the sheet.
-  static const Color surfaceRaisedDark = Color(0xFF232328);
+  /// House body. The brand colour, sampled off the mark.
+  static const Color mascotGold = Color(0xFFC88F27);
 
-  /// Recessed wells (inputs, tracks, code blocks): below the card, not on it.
-  static const Color surfaceSunkDark = Color(0xFF1A1A1E);
+  /// The lit top face of the house: same hue, one step up.
+  static const Color mascotGoldLit = Color(0xFFE1AF49);
 
-  /// Hairline on a raised plate. Stronger than [lineDark]: the edge of a lit
-  /// object reads sharper than a rule printed on the page.
-  static const Color edgeDark = Color(0xFF3C3C45);
+  /// The shaded side and the rim under the body.
+  static const Color mascotGoldDeep = Color(0xFFA2701A);
 
-  /// The same edge on the cream sheet — quieter than [lineLight].
-  static const Color edgeLight = Color(0xFFD9D9DF);
+  /// The warm halo the house throws into the dark — fireflies, glow, orbit.
+  static const Color mascotEmber = Color(0xFFB4551B);
 
-  /// Key shadow under a raised plate (dark). Wide and soft.
+  /// Aperture: warm charcoal, not a neutral grey.
+  static const Color mascotFace = Color(0xFF403F3C);
+
+  /// Door and eyes.
+  static const Color mascotCream = Color(0xFFF7F2E4);
+
+  /// Fireflies: the small warm points that drift over the ground.
+  static const Color firefly = Color(0xFFE8B94A);
+
+  // The cold side — the ground the house stands on.
+  static const Color groundDark = Color(0xFF0E1116);
+
+  static const Color groundDeep = Color(0xFF07090C);
+
+  /// Cards on the night ground: cool charcoal, so a warm plate on top of them
+  /// still separates by light rather than only by value.
+  static const Color surfaceRaisedDark = Color(0xFF1E2127);
+
+  static const Color surfaceSunkDark = Color(0xFF14161B);
+
+  static const Color edgeDark = Color(0xFF353B47);
+
+  static const Color edgeLight = Color(0xFFD8D3C6);
+
   static const Color shadowKeyDark = Color(0x7A000000);
 
-  /// The same shadow on the light sheet — it needs far less weight.
   static const Color shadowKeyLight = Color(0x1F1A1A1A);
 
   /// White/black used only as a light or shade *source* when mixing surfaces —

@@ -13,6 +13,7 @@ import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/app_surface.dart';
+import '../../../core/widgets/proxydom_ground.dart';
 import '../../../core/widgets/connect_button.dart';
 import '../../../core/widgets/house_pulsar.dart';
 import '../../../core/widgets/signal_nest_hero.dart';
@@ -62,6 +63,36 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   int _noVpnTotal = 0;
   bool _openingSubscription = false;
 
+  /// How lit the yard is, 0…1. The shell paints it; the home decides it.
+  /// Resting is not dark — an unlit yard still has fireflies.
+  static const double _yardResting = 0.30;
+
+  double _yardGlow = _yardResting;
+
+  Timer? _yardTimer;
+
+  /// Publishes the lit level to the night behind the screen.
+  void _setYard(double value) {
+    setState(() => _yardGlow = value);
+    GroundGlowScope.maybeOf(context)?.set(value);
+  }
+
+  /// A tap on the house wakes the yard for a beat, whatever the tunnel does.
+  void _wakeYard() {
+    _yardTimer?.cancel();
+    _setYard(1.0);
+    _yardTimer = Timer(const Duration(milliseconds: 900), () {
+      if (mounted) _setYard(_yardFor(ref.read(vpnProvider)));
+    });
+  }
+
+  /// The tunnel decides how bright the house is.
+  double _yardFor(Object status) {
+    if (status is VpnConnected) return 1.0;
+    if (status is VpnConnecting) return 0.75;
+    return _yardResting;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -73,8 +104,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   @override
   void dispose() {
+    _yardTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    GroundGlowScope.maybeOf(context)?.set(_yardGlow);
   }
 
   @override
@@ -225,6 +263,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Future<void> _onNestTap() async {
+    // The house is the main button: touching it wakes the yard before anything
+    // else happens, so the light answers the finger immediately instead of
+    // waiting for the tunnel.
+    _wakeYard();
     if (windowsDesktop && VpnController.instance.windowsBrokerCooling) {
       UiLog.action(
         'home',
@@ -315,6 +357,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     });
 
     ref.listen(vpnProvider, (prev, next) {
+      // The tunnel decides how bright the house is.
+      if (_yardGlow != 1.0) _setYard(_yardFor(next));
       if (prev is! VpnConnected && next is VpnConnected) {
         unawaited(_maybeAskBattery());
       }
@@ -495,9 +539,10 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
         status is VpnError && status.code == kVpnConflictErrorCode;
 
     // The house is the focal point. On a phone it fills the band between the
-    // panel and the keys; in a window it has its own column and can be larger.
+    // panel and the keys; in a window it has its own column and grows with the
+    // frame, otherwise a tall window leaves the bottom half empty.
     final nestSize = windowsDesktop
-        ? math.min(420.0, math.max(240.0, size.height * 0.46))
+        ? math.min(520.0, math.max(260.0, size.height * 0.55))
         : math.min(
             340.0,
             math.min(
@@ -505,6 +550,15 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
               math.max(200.0, widget.maxHeight - 340),
             ),
           );
+    // Tell the night where the house is, so the bloom belongs to it and the
+    // orbit clears the roof. Published during layout: the ground repaints from
+    // its own ticker and picks the numbers up on the next frame.
+    GroundGlowScope.maybeOf(context)
+      ?..houseRadius = nestSize * 0.5
+      ..houseCenter = Alignment(
+        0,
+        (nestSize * 0.5) / size.height - 0.5,
+      );
 
     return _FreeClientHome(
       nestSize: nestSize,
@@ -661,13 +715,15 @@ class _FreeClientHome extends StatelessWidget {
     // Disconnected is a normal state, not a failure: painting it alarm red
     // made the resting screen look broken. Red is reserved for VpnError.
     final accent = switch (status) {
-      VpnConnected() => AppBrand.success,
-      VpnConnecting() => AppBrand.warning,
+      VpnConnected() => AppBrand.mascotGoldLit,
+      VpnConnecting() => AppBrand.mascotEmber,
       VpnError() => AppBrand.destructive,
       _ => theme.colorScheme.onSurfaceVariant,
     };
 
-    final panel = ConnectionStatusPanel(
+    // The house is the main button, so it carries the state: the readout sits
+    // under it as one line instead of a plate that competes with it.
+    final readout = ConnectionReadout(
       status: statusText,
       profile: profile,
       traffic: traffic,
@@ -676,9 +732,7 @@ class _FreeClientHome extends StatelessWidget {
       accent: accent,
     );
     final hero = Column(
-      mainAxisAlignment: windowsDesktop
-          ? MainAxisAlignment.start
-          : MainAxisAlignment.center,
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
         if (_showsEmptyHint) ...[
           const SizedBox(
@@ -753,44 +807,59 @@ class _FreeClientHome extends StatelessWidget {
       ),
     ];
 
-    // A window is wider than it is tall-content: the house gets its own column
-    // instead of a band of empty paper between the panel and the keys.
+    // One composition for both: the house in the middle with the yard around it,
+    // the readout under it, the keys under that. The mascot is the button, so
+    // nothing else may sit above it or compete with it.
     if (windowsDesktop) {
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Expanded(
-            flex: 11,
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  panel,
-                  if (errorHint != null) ...[
-                    const SizedBox(height: 10),
-                    Text(
-                      errorHint,
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.error,
-                      ),
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final narrow = constraints.maxWidth < 700;
+          return Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: narrow ? double.infinity : 560,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    hero,
+                    const SizedBox(height: 18),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: nestSize * 1.05),
+                      child: readout,
                     ),
+                    if (errorHint != null) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        errorHint,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.error,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 20),
+                    ...actions,
                   ],
-                  const SizedBox(height: 22),
-                  ...actions,
-                ],
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 44),
-          Expanded(flex: 9, child: hero),
-        ],
+          );
+        },
       );
     }
 
     return Column(
       children: [
-        panel,
+        Expanded(child: hero),
+        const SizedBox(height: 6),
+        // The readout belongs to the house: same measure, not the full width
+        // of a phone.
+        ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: nestSize * 1.05),
+          child: readout,
+        ),
         if (errorHint != null) ...[
           const SizedBox(height: 8),
           Text(
@@ -801,7 +870,7 @@ class _FreeClientHome extends StatelessWidget {
             ),
           ),
         ],
-        Expanded(child: hero),
+        const SizedBox(height: 14),
         ...actions,
       ],
     );

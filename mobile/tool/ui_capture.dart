@@ -21,7 +21,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:proxydom/core/theme.dart';
-import 'package:proxydom/core/widgets/notebook_paper.dart';
+import 'package:proxydom/core/widgets/proxydom_ground.dart';
 import 'package:proxydom/features/home/presentation/home_screen.dart';
 import 'package:proxydom/features/settings/presentation/settings_screen.dart';
 import 'package:proxydom/features/shell/presentation/main_shell.dart';
@@ -58,21 +58,30 @@ Future<void> _loadFonts() async {
   }
 }
 
-/// Puts a bare screen body the way the shell does: on paper + grid, and on
+/// Puts a bare screen body the way the shell does: on the night ground, and on
 /// Windows inside the rail.
 Widget _frame(
   Widget child,
   BuildContext context, {
   required bool desktop,
+  double glow = 0.75,
 }) {
-  final dark = Theme.of(context).brightness == Brightness.dark;
-  Widget content = Scaffold(
-    backgroundColor: dark ? AppBrand.paperDark : AppBrand.paperLight,
-    body: NotebookPaper(marginRule: !desktop, child: child),
+  final state = GroundGlow()
+    ..houseRadius = desktop ? 200 : 160
+    ..houseCenter = const Alignment(0, -0.1);
+  state.set(glow);
+  // The screen publishes the house geometry into this scope; without it the
+  // orbit would be drawn around a guess instead of around the house.
+  Widget content = GroundGlowScope(
+    notifier: state,
+    child: Scaffold(
+      backgroundColor: Colors.transparent,
+      body: ProxydomGround(state: state, child: child),
+    ),
   );
   if (!desktop) return content;
   return Scaffold(
-    backgroundColor: dark ? AppBrand.paperDark : AppBrand.paperLight,
+    backgroundColor: Colors.transparent,
     body: Row(
       children: [
         WindowsNavRail(selected: MainShell.homeIndex, onSelect: (_) {}),
@@ -219,3 +228,4 @@ void main() {
         brightness: Brightness.dark, desktop: true);
   });
 }
+

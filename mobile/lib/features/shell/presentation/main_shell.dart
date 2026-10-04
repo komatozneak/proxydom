@@ -12,7 +12,7 @@ import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/interaction.dart';
-import '../../../core/widgets/notebook_paper.dart';
+import '../../../core/widgets/proxydom_ground.dart';
 import '../../../core/widgets/proxydom_nav_icon.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../home/application/vpn_provider.dart';
@@ -88,6 +88,10 @@ class MainShell extends ConsumerStatefulWidget {
 }
 
 class _MainShellState extends ConsumerState<MainShell> {
+  /// How lit the yard is. The home screen writes to it through
+  /// [GroundGlowScope]; this class owns the painter.
+  final GroundGlow _glow = GroundGlow();
+
   void _onTap(int index) {
     const names = ['servers', 'home', 'settings'];
     final name = index >= 0 && index < names.length ? names[index] : '$index';
@@ -120,31 +124,22 @@ class _MainShellState extends ConsumerState<MainShell> {
     final theme = Theme.of(context);
     final selected = widget.navigationShell.currentIndex;
     final dark = theme.brightness == Brightness.dark;
-    final paper = dark ? AppBrand.paperDark : AppBrand.paperLight;
 
-    // A window is not a phone. The bottom dock with a mark hanging off the
-    // bottom edge is a touch idiom: on the desktop the destinations live in a
-    // rail on the left, where a pointer expects a menu and where nothing has
-    // to hang below the window edge.
+    // The night is behind everything, and the rail sits on it like furniture
+    // in a room. Both platforms share it — the house is the only light source
+    // in the app, and it should light the window the same way.
+    Widget page = widget.navigationShell;
+
     if (windowsDesktop) {
-      return Scaffold(
-        backgroundColor: paper,
-        body: Row(
-          children: [
-            WindowsNavRail(
-              selected: selected,
-              onSelect: _onTap,
-            ),
-            Expanded(
-              child: NotebookPaper(
-                // The rail is the left edge here; a margin rule beside it would
-                // be a line marking nothing.
-                marginRule: false,
-                child: widget.navigationShell,
-              ),
-            ),
-          ],
-        ),
+      page = Row(
+        children: [
+          WindowsNavRail(selected: selected, onSelect: _onTap),
+          Expanded(child: page),
+        ],
+      );
+      return _yard(
+        context,
+        child: Scaffold(backgroundColor: Colors.transparent, body: page),
       );
     }
 
@@ -183,21 +178,18 @@ class _MainShellState extends ConsumerState<MainShell> {
         ),
       ),
     );
-    return Stack(
-      children: [
-        Scaffold(
-          backgroundColor: paper,
-          body: _PaperStatusScrim(
-            dark: theme.brightness == Brightness.dark,
-            child: NotebookPaper(child: widget.navigationShell),
-          ),
-          bottomNavigationBar: NotebookPaper(
-            emphasized: true,
-            child: DecoratedBox(
+    return _yard(
+      context,
+      child: Stack(
+        children: [
+          Scaffold(
+            backgroundColor: Colors.transparent,
+            body: _StatusBarStyle(dark: dark, child: page),
+            bottomNavigationBar: DecoratedBox(
               decoration: BoxDecoration(
                 border: Border(
                   top: BorderSide(
-                    color: AppBrand.paperMargin.withValues(alpha: 0.72),
+                    color: AppBrand.mascotGold.withValues(alpha: 0.22),
                     width: _navBarRuleWidth,
                   ),
                 ),
@@ -205,22 +197,34 @@ class _MainShellState extends ConsumerState<MainShell> {
               child: bar,
             ),
           ),
-        ),
-        Positioned(
-          left: 0,
-          right: 0,
-          height: _domButtonSize,
-          bottom: _domButtonBottom(MediaQuery.paddingOf(context).bottom),
-          child: Center(
-            child: _CenterNavMark(
-              selected: selected == MainShell.homeIndex,
-              semanticLabel: l.navVpn,
-              onTap: () => _onTap(MainShell.homeIndex),
+          Positioned(
+            left: 0,
+            right: 0,
+            height: _domButtonSize,
+            bottom: _domButtonBottom(MediaQuery.paddingOf(context).bottom),
+            child: Center(
+              child: _CenterNavMark(
+                selected: selected == MainShell.homeIndex,
+                semanticLabel: l.navVpn,
+                onTap: () => _onTap(MainShell.homeIndex),
+              ),
             ),
           ),
-        ),
-        const BusyOverlayHost(),
-      ],
+          const BusyOverlayHost(),
+        ],
+      ),
+    );
+  }
+
+  /// Puts the night behind a screen and publishes the glow to whatever is on
+  /// top, so the home can wake the yard from inside a nested navigator.
+  Widget _yard(BuildContext context, {required Widget child}) {
+    return GroundGlowScope(
+      notifier: _glow,
+      child: ListenableBuilder(
+        listenable: _glow,
+        builder: (context, _) => ProxydomGround(state: _glow, child: child),
+      ),
     );
   }
 }
@@ -453,52 +457,23 @@ class _RailItemState extends State<_RailItem> {
   }
 }
 
-/// Status band. Same sheet as the bar under Сервера / Home / Настройки.
-/// The margin rule sits on the bottom edge, facing the page.
-class _PaperStatusScrim extends StatelessWidget {
-  const _PaperStatusScrim({
-    required this.dark,
-    required this.child,
-  });
+/// Status-bar band. The night runs under it on the phone, so the only job
+/// left is telling the system which way the icons should be drawn.
+class _StatusBarStyle extends StatelessWidget {
+  const _StatusBarStyle({required this.dark, required this.child});
 
   final bool dark;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    final top = MediaQuery.paddingOf(context).top;
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: dark ? Brightness.light : Brightness.dark,
         statusBarBrightness: dark ? Brightness.dark : Brightness.light,
       ),
-      child: Stack(
-        children: [
-          child,
-          if (top > 0)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              height: top,
-              child: NotebookPaper(
-                emphasized: true,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    border: Border(
-                      bottom: BorderSide(
-                        color: AppBrand.paperMargin.withValues(alpha: 0.72),
-                        width: _navBarRuleWidth,
-                      ),
-                    ),
-                  ),
-                  child: const SizedBox.expand(),
-                ),
-              ),
-            ),
-        ],
-      ),
+      child: child,
     );
   }
 }

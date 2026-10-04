@@ -11,11 +11,9 @@ import '../../../l10n/app_localizations.dart';
 ///
 /// [onRefresh] reloads saved subscription documents. On the phone it is a
 /// small ring control beside QR; on Windows it is a full key beside Paste.
-/// Three roles, three colours: paste stays moss ([AppBrand.secondary]), QR takes
-/// the house amber ([AppBrand.actionAmber]), refresh the sky
-/// ([AppBrand.actionSky]) — none of them borrows the notebook-margin orange.
-/// Every key is an [AppActionButton], so the bar is pressed and lit the same
-/// way everywhere in the app.
+/// Every action wears a colour sampled off the mascot: paste takes the house
+/// gold, QR the ember under it, and the reload only a ring of the same light —
+/// the yard is already busy enough.
 class FreeClientActionBar extends StatelessWidget {
   const FreeClientActionBar({
     super.key,
@@ -37,7 +35,7 @@ class FreeClientActionBar extends StatelessWidget {
       onPressed: onPaste,
       icon: AppIcons.clipboard,
       label: l.freePaste,
-      color: AppBrand.secondary,
+      color: AppBrand.mascotGold,
       height: barHeight,
     );
     final refresh = onRefresh;
@@ -58,7 +56,7 @@ class FreeClientActionBar extends StatelessWidget {
                 onPressed: refresh,
                 icon: AppIcons.refresh,
                 label: l.freeRefresh,
-                color: AppBrand.actionSky,
+                color: AppBrand.mascotGoldDeep,
                 height: barHeight,
               ),
             ),
@@ -77,7 +75,7 @@ class FreeClientActionBar extends StatelessWidget {
               onPressed: onScan,
               icon: AppIcons.qrCode,
               label: l.freeQr,
-              color: AppBrand.actionAmber,
+              color: AppBrand.mascotEmber,
               height: barHeight,
             ),
           ),
@@ -87,7 +85,7 @@ class FreeClientActionBar extends StatelessWidget {
             // a saturated disc used to pull the eye off the paste key.
             AppRingButton(
               icon: AppIcons.refresh,
-              color: AppBrand.actionSky,
+              color: AppBrand.mascotGold,
               onPressed: refresh,
               tooltip: l.freeRefresh,
               size: barHeight,
@@ -148,6 +146,129 @@ class FreeClientEmptyState extends StatelessWidget {
 }
 
 /// Structured connection facts with notebook-style dots and ruled rows.
+/// One line under the house: what it says, where, how much, how long.
+///
+/// The status used to be a plate above the house and a rule table inside it.
+/// With the mascot as the main button the readout steps down to what a readout
+/// is for — a line you read at a glance, with the lamp carrying the state.
+class ConnectionReadout extends StatelessWidget {
+  const ConnectionReadout({
+    super.key,
+    required this.status,
+    required this.profile,
+    required this.traffic,
+    required this.accent,
+    this.uptime,
+    this.trafficColor,
+  });
+
+  final String status;
+  final String profile;
+  final String traffic;
+  final Color accent;
+  final String? uptime;
+  final Color? trafficColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    final mute = dark ? AppBrand.inkMutedDark : AppBrand.inkMutedLight;
+
+    return AppSurface(
+      padding: const EdgeInsets.fromLTRB(16, 13, 16, 13),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              _Lamp(color: accent),
+              const SizedBox(width: 10),
+              Flexible(
+                child: Text(
+                  status,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: accent,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ),
+              if (uptime != null) ...[
+                const SizedBox(width: 12),
+                Text(
+                  uptime!,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: mute,
+                    fontSize: 14,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  profile,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurface,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                traffic,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: trafficColor ?? mute,
+                  fontWeight: FontWeight.w600,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The status light. A ring around a filled core, lit by the state colour.
+class _Lamp extends StatelessWidget {
+  const _Lamp({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 12,
+      height: 12,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color,
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.45),
+            blurRadius: 10,
+            spreadRadius: -2,
+          ),
+        ],
+        border: Border.all(color: color.withValues(alpha: 0.55), width: 1),
+      ),
+    );
+  }
+}
+
+/// Instrument panel kept for screens that still want the ruled plate.
 class ConnectionStatusPanel extends StatelessWidget {
   const ConnectionStatusPanel({
     super.key,
