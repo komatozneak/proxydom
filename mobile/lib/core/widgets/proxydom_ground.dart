@@ -164,9 +164,7 @@ class _GroundPainter extends CustomPainter {
       size.height * (0.5 + houseCenter.y),
     );
 
-    // Parallax: the pointer on a window, a slow idle drift on a phone. Three
-    // layers, each moving faster than the one behind it, so the yard has depth
-    // without a single bright point in the middle of the screen.
+    // Parallax: the pointer on a window, a slow idle drift on a phone.
     final drive = state.pointerDriven
         ? state.pointer
         : Offset(
@@ -177,46 +175,22 @@ class _GroundPainter extends CustomPainter {
     final p = _pointer;
 
     if (night) {
-      _horizonHaze(canvas, size, p * 6, lit);
-      _ridge(canvas, size, p * 14, lit);
-      _motes(canvas, size, p * 26, lit);
-    }
-
-    _bloom(canvas, house, size, night ? 0.18 + lit * 0.30 : 0.12 * lit);
-
-    // The orbit stays, but it belongs to the house, not to the wallpaper:
-    // a thread of light while the house burns.
-    if (night && lit > 0.03) {
-      final orbit =
-          math.max(houseRadius * 1.06, size.shortestSide * 0.24) + lit * 12;
-      final spin = t * math.pi * 2 * 1.1;
-      canvas.drawCircle(
-        house,
-        orbit,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.1
-          ..color = AppBrand.mascotGoldLit.withValues(alpha: lit * 0.10),
+      // The yard, from inside the lit room: a pool of light on the floor, the
+      // boards it falls across, and dust turning slowly inside the beam. No
+      // fireflies, no orbit — the house is the only lamp, and a background that
+      // draws its own attention is a background that eats the words on it.
+      final floor = Offset(
+        house.dx + p.dx * 18,
+        // At the house's feet, not at the bottom of the window: light on a
+        // floor starts where the thing casting it stands.
+        size.height * 0.72 + p.dy * 10,
       );
-      for (var i = 0; i < 6; i++) {
-        final a = spin + i * (math.pi * 2 / 6);
-        final wobble = 1 + 0.05 * math.sin(a * 2 + i);
-        final at = house + Offset(math.cos(a), math.sin(a)) * orbit * wobble;
-        final trail = (0.16 + lit * 0.34 - i * 0.022).clamp(0.0, 1.0);
-        canvas.drawCircle(
-          at,
-          9,
-          Paint()
-            ..color = AppBrand.mascotGoldLit.withValues(alpha: trail * 0.30)
-            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 9),
-        );
-        canvas.drawCircle(
-          at,
-          2.6,
-          Paint()..color = AppBrand.mascotGoldLit.withValues(alpha: trail),
-        );
-      }
+      _lightPool(canvas, size, floor, lit);
+      _boards(canvas, size, p * 22, lit);
+      _dustInBeam(canvas, size, floor, p * 34, lit);
     }
+
+    _bloom(canvas, house, size, night ? 0.16 + lit * 0.26 : 0.12 * lit);
 
     if (!night) return;
 
@@ -255,72 +229,106 @@ class _GroundPainter extends CustomPainter {
   /// Slowed-down pointer, so the layers glide instead of snapping.
   Offset _pointer = Offset.zero;
 
-  /// Layer 1 — the warm haze sitting on the horizon.
-  void _horizonHaze(Canvas canvas, Size size, Offset shift, double lit) {
-    final band = size.height * 0.30;
-    final top = size.height * 0.72 + shift.dy - band;
-    final rect = Rect.fromLTWH(0, top, size.width, band);
-    canvas.drawRect(
-      Rect.fromLTRB(-40 + shift.dx, top, size.width + 40, top + band),
+  /// The pool of light the house throws on the floor: a wide, soft ellipse
+  /// rather than a round glow, because light on a floor is an ellipse. It
+  /// breathes with the charge — a lit house lights more of the yard.
+  void _lightPool(Canvas canvas, Size size, Offset floor, double lit) {
+    final w = size.width * 1.5;
+    final h = size.height * 0.42;
+    final breath = 1 + 0.04 * math.sin(clock.value * math.pi * 2 * 0.05);
+    canvas.drawOval(
+      Rect.fromCenter(center: floor, width: w * breath, height: h * breath),
       Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
+        ..shader = RadialGradient(
           colors: [
-            AppBrand.mascotEmber.withValues(alpha: 0),
-            AppBrand.mascotEmber.withValues(alpha: 0.035 + lit * 0.02),
-            AppBrand.mascotEmber.withValues(alpha: 0),
+            AppBrand.mascotGold.withValues(alpha: 0.055 + lit * 0.05),
+            AppBrand.mascotEmber.withValues(alpha: 0.030 + lit * 0.03),
+            AppBrand.mascotEmber.withValues(alpha: 0.0),
           ],
           stops: const [0, 0.5, 1],
-        ).createShader(rect),
+        ).createShader(
+          Rect.fromCenter(center: floor, width: w, height: h),
+        ),
     );
   }
 
-  /// Layer 2 — the ridge behind the yard: one slow curve, no detail.
-  void _ridge(Canvas canvas, Size size, Offset shift, double lit) {
-    final base = size.height * 0.80 + shift.dy;
-    final path = Path()..moveTo(-20, size.height);
-    path.lineTo(-20, base);
-    for (var i = 0; i <= 8; i++) {
-      final f = i / 8;
-      final x = -20 + f * (size.width + 40) + shift.dx * (1 + f);
-      final y = base - math.sin(f * math.pi * 1.6 + seed) * size.height * 0.045;
-      path.lineTo(x, y);
+  /// Floorboards. Long shallow lines that spread as they come forward, so the
+  /// parallax slides them like a floor under a moving camera. They fade into
+  /// the night above, because a ruled line all the way to the top of the
+  /// screen is a grid — the thing this background replaced.
+  void _boards(Canvas canvas, Size size, Offset shift, double lit) {
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1
+      ..color = AppBrand.inkMutedDark.withValues(alpha: 0.05 + lit * 0.015);
+    final start = size.height * 0.46;
+    for (var i = 0; i < 12; i++) {
+      final f = i / 12;
+      // Perspective: spacing grows towards the viewer.
+      final y = start + (size.height - start) * math.pow(f, 1.7).toDouble();
+      // Nearer boards sit a little brighter: the floor catches more light near
+      // the viewer than at the far end.
+      final depth = 0.35 + f * 0.65;
+      final slide = shift.dx * (1 + f * 2.4);
+      canvas.drawLine(
+        Offset(-30 + slide, y),
+        Offset(size.width + 30 + slide * 1.15, y),
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1
+          ..color = paint.color.withValues(alpha: paint.color.a * depth),
+      );
     }
-    path
-      ..lineTo(size.width + 20, size.height)
-      ..close();
-    canvas.drawPath(
-      path,
+    // Fog: the far end of the floor dissolves into the night, so no line ever
+    // reaches the words at the top of the screen.
+    canvas.drawRect(
+      Offset.zero & size,
       Paint()
         ..shader = LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            AppBrand.groundDark.withValues(alpha: 0.55 + lit * 0.05),
-            AppBrand.groundDeep.withValues(alpha: 0.85),
+            AppBrand.groundDark,
+            AppBrand.groundDark.withValues(alpha: 0.92),
+            AppBrand.groundDark.withValues(alpha: 0.0),
           ],
-        ).createShader(Rect.fromLTRB(0, base - 60, size.width, size.height)),
+          stops: const [0.0, 0.40, 0.58],
+        ).createShader(
+          Rect.fromLTRB(0, size.height * 0.30, size.width, size.height * 0.60),
+        ),
     );
   }
 
-  /// Layer 3 — dust in the near air. Barely there, and never in the middle.
-  void _motes(Canvas canvas, Size size, Offset shift, double lit) {
+  /// Dust turning in the beam. It only exists where the light is, which is why
+  /// it never becomes noise: away from the pool there is nothing to see.
+  void _dustInBeam(
+    Canvas canvas,
+    Size size,
+    Offset floor,
+    Offset shift,
+    double lit,
+  ) {
     final rng = math.Random(seed + 11);
-    for (var i = 0; i < 9; i++) {
+    final w = size.width * 0.72;
+    final h = size.height * 0.34;
+    for (var i = 0; i < 11; i++) {
       final fx = rng.nextDouble();
-      final fy = rng.nextDouble();
-      final phase = rng.nextDouble() * math.pi * 2;
-      final x = (fx + shift.dx * (0.6 + fx)) * size.width +
-          math.sin(phase + clock.value * math.pi * 2 * 0.05) * 10;
-      final y = (0.12 + fy * 0.82) * size.height +
-          math.cos(phase * 1.3 + clock.value * math.pi * 2 * 0.04) * 8 +
-          shift.dy * (0.4 + fy);
-      final a = (0.05 + rng.nextDouble() * 0.03) * (0.7 + lit * 0.3);
+      final rise = (clock.value * (0.02 + rng.nextDouble() * 0.03)) % 1.0;
+      // Dust rises through the beam and starts again at the floor.
+      final fy = (1 - rise + rng.nextDouble() * 0.1) % 1.0;
+      final wobble = math.sin(clock.value * math.pi * 2 * 0.08 + i) * 12;
+      final at = Offset(
+        floor.dx + (fx - 0.5) * w + wobble + shift.dx * 10,
+        floor.dy - fy * h + shift.dy * 6,
+      );
+      // Falls off towards the edge of the beam, like real dust does.
+      final edge = 1 - ((fx - 0.5) * 2).abs().clamp(0.0, 1.0);
+      final a = (0.03 + rng.nextDouble() * 0.04) * (0.5 + edge * 0.5) *
+          (0.7 + lit * 0.3);
       canvas.drawCircle(
-        Offset(x, y),
-        1.1 + rng.nextDouble() * 1.2,
-        Paint()..color = AppBrand.firefly.withValues(alpha: a),
+        at,
+        0.9 + rng.nextDouble() * 1.1,
+        Paint()..color = AppBrand.mascotGoldLit.withValues(alpha: a),
       );
     }
   }

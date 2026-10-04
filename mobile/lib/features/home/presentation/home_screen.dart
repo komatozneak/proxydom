@@ -13,6 +13,7 @@ import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/app_surface.dart';
+import '../../../core/widgets/house_orbit.dart';
 import '../../../core/widgets/proxydom_ground.dart';
 import '../../../core/widgets/connect_button.dart';
 import '../../../core/widgets/house_pulsar.dart';
@@ -762,26 +763,47 @@ class _FreeClientHome extends StatelessWidget {
     final hero = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+        // The box is wider than the house so the dance has room to go round the
+        // roof instead of running under it.
         SizedBox(
-          width: nestSize,
-          height: nestSize,
+          width: nestSize * 1.5,
+          height: nestSize * 1.5,
           child: Stack(
             alignment: Alignment.center,
             clipBehavior: Clip.none,
             children: [
-              if (status is VpnConnecting || status is VpnConnected)
-                HousePulsar(diameter: nestSize),
-              // Unlit at rest: the house is there, but dark — a lamp nobody
-              // has switched on. Touching it lights it.
-              AnimatedOpacity(
-                duration: const Duration(milliseconds: 420),
-                curve: Curves.easeOut,
-                opacity: charged ? 1.0 : 0.45,
-                child: SignalNestHero(
-                  key: kHomeSignalNestKey,
-                  state: treeState,
-                  onTap: () => onNestTap(),
-                  size: nestSize,
+              // The dance belongs to the house, not to the wallpaper: it is
+              // drawn around the button and only while the button burns.
+              Positioned.fill(
+                child: HouseOrbit(
+                  burning: charged
+                      ? 1.0
+                      : (status is VpnConnecting ? 0.45 : 0.0),
+                ),
+              ),
+              SizedBox(
+                width: nestSize,
+                height: nestSize,
+                child: Stack(
+                  alignment: Alignment.center,
+                  clipBehavior: Clip.none,
+                  children: [
+                    if (status is VpnConnecting || status is VpnConnected)
+                      HousePulsar(diameter: nestSize),
+                    // Unlit at rest: the house is there, but dark — a lamp
+                    // nobody has switched on. Touching it lights it.
+                    AnimatedOpacity(
+                      duration: const Duration(milliseconds: 420),
+                      curve: Curves.easeOut,
+                      opacity: charged ? 1.0 : 0.45,
+                      child: SignalNestHero(
+                        key: kHomeSignalNestKey,
+                        state: treeState,
+                        onTap: () => onNestTap(),
+                        size: nestSize,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -1075,3 +1097,4 @@ class _NoVpnHomeRow extends StatelessWidget {
     );
   }
 }
+
