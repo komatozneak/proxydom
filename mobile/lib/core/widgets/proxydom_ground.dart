@@ -301,9 +301,15 @@ class _GroundPainter extends CustomPainter {
     int seedField,
   ) {
     for (var bank = 0; bank < 2; bank++) {
-      // Each bank takes a minute and a half to cross, in opposite directions.
+      // Each bank crosses once per clock cycle, in opposite directions.
+      //
+      // It used to take 0.11 of the cycle, which put the wrap mid-crossing: the
+      // bank was still half-visible when the phase flipped and it jumped back to
+      // the far edge. A slow drift that teleports is worse than no drift. At one
+      // whole phase per cycle the wrap happens exactly where the mist is
+      // invisible, so the loop has no seam to see.
       final dir = bank.isEven ? 1.0 : -1.0;
-      final phase = (t * 0.11 * dir + bank * 0.5 + seedField * 0.13) % 1.0;
+      final phase = (t * dir + bank * 0.5 + seedField * 0.13) % 1.0;
       final x = -0.3 + phase * 1.6 + shift.dx * (0.6 + bank * 0.5);
       final y = size.height * (0.42 + bank * 0.22) + shift.dy * 8;
       final w = size.width * (0.95 + bank * 0.35);

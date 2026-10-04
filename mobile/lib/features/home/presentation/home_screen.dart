@@ -754,8 +754,18 @@ class _FreeClientHome extends StatelessWidget {
 
     // Disconnected is a normal state, not a failure: painting it alarm red
     // made the resting screen look broken. Red is reserved for VpnError.
+    //
+    // Connected is green, not gold. Gold is the house: it is what the button
+    // wears, what the section rule wears, what the traffic fills with. Using
+    // the house's own colour for "connected" said nothing — an all-gold screen
+    // reported every state the same way. Green is the one hue in the palette
+    // that means a thing is working, and it is the same green the rail gives a
+    // chosen server.
+    final ok = theme.brightness == Brightness.dark
+        ? AppBrand.mossLight
+        : AppBrand.moss;
     final accent = switch (status) {
-      VpnConnected() => AppBrand.mascotGoldLit,
+      VpnConnected() => ok,
       VpnConnecting() => AppBrand.mascotEmber,
       VpnError() => AppBrand.destructive,
       _ => theme.colorScheme.onSurfaceVariant,
@@ -769,6 +779,7 @@ class _FreeClientHome extends StatelessWidget {
       status: statusText,
       serverName: profile,
       serverFlag: serverFlag,
+      tile: tileForName(profile),
       uptime: uptime,
       trafficLabel: traffic,
       trafficColor: trafficColor,

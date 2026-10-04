@@ -33,7 +33,12 @@ class _HouseOrbitState extends State<HouseOrbit>
     with SingleTickerProviderStateMixin {
   late final AnimationController _clock = AnimationController(
     vsync: this,
-    duration: const Duration(seconds: 12),
+    // 9 seconds, one whole turn. It was 12 seconds at 1.35 turns, and the
+    // fractional turn was the seam: at the end of the cycle the lights snapped
+    // back 0.35 of a circle, so the dance visibly ended and started again. A
+    // repeating animation has to land where it began — the speed is the same,
+    // the circle is now whole.
+    duration: const Duration(seconds: 9),
   )..repeat();
 
   @override
@@ -88,7 +93,7 @@ class _OrbitPainter extends CustomPainter {
 
     final center = size.center(Offset.zero);
     final radius = size.shortestSide * 0.40 + lit * 6;
-    final spin = clock.value * math.pi * 2 * 1.35;
+    final spin = clock.value * math.pi * 2;
 
     // No path, no ring: a circle drawn around the roof framed the button in a
     // hoop and read as a UI artifact. Six lights on their own are enough to

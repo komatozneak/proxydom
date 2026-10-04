@@ -6,6 +6,7 @@ import '../../../core/widgets/app_action_button.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/app_surface.dart';
 import '../../../l10n/app_localizations.dart';
+import '../data/subscription_label.dart';
 import 'server_glyph.dart';
 
 /// Paste, and on the phone a matching QR. Windows has no camera and no QR.
@@ -168,6 +169,7 @@ class ConnectionTerminal extends StatelessWidget {
     required this.status,
     required this.serverName,
     required this.accent,
+    this.tile = PoolTile.flag,
     this.serverFlag,
     this.uptime,
     this.trafficLabel,
@@ -183,6 +185,9 @@ class ConnectionTerminal extends StatelessWidget {
   /// The server, with its flag, inside the terminal next to the state.
   final String serverName;
   final String? serverFlag;
+
+  /// What the mark beside the name is: a country, YouTube, or a gamepad.
+  final PoolTile tile;
 
   final Color accent;
   final String? uptime;
@@ -236,7 +241,12 @@ TextStyle _mono(
               style: _mono(
                 context,
                 size: 13,
-                color: accent.withValues(alpha: 0.85),
+                // The block mark names the screen, not the state. It wore the
+                // accent, so on a connected tunnel the word «ПОДКЛЮЧЕНИЕ» at
+                // the top went green along with the status — the label and the
+                // reading sharing one colour, which is the one thing a label
+                // must never do.
+                color: AppBrand.mascotGold.withValues(alpha: 0.75),
                 weight: 700,
                 spacing: 0,
               ),
@@ -266,11 +276,22 @@ TextStyle _mono(
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (serverFlag != null && serverFlag!.isNotEmpty) ...[
-                FlagMark(flag: serverFlag!, width: 38),
+              // The same mark the profile list draws for this node. It was a
+              // globe here and a red YouTube tile there, for the same line:
+              // one node, one mark, wherever it appears.
+              if (tile == PoolTile.flag) ...[
+                FlagMark(flag: serverFlag ?? '', width: 38),
                 const SizedBox(width: 12),
               ] else ...[
-                Icon(AppIcons.globe, size: 22, color: mute),
+                ServerGlyph(
+                  label: PoolServerLabel(
+                    title: serverName,
+                    subtitle: '',
+                    tile: tile,
+                    flag: '',
+                  ),
+                  size: 38,
+                ),
                 const SizedBox(width: 12),
               ],
               Flexible(

@@ -99,13 +99,35 @@ class _AppActionButtonState extends State<AppActionButton> {
             // Hover lifts the key the way a pointer would expect it to: a
             // shade lighter and a longer shadow, not a Material tint.
             final lit = _down ? 0.0 : (hovered ? 0.07 : 0.0);
+            // On paper the same gold reads as brown. The night gives a mid-tone
+            // gold its own light — it sits on black and looks lit — while on
+            // cream there is nothing for it to be brighter than, and #C88F27
+            // turns into mud with a dark label on it. Waxing it towards the
+            // light is what makes the key look like a key in daylight.
+            final lift = dark ? lit : lit + 0.24;
             final face = _down
                 ? Color.lerp(base, AppBrand.shadeSource, 0.16)!
-                : Color.lerp(base, AppBrand.lightSource, (dark ? 0.10 : 0.16) + lit)!;
+                : Color.lerp(
+                    base,
+                    AppBrand.lightSource,
+                    (dark ? 0.10 : 0.16) + lift,
+                  )!;
             final floor = _down
                 ? Color.lerp(base, AppBrand.shadeSource, 0.30)!
-                : Color.lerp(base, AppBrand.shadeSource, hovered ? 0.04 : 0.08)!;
-            final rim = Color.lerp(base, AppBrand.shadeSource, enabled ? 0.45 : 0.2)!;
+                : Color.lerp(
+                    base,
+                    // The floor is most of what the eye sees — the gradient
+                    // hands it everything below 62% — so lifting only the face
+                    // left a bright top on a brown box. On paper the shade goes
+                    // in the other direction.
+                    dark ? AppBrand.shadeSource : AppBrand.lightSource,
+                    dark ? (hovered ? 0.04 : 0.08) : 0.12,
+                  )!;
+            final rim = Color.lerp(
+              base,
+              dark ? AppBrand.shadeSource : AppBrand.lightSource,
+              dark ? (enabled ? 0.45 : 0.2) : 0.28,
+            )!;
 
             Widget key = AnimatedContainer(
               duration: AppBrand.motionPress,
@@ -125,7 +147,17 @@ class _AppActionButtonState extends State<AppActionButton> {
                 boxShadow: enabled
                     ? [
                         BoxShadow(
-                          color: Color.lerp(base, AppBrand.shadeSource, 0.55)!,
+                          // The key's own colour underneath it is a shadow the
+                          // way a bruise is a shadow. On the night that reads
+                          // as weight; on cream it read as dirt under a key, so
+                          // daylight gets a soft neutral instead.
+                          color: dark
+                              ? Color.lerp(
+                                  base,
+                                  AppBrand.shadeSource,
+                                  0.55,
+                                )!
+                              : AppBrand.shadeSource.withValues(alpha: 0.16),
                           blurRadius: _down ? 4 : (hovered ? 20 : 14),
                           spreadRadius: -2,
                           offset: Offset(0, _down ? 1 : (hovered ? 9 : 6)),
