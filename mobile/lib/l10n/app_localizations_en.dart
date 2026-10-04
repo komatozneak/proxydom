@@ -801,7 +801,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get settingsQsTileRemoveBody =>
-      'Pull down the shade, tap the pencil, and drag “Proxy Dom” to the top.';
+      'Pull down the shade, tap the pencil, and drag the “Proxy Dom” tile to the trash.';
 
   @override
   String get settingsQsTileRemoveAck => 'Got it';

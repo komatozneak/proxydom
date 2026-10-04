@@ -345,7 +345,7 @@
   "settingsQsTileAddedHint": "Плитка в шторке. Нажмите, чтобы убрать",
   "settingsQsTileRemove": "Убрать",
   "settingsQsTileRemoveTitle": "Убрать плитку",
-  "settingsQsTileRemoveBody": "Потяните шторку вниз, нажмите карандаш и перетащите «Прокси Дом» наверх.",
+  "settingsQsTileRemoveBody": "Потяните шторку вниз, нажмите на карандаш и перетащите плитку «Прокси Дом» в корзину.",
   "settingsQsTileRemoveAck": "Понятно",
   "settingsQsTileManual": "Добавьте вручную: шторка → карандаш → «Прокси Дом»",
   "settingsQsTileNotAdded": "Плитка не добавлена",

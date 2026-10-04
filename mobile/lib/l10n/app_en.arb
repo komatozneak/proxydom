@@ -491,7 +491,7 @@
   "settingsQsTileAddedHint": "The tile is in Quick Settings. Tap to remove it",
   "settingsQsTileRemove": "Remove",
   "settingsQsTileRemoveTitle": "Remove the tile",
-  "settingsQsTileRemoveBody": "Pull down the shade, tap the pencil, and drag “Proxy Dom” to the top.",
+  "settingsQsTileRemoveBody": "Pull down the shade, tap the pencil, and drag the “Proxy Dom” tile to the trash.",
   "settingsQsTileRemoveAck": "Got it",
   "settingsQsTileManual": "Add manually: shade → pencil → “Proxy Dom”",
   "settingsQsTileNotAdded": "The tile was not added",

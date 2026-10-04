@@ -11,7 +11,7 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
-  testWidgets('paste and qr stay moss and margin, with no add button', (
+  testWidgets('paste and qr stay moss and amber, with no add button', (
     tester,
   ) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
@@ -38,7 +38,7 @@ void main() {
     final colors = buttons
         .map((button) => button.style?.backgroundColor?.resolve({}))
         .toList();
-    expect(colors, [AppBrand.secondary, AppBrand.paperMargin]);
+    expect(colors, [AppBrand.secondary, AppBrand.actionAmber]);
     debugDefaultTargetPlatformOverride = null;
   });
 
@@ -85,6 +85,18 @@ void main() {
     expect(find.text('Обновить'), findsNothing);
     expect(find.byTooltip('Обновить'), findsOneWidget);
     expect(_refreshIcons, findsOneWidget);
+    // Refresh is the sky slot; QR beside it is amber. Neither borrows the
+    // notebook-margin orange that also paints the nav.
+    expect(
+      tester
+          .widget<IconButton>(
+            find.byWidgetPredicate((widget) => widget is IconButton),
+          )
+          .style
+          ?.backgroundColor
+          ?.resolve({}),
+      AppBrand.actionSky,
+    );
     debugDefaultTargetPlatformOverride = null;
   });
 
