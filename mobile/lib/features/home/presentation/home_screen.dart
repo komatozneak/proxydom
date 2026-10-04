@@ -69,7 +69,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   double _yardGlow = _yardResting;
 
+  /// True while the house is burning: pressed, connecting or connected. The
+  /// button is dark at rest and lights on touch — the light is the state.
+  bool _charged = false;
+
   Timer? _yardTimer;
+  Timer? _chargeTimer;
 
   /// Publishes the lit level to the night behind the screen.
   void _setYard(double value) {
@@ -77,10 +82,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     GroundGlowScope.maybeOf(context)?.set(value);
   }
 
+  void _setCharged(bool value) {
+    if (_charged == value) return;
+    setState(() => _charged = value);
+  }
+
   /// A tap on the house wakes the yard for a beat, whatever the tunnel does.
   void _wakeYard() {
     _yardTimer?.cancel();
+    _chargeTimer?.cancel();
     _setYard(1.0);
+    _setCharged(true);
+    _chargeTimer = Timer(const Duration(milliseconds: 1600), () {
+      if (!mounted) return;
+      _setCharged(_yardFor(ref.read(vpnProvider)) > _yardResting + 0.01);
+    });
     _yardTimer = Timer(const Duration(milliseconds: 900), () {
       if (mounted) _setYard(_yardFor(ref.read(vpnProvider)));
     });
@@ -105,6 +121,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   @override
   void dispose() {
     _yardTimer?.cancel();
+    _chargeTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -382,6 +399,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             final content = _DashboardBody(
               status: vpnStatus,
               maxHeight: constraints.maxHeight,
+              charged: _charged,
               serverTitle: _serverTitle == '…' && _selectionIsAuto
                   ? l.regionAutoTitle
                   : _serverTitle,
@@ -436,6 +454,7 @@ class _DashboardBody extends ConsumerStatefulWidget {
   const _DashboardBody({
     required this.status,
     required this.maxHeight,
+    required this.charged,
     required this.serverTitle,
     required this.serverSubtitle,
     this.trafficMeta,
@@ -453,6 +472,9 @@ class _DashboardBody extends ConsumerStatefulWidget {
 
   final VpnStatus status;
   final double maxHeight;
+
+  /// The house is burning: pressed, connecting or connected.
+  final bool charged;
   final String serverTitle;
   final String serverSubtitle;
   final String? trafficMeta;
@@ -562,6 +584,7 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
 
     return _FreeClientHome(
       nestSize: nestSize,
+      charged: widget.charged,
       treeState: treeState,
       status: status,
       serverTitle: widget.serverTitle,
@@ -627,6 +650,7 @@ Future<void> _refreshHomeDocuments(BuildContext context) async {
 class _FreeClientHome extends StatelessWidget {
   const _FreeClientHome({
     required this.nestSize,
+    required this.charged,
     required this.treeState,
     required this.status,
     required this.serverTitle,
@@ -639,6 +663,9 @@ class _FreeClientHome extends StatelessWidget {
   });
 
   final double nestSize;
+
+  /// The house is burning: pressed, connecting or connected.
+  final bool charged;
   final TreeState treeState;
   final VpnStatus status;
   final String serverTitle;
@@ -721,8 +748,9 @@ class _FreeClientHome extends StatelessWidget {
       _ => theme.colorScheme.onSurfaceVariant,
     };
 
-    // The house is the main button, so it carries the state: the readout sits
-    // under it as one line instead of a plate that competes with it.
+    // One tight cluster: status above, the house in the middle, the keys under.
+    // Nothing is scattered across the screen — the eye has one place to land,
+    // and that place is the power button.
     final readout = ConnectionReadout(
       status: statusText,
       profile: profile,
@@ -732,16 +760,8 @@ class _FreeClientHome extends StatelessWidget {
       accent: accent,
     );
     final hero = Column(
-      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        if (_showsEmptyHint) ...[
-          const SizedBox(
-            height: 96,
-            width: double.infinity,
-            child: Center(child: FreeClientEmptyState(compact: true)),
-          ),
-          const SizedBox(height: 8),
-        ],
         SizedBox(
           width: nestSize,
           height: nestSize,
@@ -751,15 +771,31 @@ class _FreeClientHome extends StatelessWidget {
             children: [
               if (status is VpnConnecting || status is VpnConnected)
                 HousePulsar(diameter: nestSize),
-              SignalNestHero(
-                key: kHomeSignalNestKey,
-                state: treeState,
-                onTap: () => onNestTap(),
-                size: nestSize,
+              // Unlit at rest: the house is there, but dark — a lamp nobody
+              // has switched on. Touching it lights it.
+              AnimatedOpacity(
+                duration: const Duration(milliseconds: 420),
+                curve: Curves.easeOut,
+                opacity: charged ? 1.0 : 0.45,
+                child: SignalNestHero(
+                  key: kHomeSignalNestKey,
+                  state: treeState,
+                  onTap: () => onNestTap(),
+                  size: nestSize,
+                ),
               ),
             ],
           ),
         ),
+        if (_showsEmptyHint) ...[
+          const SizedBox(height: 10),
+          // No fixed height: the empty state sizes itself, and a box shorter
+          // than its content overflowed by 24px on a short window.
+          const SizedBox(
+            width: double.infinity,
+            child: Center(child: FreeClientEmptyState(compact: true)),
+          ),
+        ],
       ],
     );
     final actions = <Widget>[
@@ -815,34 +851,35 @@ class _FreeClientHome extends StatelessWidget {
         builder: (context, constraints) {
           final narrow = constraints.maxWidth < 700;
           return Center(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: narrow ? double.infinity : 560,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    hero,
-                    const SizedBox(height: 18),
-                    ConstrainedBox(
-                      constraints: BoxConstraints(maxWidth: nestSize * 1.05),
-                      child: readout,
-                    ),
-                    if (errorHint != null) ...[
-                      const SizedBox(height: 10),
-                      Text(
-                        errorHint,
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.error,
-                        ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: nestSize * 1.05),
+                    child: readout,
+                  ),
+                  const SizedBox(height: 14),
+                  hero,
+                  if (errorHint != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      errorHint,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.error,
                       ),
-                    ],
-                    const SizedBox(height: 20),
-                    ...actions,
+                    ),
                   ],
-                ),
+                  SizedBox(height: narrow ? 18 : 26),
+                  ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: nestSize * 1.05),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: actions,
+                    ),
+                  ),
+                ],
               ),
             ),
           );
@@ -850,29 +887,40 @@ class _FreeClientHome extends StatelessWidget {
       );
     }
 
-    return Column(
-      children: [
-        Expanded(child: hero),
-        const SizedBox(height: 6),
-        // The readout belongs to the house: same measure, not the full width
-        // of a phone.
-        ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: nestSize * 1.05),
-          child: readout,
-        ),
-        if (errorHint != null) ...[
-          const SizedBox(height: 8),
-          Text(
-            errorHint,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.error,
+    return Center(
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Status on top, centred, in the same measure as the house — the
+            // three parts read as one object instead of three bands.
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: nestSize * 1.05),
+              child: readout,
             ),
-          ),
-        ],
-        const SizedBox(height: 14),
-        ...actions,
-      ],
+            const SizedBox(height: 14),
+            hero,
+            if (errorHint != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                errorHint,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.error,
+                ),
+              ),
+            ],
+            const SizedBox(height: 18),
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: nestSize * 1.05),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: actions,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

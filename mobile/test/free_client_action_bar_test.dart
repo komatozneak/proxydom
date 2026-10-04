@@ -12,7 +12,7 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
-  testWidgets('paste and qr stay house gold and ember, with no add button', (
+  testWidgets('refresh and paste keep the house colours, QR is a ring', (
     tester,
   ) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
@@ -32,14 +32,15 @@ void main() {
     );
 
     expect(find.text('Добавить'), findsNothing);
-    expect(find.text('QR'), findsOneWidget);
+    expect(find.byTooltip('QR'), findsOneWidget);
     final colors = tester
         .widgetList<AppActionButton>(
           find.byWidgetPredicate((widget) => widget is AppActionButton),
         )
         .map((button) => button.color)
         .toList();
-    expect(colors, [AppBrand.mascotGold, AppBrand.mascotEmber]);
+    // Refresh first, paste last — the familiar order under the house.
+    expect(colors, [AppBrand.mascotGoldDeep, AppBrand.mascotGold]);
     debugDefaultTargetPlatformOverride = null;
   });
 
@@ -73,7 +74,7 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
-  testWidgets('phone refresh is an unlabeled circular-arrow beside QR', (
+  testWidgets('phone QR is an unlabeled ring and refresh is a full key', (
     tester,
   ) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
@@ -81,21 +82,17 @@ void main() {
       _bar(onRefresh: _noop),
     );
 
-    expect(find.text('QR'), findsOneWidget);
+    expect(find.text('QR'), findsNothing);
     expect(find.text('Вставить'), findsOneWidget);
-    expect(find.text('Обновить'), findsNothing);
-    expect(find.byTooltip('Обновить'), findsOneWidget);
-    expect(_refreshIcons, findsOneWidget);
-    // Reload wears the same gold as the paste key, as a ring: it is the quiet
-    // action of the three and must not outshout the house itself.
-    expect(
-      tester
-          .widget<AppRingButton>(
-            find.byWidgetPredicate((widget) => widget is AppRingButton),
-          )
-          .color,
-      AppBrand.mascotGold,
+    expect(find.text('Обновить'), findsOneWidget);
+    expect(find.byTooltip('QR'), findsOneWidget);
+    expect(_qrIcons, findsOneWidget);
+    // QR wears the same gold as the paste key, as a ring: it is the quiet
+    // third action and must not outshout the house itself.
+    final ring = tester.widget<AppRingButton>(
+      find.byWidgetPredicate((widget) => widget is AppRingButton),
     );
+    expect(ring.color, AppBrand.mascotGold);
     debugDefaultTargetPlatformOverride = null;
   });
 
@@ -175,4 +172,8 @@ Widget _bar({VoidCallback? onRefresh}) {
 
 final _refreshIcons = find.byWidgetPredicate(
   (widget) => widget is AppIcon && widget.icon == AppIcons.refresh,
+);
+
+final _qrIcons = find.byWidgetPredicate(
+  (widget) => widget is AppIcon && widget.icon == AppIcons.qrCode,
 );

@@ -29,7 +29,7 @@ class FreeClientActionBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppL10n.of(context);
-    const barHeight = 56.0;
+    const barHeight = 54.0;
     const gap = SizedBox(width: 10);
     final paste = AppActionButton(
       onPressed: onPaste,
@@ -49,8 +49,6 @@ class FreeClientActionBar extends StatelessWidget {
         height: barHeight,
         child: Row(
           children: [
-            Expanded(child: paste),
-            gap,
             Expanded(
               child: AppActionButton(
                 onPressed: refresh,
@@ -60,34 +58,38 @@ class FreeClientActionBar extends StatelessWidget {
                 height: barHeight,
               ),
             ),
+            gap,
+            Expanded(child: paste),
           ],
         ),
       );
     }
+    // Familiar order under the house: refresh first, paste last — the primary
+    // action sits on the reading edge. QR stays a phone-only ring.
     return SizedBox(
       height: barHeight,
       child: Row(
         children: [
-          Expanded(child: paste),
-          gap,
           Expanded(
             child: AppActionButton(
-              onPressed: onScan,
-              icon: AppIcons.qrCode,
-              label: l.freeQr,
-              color: AppBrand.mascotEmber,
+              onPressed: refresh,
+              icon: AppIcons.refresh,
+              label: l.freeRefresh,
+              color: AppBrand.mascotGoldDeep,
               height: barHeight,
             ),
           ),
-          if (refresh != null) ...[
+          gap,
+          Expanded(child: paste),
+          // QR is a phone affordance, not a reload extra: it stays whatever
+          // else is switched off.
+          ...[
             gap,
-            // Ring, not a slab: the reload is the quiet action of the three and
-            // a saturated disc used to pull the eye off the paste key.
             AppRingButton(
-              icon: AppIcons.refresh,
+              icon: AppIcons.qrCode,
               color: AppBrand.mascotGold,
-              onPressed: refresh,
-              tooltip: l.freeRefresh,
+              onPressed: onScan,
+              tooltip: l.freeQr,
               size: barHeight,
             ),
           ],
@@ -175,18 +177,23 @@ class ConnectionReadout extends StatelessWidget {
     final dark = theme.brightness == Brightness.dark;
     final mute = dark ? AppBrand.inkMutedDark : AppBrand.inkMutedLight;
 
-    return AppSurface(
-      padding: const EdgeInsets.fromLTRB(16, 13, 16, 13),
+    // No plate. A dark card above the house would be the second-brightest
+    // thing on the screen, and the screen has one hero: the status is a lamp
+    // and two lines of text sitting on the night.
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               _Lamp(color: accent),
-              const SizedBox(width: 10),
+              const SizedBox(width: 9),
               Flexible(
                 child: Text(
                   status,
+                  textAlign: TextAlign.center,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.titleMedium?.copyWith(
@@ -198,33 +205,34 @@ class ConnectionReadout extends StatelessWidget {
                 ),
               ),
               if (uptime != null) ...[
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Text(
                   uptime!,
                   style: theme.textTheme.labelLarge?.copyWith(
                     color: mute,
-                    fontSize: 14,
+                    fontSize: 13.5,
                     fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
               ],
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 7),
           Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Expanded(
+              Flexible(
                 child: Text(
                   profile,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurface,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.75),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              Text('  ·  ', style: theme.textTheme.bodyMedium?.copyWith(color: mute)),
               Text(
                 traffic,
                 style: theme.textTheme.bodyMedium?.copyWith(
