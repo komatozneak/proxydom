@@ -31,7 +31,7 @@ void main() {
       ),
     );
 
-    expect(find.text('Добавить'), findsNothing);
+    expect(find.text('Добавить сервер'), findsOneWidget);
     expect(find.byTooltip('QR'), findsOneWidget);
     final colors = tester
         .widgetList<AppActionButton>(
@@ -39,12 +39,12 @@ void main() {
         )
         .map((button) => button.color)
         .toList();
-    // Refresh first, paste last — the familiar order under the house.
-    expect(colors, [AppBrand.mascotGoldDeep, AppBrand.mascotGold]);
+    // Add server is the only key; the phone keeps two quiet rings beside it.
+    expect(colors, [AppBrand.mascotGold]);
     debugDefaultTargetPlatformOverride = null;
   });
 
-  testWidgets('windows keeps paste and drops the QR button', (tester) async {
+  testWidgets('windows keeps add server and drops the QR button', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.windows;
     await tester.pumpWidget(
       MaterialApp(
@@ -63,9 +63,8 @@ void main() {
       ),
     );
 
-    expect(find.text('QR'), findsNothing);
-    expect(find.text('Вставить'), findsOneWidget);
-    expect(find.text('Добавьте ссылку, ключ или QR-код.'), findsNothing);
+    expect(find.text('Добавить сервер'), findsOneWidget);
+    expect(find.byTooltip('QR'), findsNothing);
     expect(find.text('Вставьте ссылку или ключ.'), findsOneWidget);
     final buttons = tester.widgetList<AppActionButton>(
       find.byWidgetPredicate((widget) => widget is AppActionButton),
@@ -74,25 +73,27 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
-  testWidgets('phone QR is an unlabeled ring and refresh is a full key', (
-    tester,
-  ) async {
+  testWidgets('phone reload and QR are both quiet rings', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     await tester.pumpWidget(
       _bar(onRefresh: _noop),
     );
 
-    expect(find.text('QR'), findsNothing);
-    expect(find.text('Вставить'), findsOneWidget);
-    expect(find.text('Обновить'), findsOneWidget);
     expect(find.byTooltip('QR'), findsOneWidget);
+    expect(find.byTooltip('Обновить'), findsOneWidget);
+    expect(find.text('Обновить'), findsNothing);
     expect(_qrIcons, findsOneWidget);
-    // QR wears the same gold as the paste key, as a ring: it is the quiet
-    // third action and must not outshout the house itself.
-    final ring = tester.widget<AppRingButton>(
-      find.byWidgetPredicate((widget) => widget is AppRingButton),
-    );
-    expect(ring.color, AppBrand.mascotGold);
+    expect(_refreshIcons, findsOneWidget);
+    final rings = tester
+        .widgetList<AppRingButton>(
+          find.byWidgetPredicate((widget) => widget is AppRingButton),
+        )
+        .toList();
+    expect(rings.length, 2);
+    // Same gold as the house: the rings belong to the same lamp as the key.
+    for (final ring in rings) {
+      expect(ring.color, AppBrand.mascotGold);
+    }
     debugDefaultTargetPlatformOverride = null;
   });
 
@@ -127,16 +128,14 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
-  testWidgets('windows refresh is a labeled button and has no QR', (
-    tester,
-  ) async {
+  testWidgets('windows refresh is a full key and has no QR', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.windows;
     await tester.pumpWidget(
       _bar(onRefresh: _noop),
     );
 
-    expect(find.text('QR'), findsNothing);
-    expect(find.text('Вставить'), findsOneWidget);
+    expect(find.byTooltip('QR'), findsNothing);
+    expect(find.text('Добавить сервер'), findsOneWidget);
     expect(find.text('Обновить'), findsOneWidget);
     expect(find.byTooltip('Обновить'), findsNothing);
     final buttons = tester.widgetList<AppActionButton>(

@@ -72,7 +72,7 @@ class AppL10nRu extends AppL10n {
   String get navHome => 'Главная';
 
   @override
-  String get navVpn => 'VPN';
+  String get navVpn => 'Подключение';
 
   @override
   String get navLocations => 'Локации';

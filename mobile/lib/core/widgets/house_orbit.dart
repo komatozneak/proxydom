@@ -90,16 +90,9 @@ class _OrbitPainter extends CustomPainter {
     final radius = size.shortestSide * 0.40 + lit * 6;
     final spin = clock.value * math.pi * 2 * 1.35;
 
-    // The path, thin: six dots alone read as confetti.
-    canvas.drawCircle(
-      center,
-      radius,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.1
-        ..color = AppBrand.mascotGoldLit.withValues(alpha: lit * 0.14),
-    );
-
+    // No path, no ring: a circle drawn around the roof framed the button in a
+    // hoop and read as a UI artifact. Six lights on their own are enough to
+    // say "going round", because they are moving.
     for (var i = 0; i < lights; i++) {
       final a = spin + i * (math.pi * 2 / lights);
       final wobble = 1 + 0.05 * math.sin(a * 2 + i);

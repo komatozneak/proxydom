@@ -31,10 +31,13 @@ class FreeClientActionBar extends StatelessWidget {
     final l = AppL10n.of(context);
     const barHeight = 54.0;
     const gap = SizedBox(width: 10);
-    final paste = AppActionButton(
+    // Add server is the primary: it is the only thing a person has to do to get
+    // this screen to work. Refresh is the quiet one, and on a phone it gets a
+    // ring rather than a slab so the two read as one family, not two rivals.
+    final add = AppActionButton(
       onPressed: onPaste,
-      icon: AppIcons.clipboard,
-      label: l.freePaste,
+      icon: AppIcons.plus,
+      label: l.freeAddServer,
       color: AppBrand.mascotGold,
       height: barHeight,
     );
@@ -43,12 +46,14 @@ class FreeClientActionBar extends StatelessWidget {
       // Windows has no camera, so the reload takes the free slot as a full key.
       if (refresh == null) {
         return SizedBox(
-            height: barHeight, width: double.infinity, child: paste);
+            height: barHeight, width: double.infinity, child: add);
       }
       return SizedBox(
         height: barHeight,
         child: Row(
           children: [
+            Expanded(child: add),
+            gap,
             Expanded(
               child: AppActionButton(
                 onPressed: refresh,
@@ -58,41 +63,31 @@ class FreeClientActionBar extends StatelessWidget {
                 height: barHeight,
               ),
             ),
-            gap,
-            Expanded(child: paste),
           ],
         ),
       );
     }
-    // Familiar order under the house: refresh first, paste last — the primary
-    // action sits on the reading edge. QR stays a phone-only ring.
     return SizedBox(
       height: barHeight,
       child: Row(
         children: [
-          Expanded(
-            child: AppActionButton(
-              onPressed: refresh,
-              icon: AppIcons.refresh,
-              label: l.freeRefresh,
-              color: AppBrand.mascotGoldDeep,
-              height: barHeight,
-            ),
+          Expanded(child: add),
+          gap,
+          AppRingButton(
+            icon: AppIcons.refresh,
+            color: AppBrand.mascotGold,
+            onPressed: refresh,
+            tooltip: l.freeRefresh,
+            size: barHeight,
           ),
           gap,
-          Expanded(child: paste),
-          // QR is a phone affordance, not a reload extra: it stays whatever
-          // else is switched off.
-          ...[
-            gap,
-            AppRingButton(
-              icon: AppIcons.qrCode,
-              color: AppBrand.mascotGold,
-              onPressed: onScan,
-              tooltip: l.freeQr,
-              size: barHeight,
-            ),
-          ],
+          AppRingButton(
+            icon: AppIcons.qrCode,
+            color: AppBrand.mascotGold,
+            onPressed: onScan,
+            tooltip: l.freeQr,
+            size: barHeight,
+          ),
         ],
       ),
     );
@@ -147,15 +142,16 @@ class FreeClientEmptyState extends StatelessWidget {
   }
 }
 
-/// Structured connection facts with notebook-style dots and ruled rows.
-/// One line under the house: what it says, where, how much, how long.
+/// The head of the home screen.
 ///
-/// The status used to be a plate above the house and a rule table inside it.
-/// With the mascot as the main button the readout steps down to what a readout
-/// is for — a line you read at a glance, with the lamp carrying the state.
+/// The status used to be a two-line readout floating in the middle of the
+/// screen with nothing above it, which is why it read as a label rather than
+/// as the state of anything. A head has a hierarchy: what this screen is,
+/// what the tunnel is doing, and the facts behind it.
 class ConnectionReadout extends StatelessWidget {
   const ConnectionReadout({
     super.key,
+    required this.eyebrow,
     required this.status,
     required this.profile,
     required this.traffic,
@@ -164,6 +160,8 @@ class ConnectionReadout extends StatelessWidget {
     this.trafficColor,
   });
 
+  /// «Подключение» — the name of the screen, quiet, above everything.
+  final String eyebrow;
   final String status;
   final String profile;
   final String traffic;
@@ -177,96 +175,92 @@ class ConnectionReadout extends StatelessWidget {
     final dark = theme.brightness == Brightness.dark;
     final mute = dark ? AppBrand.inkMutedDark : AppBrand.inkMutedLight;
 
-    // No plate. A dark card above the house would be the second-brightest
-    // thing on the screen, and the screen has one hero: the status is a lamp
-    // and two lines of text sitting on the night.
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _Lamp(color: accent),
-              const SizedBox(width: 9),
-              Flexible(
-                child: Text(
-                  status,
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: accent,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.2,
-                  ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          eyebrow.toUpperCase(),
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: mute,
+            fontSize: 11.5,
+            letterSpacing: 2.0,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            _Lamp(color: accent, size: 14),
+            const SizedBox(width: 11),
+            Flexible(
+              child: Text(
+                status,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  color: accent,
+                  fontSize: 25,
+                  height: 1.12,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
                 ),
               ),
-              if (uptime != null) ...[
-                const SizedBox(width: 10),
-                Text(
+            ),
+            if (uptime != null) ...[
+              const SizedBox(width: 12),
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
                   uptime!,
                   style: theme.textTheme.labelLarge?.copyWith(
                     color: mute,
-                    fontSize: 13.5,
+                    fontSize: 15,
                     fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
-              ],
-            ],
-          ),
-          const SizedBox(height: 7),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Flexible(
-                child: Text(
-                  profile,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.75),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              Text('  ·  ', style: theme.textTheme.bodyMedium?.copyWith(color: mute)),
-              Text(
-                traffic,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: trafficColor ?? mute,
-                  fontWeight: FontWeight.w600,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
               ),
             ],
+          ],
+        ),
+        const SizedBox(height: 8),
+        // The facts, on one line, in the order a person asks for them: where,
+        // how, how much.
+        Text(
+          '$profile  ·  $traffic',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.72),
+            fontSize: 14.5,
+            fontWeight: FontWeight.w600,
           ),
-        ],
-      ),
+        ),
+        if (trafficColor != null) const SizedBox.shrink(),
+      ],
     );
   }
 }
 
 /// The status light. A ring around a filled core, lit by the state colour.
 class _Lamp extends StatelessWidget {
-  const _Lamp({required this.color});
+  const _Lamp({required this.color, this.size = 12});
 
   final Color color;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 12,
-      height: 12,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: color,
         boxShadow: [
           BoxShadow(
             color: color.withValues(alpha: 0.45),
-            blurRadius: 10,
+            blurRadius: 12,
             spreadRadius: -2,
           ),
         ],

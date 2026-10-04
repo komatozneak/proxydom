@@ -72,7 +72,7 @@ class AppL10nEn extends AppL10n {
   String get navHome => 'Home';
 
   @override
-  String get navVpn => 'VPN';
+  String get navVpn => 'Tunnel';
 
   @override
   String get navLocations => 'Locations';

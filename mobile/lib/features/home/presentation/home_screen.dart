@@ -565,13 +565,10 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
     // panel and the keys; in a window it has its own column and grows with the
     // frame, otherwise a tall window leaves the bottom half empty.
     final nestSize = windowsDesktop
-        ? math.min(520.0, math.max(260.0, size.height * 0.55))
+        ? math.min(440.0, math.max(300.0, size.height * 0.50))
         : math.min(
-            340.0,
-            math.min(
-              size.width * 0.88,
-              math.max(200.0, widget.maxHeight - 340),
-            ),
+            size.width * 0.98,
+            math.max(260.0, widget.maxHeight * 0.46),
           );
     // Tell the night where the house is, so the bloom belongs to it and the
     // orbit clears the roof. Published during layout: the ground repaints from
@@ -753,6 +750,7 @@ class _FreeClientHome extends StatelessWidget {
     // Nothing is scattered across the screen — the eye has one place to land,
     // and that place is the power button.
     final readout = ConnectionReadout(
+      eyebrow: l.navVpn,
       status: statusText,
       profile: profile,
       traffic: traffic,
@@ -763,11 +761,11 @@ class _FreeClientHome extends StatelessWidget {
     final hero = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // The box is wider than the house so the dance has room to go round the
-        // roof instead of running under it.
+        // The button and the dance share one box, so the lights ring the roof
+        // without pushing the layout wider than the screen.
         SizedBox(
-          width: nestSize * 1.5,
-          height: nestSize * 1.5,
+          width: nestSize,
+          height: nestSize,
           child: Stack(
             alignment: Alignment.center,
             clipBehavior: Clip.none,
@@ -781,29 +779,32 @@ class _FreeClientHome extends StatelessWidget {
                       : (status is VpnConnecting ? 0.45 : 0.0),
                 ),
               ),
-              SizedBox(
-                width: nestSize,
-                height: nestSize,
-                child: Stack(
-                  alignment: Alignment.center,
-                  clipBehavior: Clip.none,
-                  children: [
-                    if (status is VpnConnecting || status is VpnConnected)
-                      HousePulsar(diameter: nestSize),
-                    // Unlit at rest: the house is there, but dark — a lamp
-                    // nobody has switched on. Touching it lights it.
-                    AnimatedOpacity(
-                      duration: const Duration(milliseconds: 420),
-                      curve: Curves.easeOut,
-                      opacity: charged ? 1.0 : 0.45,
-                      child: SignalNestHero(
-                        key: kHomeSignalNestKey,
-                        state: treeState,
-                        onTap: () => onNestTap(),
-                        size: nestSize,
-                      ),
-                    ),
-                  ],
+              // The familiar pulse: it answers the finger whether or not
+              // the tunnel has moved yet.
+              if (charged || status is VpnConnecting)
+                HousePulsar(diameter: nestSize),
+              // The artwork is painted larger than the tap box: the mark
+              // ships with a wide transparent margin, and at box size the house
+              // read as a small token lost in the middle of the screen.
+              // Scaling the painting rather than the box keeps the layout
+              // honest — nothing overflows the column, the house just draws
+              // past its own frame.
+              // Unlit, not muddy: alpha-fading the mark turned the gold to mud. The house
+              // stays crisp at rest and the difference is carried by the light
+              // itself — no bloom, no orbit, no pulse until a finger lands on
+              // it.
+              AnimatedOpacity(
+                duration: const Duration(milliseconds: 420),
+                curve: Curves.easeOut,
+                opacity: charged ? 1.0 : 0.74,
+                child: Transform.scale(
+                  scale: 1.45,
+                  child: SignalNestHero(
+                    key: kHomeSignalNestKey,
+                    state: treeState,
+                    onTap: () => onNestTap(),
+                    size: nestSize,
+                  ),
                 ),
               ),
             ],
@@ -811,12 +812,10 @@ class _FreeClientHome extends StatelessWidget {
         ),
         if (_showsEmptyHint) ...[
           const SizedBox(height: 10),
-          // No fixed height: the empty state sizes itself, and a box shorter
-          // than its content overflowed by 24px on a short window.
-          const SizedBox(
-            width: double.infinity,
-            child: Center(child: FreeClientEmptyState(compact: true)),
-          ),
+          // Inside the FittedBox the hero must have an intrinsic width: an
+          // infinite-width box here forces invalid constraints on the FittedBox
+          // and the whole home fails to lay out.
+          const FreeClientEmptyState(compact: true),
         ],
       ],
     );
@@ -868,78 +867,39 @@ class _FreeClientHome extends StatelessWidget {
     // One composition for both: the house in the middle with the yard around it,
     // the readout under it, the keys under that. The mascot is the button, so
     // nothing else may sit above it or compete with it.
-    if (windowsDesktop) {
-      return LayoutBuilder(
-        builder: (context, constraints) {
-          final narrow = constraints.maxWidth < 700;
-          return Center(
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: nestSize * 1.05),
-                    child: readout,
-                  ),
-                  const SizedBox(height: 14),
-                  hero,
-                  if (errorHint != null) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      errorHint,
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.error,
-                      ),
-                    ),
-                  ],
-                  SizedBox(height: narrow ? 18 : 26),
-                  ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: nestSize * 1.05),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: actions,
-                    ),
-                  ),
-                ],
+    // A home fills its screen or it looks abandoned: head anchored at the top,
+    // the button in the middle, the actions at the bottom. One column, one
+    // measure, so the eye runs straight down it.
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SizedBox(height: 8),
+            readout,
+            Expanded(
+              // Scales the button down on a short window instead of
+              // overflowing it: a tunnel that cannot be pressed is worse than
+              // a slightly smaller house.
+              child: Center(
+                child: FittedBox(fit: BoxFit.scaleDown, child: hero),
               ),
             ),
-          );
-        },
-      );
-    }
-
-    return Center(
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Status on top, centred, in the same measure as the house — the
-            // three parts read as one object instead of three bands.
-            ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: nestSize * 1.05),
-              child: readout,
-            ),
-            const SizedBox(height: 14),
-            hero,
             if (errorHint != null) ...[
-              const SizedBox(height: 12),
               Text(
                 errorHint,
                 textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.error,
                 ),
               ),
+              const SizedBox(height: 12),
             ],
-            const SizedBox(height: 18),
-            ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: nestSize * 1.05),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: actions,
-              ),
-            ),
+            ...actions,
+            const SizedBox(height: 10),
           ],
         ),
       ),
