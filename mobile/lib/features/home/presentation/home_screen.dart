@@ -89,16 +89,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   /// A tap on the house wakes the yard for a beat, whatever the tunnel does.
+  ///
+  /// The lamp goes out on its own, and how long that takes is the difference
+  /// between a light and a delay. Too long and the house stays lit after you
+  /// let go, which reads as the button having missed; too short and the yard
+  /// snaps off, which reads as the button having broken. The charge holds for
+  /// 820ms and the ground dies at 480 - ground always goes last, because a
+  /// floor takes longer to cool than a lamp.
   void _wakeYard() {
     _yardTimer?.cancel();
     _chargeTimer?.cancel();
     _setYard(1.0);
     _setCharged(true);
-    _chargeTimer = Timer(const Duration(milliseconds: 1600), () {
+    _chargeTimer = Timer(const Duration(milliseconds: 820), () {
       if (!mounted) return;
       _setCharged(_yardFor(ref.read(vpnProvider)) > _yardResting + 0.01);
     });
-    _yardTimer = Timer(const Duration(milliseconds: 900), () {
+    _yardTimer = Timer(const Duration(milliseconds: 480), () {
       if (mounted) _setYard(_yardFor(ref.read(vpnProvider)));
     });
   }

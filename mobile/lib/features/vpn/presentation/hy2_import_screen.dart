@@ -358,6 +358,7 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
                               ),
                               const SizedBox(height: 12),
                               FreeClientActionBar(
+                                draft: true,
                                 onPaste: _pasteClipboard,
                                 onScan: () {
                                   UiLog.action('import', 'scan');

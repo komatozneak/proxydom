@@ -20,11 +20,21 @@ class FreeClientActionBar extends StatelessWidget {
     required this.onPaste,
     required this.onScan,
     this.onRefresh,
+    this.draft = false,
   });
 
   final VoidCallback onPaste;
   final VoidCallback onScan;
   final VoidCallback? onRefresh;
+
+  /// True on the import screen's first step.
+  ///
+  /// There the key does not add a server — the server is added by the key at
+  /// the bottom of the screen — it puts the clipboard into the field above.
+  /// Saying «Добавить сервер» twice on one screen made a person wonder which
+  /// one actually adds it. Nothing here reloads either: there is nothing saved
+  /// yet to reload.
+  final bool draft;
 
   @override
   Widget build(BuildContext context) {
@@ -37,12 +47,12 @@ class FreeClientActionBar extends StatelessWidget {
     // wheel, and the colour says "this talks to the network" without a word.
     final add = AppActionButton(
       onPressed: onPaste,
-      icon: AppIcons.plus,
-      label: l.freeAddServer,
+      icon: draft ? AppIcons.clipboard : AppIcons.plus,
+      label: draft ? l.freePaste : l.freeAddServer,
       color: AppBrand.mascotGold,
       height: barHeight,
     );
-    final refresh = onRefresh;
+    final refresh = draft ? null : onRefresh;
     if (windowsDesktop) {
       // Windows has no camera, so the reload takes the free slot as a full key.
       if (refresh == null) {
