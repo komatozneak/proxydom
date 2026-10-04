@@ -459,7 +459,7 @@ class _DashboardBody extends ConsumerStatefulWidget {
     required this.serverTitle,
     required this.serverSubtitle,
     this.trafficMeta,
-    required this.serverFlag,
+    this.serverFlag,
     required this.selectionIsAuto,
     required this.autoPoolFlags,
     required this.noVpnEnabled,
@@ -479,7 +479,7 @@ class _DashboardBody extends ConsumerStatefulWidget {
   final String serverTitle;
   final String serverSubtitle;
   final String? trafficMeta;
-  final String serverFlag;
+  final String? serverFlag;
   final bool selectionIsAuto;
   final List<String> autoPoolFlags;
   final int noVpnEnabled;
@@ -586,6 +586,7 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
       treeState: treeState,
       status: status,
       serverTitle: widget.serverTitle,
+      serverFlag: widget.serverFlag,
       trafficMeta: widget.trafficMeta,
       onNestTap: widget.onNestTap,
       showVpnSettingsCta: showVpnSettingsCta,
@@ -652,6 +653,7 @@ class _FreeClientHome extends StatelessWidget {
     required this.treeState,
     required this.status,
     required this.serverTitle,
+    this.serverFlag,
     this.trafficMeta,
     required this.onNestTap,
     required this.showVpnSettingsCta,
@@ -667,6 +669,9 @@ class _FreeClientHome extends StatelessWidget {
   final TreeState treeState;
   final VpnStatus status;
   final String serverTitle;
+
+  /// The flag shown beside the server name in the terminal head.
+  final String? serverFlag;
   final String? trafficMeta;
   final Future<void> Function() onNestTap;
   final bool showVpnSettingsCta;
@@ -749,13 +754,23 @@ class _FreeClientHome extends StatelessWidget {
     // One tight cluster: status above, the house in the middle, the keys under.
     // Nothing is scattered across the screen — the eye has one place to land,
     // and that place is the power button.
-    final readout = ConnectionReadout(
-      eyebrow: l.navVpn,
+    final readout = ConnectionTerminal(
+      label: l.navVpn,
       status: statusText,
-      profile: profile,
-      traffic: traffic,
-      trafficColor: trafficColor,
+      serverName: profile,
+      serverFlag: serverFlag,
       uptime: uptime,
+      trafficLabel: traffic,
+      trafficColor: trafficColor,
+      // The rail fills by what is spent, so it answers "how much is left"
+      // without a second line of arithmetic.
+      trafficUsed: parsedTraffic == null || parsedTraffic.unlimited
+          ? 0
+          : (parsedTraffic.upload + parsedTraffic.download) /
+                parsedTraffic.total,
+      trafficCap: parsedTraffic == null || parsedTraffic.unlimited
+          ? 0
+          : parsedTraffic.total.toDouble(),
       accent: accent,
     );
     final hero = Column(

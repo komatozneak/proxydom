@@ -32,8 +32,9 @@ class FreeClientActionBar extends StatelessWidget {
     const barHeight = 54.0;
     const gap = SizedBox(width: 10);
     // Add server is the primary: it is the only thing a person has to do to get
-    // this screen to work. Refresh is the quiet one, and on a phone it gets a
-    // ring rather than a slab so the two read as one family, not two rivals.
+    // this screen to work, so it wears the house's own gold. Reload wears the
+    // cool counterpart — the same harmony read from the other side of the
+    // wheel, and the colour says "this talks to the network" without a word.
     final add = AppActionButton(
       onPressed: onPaste,
       icon: AppIcons.plus,
@@ -59,7 +60,7 @@ class FreeClientActionBar extends StatelessWidget {
                 onPressed: refresh,
                 icon: AppIcons.refresh,
                 label: l.freeRefresh,
-                color: AppBrand.mascotGoldDeep,
+                color: AppBrand.actionSky,
                 height: barHeight,
               ),
             ),
@@ -75,7 +76,7 @@ class FreeClientActionBar extends StatelessWidget {
           gap,
           AppRingButton(
             icon: AppIcons.refresh,
-            color: AppBrand.mascotGold,
+            color: AppBrand.actionSky,
             onPressed: refresh,
             tooltip: l.freeRefresh,
             size: barHeight,
@@ -83,7 +84,7 @@ class FreeClientActionBar extends StatelessWidget {
           gap,
           AppRingButton(
             icon: AppIcons.qrCode,
-            color: AppBrand.mascotGold,
+            color: AppBrand.mascotGoldDeep,
             onPressed: onScan,
             tooltip: l.freeQr,
             size: barHeight,
@@ -142,32 +143,227 @@ class FreeClientEmptyState extends StatelessWidget {
   }
 }
 
-/// The head of the home screen.
+/// The head of the home screen: a quiet terminal.
 ///
-/// The status used to be a two-line readout floating in the middle of the
-/// screen with nothing above it, which is why it read as a label rather than
-/// as the state of anything. A head has a hierarchy: what this screen is,
-/// what the tunnel is doing, and the facts behind it.
-class ConnectionReadout extends StatelessWidget {
-  const ConnectionReadout({
+/// Not the green-on-black hightech cliché — this is a lamp on a night, read at
+/// a glance. Monospace and letterspaced so the numbers line up like an
+/// instrument, warm gold instead of neon, and nothing brighter than the house
+/// itself. The three fields are spread across the width with the state in the
+/// middle: where it is going, what it is doing, how long it has been up.
+class ConnectionTerminal extends StatelessWidget {
+  const ConnectionTerminal({
     super.key,
-    required this.eyebrow,
+    required this.label,
     required this.status,
-    required this.profile,
-    required this.traffic,
+    required this.serverName,
     required this.accent,
+    this.serverFlag,
     this.uptime,
+    this.trafficLabel,
+    this.trafficUsed = 0,
+    this.trafficCap = 0,
     this.trafficColor,
   });
 
-  /// «Подключение» — the name of the screen, quiet, above everything.
-  final String eyebrow;
+  /// What this screen is.
+  final String label;
   final String status;
-  final String profile;
-  final String traffic;
+
+  /// The server, with its flag, inside the terminal next to the state.
+  final String serverName;
+  final String? serverFlag;
+
   final Color accent;
   final String? uptime;
+  final String? trafficLabel;
+
+  /// Fraction of the cap already spent, 0…1. Zero cap means unlimited.
+  final double trafficUsed;
+  final double trafficCap;
+
   final Color? trafficColor;
+
+  /// The terminal's own type.
+///
+/// Not a monospace family: none is bundled, and asking the platform for one
+/// means tofu on any device that has none, plus metrics that differ per
+/// platform. Inter carries it instead — caps, wide tracking, tabular figures —
+/// and the terminal-ness comes from the structure around the words.
+TextStyle _mono(
+    BuildContext context, {
+    required double size,
+    required Color color,
+    double weight = 600,
+    double spacing = 1.1,
+  }) {
+    return TextStyle(
+      fontFamily: 'Inter',
+      fontSize: size,
+      fontWeight: weight >= 700 ? FontWeight.w700 : FontWeight.w600,
+      color: color,
+      letterSpacing: spacing,
+      height: 1.2,
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    final mute = dark ? AppBrand.inkMutedDark : AppBrand.inkMutedLight;
+    final ink = theme.colorScheme.onSurface;
+    final capped = trafficCap > 0;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              '▌',
+              style: _mono(
+                context,
+                size: 13,
+                color: accent.withValues(alpha: 0.85),
+                weight: 700,
+                spacing: 0,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label.toUpperCase(),
+              style: _mono(
+                context,
+                size: 11.5,
+                color: mute,
+                weight: 700,
+                spacing: 2.6,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        // The three fields, spread across the width with the state in the
+        // middle: where, what, how long.
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Flexible(
+              flex: 4,
+              child: Row(
+                children: [
+                  if (serverFlag != null && serverFlag!.isNotEmpty) ...[
+                    Text(serverFlag!, style: const TextStyle(fontSize: 15)),
+                    const SizedBox(width: 6),
+                  ] else ...[
+                    Icon(AppIcons.globe, size: 14, color: mute),
+                    const SizedBox(width: 6),
+                  ],
+                  Flexible(
+                    child: Text(
+                      serverName.toUpperCase(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: _mono(
+                        context,
+                        size: 11.5,
+                        color: ink.withValues(alpha: 0.8),
+                        spacing: 0.6,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Flexible(
+              flex: 7,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  _Lamp(color: accent, size: 9),
+                  const SizedBox(height: 6),
+                  Text(
+                    status.toUpperCase(),
+                    maxLines: 1,
+                    textAlign: TextAlign.center,
+                    overflow: TextOverflow.ellipsis,
+                    style: _mono(
+                      context,
+                      size: 14,
+                      color: accent,
+                      weight: 700,
+                      spacing: 0.4,
+                    ).copyWith(height: 1.15),
+                  ),
+                ],
+              ),
+            ),
+            Flexible(
+              flex: 3,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    'UPTIME',
+                    style: _mono(
+                      context,
+                      size: 9,
+                      color: mute.withValues(alpha: 0.7),
+                      spacing: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      uptime ?? '--:--:--',
+                      style: _mono(
+                        context,
+                        size: 12.5,
+                        color: ink.withValues(alpha: 0.78),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        // The rail the traffic runs on.
+        _TrafficRail(
+          label: trafficLabel ?? '--',
+          value: capped ? trafficUsed.clamp(0.0, 1.0) : 0.0,
+          capped: capped,
+          color: trafficColor ?? accent,
+          mono: _mono,
+        ),
+      ],
+    );
+  }
+}
+
+/// A segmented rail of traffic. Blocks, not a smooth bar: this is the one
+/// place on the screen where a number moves, and it should look like it is
+/// being counted rather than like a progress animation.
+class _TrafficRail extends StatelessWidget {
+  const _TrafficRail({
+    required this.label,
+    required this.value,
+    required this.capped,
+    required this.color,
+    required this.mono,
+  });
+
+  final String label;
+  final double value;
+  final bool capped;
+  final Color color;
+  final TextStyle Function(BuildContext, {required double size, required Color color, double weight, double spacing})
+  mono;
 
   @override
   Widget build(BuildContext context) {
@@ -179,67 +375,98 @@ class ConnectionReadout extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          eyebrow.toUpperCase(),
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: mute,
-            fontSize: 11.5,
-            letterSpacing: 2.0,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 10),
         Row(
           children: [
-            _Lamp(color: accent, size: 14),
-            const SizedBox(width: 11),
-            Flexible(
-              child: Text(
-                status,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  color: accent,
-                  fontSize: 25,
-                  height: 1.12,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.5,
-                ),
+            Text(
+              'ТРАФИК',
+              style: mono(
+                context,
+                size: 9.5,
+                color: mute.withValues(alpha: 0.75),
+                spacing: 1.8,
               ),
             ),
-            if (uptime != null) ...[
-              const SizedBox(width: 12),
-              Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Text(
-                  uptime!,
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: mute,
-                    fontSize: 15,
-                    fontFeatures: const [FontFeature.tabularFigures()],
+            const SizedBox(width: 10),
+            Expanded(
+              child: SizedBox(
+                height: 10,
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0, end: value),
+                  duration: const Duration(milliseconds: 700),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, v, _) => CustomPaint(
+                    painter: _SegmentBarPainter(value: v, color: color),
+                    isComplex: true,
                   ),
                 ),
               ),
-            ],
+            ),
+            const SizedBox(width: 10),
+            Text(
+              label,
+              style: mono(
+                context,
+                size: 11.5,
+                color: color,
+                weight: 700,
+                spacing: 0.6,
+              ).copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
+            ),
           ],
         ),
-        const SizedBox(height: 8),
-        // The facts, on one line, in the order a person asks for them: where,
-        // how, how much.
-        Text(
-          '$profile  ·  $traffic',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurface.withValues(alpha: 0.72),
-            fontSize: 14.5,
-            fontWeight: FontWeight.w600,
+        if (!capped) ...[
+          const SizedBox(height: 7),
+          Text(
+            'БЕЗ ЛИМИТА',
+            style: mono(
+              context,
+              size: 9.5,
+              color: mute.withValues(alpha: 0.55),
+              spacing: 1.6,
+            ),
           ),
-        ),
-        if (trafficColor != null) const SizedBox.shrink(),
+        ],
       ],
     );
   }
+}
+
+class _SegmentBarPainter extends CustomPainter {
+  _SegmentBarPainter({required this.value, required this.color});
+
+  final double value;
+  final Color color;
+
+  static const int _cells = 26;
+  static const double _gap = 2.4;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cell = (size.width - _gap * (_cells - 1)) / _cells;
+    final filled = (value.clamp(0.0, 1.0) * _cells).roundToDouble();
+    for (var i = 0; i < _cells; i++) {
+      final x = i * (cell + _gap);
+      // The cell under the head glows a little brighter: the leading edge is
+      // where the eye goes.
+      final isHead = (i + 1 - filled).abs() < 0.5 && filled > 0;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(x, 1, cell, size.height - 2),
+          const Radius.circular(1.2),
+        ),
+        Paint()
+          ..color = i < filled
+              ? (isHead
+                    ? color
+                    : color.withValues(alpha: 0.55))
+              : color.withValues(alpha: 0.12),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SegmentBarPainter old) =>
+      old.value != value || old.color != color;
 }
 
 /// The status light. A ring around a filled core, lit by the state colour.

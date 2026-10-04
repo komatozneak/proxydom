@@ -73,7 +73,7 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
-  testWidgets('phone reload and QR are both quiet rings', (tester) async {
+  testWidgets('phone reload wears sky and QR the deep gold', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     await tester.pumpWidget(
       _bar(onRefresh: _noop),
@@ -90,10 +90,13 @@ void main() {
         )
         .toList();
     expect(rings.length, 2);
-    // Same gold as the house: the rings belong to the same lamp as the key.
-    for (final ring in rings) {
-      expect(ring.color, AppBrand.mascotGold);
-    }
+    // Two colours, one wheel: sky for the reload that talks to the network,
+    // the house's deep gold for the scan. Harmonic, and each colour says what
+    // the button does without a label.
+    expect(rings.map((ring) => ring.color), [
+      AppBrand.actionSky,
+      AppBrand.mascotGoldDeep,
+    ]);
     debugDefaultTargetPlatformOverride = null;
   });
 
