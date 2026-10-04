@@ -223,6 +223,15 @@ class AppBrand {
   static const double radiusPill = 27;
   static const double radiusNavPill = 999;
 
+  /// The line a tab starts on: its heading and its content share this gutter.
+  ///
+  /// It is a token because it was three numbers. The Servers heading sat at 44,
+  /// Settings at 20 and Home at 24, so switching tabs shifted the page sideways
+  /// under the eye — the heading looked pushed to the right on one screen and
+  /// not on the next. A phone gets the narrow gutter, a window the wide one.
+  static const double pageGutter = 24;
+  static const double pageGutterWide = 32;
+
   static Color oakWithOpacity(double opacity) =>
       Color.fromRGBO(26, 26, 26, opacity);
 

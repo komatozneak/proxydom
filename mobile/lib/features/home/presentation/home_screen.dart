@@ -438,7 +438,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             );
             if (windowsDesktop) {
               return Padding(
-                padding: const EdgeInsets.fromLTRB(32, 28, 36, 28),
+                padding: const EdgeInsets.fromLTRB(
+                  AppBrand.pageGutterWide,
+                  28,
+                  AppBrand.pageGutterWide,
+                  28,
+                ),
                 child: Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 1080),
@@ -448,7 +453,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               );
             }
             return Padding(
-              padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
+              padding: const EdgeInsets.fromLTRB(
+                AppBrand.pageGutter,
+                8,
+                AppBrand.pageGutter,
+                12,
+              ),
               child: content,
             );
           },
