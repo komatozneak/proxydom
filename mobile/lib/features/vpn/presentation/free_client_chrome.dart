@@ -252,16 +252,30 @@ TextStyle _mono(
               ),
             ),
             const SizedBox(width: 8),
-            Text(
-              label.toUpperCase(),
-              style: _mono(
-                context,
-                size: 11.5,
-                color: mute,
-                weight: 700,
-                spacing: 2.6,
+            Flexible(
+              child: Text(
+                label.toUpperCase(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: _mono(
+                  context,
+                  size: 11.5,
+                  color: mute,
+                  weight: 700,
+                  spacing: 2.6,
+                ),
               ),
             ),
+            // Uptime on the counter, where a terminal puts a reading that
+            // belongs to the screen rather than to the state: the label at one
+            // end of the line and the clock at the other, the same measure the
+            // traffic rail keeps below. Turned on its side beside the GB it was
+            // a second measurement in a different alphabet — clever, and the
+            // first thing a person had to decode.
+            if (windowsDesktop && uptime != null) ...[
+              const Spacer(),
+              _uptimeField(context, ink, mute, uptime),
+            ],
           ],
         ),
         const SizedBox(height: 14),
@@ -338,74 +352,59 @@ TextStyle _mono(
           ),
         ),
         const SizedBox(height: 16),
-        // The rail the traffic runs on, the spent GB at its end, and the clock
-        // turned on its side beside them.
-        //
-        // Uptime used to sit in the same row as the state, where it read as
-        // part of the state — «подключено 00:12:04» — which is a lie: uptime is
-        // how long, not whether. Turned against the GB count it is clearly a
-        // second measurement, not a longer sentence.
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Expanded(
-              child: _TrafficRail(
-                label: trafficLabel ?? '--',
-                value: capped ? trafficUsed.clamp(0.0, 1.0) : 0.0,
-                capped: capped,
-                color: trafficColor ?? accent,
-                mono: _mono,
-              ),
-            ),
-            if (windowsDesktop) ...[
-              const SizedBox(width: 10),
-              _uptimeField(context, ink, mute, uptime),
-            ],
-          ],
+        // The rail the traffic runs on, with the spent GB at its end.
+        _TrafficRail(
+          label: trafficLabel ?? '--',
+          value: capped ? trafficUsed.clamp(0.0, 1.0) : 0.0,
+          capped: capped,
+          color: trafficColor ?? accent,
+          mono: _mono,
         ),
       ],
     );
   }
 
-  /// How long, turned on its side.
+  /// How long the tunnel has been up, as a caption in the head's top line.
   ///
-  /// Perpendicular to the GB count it stands beside: two measurements at right
-  /// angles read as two measurements, while two numbers in one row read as one
-  /// number with a strange tail.
+  /// The label sits at the left of that line and the clock at the right, which
+  /// is the same measure the traffic rail keeps: two ends of one rule. It was
+  /// turned on its side for a while, standing perpendicular to the spent GB —
+  /// two measurements at right angles, which is clever and is also the first
+  /// thing a person has to decode on a screen that is meant to be read at a
+  /// glance.
   Widget _uptimeField(
     BuildContext context,
     Color ink,
     Color mute,
     String? uptime,
   ) {
-    return RotatedBox(
-      quarterTurns: 1,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'UPTIME',
-            style: _mono(
-              context,
-              size: 9,
-              color: mute.withValues(alpha: 0.7),
-              spacing: 1.4,
-            ),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'UPTIME',
+          style: _mono(
+            context,
+            size: 9,
+            color: mute.withValues(alpha: 0.7),
+            spacing: 1.4,
           ),
-          const SizedBox(width: 7),
-          Text(
-            uptime ?? '--:--:--',
-            style: _mono(
-              context,
-              size: 12.5,
-              color: ink.withValues(alpha: 0.78),
-            ),
+        ),
+        const SizedBox(width: 7),
+        Text(
+          uptime ?? '--:--:--',
+          style: _mono(
+            context,
+            size: 12.5,
+            color: ink.withValues(alpha: 0.78),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
+
+/// A segmented rail of traffic. Blocks, not a smooth bar: this is the one
 /// place on the screen where a number moves, and it should look like it is
 /// being counted rather than like a progress animation.
 class _TrafficRail extends StatelessWidget {
