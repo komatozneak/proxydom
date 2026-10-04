@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:proxydom/core/widgets/app_action_button.dart';
 import 'package:proxydom/features/vpn/presentation/hy2_import_screen.dart';
 import 'package:proxydom/l10n/app_localizations.dart';
 
@@ -40,7 +41,7 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.text('Сохранить'), findsOneWidget);
-    expect(find.text('Только сохранить'), findsOneWidget);
+    expect(find.text('Только сохранить'), findsNothing);
   });
 
   testWidgets('a bad draft says the link was not read', (tester) async {
@@ -106,10 +107,12 @@ void main() {
       ),
       findsOneWidget,
     );
+    // The keys are AppActionButton now, not Material buttons: the save key
+    // must stay dead while the draft has nothing Hy2 in it.
     expect(
       tester
-          .widget<FilledButton>(
-            find.widgetWithText(FilledButton, 'Сохранить'),
+          .widget<AppActionButton>(
+            find.widgetWithText(AppActionButton, 'Сохранить'),
           )
           .onPressed,
       isNull,

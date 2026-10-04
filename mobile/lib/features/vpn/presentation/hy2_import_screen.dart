@@ -183,8 +183,14 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
       (_error == null || _error == 'no_hy2') &&
       (_subscriptionUrl || _preview.isNotEmpty);
 
-  Future<void> _save({required bool connect}) async {
-    UiLog.action('import', 'save', extra: {'connect': connect});
+  /// Saves the draft and dials it.
+  ///
+  /// There was a second path here - save without connecting - and it was the
+  /// same question asked with two answers. One key now: save, then go where the
+  /// person can act. If nothing in the draft can dial, the key was dead before
+  /// they got here and step 2 said so.
+  Future<void> _save() async {
+    UiLog.action('import', 'save', extra: {'connect': true});
     setState(() {
       _busy = true;
       _error = null;
@@ -196,21 +202,20 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
         'import',
         'save',
         result: 'ok',
-        extra: {'links': links.length, 'connect': connect},
+        extra: {'links': links.length, 'connect': true},
       );
       showProxyDomSnackBar(context, AppL10n.of(context).freeServerAdded);
-      if (connect && links.isNotEmpty) {
-        if (!mounted) return;
-        await _stopLiveTunnel(reason: 'import');
-        if (!mounted) return;
-        final canStart = links.any(
-          (link) => canDialScheme(link.scheme, ios: false),
-        );
-        context.go(canStart ? '/home' : '/locations');
+      if (links.isEmpty) {
+        context.go('/locations');
         return;
       }
+      await _stopLiveTunnel(reason: 'import');
       if (!mounted) return;
-      context.go('/locations');
+      final canStart = links.any(
+        (link) => canDialScheme(link.scheme, ios: false),
+      );
+      context.go(canStart ? '/home' : '/locations');
+      return;
     } on SubscriptionDocumentException catch (error) {
       if (!mounted) return;
       UiLog.action('import', 'save', result: 'bad', reason: error.code);
@@ -465,30 +470,21 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
                   ),
                   const SizedBox(height: 14),
                   // Two keys, in the app's own key language, primary first.
-                  Row(
-                    children: [
-                      Expanded(
-                        child: AppActionButton(
-                          onPressed:
-                              _canSave ? () => _save(connect: true) : null,
-                          icon: AppIcons.check,
-                          label: l.freeSaveConnect,
-                          color: AppBrand.mascotGold,
-                          height: 50,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: AppActionButton(
-                          onPressed:
-                              _canSave ? () => _save(connect: false) : null,
-                          icon: AppIcons.download,
-                          label: l.freeSaveOnly,
-                          color: AppBrand.mascotGoldDeep,
-                          height: 50,
-                        ),
-                      ),
-                    ],
+                  // One key. «Сохранить» and «Только сохранить» asked the same question with
+                  // two answers, and a person who cannot tell them apart
+                  // guesses. The key saves and dials; if the link has nothing
+                  // dialable in it, the key stays dead and the second step
+                  // says why. It is not stretched: a button across the whole
+                  // measure is a banner, not a key.
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: AppActionButton(
+                      onPressed: _canSave ? () => _save() : null,
+                      icon: AppIcons.check,
+                      label: l.freeSaveConnect,
+                      color: AppBrand.mascotGold,
+                      height: 50,
+                    ),
                   ),
                 ],
               ),
