@@ -72,7 +72,7 @@ class AppL10nRu extends AppL10n {
   String get navHome => 'Главная';
 
   @override
-  String get navVpn => 'VPN';
+  String get navVpn => 'Подключение';
 
   @override
   String get navLocations => 'Локации';
@@ -1503,6 +1503,33 @@ class AppL10nRu extends AppL10n {
   String get freeSearch => 'Поиск серверов';
 
   @override
+  String get locationsNodes => 'Узлы';
+
+  @override
+  String get locationsSelected => 'ВЫБРАН';
+
+  @override
+  String get locationsActive => 'активен';
+
+  @override
+  String get locationsNotUsed => 'НЕ ВЫБРАН';
+
+  @override
+  String get locationsUseIt => 'Подключить';
+
+  @override
+  String get locationsInUse => 'Подключено';
+
+  @override
+  String get locationsShareKey => 'Ключ';
+
+  @override
+  String get freeTelegram => 'Telegram';
+
+  @override
+  String get locationsKeyHandle => 'ключ';
+
+  @override
   String get freeDelete => 'Удалить';
 
   @override
@@ -1528,4 +1555,14 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get freeRefreshFail => 'Не удалось обновить';
+
+  @override
+  String get freeStepLink => 'Ссылка';
+
+  @override
+  String get freeStepFound => 'Найдено';
+
+  @override
+  String get freeFieldEmpty =>
+      'Пока пусто. Вставьте ссылку — и мир увидит что внутри.';
 }

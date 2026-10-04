@@ -16,7 +16,7 @@ class AppBrand {
 
   static const Color primaryContainer = Color(0xFF2A2A2E);
 
-  /// Moss — success / «работает» (semantic, not chrome accent).
+  /// Moss — success / «Дуб» (semantic, not chrome accent).
   static const Color secondary = Color(0xFF558B2F);
 
   /// Chrome accent = charcoal (matches mono mark).
@@ -79,18 +79,107 @@ class AppBrand {
   /// Free slot in the harmony: the mid step of the same sky family, between
   /// [noticeBand] and [noticeBandDark]. Chrome fill for the refresh action —
   /// the cool counterweight to the moss paste button and the warm house.
-  /// Charcoal ink stays readable on it (≈4.8:1) and the pill keeps its shape on
+  /// Charcoal ink stays readable on it (в‰€4.8:1) and the pill keeps its shape on
   /// both the charcoal ground and the cream sheet.
   static const Color actionSky = Color(0xFF3D8FB5);
 
   /// Free slot in the harmony: the amber step of the house gold, warmer than
   /// [livingHouse] and deeper than [flame]. Chrome fill for the QR action, so
   /// the bar keeps the house's own warmth instead of the borrowed notebook
-  /// orange. Charcoal ink on it is ≈5.9:1.
+  /// orange. Charcoal ink on it is в‰€5.9:1.
   static const Color actionAmber = Color(0xFFC98A16);
 
   /// Dark elevated cards — enough lift off [surfaceDark] so numbers read.
   static const Color surfaceVariantDark = Color(0xFF2C2C32);
+
+  // ── The house in a cold night ──────────────────────────────────────────────
+  //
+  // The mascot is the reference: a warm ochre house with a charcoal aperture,
+  // sampled straight off the mark. Everything warm in the app comes from it.
+  // Everything the house stands on is cold — «тёплый дом в холодном интернете»
+  // — so the gold reads as light rather than as a colour.
+
+  /// House body. The brand colour, sampled off the mark.
+  static const Color mascotGold = Color(0xFFC88F27);
+
+  /// The lit top face of the house: same hue, one step up.
+  static const Color mascotGoldLit = Color(0xFFE1AF49);
+
+  /// The shaded side and the rim under the body.
+  static const Color mascotGoldDeep = Color(0xFFA2701A);
+
+  /// The warm halo the house throws into the dark — fireflies, glow, orbit.
+  static const Color mascotEmber = Color(0xFFB4551B);
+
+  /// Aperture: warm charcoal, not a neutral grey.
+  static const Color mascotFace = Color(0xFF403F3C);
+
+  /// Door and eyes.
+  static const Color mascotCream = Color(0xFFF7F2E4);
+
+  /// Fireflies: the small warm points that drift over the ground.
+  static const Color firefly = Color(0xFFE8B94A);
+
+  // ── One night, not two ─────────────────────────────────────────────────────
+  //
+  // The yard was blue-black, the rail green-black and the card a third grey:
+  // three backgrounds that did not come from the same night. Now there is one
+  // cold family with a green undertone — a forest at night. The rail is that
+  // family one step down, the plates are that family with light on them, and
+  // moss is an accent inside it, never a second ground.
+
+  static const Color groundDark = Color(0xFF0D1211);
+
+  static const Color groundDeep = Color(0xFF080B0A);
+
+  static const Color forestDark = Color(0xFF0A100E);
+
+  static const Color forestDeep = Color(0xFF070A09);
+
+  static const Color forestShade = Color(0xFF040706);
+
+  static const Color moss = Color(0xFF2F5238);
+
+  /// Moss seen at night: the rail's selected plate, deep enough to sit under
+  /// text instead of shouting over it.
+  static const Color mossDeep = Color(0xFF1D3524);
+
+  static const Color mossLight = Color(0xFF6E8F5C);
+
+  /// The slab in daylight: pale stone, still damp, still green at the foot.
+  static const Color stoneLight = Color(0xFFF0EDE6);
+
+  static const Color stoneShade = Color(0xFFBDB6A8);
+
+  /// Cards on the night ground: the same slate, lifted and warmed a hair, so a
+  /// plate separates by light rather than only by value.
+  static const Color surfaceRaisedDark = Color(0xFF171C1A);
+
+  static const Color surfaceSunkDark = Color(0xFF101413);
+
+  static const Color edgeDark = Color(0xFF353B47);
+
+  static const Color edgeLight = Color(0xFFD8D3C6);
+
+  static const Color shadowKeyDark = Color(0x7A000000);
+
+  static const Color shadowKeyLight = Color(0x1F1A1A1A);
+
+  /// White/black used only as a light or shade *source* when mixing surfaces —
+  /// never as a fill on its own.
+  static const Color lightSource = Color(0xFFFFFFFF);
+
+  static const Color shadeSource = Color(0xFF000000);
+
+  /// Motion. One spring for anything the finger drives, one ease for anything
+  /// the screen does on its own.
+  static const Duration motionPress = Duration(milliseconds: 120);
+
+  static const Curve motionPressCurve = Curves.easeOutCubic;
+
+  static const Duration motionReveal = Duration(milliseconds: 260);
+
+  static const Curve motionRevealCurve = Curves.easeOutCubic;
 
   /// Unselected Material switch track in dark — lighter than card zinc.
   static const Color switchTrackOffDark = Color(0xFFB0B0B8);
@@ -112,7 +201,7 @@ class AppBrand {
 
   static const Color onSurfaceVariantDark = Color(0xFFC8C8D0);
 
-  /// Free quota HP bar: healthy → caution → critical, then depleted grey.
+  /// Free quota HP bar: healthy в†’ caution в†’ critical, then depleted grey.
   static const Color quotaHealthy = success;
   static const Color quotaCaution = livingHouse;
   static const Color quotaCritical = destructive;
@@ -183,7 +272,7 @@ class AppTheme {
       brightness: brightness,
       colorScheme: scheme,
       scaffoldBackgroundColor: bg,
-      fontFamily: 'Inter',
+      fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
       iconTheme: IconThemeData(color: onSurface, size: 24),
       textTheme: _buildTextTheme(scheme),
       appBarTheme: AppBarTheme(
@@ -193,7 +282,7 @@ class AppTheme {
         scrolledUnderElevation: 0,
         centerTitle: false,
         titleTextStyle: TextStyle(
-          fontFamily: 'Inter',
+          fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
           color: onSurface,
           fontSize: 28,
           fontWeight: FontWeight.w800,
@@ -229,9 +318,15 @@ class AppTheme {
               isDark ? AppBrand.primary : AppBrand.surfaceElevatedLight,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           shape: const StadiumBorder(),
+          // The family has to be repeated here: a ButtonStyle textStyle
+          // REPLACES the ambient default instead of merging with it, so without
+          // it every button label silently falls back to the platform font and
+          // the app ends up with two typefaces on one screen.
           textStyle: const TextStyle(
+            fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
             fontSize: 16,
             fontWeight: FontWeight.w700,
+            letterSpacing: -0.2,
           ),
         ),
       ),
@@ -240,6 +335,12 @@ class AppTheme {
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           shape: const StadiumBorder(),
           side: BorderSide(color: line, width: 1),
+          textStyle: const TextStyle(
+            fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            letterSpacing: -0.1,
+          ),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -247,6 +348,11 @@ class AppTheme {
           foregroundColor: onSurface,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           shape: const StadiumBorder(),
+          textStyle: const TextStyle(
+            fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
       cardTheme: CardThemeData(
@@ -259,12 +365,21 @@ class AppTheme {
         ),
       ),
       switchTheme: SwitchThemeData(
-        thumbColor: WidgetStateProperty.resolveWith(
-          (s) => AppBrand.surfaceElevatedLight,
-        ),
+        thumbColor: WidgetStateProperty.resolveWith((s) {
+          // On, the thumb takes the moss that grows in the light of the rail's
+          // lip; off, it stays the plain plate. A switch is a lamp, and the
+          // lamp in this app is never a colour the palette does not own.
+          if (s.contains(WidgetState.selected) && isDark) {
+            return AppBrand.mossLight;
+          }
+          return AppBrand.surfaceElevatedLight;
+        }),
         trackColor: WidgetStateProperty.resolveWith((s) {
           if (s.contains(WidgetState.selected)) {
-            return AppBrand.secondary;
+            // Deep moss, not the old bright #558B2F: that green was the last
+            // Material colour left in the app and it read as a default switch
+            // sitting on a hand-made night.
+            return AppBrand.moss;
           }
           return isDark ? AppBrand.switchTrackOffDark : AppBrand.inkMutedLight;
         }),
@@ -320,64 +435,64 @@ class AppTheme {
   static TextTheme _buildTextTheme(ColorScheme scheme) {
     return TextTheme(
       displayLarge: TextStyle(
-        fontFamily: 'Inter',
+        fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
         fontSize: 32,
         fontWeight: FontWeight.w800,
         letterSpacing: -0.5,
         color: scheme.onSurface,
       ),
       displayMedium: TextStyle(
-        fontFamily: 'Inter',
+        fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
         fontSize: 28,
         fontWeight: FontWeight.w800,
         color: scheme.onSurface,
       ),
       headlineLarge: TextStyle(
-        fontFamily: 'Inter',
+        fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
         fontSize: 24,
         fontWeight: FontWeight.w700,
         color: scheme.onSurface,
       ),
       headlineMedium: TextStyle(
-        fontFamily: 'Inter',
+        fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
         fontSize: 20,
         fontWeight: FontWeight.w700,
         color: scheme.onSurface,
       ),
       titleLarge: TextStyle(
-        fontFamily: 'Inter',
+        fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
         fontSize: 18,
         fontWeight: FontWeight.w700,
         color: scheme.onSurface,
       ),
       titleMedium: TextStyle(
-        fontFamily: 'Inter',
+        fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
         fontSize: 16,
         fontWeight: FontWeight.w600,
         color: scheme.onSurface,
       ),
       bodyLarge: TextStyle(
-        fontFamily: 'Inter',
+        fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
         fontSize: 16,
         fontWeight: FontWeight.w400,
         color: scheme.onSurface,
         height: 1.5,
       ),
       bodyMedium: TextStyle(
-        fontFamily: 'Inter',
+        fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
         fontSize: 14,
         fontWeight: FontWeight.w400,
         color: scheme.onSurfaceVariant,
         height: 1.4,
       ),
       labelLarge: TextStyle(
-        fontFamily: 'Inter',
+        fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
         fontSize: 14,
         fontWeight: FontWeight.w600,
         color: scheme.onSurface,
       ),
       labelSmall: TextStyle(
-        fontFamily: 'Inter',
+        fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
         fontSize: 11,
         fontWeight: FontWeight.w600,
         color: scheme.onSurfaceVariant,

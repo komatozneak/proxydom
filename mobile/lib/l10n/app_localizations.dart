@@ -226,7 +226,7 @@ abstract class AppL10n {
   /// No description provided for @navVpn.
   ///
   /// In en, this message translates to:
-  /// **'VPN'**
+  /// **'Tunnel'**
   String get navVpn;
 
   /// No description provided for @navLocations.
@@ -2827,6 +2827,60 @@ abstract class AppL10n {
   /// **'Search servers'**
   String get freeSearch;
 
+  /// No description provided for @locationsNodes.
+  ///
+  /// In en, this message translates to:
+  /// **'Nodes'**
+  String get locationsNodes;
+
+  /// No description provided for @locationsSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'IN USE'**
+  String get locationsSelected;
+
+  /// No description provided for @locationsActive.
+  ///
+  /// In en, this message translates to:
+  /// **'active'**
+  String get locationsActive;
+
+  /// No description provided for @locationsNotUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'NOT USED'**
+  String get locationsNotUsed;
+
+  /// No description provided for @locationsUseIt.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect'**
+  String get locationsUseIt;
+
+  /// No description provided for @locationsInUse.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected'**
+  String get locationsInUse;
+
+  /// No description provided for @locationsShareKey.
+  ///
+  /// In en, this message translates to:
+  /// **'Key'**
+  String get locationsShareKey;
+
+  /// No description provided for @freeTelegram.
+  ///
+  /// In en, this message translates to:
+  /// **'Telegram'**
+  String get freeTelegram;
+
+  /// No description provided for @locationsKeyHandle.
+  ///
+  /// In en, this message translates to:
+  /// **'key'**
+  String get locationsKeyHandle;
+
   /// No description provided for @freeDelete.
   ///
   /// In en, this message translates to:
@@ -2874,6 +2928,24 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Could not refresh'**
   String get freeRefreshFail;
+
+  /// No description provided for @freeStepLink.
+  ///
+  /// In en, this message translates to:
+  /// **'LINK'**
+  String get freeStepLink;
+
+  /// No description provided for @freeStepFound.
+  ///
+  /// In en, this message translates to:
+  /// **'FOUND'**
+  String get freeStepFound;
+
+  /// No description provided for @freeFieldEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Empty for now. Paste a link and we will see what is inside.'**
+  String get freeFieldEmpty;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

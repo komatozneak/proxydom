@@ -12,6 +12,9 @@ import '../../../core/diagnostics/ui_log.dart';
 import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
+import '../../../core/widgets/app_surface.dart';
+import '../../../core/widgets/house_orbit.dart';
+import '../../../core/widgets/proxydom_ground.dart';
 import '../../../core/widgets/connect_button.dart';
 import '../../../core/widgets/house_pulsar.dart';
 import '../../../core/widgets/signal_nest_hero.dart';
@@ -61,6 +64,59 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   int _noVpnTotal = 0;
   bool _openingSubscription = false;
 
+  /// How lit the yard is, 0…1. The shell paints it; the home decides it.
+  /// Resting is not dark — an unlit yard still has fireflies.
+  static const double _yardResting = 0.30;
+
+  double _yardGlow = _yardResting;
+
+  /// True while the house is burning: pressed, connecting or connected. The
+  /// button is dark at rest and lights on touch — the light is the state.
+  bool _charged = false;
+
+  Timer? _yardTimer;
+  Timer? _chargeTimer;
+
+  /// Publishes the lit level to the night behind the screen.
+  void _setYard(double value) {
+    setState(() => _yardGlow = value);
+    GroundGlowScope.maybeOf(context)?.set(value);
+  }
+
+  void _setCharged(bool value) {
+    if (_charged == value) return;
+    setState(() => _charged = value);
+  }
+
+  /// A tap on the house wakes the yard for a beat, whatever the tunnel does.
+  ///
+  /// The lamp goes out on its own, and how long that takes is the difference
+  /// between a light and a delay. Too long and the house stays lit after you
+  /// let go, which reads as the button having missed; too short and the yard
+  /// snaps off, which reads as the button having broken. The charge holds for
+  /// 820ms and the ground dies at 480 - ground always goes last, because a
+  /// floor takes longer to cool than a lamp.
+  void _wakeYard() {
+    _yardTimer?.cancel();
+    _chargeTimer?.cancel();
+    _setYard(1.0);
+    _setCharged(true);
+    _chargeTimer = Timer(const Duration(milliseconds: 820), () {
+      if (!mounted) return;
+      _setCharged(_yardFor(ref.read(vpnProvider)) > _yardResting + 0.01);
+    });
+    _yardTimer = Timer(const Duration(milliseconds: 480), () {
+      if (mounted) _setYard(_yardFor(ref.read(vpnProvider)));
+    });
+  }
+
+  /// The tunnel decides how bright the house is.
+  double _yardFor(Object status) {
+    if (status is VpnConnected) return 1.0;
+    if (status is VpnConnecting) return 0.75;
+    return _yardResting;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -72,8 +128,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   @override
   void dispose() {
+    _yardTimer?.cancel();
+    _chargeTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    GroundGlowScope.maybeOf(context)?.set(_yardGlow);
   }
 
   @override
@@ -224,6 +288,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Future<void> _onNestTap() async {
+    // The house is the main button: touching it wakes the yard before anything
+    // else happens, so the light answers the finger immediately instead of
+    // waiting for the tunnel.
+    _wakeYard();
     if (windowsDesktop && VpnController.instance.windowsBrokerCooling) {
       UiLog.action(
         'home',
@@ -314,6 +382,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     });
 
     ref.listen(vpnProvider, (prev, next) {
+      // The tunnel decides how bright the house is.
+      if (_yardGlow != 1.0) _setYard(_yardFor(next));
       if (prev is! VpnConnected && next is VpnConnected) {
         unawaited(_maybeAskBattery());
       }
@@ -331,39 +401,55 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
-              child: _DashboardBody(
-                status: vpnStatus,
-                maxHeight: constraints.maxHeight,
-                serverTitle: _serverTitle == '…' && _selectionIsAuto
-                    ? l.regionAutoTitle
-                    : _serverTitle,
-                serverSubtitle: _serverSubtitle.isEmpty
-                    ? (_selectionIsAuto
+            // A window has room to breathe and room to stop: cap the measure so
+            // the panel never stretches into a banner, and pad like a desktop
+            // rather than like a phone.
+            final content = _DashboardBody(
+              status: vpnStatus,
+              maxHeight: constraints.maxHeight,
+              charged: _charged,
+              serverTitle: _serverTitle == '…' && _selectionIsAuto
+                  ? l.regionAutoTitle
+                  : _serverTitle,
+              serverSubtitle: _serverSubtitle.isEmpty
+                  ? (_selectionIsAuto
                         ? l.regionAutoSubtitle
                         : l.homeStatServer)
-                    : _serverSubtitle,
-                trafficMeta: _trafficMeta,
-                serverFlag: _serverFlag,
-                selectionIsAuto: _selectionIsAuto,
-                autoPoolFlags: _autoPoolFlags,
-                noVpnEnabled: _noVpnEnabled,
-                noVpnTotal: _noVpnTotal,
-                onNestTap: _onNestTap,
-                onPlaceRefresh: _refreshServerCard,
-                onOpenLocations: () {
-                  UiLog.action('home', 'open', extra: {'route': '/locations'});
-                  context.go('/locations');
-                },
-                onOpenSubscription: _openSubscription,
-                onOpenNoVpn: () async {
-                  UiLog.action('home', 'open',
-                      extra: {'route': '/settings/no-vpn'});
-                  await context.push('/settings/no-vpn');
-                  if (mounted) unawaited(_refreshNoVpnCounter());
-                },
-              ),
+                  : _serverSubtitle,
+              trafficMeta: _trafficMeta,
+              serverFlag: _serverFlag,
+              selectionIsAuto: _selectionIsAuto,
+              autoPoolFlags: _autoPoolFlags,
+              noVpnEnabled: _noVpnEnabled,
+              noVpnTotal: _noVpnTotal,
+              onNestTap: _onNestTap,
+              onPlaceRefresh: _refreshServerCard,
+              onOpenLocations: () {
+                UiLog.action('home', 'open', extra: {'route': '/locations'});
+                context.go('/locations');
+              },
+              onOpenSubscription: _openSubscription,
+              onOpenNoVpn: () async {
+                UiLog.action('home', 'open',
+                    extra: {'route': '/settings/no-vpn'});
+                await context.push('/settings/no-vpn');
+                if (mounted) unawaited(_refreshNoVpnCounter());
+              },
+            );
+            if (windowsDesktop) {
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(32, 28, 36, 28),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1080),
+                    child: content,
+                  ),
+                ),
+              );
+            }
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
+              child: content,
             );
           },
         ),
@@ -376,10 +462,11 @@ class _DashboardBody extends ConsumerStatefulWidget {
   const _DashboardBody({
     required this.status,
     required this.maxHeight,
+    required this.charged,
     required this.serverTitle,
     required this.serverSubtitle,
     this.trafficMeta,
-    required this.serverFlag,
+    this.serverFlag,
     required this.selectionIsAuto,
     required this.autoPoolFlags,
     required this.noVpnEnabled,
@@ -393,10 +480,13 @@ class _DashboardBody extends ConsumerStatefulWidget {
 
   final VpnStatus status;
   final double maxHeight;
+
+  /// The house is burning: pressed, connecting or connected.
+  final bool charged;
   final String serverTitle;
   final String serverSubtitle;
   final String? trafficMeta;
-  final String serverFlag;
+  final String? serverFlag;
   final bool selectionIsAuto;
   final List<String> autoPoolFlags;
   final int noVpnEnabled;
@@ -478,19 +568,35 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
     final showVpnSettingsCta =
         status is VpnError && status.code == kVpnConflictErrorCode;
 
-    final nestSize = math.min(
-      340.0,
-      math.min(
-        size.width * 0.88,
-        math.max(200.0, widget.maxHeight - 340),
-      ),
-    );
+    // The house is the focal point. On a phone it fills the band between the
+    // panel and the keys; in a window it has its own column and grows with the
+    // frame, otherwise a tall window leaves the bottom half empty.
+    final nestSize = windowsDesktop
+        ? math.min(440.0, math.max(300.0, size.height * 0.50))
+        // A phone has no room to be generous: the house takes a little over half
+        // the width and lets the night show around it. At 0.98 of the width it
+        // became the wallpaper and the yard behind it stopped existing.
+        : math.min(
+            size.width * 0.78,
+            math.max(210.0, widget.maxHeight * 0.34),
+          );
+    // Tell the night where the house is, so the bloom belongs to it and the
+    // orbit clears the roof. Published during layout: the ground repaints from
+    // its own ticker and picks the numbers up on the next frame.
+    GroundGlowScope.maybeOf(context)
+      ?..houseRadius = nestSize * 0.5
+      ..houseCenter = Alignment(
+        0,
+        (nestSize * 0.5) / size.height - 0.5,
+      );
 
     return _FreeClientHome(
       nestSize: nestSize,
+      charged: widget.charged,
       treeState: treeState,
       status: status,
       serverTitle: widget.serverTitle,
+      serverFlag: widget.serverFlag,
       trafficMeta: widget.trafficMeta,
       onNestTap: widget.onNestTap,
       showVpnSettingsCta: showVpnSettingsCta,
@@ -553,9 +659,11 @@ Future<void> _refreshHomeDocuments(BuildContext context) async {
 class _FreeClientHome extends StatelessWidget {
   const _FreeClientHome({
     required this.nestSize,
+    required this.charged,
     required this.treeState,
     required this.status,
     required this.serverTitle,
+    this.serverFlag,
     this.trafficMeta,
     required this.onNestTap,
     required this.showVpnSettingsCta,
@@ -565,9 +673,15 @@ class _FreeClientHome extends StatelessWidget {
   });
 
   final double nestSize;
+
+  /// The house is burning: pressed, connecting or connected.
+  final bool charged;
   final TreeState treeState;
   final VpnStatus status;
   final String serverTitle;
+
+  /// The flag shown beside the server name in the terminal head.
+  final String? serverFlag;
   final String? trafficMeta;
   final Future<void> Function() onNestTap;
   final bool showVpnSettingsCta;
@@ -638,108 +752,195 @@ class _FreeClientHome extends StatelessWidget {
       _ => null,
     };
 
-    final accent = status is VpnConnected
-        ? AppBrand.success
-        : status is VpnConnecting
-            ? AppBrand.warning
-            : AppBrand.destructive;
+    // Disconnected is a normal state, not a failure: painting it alarm red
+    // made the resting screen look broken. Red is reserved for VpnError.
+    //
+    // Connected is green, not gold. Gold is the house: it is what the button
+    // wears, what the section rule wears, what the traffic fills with. Using
+    // the house's own colour for "connected" said nothing — an all-gold screen
+    // reported every state the same way. Green is the one hue in the palette
+    // that means a thing is working, and it is the same green the rail gives a
+    // chosen server.
+    final ok = theme.brightness == Brightness.dark
+        ? AppBrand.mossLight
+        : AppBrand.moss;
+    final accent = switch (status) {
+      VpnConnected() => ok,
+      VpnConnecting() => AppBrand.mascotEmber,
+      VpnError() => AppBrand.destructive,
+      _ => theme.colorScheme.onSurfaceVariant,
+    };
 
-    return Column(
+    // One tight cluster: status above, the house in the middle, the keys under.
+    // Nothing is scattered across the screen — the eye has one place to land,
+    // and that place is the power button.
+    final readout = ConnectionTerminal(
+      status: statusText,
+      serverName: profile,
+      serverFlag: serverFlag,
+      tile: tileForName(profile),
+      uptime: uptime,
+      trafficLabel: traffic,
+      trafficColor: trafficColor,
+      // The rail fills by what is spent, so it answers "how much is left"
+      // without a second line of arithmetic.
+      trafficUsed: parsedTraffic == null || parsedTraffic.unlimited
+          ? 0
+          : (parsedTraffic.upload + parsedTraffic.download) /
+                parsedTraffic.total,
+      trafficCap: parsedTraffic == null || parsedTraffic.unlimited
+          ? 0
+          : parsedTraffic.total.toDouble(),
+      accent: accent,
+    );
+    final hero = Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        ConnectionStatusPanel(
-          status: statusText,
-          profile: profile,
-          traffic: traffic,
-          trafficColor: trafficColor,
-          uptime: uptime,
-          accent: accent,
-        ),
-        if (errorHint != null) ...[
-          const SizedBox(height: 8),
-          Text(
-            errorHint,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.error,
-            ),
-          ),
-        ],
-        Expanded(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+        // The button and the dance share one box, so the lights ring the roof
+        // without pushing the layout wider than the screen.
+        SizedBox(
+          width: nestSize,
+          height: nestSize,
+          child: Stack(
+            alignment: Alignment.center,
+            clipBehavior: Clip.none,
             children: [
-              if (_showsEmptyHint) ...[
-                const SizedBox(
-                  height: 96,
-                  width: double.infinity,
-                  child: Center(child: FreeClientEmptyState(compact: true)),
+              // The dance belongs to the house, not to the wallpaper: it is
+              // drawn around the button and only while the button burns.
+              Positioned.fill(
+                child: HouseOrbit(
+                  burning: charged
+                      ? 1.0
+                      : (status is VpnConnecting ? 0.45 : 0.0),
                 ),
-                const SizedBox(height: 8),
-              ],
-              SizedBox(
-                width: nestSize,
-                height: nestSize,
-                child: Stack(
-                  alignment: Alignment.center,
-                  clipBehavior: Clip.none,
-                  children: [
-                    if (status is VpnConnecting || status is VpnConnected)
-                      HousePulsar(diameter: nestSize),
-                    SignalNestHero(
-                      key: kHomeSignalNestKey,
-                      state: treeState,
-                      onTap: () => onNestTap(),
-                      size: nestSize,
-                    ),
-                  ],
+              ),
+              // The familiar pulse: it answers the finger whether or not
+              // the tunnel has moved yet.
+              if (charged || status is VpnConnecting)
+                HousePulsar(diameter: nestSize),
+              // The artwork is painted larger than the tap box: the mark
+              // ships with a wide transparent margin, and at box size the house
+              // read as a small token lost in the middle of the screen.
+              // Scaling the painting rather than the box keeps the layout
+              // honest — nothing overflows the column, the house just draws
+              // past its own frame.
+              // Unlit, not muddy: alpha-fading the mark turned the gold to mud. The house
+              // stays crisp at rest and the difference is carried by the light
+              // itself — no bloom, no orbit, no pulse until a finger lands on
+              // it.
+              AnimatedOpacity(
+                duration: const Duration(milliseconds: 420),
+                curve: Curves.easeOut,
+                opacity: charged ? 1.0 : 0.74,
+                child: Transform.scale(
+                  // The artwork is drawn inside a frame with its own margin, so
+                  // the scale that fills a window's empty column would eat a
+                  // phone whole.
+                  scale: windowsDesktop ? 1.45 : 1.28,
+                  child: SignalNestHero(
+                    key: kHomeSignalNestKey,
+                    state: treeState,
+                    onTap: () => onNestTap(),
+                    size: nestSize,
+                  ),
                 ),
               ),
             ],
           ),
         ),
-        if (showVpnSettingsCta) ...[
-          const SizedBox(height: 12),
-          FilledButton.tonal(
-            onPressed: () async {
-              final opened = await VpnController.instance.openVpnSettings();
-              UiLog.action(
-                'home',
-                'vpn_settings',
-                result: opened ? 'ok' : 'fail',
+        if (_showsEmptyHint) ...[
+          const SizedBox(height: 10),
+          // Inside the FittedBox the hero must have an intrinsic width: an
+          // infinite-width box here forces invalid constraints on the FittedBox
+          // and the whole home fails to lay out.
+          const FreeClientEmptyState(compact: true),
+        ],
+      ],
+    );
+    final actions = <Widget>[
+      if (showVpnSettingsCta) ...[
+        const SizedBox(height: 14),
+        FilledButton.tonal(
+          onPressed: () async {
+            final opened = await VpnController.instance.openVpnSettings();
+            UiLog.action(
+              'home',
+              'vpn_settings',
+              result: opened ? 'ok' : 'fail',
+            );
+            if (!context.mounted) return;
+            if (!opened) {
+              showProxyDomSnackBar(
+                context,
+                settingsKillSwitchOpenFailedForPlatform(l),
               );
-              if (!context.mounted) return;
-              if (!opened) {
-                showProxyDomSnackBar(
-                  context,
-                  settingsKillSwitchOpenFailedForPlatform(l),
-                );
-              }
-            },
-            child: Text(l.settingsKillSwitchOpenVpn),
-          ),
-        ],
-        if (status is VpnConnected && androidPerAppSplit) ...[
-          const SizedBox(height: 8),
-          _NoVpnHomeRow(
-            label: l.homeNoVpnRow,
-            enabled: noVpnEnabled,
-            total: noVpnTotal,
-            onTap: onOpenNoVpn,
-          ),
-        ],
-        const SizedBox(height: 12),
-        FreeClientActionBar(
-          onPaste: () {
-            UiLog.action('home', 'paste');
-            context.push('/import?clipboard=1');
+            }
           },
-          onScan: () {
-            UiLog.action('home', 'scan');
-            openFreeClientCapture(context);
-          },
-          onRefresh: () => _refreshHomeDocuments(context),
+          child: Text(l.settingsKillSwitchOpenVpn),
         ),
       ],
+      if (status is VpnConnected && androidPerAppSplit) ...[
+        const SizedBox(height: 10),
+        _NoVpnHomeRow(
+          label: l.homeNoVpnRow,
+          enabled: noVpnEnabled,
+          total: noVpnTotal,
+          onTap: onOpenNoVpn,
+        ),
+      ],
+      const SizedBox(height: 16),
+      FreeClientActionBar(
+        onPaste: () {
+          UiLog.action('home', 'paste');
+          context.push('/import?clipboard=1');
+        },
+        onScan: () {
+          UiLog.action('home', 'scan');
+          openFreeClientCapture(context);
+        },
+        onRefresh: () => _refreshHomeDocuments(context),
+      ),
+    ];
+
+    // One composition for both: the house in the middle with the yard around it,
+    // the readout under it, the keys under that. The mascot is the button, so
+    // nothing else may sit above it or compete with it.
+    // A home fills its screen or it looks abandoned: head anchored at the top,
+    // the button in the middle, the actions at the bottom. One column, one
+    // measure, so the eye runs straight down it.
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SizedBox(height: 8),
+            readout,
+            Expanded(
+              // Scales the button down on a short window instead of
+              // overflowing it: a tunnel that cannot be pressed is worse than
+              // a slightly smaller house.
+              child: Center(
+                child: FittedBox(fit: BoxFit.scaleDown, child: hero),
+              ),
+            ),
+            if (errorHint != null) ...[
+              Text(
+                errorHint,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.error,
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            ...actions,
+            const SizedBox(height: 10),
+          ],
+        ),
+      ),
     );
   }
 
@@ -779,7 +980,6 @@ class _NoVpnHomeRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final elevated = theme.colorScheme.surfaceContainerHighest;
     final line = theme.colorScheme.outline;
     final showAppsPin = !iosAppsSplitUnsupported;
     final mute = theme.colorScheme.onSurfaceVariant;
@@ -787,16 +987,15 @@ class _NoVpnHomeRow extends StatelessWidget {
         ? AppBrand.inkDark
         : AppBrand.inkLight;
 
-    return Material(
-      color: elevated,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppBrand.radiusPill),
-        side: BorderSide(color: line),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppBrand.radiusPill),
-        child: ConstrainedBox(
+    return AppSurface(
+      radius: AppBrand.radiusPill,
+      clip: true,
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(AppBrand.radiusPill),
+          child: ConstrainedBox(
           constraints: const BoxConstraints(minHeight: 48),
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 10),
@@ -891,7 +1090,9 @@ class _NoVpnHomeRow extends StatelessWidget {
             ),
           ),
         ),
+        ),
       ),
     );
   }
 }
+

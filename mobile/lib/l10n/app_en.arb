@@ -30,7 +30,7 @@
   "homeSettings": "Settings",
   "navHome": "Home",
   "@navHome": {},
-  "navVpn": "VPN",
+  "navVpn": "Tunnel",
   "@navVpn": {},
   "navLocations": "Locations",
   "@navLocations": {},
@@ -780,6 +780,15 @@
   "freeSchemeParked": "This protocol cannot start.",
   "freePoolGeneral": "General",
   "freeSearch": "Search servers",
+  "locationsNodes": "Nodes",
+  "locationsSelected": "IN USE",
+  "locationsActive": "active",
+  "locationsNotUsed": "NOT USED",
+  "locationsUseIt": "Connect",
+  "locationsInUse": "Connected",
+  "locationsShareKey": "Key",
+  "freeTelegram": "Telegram",
+  "locationsKeyHandle": "key",
   "freeDelete": "Remove",
   "freeDeleteServerTitle": "Remove this server?",
   "freeDeleteServerBody": "The link is deleted from this phone.",
@@ -794,5 +803,8 @@
       }
     }
   },
-  "freeRefreshFail": "Could not refresh"
+  "freeRefreshFail": "Could not refresh",
+  "freeStepLink": "LINK",
+  "freeStepFound": "FOUND",
+  "freeFieldEmpty": "Empty for now. Paste a link and we will see what is inside."
 }

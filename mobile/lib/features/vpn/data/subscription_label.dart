@@ -88,6 +88,13 @@ PoolTile _tileForTitle(String title) {
   return PoolTile.flag;
 }
 
+/// Which mark a node's name earns, for anything that has a name and no label.
+///
+/// The profile list and the home screen show the same node, and the home used
+/// to draw a globe for both: the YouTube line had its red tile in the list and
+/// a globe on the button. One name, one mark.
+PoolTile tileForName(String title) => _tileForTitle(title);
+
 bool isPremiumPoolServer(String title) {
   final lower = title.toLowerCase();
   return lower.contains('youtube') ||

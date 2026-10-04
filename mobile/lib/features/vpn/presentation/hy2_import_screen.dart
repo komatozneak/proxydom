@@ -6,7 +6,9 @@ import 'package:go_router/go_router.dart';
 import '../../../core/diagnostics/ui_log.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
-import '../../../core/widgets/notebook_paper.dart';
+import '../../../core/widgets/app_action_button.dart';
+import '../../../core/widgets/proxydom_ground.dart';
+import '../../../core/widgets/app_surface.dart';
 import '../../../core/widgets/proxydom_snackbar.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../home/application/vpn_provider.dart';
@@ -18,8 +20,8 @@ import '../data/subscription_device.dart';
 import '../data/subscription_label.dart';
 import '../data/subscription_link_inbox.dart';
 import 'free_client_chrome.dart';
+import 'server_instrument_parts.dart';
 import 'windows_share_qr.dart';
-import 'pool_server_mark.dart';
 
 /// Add a link or key, preview the profiles, then save or connect.
 class Hy2ImportScreen extends ConsumerStatefulWidget {
@@ -182,8 +184,14 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
       (_error == null || _error == 'no_hy2') &&
       (_subscriptionUrl || _preview.isNotEmpty);
 
-  Future<void> _save({required bool connect}) async {
-    UiLog.action('import', 'save', extra: {'connect': connect});
+  /// Saves the draft and dials it.
+  ///
+  /// There was a second path here - save without connecting - and it was the
+  /// same question asked with two answers. One key now: save, then go where the
+  /// person can act. If nothing in the draft can dial, the key was dead before
+  /// they got here and step 2 said so.
+  Future<void> _save() async {
+    UiLog.action('import', 'save', extra: {'connect': true});
     setState(() {
       _busy = true;
       _error = null;
@@ -195,21 +203,20 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
         'import',
         'save',
         result: 'ok',
-        extra: {'links': links.length, 'connect': connect},
+        extra: {'links': links.length, 'connect': true},
       );
       showProxyDomSnackBar(context, AppL10n.of(context).freeServerAdded);
-      if (connect && links.isNotEmpty) {
-        if (!mounted) return;
-        await _stopLiveTunnel(reason: 'import');
-        if (!mounted) return;
-        final canStart = links.any(
-          (link) => canDialScheme(link.scheme, ios: false),
-        );
-        context.go(canStart ? '/home' : '/locations');
+      if (links.isEmpty) {
+        context.go('/locations');
         return;
       }
+      await _stopLiveTunnel(reason: 'import');
       if (!mounted) return;
-      context.go('/locations');
+      final canStart = links.any(
+        (link) => canDialScheme(link.scheme, ios: false),
+      );
+      context.go(canStart ? '/home' : '/locations');
+      return;
     } on SubscriptionDocumentException catch (error) {
       if (!mounted) return;
       UiLog.action('import', 'save', result: 'bad', reason: error.code);
@@ -244,188 +251,370 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
     final l = AppL10n.of(context);
     final theme = Theme.of(context);
     final keyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
-    return NotebookPaper(
+    final dark = theme.brightness == Brightness.dark;
+    final mute = dark ? AppBrand.inkMutedDark : AppBrand.inkMutedLight;
+
+    // A link and its result are one thing, so they are one column in one
+    // measure. On a phone that is the whole width; in a window it is 640px,
+    // because a link field stretched across 1400px is the phone layout wearing
+    // a big coat.
+    return NightBackdrop(
       child: Scaffold(
+      backgroundColor: Colors.transparent,
+      resizeToAvoidBottomInset: true,
+      appBar: AppBar(
         backgroundColor: Colors.transparent,
-        resizeToAvoidBottomInset: true,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          surfaceTintColor: Colors.transparent,
-          leading: _hasSaved
-              ? IconButton(
-                  onPressed: () {
-                    if (context.canPop()) {
-                      context.pop();
-                    } else {
-                      context.go('/home');
-                    }
-                  },
-                  icon: const _AddBackMark(),
-                )
-              : null,
-          title: Text(l.freeAddTitle),
-        ),
-        body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: ListView(
-                    keyboardDismissBehavior:
-                        ScrollViewKeyboardDismissBehavior.onDrag,
-                    children: [
-                      Text(
-                        l.freeAddHint,
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: _controller,
-                        focusNode: _fieldFocus,
-                        minLines: keyboard ? 2 : 4,
-                        maxLines: keyboard ? 3 : 6,
-                        onChanged: _previewInput,
-                        decoration: InputDecoration(
-                          hintText: l.freeAddHint,
-                          filled: true,
-                          fillColor: theme.colorScheme.surfaceContainerHighest,
-                          suffixIcon: _controller.text.isEmpty
-                              ? null
-                              : IconButton(
-                                  onPressed: () {
-                                    _controller.clear();
-                                    _previewInput('');
-                                  },
-                                  icon: const AppIcon(AppIcons.x, size: 18),
+        surfaceTintColor: Colors.transparent,
+        leading: _hasSaved
+            ? IconButton(
+                onPressed: () {
+                  if (context.canPop()) {
+                    context.pop();
+                  } else {
+                    context.go('/home');
+                  }
+                },
+                icon: const _AddBackMark(),
+              )
+            : null,
+        title: Text(l.freeAddTitle),
+      ),
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 640),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: ListView(
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      children: [
+                        // Step 1 — the link.
+                        AppSurface(
+                          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _StepLabel('1', l.freeStepLink),
+                              const SizedBox(height: 12),
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.onSurface
+                                      .withValues(alpha: 0.045),
+                                  borderRadius:
+                                      BorderRadius.circular(AppBrand.radiusCard),
+                                  border: Border.all(
+                                    color: _fieldFocus.hasFocus
+                                        ? AppBrand.mascotGold
+                                            .withValues(alpha: 0.75)
+                                        : theme.colorScheme.outline
+                                            .withValues(alpha: 0.6),
+                                    width: _fieldFocus.hasFocus ? 1.6 : 1,
+                                  ),
                                 ),
-                          border: OutlineInputBorder(
-                            borderRadius:
-                                BorderRadius.circular(AppBrand.radiusCard),
-                            borderSide:
-                                BorderSide(color: theme.colorScheme.outline),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      FreeClientActionBar(
-                        onPaste: _pasteClipboard,
-                        onScan: () {
-                          UiLog.action('import', 'scan');
-                          openFreeClientCapture(context);
-                        },
-                      ),
-                      if (_loadingPreview) ...[
-                        const SizedBox(height: 8),
-                        const LinearProgressIndicator(),
-                      ],
-                      if (_error != null) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          _error == 'load'
-                              ? l.freeSubscriptionLoadFail
-                              : _error == 'missing'
-                                  ? l.freeSubscriptionMissing
-                                  : _error == 'device_limit'
-                                      ? l.freeSubscriptionDeviceLimit
-                                      : _error == 'client_refused'
-                                          ? l.freeSubscriptionClientRefused
-                                          : _error == 'hy2_only'
-                                              ? l.freeHy2OnlyAdd
-                                              : _error == 'no_hy2'
-                                                  ? l.freeNoHy2Lines
-                                                  : l.freeLinkInvalid,
-                          style: TextStyle(color: theme.colorScheme.error),
-                        ),
-                      ],
-                      const SizedBox(height: 16),
-                      Text(
-                        l.freePreview,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      if (_previewTitle != null && _previewTitle!.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Text(
-                            _previewTitle!,
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                      if (_loadingPreview)
-                        const SizedBox.shrink()
-                      else if (_error != null &&
-                          _error != 'no_hy2' &&
-                          _error != 'hy2_only')
-                        const SizedBox.shrink()
-                      else if (_preview.isEmpty)
-                        const FreeClientEmptyState(compact: true)
-                      else
-                        for (var i = 0; i < _preview.length; i++) ...[
-                          if (i > 0) const SizedBox(height: 8),
-                          Builder(
-                            builder: (context) {
-                              final label = labelForShareLink(_preview[i]);
-                              final dialable = canDialScheme(
-                                _preview[i].scheme,
-                                ios: false,
-                              );
-                              return ListTile(
-                                leading: PoolServerMark(label: label),
-                                title: Text(label.title),
-                                subtitle: Text(
-                                  dialable
-                                      ? (label.subtitle.isEmpty
-                                          ? _preview[i].endpoint
-                                          : label.subtitle)
-                                      : l.freeSchemeParked,
+                                padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
+                                child: TextField(
+                                  controller: _controller,
+                                  focusNode: _fieldFocus,
+                                  minLines: keyboard ? 2 : 1,
+                                  maxLines: keyboard ? 3 : 4,
+                                  onChanged: _previewInput,
+                                  cursorColor: AppBrand.mascotGold,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    fontFamily: 'JetBrainsMono',
+                                    fontFamilyFallback: const ['Onest'],
+                                    fontSize: 14,
+                                    height: 1.5,
+                                  ),
+                                  decoration: InputDecoration(
+                                    hintText: l.freeAddHint,
+                                    hintStyle: theme.textTheme.bodyMedium
+                                        ?.copyWith(
+                                      color: mute.withValues(alpha: 0.6),
+                                      fontFamily: 'JetBrainsMono',
+                                      fontFamilyFallback: const ['Onest'],
+                                      fontSize: 13.5,
+                                    ),
+                                    border: InputBorder.none,
+                                    isDense: true,
+                                    contentPadding:
+                                        const EdgeInsets.symmetric(vertical: 12),
+                                    suffixIcon: _controller.text.isEmpty
+                                        ? null
+                                        : IconButton(
+                                            onPressed: () {
+                                              _controller.clear();
+                                              _previewInput('');
+                                            },
+                                            icon: const AppIcon(
+                                              AppIcons.x,
+                                              size: 18,
+                                            ),
+                                          ),
+                                  ),
                                 ),
-                              );
-                            },
+                              ),
+                              const SizedBox(height: 12),
+                              FreeClientActionBar(
+                                draft: true,
+                                onPaste: _pasteClipboard,
+                                onScan: () {
+                                  UiLog.action('import', 'scan');
+                                  openFreeClientCapture(context);
+                                },
+                              ),
+                              if (_loadingPreview) ...[
+                                const SizedBox(height: 12),
+                                const SizedBox(
+                                  height: 2,
+                                  child: LinearProgressIndicator(
+                                    color: AppBrand.mascotGold,
+                                    backgroundColor: Colors.transparent,
+                                  ),
+                                ),
+                              ],
+                              if (_error != null) ...[
+                                const SizedBox(height: 12),
+                                _ErrorLine(_errorFor(l)),
+                              ],
+                            ],
                           ),
-                        ],
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                FilledButton(
-                  onPressed: _canSave ? () => _save(connect: true) : null,
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    backgroundColor: theme.colorScheme.primary,
-                    foregroundColor: theme.colorScheme.onPrimary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppBrand.radiusPill),
+                        ),
+                        const SizedBox(height: 12),
+                        // Step 2 — what the link actually brought in.
+                        AppSurface(
+                          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Row(
+                                children: [
+                                  _StepLabel('2', l.freeStepFound),
+                                  const Spacer(),
+                                  if (_preview.isNotEmpty)
+                                    Text(
+                                      '${_preview.length}',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        letterSpacing: 1,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppBrand.mascotGoldLit,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              if (_previewTitle != null &&
+                                  _previewTitle!.isNotEmpty) ...[
+                                const SizedBox(height: 10),
+                                Text(
+                                  _previewTitle!.toUpperCase(),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 1.1,
+                                  ),
+                                ),
+                              ],
+                              const SizedBox(height: 12),
+                              if (_loadingPreview)
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 18),
+                                  child: Center(
+                                    child: SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: AppBrand.mascotGold,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              else if (_error != null &&
+                                  _error != 'no_hy2' &&
+                                  _error != 'hy2_only')
+                                _EmptyPreview(l.freeFieldEmpty)
+                              else if (_preview.isEmpty)
+                                _EmptyPreview(l.freeEmptyBody)
+                              else
+                                for (var i = 0; i < _preview.length; i++) ...[
+                                  if (i > 0) const SizedBox(height: 7),
+                                  Builder(
+                                    builder: (context) {
+                                      final label =
+                                          labelForShareLink(_preview[i]);
+                                      final dialable = canDialScheme(
+                                        _preview[i].scheme,
+                                        ios: false,
+                                      );
+                                      return NodeLine(
+                                        label: label,
+                                        endpoint: dialable
+                                            ? (label.subtitle.isEmpty
+                                                ? _preview[i].endpoint
+                                                : label.subtitle)
+                                            : l.freeSchemeParked,
+                                        selected: false,
+                                        onTap: () {},
+                                      );
+                                    },
+                                  ),
+                                ],
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  child: Text(l.freeSaveConnect),
-                ),
-                const SizedBox(height: 8),
-                OutlinedButton(
-                  onPressed: _canSave ? () => _save(connect: false) : null,
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    foregroundColor: theme.colorScheme.onSurface,
-                    side: BorderSide(
-                      color: theme.colorScheme.outline,
-                      width: 1.4,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppBrand.radiusPill),
+                  const SizedBox(height: 14),
+                  // Two keys, in the app's own key language, primary first.
+                  // One key. «Сохранить» and «Только сохранить» asked the same question with
+                  // two answers, and a person who cannot tell them apart
+                  // guesses. The key saves and dials; if the link has nothing
+                  // dialable in it, the key stays dead and the second step
+                  // says why. It is not stretched: a button across the whole
+                  // measure is a banner, not a key.
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: AppActionButton(
+                      onPressed: _canSave ? () => _save() : null,
+                      icon: AppIcons.check,
+                      label: l.freeSaveConnect,
+                      color: AppBrand.mascotGold,
+                      height: 50,
                     ),
                   ),
-                  child: Text(l.freeSaveOnly),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
+        ),
+      ),
+      ),
+    );
+  }
+
+  String _errorFor(AppL10n l) => switch (_error) {
+        'load' => l.freeSubscriptionLoadFail,
+        'missing' => l.freeSubscriptionMissing,
+        'device_limit' => l.freeSubscriptionDeviceLimit,
+        'client_refused' => l.freeSubscriptionClientRefused,
+        'hy2_only' => l.freeHy2OnlyAdd,
+        'no_hy2' => l.freeNoHy2Lines,
+        _ => l.freeLinkInvalid,
+      };
+}
+
+/// `1 · ССЫЛКА` — the step, in the terminal voice the home head uses.
+class _StepLabel extends StatelessWidget {
+  const _StepLabel(this.step, this.text);
+
+  final String step;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    final mute = dark ? AppBrand.inkMutedDark : AppBrand.inkMutedLight;
+    final rule = Container(height: 1, color: mute.withValues(alpha: 0.16));
+    return LayoutBuilder(
+      builder: (context, box) => Row(
+      children: [
+        Container(
+          width: 16,
+          height: 16,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(
+              color: AppBrand.mascotGold.withValues(alpha: 0.7),
+            ),
+          ),
+          child: Text(
+            step,
+            style: const TextStyle(
+              fontFamily: 'JetBrainsMono',
+              fontSize: 9.5,
+              fontWeight: FontWeight.w700,
+              color: AppBrand.mascotGoldLit,
+            ),
+          ),
+        ),
+        const SizedBox(width: 9),
+        Text(
+          text.toUpperCase(),
+          style: TextStyle(
+            fontSize: 10,
+            letterSpacing: 2.2,
+            fontWeight: FontWeight.w700,
+            color: mute,
+          ),
+        ),
+        const SizedBox(width: 10),
+        // The rule fills what is left, but only where "what is left" exists:
+        // a Row with Expanded under an unbounded width throws, and this label
+        // is also measured inside unbounded probes.
+        if (box.hasBoundedWidth) Expanded(child: rule) else rule,
+      ],
+      ),
+    );
+  }
+}
+
+class _ErrorLine extends StatelessWidget {
+  const _ErrorLine(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(11, 9, 11, 10),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.error.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border(
+          left: BorderSide(
+            color: Theme.of(context).colorScheme.error.withValues(alpha: 0.8),
+            width: 2.5,
+          ),
+        ),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 13,
+          height: 1.4,
+          color: Theme.of(context).colorScheme.error,
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyPreview extends StatelessWidget {
+  const _EmptyPreview(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    final mute = dark ? AppBrand.inkMutedDark : AppBrand.inkMutedLight;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      child: Text(
+        text,
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: mute.withValues(alpha: 0.8),
+          fontSize: 13.5,
         ),
       ),
     );

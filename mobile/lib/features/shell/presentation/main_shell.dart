@@ -6,12 +6,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/busy/busy_overlay.dart';
-import '../../../core/diagnostics/ui_log.dart';
 import '../../../core/busy/busy_overlay_host.dart';
+import '../../../core/diagnostics/ui_log.dart';
 import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
-import '../../../core/widgets/notebook_paper.dart';
+import '../../../core/widgets/interaction.dart';
+import '../../../core/widgets/mossy_rail.dart';
+import '../../../core/widgets/proxydom_ground.dart';
+import '../../../core/widgets/proxydom_mark.dart';
 import '../../../core/widgets/proxydom_nav_icon.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../home/application/vpn_provider.dart';
@@ -35,7 +38,6 @@ const double _sideGap = 2 * _sideScale;
 const double _sideLabelSize = 13 * _sideScale;
 
 /// Top rule thickness on the nav sheet.
-const double _navBarRuleWidth = 2.5;
 
 /// DOM mark, larger than the nav band and centered on Сервера / Настройки.
 const double _domButtonSize = 62;
@@ -87,6 +89,10 @@ class MainShell extends ConsumerStatefulWidget {
 }
 
 class _MainShellState extends ConsumerState<MainShell> {
+  /// How lit the yard is. The home screen writes to it through
+  /// [GroundGlowScope]; this class owns the painter.
+  final GroundGlow _glow = GroundGlow();
+
   void _onTap(int index) {
     const names = ['servers', 'home', 'settings'];
     final name = index >= 0 && index < names.length ? names[index] : '$index';
@@ -118,9 +124,26 @@ class _MainShellState extends ConsumerState<MainShell> {
     final l = AppL10n.of(context);
     final theme = Theme.of(context);
     final selected = widget.navigationShell.currentIndex;
-    final paper = theme.brightness == Brightness.dark
-        ? AppBrand.paperDark
-        : AppBrand.paperLight;
+    final dark = theme.brightness == Brightness.dark;
+
+    // The night is behind everything, and the rail sits on it like furniture
+    // in a room. Both platforms share it — the house is the only light source
+    // in the app, and it should light the window the same way.
+    Widget page = widget.navigationShell;
+
+    if (windowsDesktop) {
+      page = Row(
+        children: [
+          WindowsNavRail(selected: selected, onSelect: _onTap),
+          Expanded(child: page),
+        ],
+      );
+      return _yard(
+        context,
+        child: Scaffold(backgroundColor: Colors.transparent, body: page),
+      );
+    }
+
     final bar = SafeArea(
       top: false,
       child: SizedBox(
@@ -156,94 +179,314 @@ class _MainShellState extends ConsumerState<MainShell> {
         ),
       ),
     );
-    return Stack(
-      children: [
-        Scaffold(
-          backgroundColor: paper,
-          body: _PaperStatusScrim(
-            dark: theme.brightness == Brightness.dark,
-            child: NotebookPaper(child: widget.navigationShell),
-          ),
-          bottomNavigationBar: NotebookPaper(
-            emphasized: true,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                border: Border(
-                  top: BorderSide(
-                    color: AppBrand.paperMargin.withValues(alpha: 0.72),
-                    width: _navBarRuleWidth,
-                  ),
-                ),
-              ),
+    return _yard(
+      context,
+      child: Stack(
+        children: [
+          Scaffold(
+            backgroundColor: Colors.transparent,
+            body: _StatusBarStyle(dark: dark, child: page),
+            bottomNavigationBar: MossySlab(
+              light: !dark,
               child: bar,
             ),
           ),
-        ),
-        Positioned(
-          left: 0,
-          right: 0,
-          height: _domButtonSize,
-          bottom: _domButtonBottom(MediaQuery.paddingOf(context).bottom),
-          child: Center(
-            child: _CenterNavMark(
-              selected: selected == MainShell.homeIndex,
-              semanticLabel: l.navVpn,
-              onTap: () => _onTap(MainShell.homeIndex),
+          Positioned(
+            left: 0,
+            right: 0,
+            height: _domButtonSize,
+            bottom: _domButtonBottom(MediaQuery.paddingOf(context).bottom),
+            child: Center(
+              child: _CenterNavMark(
+                selected: selected == MainShell.homeIndex,
+                semanticLabel: l.navVpn,
+                onTap: () => _onTap(MainShell.homeIndex),
+              ),
             ),
           ),
-        ),
-        const BusyOverlayHost(),
-      ],
+          const BusyOverlayHost(),
+        ],
+      ),
+    );
+  }
+
+  /// Puts the night behind a screen and publishes the glow to whatever is on
+  /// top, so the home can wake the yard from inside a nested navigator.
+  ///
+  /// A window has a pointer, so the yard answers it: the background layers
+  /// shift at different rates with the cursor. A phone has no pointer, and
+  /// there the painter drifts on its own clock instead.
+  Widget _yard(BuildContext context, {required Widget child}) {
+    final body = GroundGlowScope(
+      notifier: _glow,
+      child: ListenableBuilder(
+        listenable: _glow,
+        builder: (context, _) => ProxydomGround(state: _glow, child: child),
+      ),
+    );
+    if (!windowsDesktop) return body;
+    return MouseRegion(
+      onHover: (event) {
+        final box = context.findRenderObject() as RenderBox?;
+        if (box == null || !box.hasSize) return;
+        _glow
+          ..pointerDriven = true
+          ..pointer = Offset(
+            ((event.localPosition.dx / box.size.width) - 0.5).clamp(-1.0, 1.0),
+            ((event.localPosition.dy / box.size.height) - 0.5).clamp(-1.0, 1.0),
+          );
+      },
+      onExit: (_) => _glow.pointer = Offset.zero,
+      child: body,
     );
   }
 }
 
-/// Status band. Same sheet as the bar under Сервера / Home / Настройки.
-/// The margin rule sits on the bottom edge, facing the page.
-class _PaperStatusScrim extends StatelessWidget {
-  const _PaperStatusScrim({
-    required this.dark,
-    required this.child,
+/// Desktop navigation rail.
+///
+/// Same three destinations as the phone dock, drawn the way a window draws
+/// them: a mark, then a vertical list of items where the selected one is a lit
+/// plate with an accent bar, and where the pointer gets hover and the keyboard
+/// gets a focus ring.
+///
+/// Public so the shell and the capture harness render the same widget.
+class WindowsNavRail extends StatelessWidget {
+  const WindowsNavRail({
+    super.key,
+    required this.selected,
+    required this.onSelect,
   });
+
+  final int selected;
+
+  final ValueChanged<int> onSelect;
+
+  static const double width = 212;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final l = AppL10n.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    final ink = dark ? AppBrand.inkDark : AppBrand.inkLight;
+    final mute = dark ? AppBrand.inkMutedDark : AppBrand.inkMutedLight;
+
+    final items = <({IconData icon, String label, int index})>[
+      (
+        icon: AppIcons.mapPin,
+        label: Localizations.localeOf(context).languageCode == 'ru'
+            ? 'Сервера'
+            : 'Servers',
+        index: MainShell.locationsIndex,
+      ),
+      (icon: AppIcons.house, label: l.navVpn, index: MainShell.homeIndex),
+      (
+        icon: AppIcons.settings,
+        label: l.navSettings,
+        index: MainShell.settingsIndex,
+      ),
+    ];
+
+    return MossyRail(
+      light: !dark,
+      child: SizedBox(
+        width: width,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 22, 14, 18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(left: 6, bottom: 26),
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        Localizations.localeOf(context).languageCode == 'ru'
+                            ? 'Прокси Дом'
+                            : 'Proxy Dom',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: ink,
+                          // The wordmark carries the weight the monogram used
+                          // to: the mark sits beside it now, not before it.
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.6,
+                          fontSize: 17,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // The DOM mark beside the name: the mascot in monochrome
+                    // with the letters cut out of it. It was a badge before the
+                    // name; a mark after it reads as a signature.
+                    ProxyDomMark(size: 26, ink: ink),
+                  ],
+                ),
+              ),
+              for (final item in items)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: _RailItem(
+                    icon: item.icon,
+                    label: item.label,
+                    selected: item.index == selected,
+                    onTap: () => onSelect(item.index),
+                  ),
+                ),
+              const Spacer(),
+              Padding(
+                padding: const EdgeInsets.only(left: 12, right: 4),
+                child: Text(
+                  Localizations.localeOf(context).languageCode == 'ru'
+                      ? 'Прокси Дом · утилита'
+                      : 'Proxy Dom · utility',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: mute.withValues(alpha: 0.65),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RailItem extends StatefulWidget {
+  const _RailItem({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  State<_RailItem> createState() => _RailItemState();
+}
+
+class _RailItemState extends State<_RailItem> {
+  final FocusNode _focus = FocusNode(debugLabel: 'RailItem');
+
+  @override
+  void dispose() {
+    _focus.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    final ink = dark ? AppBrand.inkDark : AppBrand.inkLight;
+
+    return Semantics(
+      button: true,
+      selected: widget.selected,
+      label: widget.label,
+      child: HoverBuilder(
+        onTap: widget.onTap,
+        focusNode: _focus,
+        onKeyActivate: widget.onTap,
+        builder: (context, hovered) {
+          final fill = widget.selected
+              ? (dark
+                    ? AppBrand.mossDeep.withValues(alpha: 0.92)
+                    : AppBrand.mossLight.withValues(alpha: 0.12))
+              : hovered
+                  ? (dark
+                        ? AppBrand.lightSource.withValues(alpha: 0.045)
+                        : AppBrand.inkLight.withValues(alpha: 0.035))
+                  : null;
+          return AnimatedContainer(
+            duration: AppBrand.motionReveal,
+            curve: AppBrand.motionRevealCurve,
+            padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
+            decoration: BoxDecoration(
+              color: fill,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: widget.selected
+                    ? (dark
+                          ? AppBrand.moss.withValues(alpha: 0.35)
+                          : AppBrand.moss.withValues(alpha: 0.28))
+                    : Colors.transparent,
+              ),
+            ),
+            child: Row(
+              children: [
+                // The accent bar is moss: the selection belongs to the stone the
+                // rail is made of, not to the house on the other side of it.
+                AnimatedContainer(
+                  duration: AppBrand.motionReveal,
+                  curve: AppBrand.motionRevealCurve,
+                  width: 3,
+                  height: 20,
+                  margin: const EdgeInsets.only(right: 11),
+                  decoration: BoxDecoration(
+                    color: widget.selected
+                        ? (dark ? AppBrand.mossLight : AppBrand.moss)
+                        : AppBrand.shadeSource.withValues(alpha: 0.0),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                AppIcon(
+                  widget.icon,
+                  size: 19,
+                  color: widget.selected
+                      ? (dark ? AppBrand.mossLight : AppBrand.moss)
+                      : ink.withValues(alpha: 0.78),
+                ),
+                const SizedBox(width: 11),
+                Flexible(
+                  child: Text(
+                    widget.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: ink,
+                      fontSize: 14.5,
+                      fontWeight:
+                          widget.selected ? FontWeight.w700 : FontWeight.w600,
+                      letterSpacing: -0.1,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Status-bar band. The night runs under it on the phone, so the only job
+/// left is telling the system which way the icons should be drawn.
+class _StatusBarStyle extends StatelessWidget {
+  const _StatusBarStyle({required this.dark, required this.child});
 
   final bool dark;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    final top = MediaQuery.paddingOf(context).top;
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: dark ? Brightness.light : Brightness.dark,
         statusBarBrightness: dark ? Brightness.dark : Brightness.light,
       ),
-      child: Stack(
-        children: [
-          child,
-          if (top > 0)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              height: top,
-              child: NotebookPaper(
-                emphasized: true,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    border: Border(
-                      bottom: BorderSide(
-                        color: AppBrand.paperMargin.withValues(alpha: 0.72),
-                        width: _navBarRuleWidth,
-                      ),
-                    ),
-                  ),
-                  child: const SizedBox.expand(),
-                ),
-              ),
-            ),
-        ],
-      ),
+      child: child,
     );
   }
 }
@@ -266,8 +509,11 @@ class _SideNavGlyph extends StatelessWidget {
     final theme = Theme.of(context);
     final dark = theme.brightness == Brightness.dark;
     final ink = dark ? AppBrand.inkDark : AppBrand.inkLight;
-    final chip =
-        dark ? AppBrand.surfaceVariantDark : AppBrand.surfaceElevatedLight;
+    // The active place wears moss, like the rail's selected item: the
+    // selection belongs to the slab, not to the house above it.
+    final tint = selected
+        ? (dark ? AppBrand.mossLight : AppBrand.moss)
+        : ink.withValues(alpha: 0.72);
 
     return InkWell(
       onTap: onTap,
@@ -282,15 +528,20 @@ class _SideNavGlyph extends StatelessWidget {
               vertical: _sidePadV,
             ),
             decoration: BoxDecoration(
-              color: chip,
+              color: selected
+                  ? (dark
+                        ? AppBrand.mossDeep.withValues(alpha: 0.92)
+                        : AppBrand.mossLight.withValues(alpha: 0.12))
+                  : Colors.transparent,
               borderRadius: BorderRadius.circular(AppBrand.radiusNavPill),
               border: Border.all(
-                color:
-                    selected ? AppBrand.paperMargin : theme.colorScheme.outline,
-                width: selected ? 1.6 : 1,
+                color: selected
+                    ? AppBrand.moss.withValues(alpha: 0.4)
+                    : Colors.transparent,
+                width: 1,
               ),
             ),
-            child: AppIcon(icon, size: _sideIconSize, color: ink),
+            child: AppIcon(icon, size: _sideIconSize, color: tint),
           ),
           const SizedBox(height: _sideGap),
           Text(
@@ -298,7 +549,7 @@ class _SideNavGlyph extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: theme.textTheme.labelSmall?.copyWith(
-              color: ink,
+              color: tint,
               fontSize: _sideLabelSize,
               height: 1,
               fontWeight: FontWeight.w700,

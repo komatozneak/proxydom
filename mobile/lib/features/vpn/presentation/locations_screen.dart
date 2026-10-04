@@ -20,7 +20,8 @@ import '../data/route_document.dart';
 import '../data/subscription_label.dart';
 import '../data/subscription_notice.dart';
 import 'free_client_chrome.dart';
-import 'pool_server_mark.dart';
+import 'server_instrument.dart';
+import 'server_instrument_parts.dart';
 import 'subscription_notice_view.dart';
 import '../data/share_link_parser.dart';
 
@@ -323,166 +324,104 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     return (premium: premium, general: general);
   }
 
-  Widget _poolSection(ThemeData theme, String title, List<int> indexes) {
-    if (indexes.isEmpty) return const SizedBox.shrink();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-          child: Text(title, style: theme.textTheme.titleSmall),
-        ),
-        for (final index in indexes) _poolRow(index),
-      ],
-    );
-  }
-
-  Widget _poolRow(int index) {
-    final link = _imported[index];
-    final label = labelForShareLink(link);
-    final selected = _selectedId == '$index';
-    final theme = Theme.of(context);
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-      leading: PoolServerMark(label: label),
-      title: Text(label.title),
-      subtitle: Text(label.subtitle.isEmpty ? link.endpoint : label.subtitle),
-      selected: selected,
-      selectedTileColor: theme.colorScheme.primaryContainer,
-      onTap: () => _chooseImported(index),
-    );
-  }
-
-  /// Fixed square. A progress indicator in a stretched row otherwise grows into
-  /// a wide ellipse and the refresh cell no longer matches the icon buttons.
-  Widget _catalogIconButton({
-    Key? key,
-    required String tooltip,
-    required VoidCallback? onTap,
-    required Widget icon,
-  }) {
-    return Tooltip(
-      key: key,
-      message: tooltip,
-      child: InkWell(
-        onTap: onTap,
-        child: Center(child: icon),
-      ),
-    );
-  }
-
   Widget _catalogCard(ThemeData theme, AppL10n l, ShareCatalog catalog) {
     final title = catalog.title.trim().isEmpty ? l.freeServers : catalog.title;
     final lines = _catalogLineIndexes(catalog);
-    final hasLines = lines.premium.isNotEmpty || lines.general.isNotEmpty;
     final notice = profileNotice(
       announce: catalog.announce,
       supportUrl: catalog.supportUrl,
     );
-    final dark = theme.brightness == Brightness.dark;
-    final showRefresh = catalog.url != null && catalog.url!.isNotEmpty;
     final planeUrl = notice.planeUrl?.trim() ?? '';
-    final parkPlane = planeUrl.isNotEmpty;
-    final onFill = dark ? AppBrand.inkDark : AppBrand.inkLight;
-    final band = dark ? AppBrand.noticeBandDark : AppBrand.noticeBand;
     final noticeBody = notice.text?.trim() ?? '';
-    return Material(
-      color: theme.colorScheme.surfaceContainerHighest,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppBrand.radiusCard),
-        side: BorderSide(color: theme.colorScheme.outline),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          CatalogProfileChrome(
-            title: Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
+    final handle = _keyHandle(catalog);
+    final selectedLabel = _selectedLabel();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: ProfileInstrument(
+        title: title,
+        description: noticeBody,
+        facts: profileFacts(
+          trafficMeta: catalog.trafficMeta,
+          lastUpdated: catalog.lastUpdated,
+          russian: Localizations.localeOf(context).languageCode == 'ru',
+          keyHandle: handle,
+        ),
+        selected: _catalogIsSelected(catalog),
+        onSelect: () => _chooseCatalog(catalog),
+        onNodeTap: (_) {},
+        nodes: [
+          for (final index in [...lines.premium, ...lines.general])
+            NodeLine(
+              label: labelForShareLink(_imported[index]),
+              endpoint: _imported[index].endpoint,
+              selected: _selectedId == '$index',
+              onTap: () => _chooseImported(index),
             ),
-            share: _catalogIconButton(
-              tooltip: l.freeSharePool,
-              onTap: () => _shareCatalog(catalog),
-              icon: const AppIcon(AppIcons.share, size: 20),
-            ),
-            refresh: showRefresh
-                ? _catalogIconButton(
-                    tooltip: l.freeRefresh,
-                    onTap: _refreshing.contains(catalog.id)
-                        ? null
-                        : () => _refreshCatalog(catalog),
-                    icon: _refreshing.contains(catalog.id)
-                        ? SizedBox.square(
-                            dimension: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: onFill,
-                              constraints: const BoxConstraints.tightFor(
-                                width: 20,
-                                height: 20,
-                              ),
-                            ),
-                          )
-                        : AppIcon(AppIcons.refresh, size: 20, color: onFill),
-                  )
-                : null,
-            plane: parkPlane
-                ? _catalogIconButton(
-                    key: kSubscriptionNoticePlaneKey,
-                    tooltip: subscriptionPlaneIsTelegram(planeUrl)
-                        ? 'Telegram'
-                        : 'Link',
-                    onTap: () => openSubscriptionPlane(planeUrl),
-                    icon: AppIcon(
-                      subscriptionPlaneIsTelegram(planeUrl)
-                          ? AppIcons.paperPlane
-                          : AppIcons.link,
-                      size: 22,
-                      color: catalogPlaneInk(dark: dark),
-                    ),
-                  )
-                : null,
-            trash: _catalogIconButton(
-              tooltip: l.freeDelete,
-              onTap: () => _deleteProfile(catalog.id),
-              icon: const AppIcon(
-                AppIcons.trash,
-                size: 20,
-                color: AppBrand.surfaceElevatedLight,
-              ),
-            ),
-            band: band,
-            trashFill: catalogTrashFill(
-              theme.colorScheme.surfaceContainerHighest,
-              dark: dark,
-            ),
-            seamColor: theme.colorScheme.outline,
-            notice: noticeBody.isEmpty
-                ? null
-                : SubscriptionNoticeView(
-                    text: notice.text,
-                    planeUrl: notice.planeUrl,
-                    frame: false,
-                    showPlane: false,
-                  ),
-          ),
-          if (hasLines) ...[
-            Divider(
-              height: 1,
-              thickness: 1,
-              color: theme.colorScheme.outline,
-            ),
-            _poolSection(theme, l.freePoolMarked, lines.premium),
-            _poolSection(theme, l.freePoolGeneral, lines.general),
-            const SizedBox(height: 8),
-          ],
         ],
+        selectedNodeTitle: selectedLabel,
+        telegramLabel: subscriptionPlaneIsTelegram(planeUrl)
+            ? l.freeTelegram
+            : l.freeSharePool,
+        onTelegram: planeUrl.isEmpty
+            ? null
+            : () => openSubscriptionPlane(planeUrl),
+        onRefresh: catalog.url == null || catalog.url!.isEmpty
+            ? null
+            : () => _refreshCatalog(catalog),
+        refreshing: _refreshing.contains(catalog.id),
+        onShare: catalog.subscriptionKey == null
+            ? null
+            : () => _shareCatalog(catalog),
+        onDelete: () => _deleteProfile(catalog.id),
+        showTelegraph: planeUrl.isNotEmpty,
       ),
+    );
+  }
+
+  /// The short handle a person recognises their own key by, taken from the
+  /// document address: `2aq93K0s`. It is the one string worth showing next to
+  /// the name.
+  String _keyHandle(ShareCatalog catalog) {
+    final text = catalog.subscriptionKey?.trim() ?? '';
+    if (text.isEmpty) return '';
+    if (!text.startsWith('http')) return '';
+    final uri = Uri.tryParse(text);
+    final segment = uri?.pathSegments.isNotEmpty == true
+        ? uri!.pathSegments.last
+        : '';
+    if (segment.length < 6) return '';
+    return segment.substring(0, 7);
+  }
+
+  String _selectedLabel() {
+    final index = int.tryParse(_selectedId ?? '');
+    if (index == null || index < 0 || index >= _imported.length) return '';
+    return labelForShareLink(_imported[index]).title;
+  }
+
+  bool _catalogIsSelected(ShareCatalog catalog) {
+    for (final raw in catalog.lines) {
+      final index = _imported.indexWhere((link) => link.raw == raw);
+      if (index >= 0 && _selectedId == '$index') return true;
+    }
+    return false;
+  }
+
+  Future<void> _chooseCatalog(ShareCatalog catalog) async {
+    for (final raw in catalog.lines) {
+      final index = _imported.indexWhere((link) => link.raw == raw);
+      if (index < 0) continue;
+      final link = _imported[index];
+      if (!canDialScheme(link.scheme, ios: false)) continue;
+      await _chooseImported(index, scheme: link.scheme);
+      return;
+    }
+    UiLog.action(
+      'locations',
+      'pick_profile',
+      result: 'rejected',
+      reason: 'no_dialable_line',
     );
   }
 

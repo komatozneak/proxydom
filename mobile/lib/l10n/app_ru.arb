@@ -21,7 +21,7 @@
   "homeRegion": "Регион",
   "homeSettings": "Настройки",
   "navHome": "Главная",
-  "navVpn": "VPN",
+  "navVpn": "Подключение",
   "navLocations": "Локации",
   "navModes": "Режимы",
   "homeTrafficRemainder": "Остаток трафика",
@@ -608,6 +608,15 @@
   "freeSchemeParked": "Подключение недоступно (протокол не поддерживается клиентом).",
   "freePoolGeneral": "Общего назначения",
   "freeSearch": "Поиск серверов",
+  "locationsNodes": "Узлы",
+  "locationsSelected": "ВЫБРАН",
+  "locationsActive": "активен",
+  "locationsNotUsed": "НЕ ВЫБРАН",
+  "locationsUseIt": "Подключить",
+  "locationsInUse": "Подключено",
+  "locationsShareKey": "Ключ",
+  "freeTelegram": "Telegram",
+  "locationsKeyHandle": "ключ",
   "freeDelete": "Удалить",
   "freeDeleteServerTitle": "Удалить этот сервер?",
   "freeDeleteServerBody": "Ссылка сотрётся с этого телефона.",
@@ -622,5 +631,8 @@
       }
     }
   },
-  "freeRefreshFail": "Не удалось обновить"
+  "freeRefreshFail": "Не удалось обновить",
+  "freeStepLink": "Ссылка",
+  "freeStepFound": "Найдено",
+  "freeFieldEmpty": "Пока пусто. Вставьте ссылку — и мир увидит что внутри."
 }

@@ -110,7 +110,8 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 2));
 
-    expect(find.text('Не подключено'), findsOneWidget);
+    // The terminal head sets its fields in caps.
+    expect(find.text('НЕ ПОДКЛЮЧЕНО'), findsOneWidget);
     expect(find.byType(ServerCard), findsNothing);
     expect(find.text('Что работает без VPN?'), findsNothing);
     expect(find.text('1 / 1'), findsNothing);

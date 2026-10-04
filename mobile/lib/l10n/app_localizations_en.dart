@@ -72,7 +72,7 @@ class AppL10nEn extends AppL10n {
   String get navHome => 'Home';
 
   @override
-  String get navVpn => 'VPN';
+  String get navVpn => 'Tunnel';
 
   @override
   String get navLocations => 'Locations';
@@ -1498,6 +1498,33 @@ class AppL10nEn extends AppL10n {
   String get freeSearch => 'Search servers';
 
   @override
+  String get locationsNodes => 'Nodes';
+
+  @override
+  String get locationsSelected => 'IN USE';
+
+  @override
+  String get locationsActive => 'active';
+
+  @override
+  String get locationsNotUsed => 'NOT USED';
+
+  @override
+  String get locationsUseIt => 'Connect';
+
+  @override
+  String get locationsInUse => 'Connected';
+
+  @override
+  String get locationsShareKey => 'Key';
+
+  @override
+  String get freeTelegram => 'Telegram';
+
+  @override
+  String get locationsKeyHandle => 'key';
+
+  @override
   String get freeDelete => 'Remove';
 
   @override
@@ -1523,4 +1550,14 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get freeRefreshFail => 'Could not refresh';
+
+  @override
+  String get freeStepLink => 'LINK';
+
+  @override
+  String get freeStepFound => 'FOUND';
+
+  @override
+  String get freeFieldEmpty =>
+      'Empty for now. Paste a link and we will see what is inside.';
 }

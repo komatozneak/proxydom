@@ -2,66 +2,77 @@ import 'package:flutter/material.dart';
 
 import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
+import '../../../core/widgets/app_action_button.dart';
 import '../../../core/widgets/app_icon.dart';
+import '../../../core/widgets/app_surface.dart';
 import '../../../l10n/app_localizations.dart';
+import '../data/subscription_label.dart';
+import 'server_glyph.dart';
 
 /// Paste, and on the phone a matching QR. Windows has no camera and no QR.
 ///
 /// [onRefresh] reloads saved subscription documents. On the phone it is a
-/// small circular-arrow control beside QR. On Windows it is a labeled button
-/// beside Paste. Three roles, three colours: paste stays moss ([AppBrand.secondary]),
-/// QR takes the house amber ([AppBrand.actionAmber]), refresh the sky
-/// ([AppBrand.actionSky]) — none of them borrows the notebook-margin orange.
+/// small ring control beside QR; on Windows it is a full key beside Paste.
+/// Every action wears a colour sampled off the mascot: paste takes the house
+/// gold, QR the ember under it, and the reload only a ring of the same light —
+/// the yard is already busy enough.
 class FreeClientActionBar extends StatelessWidget {
   const FreeClientActionBar({
     super.key,
     required this.onPaste,
     required this.onScan,
     this.onRefresh,
+    this.draft = false,
   });
 
   final VoidCallback onPaste;
   final VoidCallback onScan;
   final VoidCallback? onRefresh;
 
+  /// True on the import screen's first step.
+  ///
+  /// There the key does not add a server — the server is added by the key at
+  /// the bottom of the screen — it puts the clipboard into the field above.
+  /// Saying «Добавить сервер» twice on one screen made a person wonder which
+  /// one actually adds it. Nothing here reloads either: there is nothing saved
+  /// yet to reload.
+  final bool draft;
+
   @override
   Widget build(BuildContext context) {
     final l = AppL10n.of(context);
-    final shape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(AppBrand.radiusPill),
-    );
-    const pad = EdgeInsets.symmetric(horizontal: 12, vertical: 14);
-    const barHeight = 52.0;
-    final paste = _action(
+    const barHeight = 54.0;
+    const gap = SizedBox(width: 10);
+    // Add server is the primary: it is the only thing a person has to do to get
+    // this screen to work, so it wears the house's own gold. Reload wears the
+    // cool counterpart — the same harmony read from the other side of the
+    // wheel, and the colour says "this talks to the network" without a word.
+    final add = AppActionButton(
       onPressed: onPaste,
-      icon: AppIcons.clipboard,
-      label: l.freePaste,
-      background: AppBrand.secondary,
-      foreground: AppBrand.surfaceElevatedLight,
-      shape: shape,
-      pad: pad,
+      icon: draft ? AppIcons.clipboard : AppIcons.plus,
+      label: draft ? l.freePaste : l.freeAddServer,
+      color: AppBrand.mascotGold,
       height: barHeight,
     );
-    final refresh = onRefresh;
+    final refresh = draft ? null : onRefresh;
     if (windowsDesktop) {
+      // Windows has no camera, so the reload takes the free slot as a full key.
       if (refresh == null) {
-        return SizedBox(height: barHeight, width: double.infinity, child: paste);
+        return SizedBox(
+            height: barHeight, width: double.infinity, child: add);
       }
       return SizedBox(
         height: barHeight,
         child: Row(
           children: [
-            Expanded(child: paste),
-            const SizedBox(width: 8),
+            Expanded(child: add),
+            gap,
             Expanded(
-              child: _action(
+              child: AppActionButton(
                 onPressed: refresh,
                 icon: AppIcons.refresh,
                 label: l.freeRefresh,
-                background: AppBrand.actionSky,
-                foreground: AppBrand.inkLight,
-                shape: shape,
-                pad: pad,
+                color: AppBrand.actionSky,
                 height: barHeight,
               ),
             ),
@@ -73,90 +84,24 @@ class FreeClientActionBar extends StatelessWidget {
       height: barHeight,
       child: Row(
         children: [
-          Expanded(child: paste),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _action(
-              onPressed: onScan,
-              icon: AppIcons.qrCode,
-              label: l.freeQr,
-              background: AppBrand.actionAmber,
-              foreground: AppBrand.inkLight,
-              shape: shape,
-              pad: pad,
-              height: barHeight,
-            ),
+          Expanded(child: add),
+          gap,
+          AppRingButton(
+            icon: AppIcons.refresh,
+            color: AppBrand.actionSky,
+            onPressed: refresh,
+            tooltip: l.freeRefresh,
+            size: barHeight,
           ),
-          if (refresh != null) ...[
-            const SizedBox(width: 8),
-            _PhoneRefreshButton(onPressed: refresh, tooltip: l.freeRefresh),
-          ],
+          gap,
+          AppRingButton(
+            icon: AppIcons.qrCode,
+            color: AppBrand.mascotGoldDeep,
+            onPressed: onScan,
+            tooltip: l.freeQr,
+            size: barHeight,
+          ),
         ],
-      ),
-    );
-  }
-
-  Widget _action({
-    required VoidCallback onPressed,
-    required IconData icon,
-    required String label,
-    required Color background,
-    required Color foreground,
-    required OutlinedBorder shape,
-    required EdgeInsets pad,
-    required double height,
-  }) {
-    return SizedBox(
-      height: height,
-      width: double.infinity,
-      child: FilledButton.icon(
-        onPressed: onPressed,
-        icon: AppIcon(icon, size: 18, color: foreground),
-        label: Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        style: FilledButton.styleFrom(
-          padding: pad,
-          minimumSize: Size(double.infinity, height),
-          fixedSize: Size.fromHeight(height),
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          shape: shape,
-          backgroundColor: background,
-          foregroundColor: foreground,
-        ),
-      ),
-    );
-  }
-}
-
-/// Phone-only reload. No caption: the circular arrows are the label.
-/// Sky fill, so the reload reads as its own thing next to the amber QR.
-class _PhoneRefreshButton extends StatelessWidget {
-  const _PhoneRefreshButton({
-    required this.onPressed,
-    required this.tooltip,
-  });
-
-  final VoidCallback onPressed;
-  final String tooltip;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 40,
-      height: 40,
-      child: IconButton(
-        tooltip: tooltip,
-        onPressed: onPressed,
-        padding: EdgeInsets.zero,
-        style: IconButton.styleFrom(
-          backgroundColor: AppBrand.actionSky,
-          foregroundColor: AppBrand.inkLight,
-          shape: const CircleBorder(),
-        ),
-        icon: const AppIcon(AppIcons.refresh, size: 20, color: AppBrand.inkLight),
       ),
     );
   }
@@ -210,7 +155,391 @@ class FreeClientEmptyState extends StatelessWidget {
   }
 }
 
-/// Structured connection facts with notebook-style dots and ruled rows.
+/// The head of the home screen: a quiet terminal.
+///
+/// Not the green-on-black hightech cliché — this is a lamp on a night, read at
+/// a glance. Monospace and letterspaced so the numbers line up like an
+/// instrument, warm gold instead of neon, and nothing brighter than the house
+/// itself. The three fields are spread across the width with the state in the
+/// middle: where it is going, what it is doing, how long it has been up.
+class ConnectionTerminal extends StatelessWidget {
+  const ConnectionTerminal({
+    super.key,
+    required this.status,
+    required this.serverName,
+    required this.accent,
+    this.tile = PoolTile.flag,
+    this.serverFlag,
+    this.uptime,
+    this.trafficLabel,
+    this.trafficUsed = 0,
+    this.trafficCap = 0,
+    this.trafficColor,
+  });
+
+  final String status;
+
+  /// The server, with its flag, inside the terminal next to the state.
+  final String serverName;
+  final String? serverFlag;
+
+  /// What the mark beside the name is: a country, YouTube, or a gamepad.
+  final PoolTile tile;
+
+  final Color accent;
+  final String? uptime;
+  final String? trafficLabel;
+
+  /// Fraction of the cap already spent, 0…1. Zero cap means unlimited.
+  final double trafficUsed;
+  final double trafficCap;
+
+  final Color? trafficColor;
+
+  /// The terminal's own type.
+///
+/// A real monospace, bundled: JetBrains Mono has native Cyrillic, which the
+/// platform's `monospace` does not promise and which showed up as tofu on a
+/// machine with no mono installed. Everything else is Onest.
+TextStyle _mono(
+    BuildContext context, {
+    required double size,
+    required Color color,
+    double weight = 600,
+    double spacing = 1.1,
+  }) {
+    return TextStyle(
+      fontFamily: 'JetBrainsMono',
+      fontFamilyFallback: const ['Onest', 'Inter'],
+      fontSize: size,
+      fontWeight: weight >= 700 ? FontWeight.w700 : FontWeight.w400,
+      color: color,
+      letterSpacing: spacing,
+      height: 1.2,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    final mute = dark ? AppBrand.inkMutedDark : AppBrand.inkMutedLight;
+    final ink = theme.colorScheme.onSurface;
+    final capped = trafficCap > 0;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // No label line.
+        //
+        // It said «ПОДКЛЮЧЕНИЕ», which is the name of the tab the person is
+        // already standing on — the rail and the bottom bar both say it — and
+        // it put the word «подключение» three lines above the word
+        // «подключено». One screen, one name, one state: the head opens with
+        // the node.
+        //
+        // Where you are, in the middle and large.
+        Center(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // The same mark the profile list draws for this node. It was a
+              // globe here and a red YouTube tile there, for the same line:
+              // one node, one mark, wherever it appears.
+              if (tile == PoolTile.flag) ...[
+                FlagMark(flag: serverFlag ?? '', width: 38),
+                const SizedBox(width: 12),
+              ] else ...[
+                ServerGlyph(
+                  label: PoolServerLabel(
+                    title: serverName,
+                    subtitle: '',
+                    tile: tile,
+                    flag: '',
+                  ),
+                  size: 38,
+                ),
+                const SizedBox(width: 12),
+              ],
+              Flexible(
+                child: Text(
+                  serverName.toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: _mono(
+                    context,
+                    size: 21,
+                    color: ink,
+                    weight: 700,
+                    spacing: 1.6,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        // The state under it, small: the lamp is the signal, the word is the
+        // caption. Centred, because everything above it is — and the clock on
+        // the counter at the right, the one other reading that belongs to the
+        // screen rather than to the state.
+        Row(
+          children: [
+            Expanded(
+              child: Center(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _Lamp(color: accent, size: 8),
+                    const SizedBox(width: 9),
+                    Flexible(
+                      child: Text(
+                        status.toUpperCase(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: _mono(
+                          context,
+                          size: 11,
+                          color: accent,
+                          weight: 700,
+                          spacing: 2.2,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (windowsDesktop && uptime != null) ...[
+              const SizedBox(width: 10),
+              _uptimeField(context, ink, mute, uptime),
+            ],
+          ],
+        ),
+        const SizedBox(height: 16),
+        // The rail the traffic runs on, with the spent GB at its end.
+        _TrafficRail(
+          label: trafficLabel ?? '--',
+          value: capped ? trafficUsed.clamp(0.0, 1.0) : 0.0,
+          capped: capped,
+          color: trafficColor ?? accent,
+          mono: _mono,
+        ),
+      ],
+    );
+  }
+
+  /// How long the tunnel has been up, as a caption in the head's top line.
+  ///
+  /// The label sits at the left of that line and the clock at the right, which
+  /// is the same measure the traffic rail keeps: two ends of one rule. It was
+  /// turned on its side for a while, standing perpendicular to the spent GB —
+  /// two measurements at right angles, which is clever and is also the first
+  /// thing a person has to decode on a screen that is meant to be read at a
+  /// glance.
+  Widget _uptimeField(
+    BuildContext context,
+    Color ink,
+    Color mute,
+    String? uptime,
+  ) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'UPTIME',
+          style: _mono(
+            context,
+            size: 9,
+            color: mute.withValues(alpha: 0.7),
+            spacing: 1.4,
+          ),
+        ),
+        const SizedBox(width: 7),
+        Text(
+          uptime ?? '--:--:--',
+          style: _mono(
+            context,
+            size: 12.5,
+            color: ink.withValues(alpha: 0.78),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// A segmented rail of traffic. Blocks, not a smooth bar: this is the one
+/// place on the screen where a number moves, and it should look like it is
+/// being counted rather than like a progress animation.
+class _TrafficRail extends StatelessWidget {
+  const _TrafficRail({
+    required this.label,
+    required this.value,
+    required this.capped,
+    required this.color,
+    required this.mono,
+  });
+
+  final String label;
+  final double value;
+  final bool capped;
+  final Color color;
+  final TextStyle Function(BuildContext, {required double size, required Color color, double weight, double spacing})
+  mono;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    final mute = dark ? AppBrand.inkMutedDark : AppBrand.inkMutedLight;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              'ТРАФИК',
+              style: mono(
+                context,
+                size: 9.5,
+                color: mute.withValues(alpha: 0.75),
+                spacing: 1.8,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: SizedBox(
+                height: 10,
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0, end: value),
+                  duration: const Duration(milliseconds: 700),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, v, _) => CustomPaint(
+                    painter: _SegmentBarPainter(
+                      value: v,
+                      color: color,
+                      night: dark,
+                    ),
+                    isComplex: true,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              label,
+              style: mono(
+                context,
+                size: 11.5,
+                color: color,
+                weight: 700,
+                spacing: 0.6,
+              ).copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
+            ),
+          ],
+        ),
+        if (!capped) ...[
+          const SizedBox(height: 7),
+          Text(
+            'БЕЗ ЛИМИТА',
+            style: mono(
+              context,
+              size: 9.5,
+              color: mute.withValues(alpha: 0.55),
+              spacing: 1.6,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _SegmentBarPainter extends CustomPainter {
+  _SegmentBarPainter({
+    required this.value,
+    required this.color,
+    required this.night,
+  });
+
+  final double value;
+  final Color color;
+
+  /// The two themes need two different rails, not one rail at two opacities.
+  /// On the night the empty cells are the same colour, nearly out: a dark
+  /// groove with light in part of it. On paper that trick disappears — 12% of
+  /// gold on cream is nothing — so the empty cells become ink instead, a real
+  /// groove cut into the sheet, and the filled ones go almost solid because
+  /// there is no dark background to make them glow.
+  final bool night;
+
+  static const int _cells = 26;
+  static const double _gap = 2.4;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cell = (size.width - _gap * (_cells - 1)) / _cells;
+    final filled = (value.clamp(0.0, 1.0) * _cells).roundToDouble();
+    for (var i = 0; i < _cells; i++) {
+      final x = i * (cell + _gap);
+      // The cell under the head glows a little brighter: the leading edge is
+      // where the eye goes.
+      final isHead = (i + 1 - filled).abs() < 0.5 && filled > 0;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(x, 1, cell, size.height - 2),
+          const Radius.circular(1.2),
+        ),
+        Paint()
+          ..color = i < filled
+              ? (isHead
+                    ? color
+                    : color.withValues(alpha: night ? 0.55 : 0.88))
+              : (night
+                    ? color.withValues(alpha: 0.12)
+                    : AppBrand.inkLight.withValues(alpha: 0.16)),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SegmentBarPainter old) =>
+      old.value != value || old.color != color || old.night != night;
+}
+
+/// The status light. A ring around a filled core, lit by the state colour.
+class _Lamp extends StatelessWidget {
+  const _Lamp({required this.color, this.size = 12});
+
+  final Color color;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color,
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.45),
+            blurRadius: 12,
+            spreadRadius: -2,
+          ),
+        ],
+        border: Border.all(color: color.withValues(alpha: 0.55), width: 1),
+      ),
+    );
+  }
+}
+
+/// Instrument panel kept for screens that still want the ruled plate.
 class ConnectionStatusPanel extends StatelessWidget {
   const ConnectionStatusPanel({
     super.key,
@@ -236,98 +565,62 @@ class ConnectionStatusPanel extends StatelessWidget {
     final l = AppL10n.of(context);
     final theme = Theme.of(context);
     final dark = theme.brightness == Brightness.dark;
-    final rule = AppBrand.paperMargin.withValues(alpha: dark ? 0.55 : 0.72);
-    final mute = theme.colorScheme.onSurfaceVariant;
-    final sessionColor = dark ? AppBrand.accentOnDark : AppBrand.inkLight;
+    final mute = dark ? AppBrand.inkMutedDark : AppBrand.inkMutedLight;
 
-    final rows = <({
-      String label,
-      String value,
-      bool underline,
-      bool emphasize,
-      Color? valueColor,
-    })>[
-      (
-        label: l.freeStatus,
-        value: status,
-        underline: true,
-        emphasize: true,
-        valueColor: accent,
-      ),
-      (
-        label: l.freeProfile,
-        value: profile,
-        underline: true,
-        emphasize: false,
-        valueColor: null,
-      ),
+    // The panel stopped being a ruled notebook table and became an instrument:
+    // the label is a caption, the value is the only thing set at reading size,
+    // and the numbers use tabular figures so a ticking clock does not shuffle
+    // the row while it runs.
+    final rows = <({String label, String value, bool numeric, Color? color})>[
+      (label: l.freeStatus, value: status, numeric: false, color: accent),
+      (label: l.freeProfile, value: profile, numeric: false, color: null),
       (
         label: l.freeTrafficLeft,
         value: traffic,
-        underline: uptime != null,
-        emphasize: false,
-        valueColor: trafficColor,
+        numeric: true,
+        color: trafficColor,
       ),
       if (uptime != null)
-        (
-          label: l.freeUptime,
-          value: uptime!,
-          underline: false,
-          emphasize: false,
-          valueColor: sessionColor,
-        ),
+        (label: l.freeUptime, value: uptime!, numeric: true, color: mute),
     ];
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(AppBrand.radiusCard),
-        border: Border.all(color: theme.colorScheme.outline),
-      ),
+    return AppSurface(
+      padding: const EdgeInsets.fromLTRB(16, 11, 16, 11),
       child: IntrinsicHeight(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(
-              child: Column(
-                children: [
-                  for (final row in rows)
-                    _NotebookHalf(
-                      text: row.label,
-                      align: TextAlign.start,
-                      underline: row.underline,
-                      rule: rule,
-                      leadingDot: true,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: mute,
-                      ),
-                    ),
+            // The status light sits on the edge of the plate: the colour reads
+            // before the words do, and every row stays on one baseline.
+            Container(
+              width: 3,
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.75),
+                borderRadius: BorderRadius.circular(2),
+                boxShadow: [
+                  BoxShadow(
+                    color: accent.withValues(alpha: 0.35),
+                    blurRadius: 10,
+                    spreadRadius: -2,
+                  ),
                 ],
               ),
             ),
-            Container(
-              width: 1.2,
-              margin: const EdgeInsets.symmetric(vertical: 2),
-              color: rule,
-            ),
+            const SizedBox(width: 15),
             Expanded(
               child: Column(
                 children: [
-                  for (final row in rows)
-                    _NotebookHalf(
-                      text: row.value,
-                      align: TextAlign.end,
-                      underline: row.underline,
-                      rule: rule,
-                      trailingDot: true,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight:
-                            row.emphasize ? FontWeight.w800 : FontWeight.w700,
-                        color: row.valueColor,
-                      ),
+                  for (final (index, row) in rows.indexed) ...[
+                    if (index > 0) const _PanelRule(),
+                    _InstrumentRow(
+                      label: row.label,
+                      value: row.value,
+                      numeric: row.numeric,
+                      color: row.color,
+                      mute: mute,
+                      emphasize: index == 0,
                     ),
+                  ],
                 ],
               ),
             ),
@@ -338,76 +631,92 @@ class ConnectionStatusPanel extends StatelessWidget {
   }
 }
 
-class _NotebookHalf extends StatelessWidget {
-  const _NotebookHalf({
-    required this.text,
-    required this.align,
-    required this.underline,
-    required this.rule,
-    required this.style,
-    this.leadingDot = false,
-    this.trailingDot = false,
-  });
-
-  final String text;
-  final TextAlign align;
-  final bool underline;
-  final Color rule;
-  final TextStyle? style;
-  final bool leadingDot;
-  final bool trailingDot;
+/// Hairline between instrument rows — a printed rule on the plate, not the
+/// orange margin rule the notebook sheet uses.
+class _PanelRule extends StatelessWidget {
+  const _PanelRule();
 
   @override
   Widget build(BuildContext context) {
-    final mute = Theme.of(context).colorScheme.onSurfaceVariant;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-      decoration: underline
-          ? BoxDecoration(
-              border: Border(
-                bottom: BorderSide(color: rule, width: 1.2),
-              ),
-            )
-          : null,
-      child: Row(
-        children: [
-          if (leadingDot) ...[
-            _NotebookDot(color: mute),
-            const SizedBox(width: 6),
-          ],
-          Expanded(
-            child: Text(
-              text,
-              textAlign: align,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: style,
-            ),
-          ),
-          if (trailingDot) ...[
-            const SizedBox(width: 6),
-            _NotebookDot(color: mute),
-          ],
-        ],
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      // The rule is a printed line, not a band: it borrows no vertical budget
+      // of its own, so three rows stay as short as they were before the panel
+      // became an instrument. Anything else overflows on a 600pt window.
+      padding: const EdgeInsets.symmetric(vertical: 1),
+      child: Container(
+        height: 1,
+        color: dark
+            ? AppBrand.lightSource.withValues(alpha: 0.07)
+            : AppBrand.shadeSource.withValues(alpha: 0.07),
       ),
     );
   }
 }
 
-class _NotebookDot extends StatelessWidget {
-  const _NotebookDot({required this.color});
+class _InstrumentRow extends StatelessWidget {
+  const _InstrumentRow({
+    required this.label,
+    required this.value,
+    required this.numeric,
+    required this.mute,
+    required this.emphasize,
+    this.color,
+  });
 
-  final Color color;
+  final String label;
+  final String value;
+  final bool numeric;
+  final Color mute;
+  final bool emphasize;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 5,
-      height: 5,
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.85),
-        shape: BoxShape.circle,
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        // Caption and value share the row by weight, not 50/50: a status like
+        // «Не подключено» needs more than half the line to set at 16.5pt.
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
+        children: [
+          Flexible(
+            flex: 2,
+            child: Text(
+              label.toUpperCase(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: mute,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.0,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            flex: 3,
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              // The status can be a whole sentence («Служба недоступна»):
+              // one line clipped it. The other rows are short values.
+              maxLines: emphasize ? 2 : 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleSmall?.copyWith(
+                color: color ?? theme.colorScheme.onSurface,
+                fontSize: emphasize ? 16.5 : 15.5,
+                fontWeight: emphasize ? FontWeight.w800 : FontWeight.w600,
+                letterSpacing: -0.2,
+                fontFeatures:
+                    numeric ? const [FontFeature.tabularFigures()] : null,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -446,9 +755,8 @@ class ImportedProfileCard extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppBrand.radiusCard),
         side: BorderSide(
-          color: selected
-              ? theme.colorScheme.primary
-              : theme.colorScheme.outline,
+          color:
+              selected ? theme.colorScheme.primary : theme.colorScheme.outline,
           width: selected ? 1.6 : 1,
         ),
       ),
@@ -485,7 +793,8 @@ class ImportedProfileCard extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (connected)
-              const Icon(AppIcons.checkCircleFill, color: AppBrand.success, size: 18),
+              const Icon(AppIcons.checkCircleFill,
+                  color: AppBrand.success, size: 18),
             if (onDelete != null)
               SheetTintTrashButton(
                 tooltip: l.freeDelete,
