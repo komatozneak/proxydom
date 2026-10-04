@@ -804,7 +804,7 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get settingsQsTileRemoveBody =>
-      'Потяните шторку вниз, нажмите карандаш и перетащите «Прокси Дом» наверх.';
+      'Потяните шторку вниз, нажмите на карандаш и перетащите плитку «Прокси Дом» в корзину.';
 
   @override
   String get settingsQsTileRemoveAck => 'Понятно';

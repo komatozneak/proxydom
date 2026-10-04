@@ -76,6 +76,19 @@ class AppBrand {
   /// Same band on the dark sheet, deep enough for light icons.
   static const Color noticeBandDark = Color(0xFF1B4E63);
 
+  /// Free slot in the harmony: the mid step of the same sky family, between
+  /// [noticeBand] and [noticeBandDark]. Chrome fill for the refresh action —
+  /// the cool counterweight to the moss paste button and the warm house.
+  /// Charcoal ink stays readable on it (≈4.8:1) and the pill keeps its shape on
+  /// both the charcoal ground and the cream sheet.
+  static const Color actionSky = Color(0xFF3D8FB5);
+
+  /// Free slot in the harmony: the amber step of the house gold, warmer than
+  /// [livingHouse] and deeper than [flame]. Chrome fill for the QR action, so
+  /// the bar keeps the house's own warmth instead of the borrowed notebook
+  /// orange. Charcoal ink on it is ≈5.9:1.
+  static const Color actionAmber = Color(0xFFC98A16);
+
   /// Dark elevated cards — enough lift off [surfaceDark] so numbers read.
   static const Color surfaceVariantDark = Color(0xFF2C2C32);
 

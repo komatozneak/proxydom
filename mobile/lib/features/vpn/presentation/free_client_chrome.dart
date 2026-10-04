@@ -9,7 +9,9 @@ import '../../../l10n/app_localizations.dart';
 ///
 /// [onRefresh] reloads saved subscription documents. On the phone it is a
 /// small circular-arrow control beside QR. On Windows it is a labeled button
-/// beside Paste.
+/// beside Paste. Three roles, three colours: paste stays moss ([AppBrand.secondary]),
+/// QR takes the house amber ([AppBrand.actionAmber]), refresh the sky
+/// ([AppBrand.actionSky]) — none of them borrows the notebook-margin orange.
 class FreeClientActionBar extends StatelessWidget {
   const FreeClientActionBar({
     super.key,
@@ -56,7 +58,7 @@ class FreeClientActionBar extends StatelessWidget {
                 onPressed: refresh,
                 icon: AppIcons.refresh,
                 label: l.freeRefresh,
-                background: AppBrand.paperMargin,
+                background: AppBrand.actionSky,
                 foreground: AppBrand.inkLight,
                 shape: shape,
                 pad: pad,
@@ -78,7 +80,7 @@ class FreeClientActionBar extends StatelessWidget {
               onPressed: onScan,
               icon: AppIcons.qrCode,
               label: l.freeQr,
-              background: AppBrand.paperMargin,
+              background: AppBrand.actionAmber,
               foreground: AppBrand.inkLight,
               shape: shape,
               pad: pad,
@@ -130,6 +132,7 @@ class FreeClientActionBar extends StatelessWidget {
 }
 
 /// Phone-only reload. No caption: the circular arrows are the label.
+/// Sky fill, so the reload reads as its own thing next to the amber QR.
 class _PhoneRefreshButton extends StatelessWidget {
   const _PhoneRefreshButton({
     required this.onPressed,
@@ -149,7 +152,7 @@ class _PhoneRefreshButton extends StatelessWidget {
         onPressed: onPressed,
         padding: EdgeInsets.zero,
         style: IconButton.styleFrom(
-          backgroundColor: AppBrand.paperMargin,
+          backgroundColor: AppBrand.actionSky,
           foregroundColor: AppBrand.inkLight,
           shape: const CircleBorder(),
         ),
