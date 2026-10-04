@@ -64,6 +64,7 @@ flutter:
     # PR #35 textures/empty_states intentionally NOT bundled (see
     # assets/brand/DEPRECATED-PR35.md — FLUX Klein 9B non-commercial).
   fonts:
+    # Inter stays: it is the fallback everywhere.
     - family: Inter
       fonts:
         - asset: assets/fonts/Inter-Regular.ttf
@@ -74,6 +75,27 @@ flutter:
           weight: 700
         - asset: assets/fonts/Inter-ExtraBold.ttf
           weight: 800
+    # Onest — a grotesque drawn for Cyrillic first. Inter is a neutral latin
+    # face that the app has been wearing as a default; Onest has the warmth of
+    # a stove and the Cyrillic is native, not borrowed. OFL, see
+    # assets/fonts/OFL-Onest.txt.
+    - family: Onest
+      fonts:
+        - asset: assets/fonts/Onest-var.ttf
+          weight: 400
+        - asset: assets/fonts/Onest-var.ttf
+          weight: 600
+        - asset: assets/fonts/Onest-var.ttf
+          weight: 800
+    # JetBrains Mono — the terminal head. It has real Cyrillic, unlike the
+    # platform monospace, which is why the head is set in it instead of
+    # whatever the OS happens to call mono. OFL, OFL-JetBrainsMono.txt.
+    - family: JetBrainsMono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono-var.ttf
+          weight: 400
+        - asset: assets/fonts/JetBrainsMono-var.ttf
+          weight: 700
 # Android 13+ themed icons: background + foreground + monochrome.
 # Regenerate:
 #   python tool/generate_adaptive_icon.py

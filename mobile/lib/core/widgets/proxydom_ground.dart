@@ -174,19 +174,16 @@ class _GroundPainter extends CustomPainter {
     final p = _pointer;
 
     if (night) {
-      // The yard, from inside the lit room: a pool of light on the floor, the
-      // boards it falls across, and dust turning slowly inside the beam. No
-      // fireflies, no orbit — the house is the only lamp, and a background that
-      // draws its own attention is a background that eats the words on it.
+      // The yard, seen from inside a lit room: a pool of light on the ground and
+      // two banks of slow mist crossing it. Nothing is drawn that has an edge —
+      // a line, a board or a dot at this scale is noise behind the words, and
+      // noise is what the words must not fight.
       final floor = Offset(
         house.dx + p.dx * 18,
-        // At the house's feet, not at the bottom of the window: light on a
-        // floor starts where the thing casting it stands.
         size.height * 0.72 + p.dy * 10,
       );
       _lightPool(canvas, size, floor, lit);
-      _boards(canvas, size, p * 22, lit);
-      _dustInBeam(canvas, size, floor, p * 34, lit);
+      _mist(canvas, size, p * 26, lit, clock.value, seed);
     }
 
     _bloom(canvas, house, size, night ? 0.16 + lit * 0.26 : 0.12 * lit);
@@ -251,84 +248,51 @@ class _GroundPainter extends CustomPainter {
     );
   }
 
-  /// Floorboards. Long shallow lines that spread as they come forward, so the
-  /// parallax slides them like a floor under a moving camera. They fade into
-  /// the night above, because a ruled line all the way to the top of the
-  /// screen is a grid — the thing this background replaced.
-  void _boards(Canvas canvas, Size size, Offset shift, double lit) {
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1
-      ..color = AppBrand.inkMutedDark.withValues(alpha: 0.05 + lit * 0.015);
-    final start = size.height * 0.46;
-    for (var i = 0; i < 12; i++) {
-      final f = i / 12;
-      // Perspective: spacing grows towards the viewer.
-      final y = start + (size.height - start) * math.pow(f, 1.7).toDouble();
-      // Nearer boards sit a little brighter: the floor catches more light near
-      // the viewer than at the far end.
-      final depth = 0.35 + f * 0.65;
-      final slide = shift.dx * (1 + f * 2.4);
-      canvas.drawLine(
-        Offset(-30 + slide, y),
-        Offset(size.width + 30 + slide * 1.15, y),
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1
-          ..color = paint.color.withValues(alpha: paint.color.a * depth),
-      );
-    }
-    // Fog: the far end of the floor dissolves into the night, so no line ever
-    // reaches the words at the top of the screen.
-    canvas.drawRect(
-      Offset.zero & size,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            AppBrand.groundDark,
-            AppBrand.groundDark.withValues(alpha: 0.92),
-            AppBrand.groundDark.withValues(alpha: 0.0),
-          ],
-          stops: const [0.0, 0.40, 0.58],
-        ).createShader(
-          Rect.fromLTRB(0, size.height * 0.30, size.width, size.height * 0.60),
-        ),
-    );
-  }
-
-  /// Dust turning in the beam. It only exists where the light is, which is why
-  /// it never becomes noise: away from the pool there is nothing to see.
-  void _dustInBeam(
+  /// Two banks of mist crossing the yard, and nothing else.
+  ///
+  /// The boards and the dust were detail: at this scale a line is a line and a
+  /// dot is a dot, and behind a screen full of words they are noise. Mist has
+  /// no edge, so it moves without ever being something to read.
+  void _mist(
     Canvas canvas,
     Size size,
-    Offset floor,
     Offset shift,
     double lit,
+    double t,
+    int seedField,
   ) {
-    final rng = math.Random(seed + 11);
-    final w = size.width * 0.72;
-    final h = size.height * 0.34;
-    for (var i = 0; i < 11; i++) {
-      final fx = rng.nextDouble();
-      final rise = (clock.value * (0.02 + rng.nextDouble() * 0.03)) % 1.0;
-      // Dust rises through the beam and starts again at the floor.
-      final fy = (1 - rise + rng.nextDouble() * 0.1) % 1.0;
-      final wobble = math.sin(clock.value * math.pi * 2 * 0.08 + i) * 12;
-      final at = Offset(
-        floor.dx + (fx - 0.5) * w + wobble + shift.dx * 10,
-        floor.dy - fy * h + shift.dy * 6,
+    for (var bank = 0; bank < 2; bank++) {
+      // Each bank takes a minute and a half to cross, in opposite directions.
+      final dir = bank.isEven ? 1.0 : -1.0;
+      final phase = (t * 0.11 * dir + bank * 0.5 + seedField * 0.13) % 1.0;
+      final x = -0.3 + phase * 1.6 + shift.dx * (0.6 + bank * 0.5);
+      final y = size.height * (0.42 + bank * 0.22) + shift.dy * 8;
+      final w = size.width * (0.95 + bank * 0.35);
+      final h = size.height * (0.30 + bank * 0.12);
+      // Fades in at one edge and out at the other: a bank crossing the screen
+      // would be a wipe, not weather.
+      final a = math.sin(phase * math.pi).abs() * (0.030 + lit * 0.016);
+      canvas.save();
+      canvas.translate(x * size.width, y);
+      canvas.drawOval(
+        Rect.fromCenter(
+          center: Offset.zero,
+          width: w,
+          height: h,
+        ),
+        Paint()
+          ..shader = RadialGradient(
+            colors: [
+              AppBrand.forestShade.withValues(alpha: a),
+              AppBrand.mascotEmber.withValues(alpha: a * 0.5),
+              AppBrand.forestShade.withValues(alpha: 0.0),
+            ],
+            stops: const [0, 0.5, 1],
+          ).createShader(
+            Rect.fromCenter(center: Offset.zero, width: w, height: h),
+          ),
       );
-      // Falls off towards the edge of the beam, like real dust does.
-      final edge = 1 - ((fx - 0.5) * 2).abs().clamp(0.0, 1.0);
-      final a = (0.03 + rng.nextDouble() * 0.04) * (0.5 + edge * 0.5) *
-          (0.7 + lit * 0.3);
-      canvas.drawCircle(
-        at,
-        0.9 + rng.nextDouble() * 1.1,
-        Paint()..color = AppBrand.mascotGoldLit.withValues(alpha: a),
-      );
+      canvas.restore();
     }
   }
 

@@ -12,6 +12,7 @@ import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/interaction.dart';
+import '../../../core/widgets/mossy_rail.dart';
 import '../../../core/widgets/proxydom_ground.dart';
 import '../../../core/widgets/proxydom_nav_icon.dart';
 import '../../../l10n/app_localizations.dart';
@@ -293,20 +294,8 @@ class WindowsNavRail extends StatelessWidget {
       ),
     ];
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        // The rail is furniture, not page: it sits a shade off the sheet.
-        color: dark
-            ? AppBrand.surfaceSunkDark
-            : AppBrand.paperLight.withValues(alpha: 0.72),
-        border: Border(
-          right: BorderSide(
-            color: dark
-                ? AppBrand.lightSource.withValues(alpha: 0.06)
-                : AppBrand.shadeSource.withValues(alpha: 0.07),
-          ),
-        ),
-      ),
+    return MossyRail(
+      light: !dark,
       child: SizedBox(
         width: width,
         child: Padding(
@@ -412,11 +401,11 @@ class _RailItemState extends State<_RailItem> {
         builder: (context, hovered) {
           final fill = widget.selected
               ? (dark
-                    ? AppBrand.lightSource.withValues(alpha: 0.08)
-                    : AppBrand.inkLight.withValues(alpha: 0.06))
+                    ? AppBrand.moss.withValues(alpha: 0.16)
+                    : AppBrand.mossLight.withValues(alpha: 0.14))
               : hovered
                   ? (dark
-                        ? AppBrand.lightSource.withValues(alpha: 0.05)
+                        ? AppBrand.lightSource.withValues(alpha: 0.045)
                         : AppBrand.inkLight.withValues(alpha: 0.035))
                   : null;
           return AnimatedContainer(
@@ -429,15 +418,15 @@ class _RailItemState extends State<_RailItem> {
               border: Border.all(
                 color: widget.selected
                     ? (dark
-                          ? AppBrand.lightSource.withValues(alpha: 0.10)
-                          : AppBrand.shadeSource.withValues(alpha: 0.10))
+                          ? AppBrand.mossLight.withValues(alpha: 0.28)
+                          : AppBrand.moss.withValues(alpha: 0.28))
                     : Colors.transparent,
               ),
             ),
             child: Row(
               children: [
-                // The accent bar is the same device as the status light on the
-                // home plate: colour marks the active place.
+                // The accent bar is moss: the selection belongs to the stone the
+                // rail is made of, not to the house on the other side of it.
                 AnimatedContainer(
                   duration: AppBrand.motionReveal,
                   curve: AppBrand.motionRevealCurve,
@@ -446,12 +435,18 @@ class _RailItemState extends State<_RailItem> {
                   margin: const EdgeInsets.only(right: 11),
                   decoration: BoxDecoration(
                     color: widget.selected
-                        ? AppBrand.actionAmber
+                        ? (dark ? AppBrand.mossLight : AppBrand.moss)
                         : AppBrand.shadeSource.withValues(alpha: 0.0),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                AppIcon(widget.icon, size: 19, color: ink.withValues(alpha: 0.9)),
+                AppIcon(
+                  widget.icon,
+                  size: 19,
+                  color: widget.selected
+                      ? (dark ? AppBrand.mossLight : AppBrand.moss)
+                      : ink.withValues(alpha: 0.78),
+                ),
                 const SizedBox(width: 11),
                 Flexible(
                   child: Text(

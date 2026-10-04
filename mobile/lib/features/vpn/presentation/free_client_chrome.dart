@@ -185,10 +185,9 @@ class ConnectionTerminal extends StatelessWidget {
 
   /// The terminal's own type.
 ///
-/// Not a monospace family: none is bundled, and asking the platform for one
-/// means tofu on any device that has none, plus metrics that differ per
-/// platform. Inter carries it instead — caps, wide tracking, tabular figures —
-/// and the terminal-ness comes from the structure around the words.
+/// A real monospace, bundled: JetBrains Mono has native Cyrillic, which the
+/// platform's `monospace` does not promise and which showed up as tofu on a
+/// machine with no mono installed. Everything else is Onest.
 TextStyle _mono(
     BuildContext context, {
     required double size,
@@ -197,13 +196,13 @@ TextStyle _mono(
     double spacing = 1.1,
   }) {
     return TextStyle(
-      fontFamily: 'Inter',
+      fontFamily: 'JetBrainsMono',
+      fontFamilyFallback: const ['Onest', 'Inter'],
       fontSize: size,
-      fontWeight: weight >= 700 ? FontWeight.w700 : FontWeight.w600,
+      fontWeight: weight >= 700 ? FontWeight.w700 : FontWeight.w400,
       color: color,
       letterSpacing: spacing,
       height: 1.2,
-      fontFeatures: const [FontFeature.tabularFigures()],
     );
   }
 

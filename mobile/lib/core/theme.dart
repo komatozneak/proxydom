@@ -16,7 +16,7 @@ class AppBrand {
 
   static const Color primaryContainer = Color(0xFF2A2A2E);
 
-  /// Moss — success / «работает» (semantic, not chrome accent).
+  /// Moss — success / «Дуб» (semantic, not chrome accent).
   static const Color secondary = Color(0xFF558B2F);
 
   /// Chrome accent = charcoal (matches mono mark).
@@ -79,14 +79,14 @@ class AppBrand {
   /// Free slot in the harmony: the mid step of the same sky family, between
   /// [noticeBand] and [noticeBandDark]. Chrome fill for the refresh action —
   /// the cool counterweight to the moss paste button and the warm house.
-  /// Charcoal ink stays readable on it (≈4.8:1) and the pill keeps its shape on
+  /// Charcoal ink stays readable on it (в‰€4.8:1) and the pill keeps its shape on
   /// both the charcoal ground and the cream sheet.
   static const Color actionSky = Color(0xFF3D8FB5);
 
   /// Free slot in the harmony: the amber step of the house gold, warmer than
   /// [livingHouse] and deeper than [flame]. Chrome fill for the QR action, so
   /// the bar keeps the house's own warmth instead of the borrowed notebook
-  /// orange. Charcoal ink on it is ≈5.9:1.
+  /// orange. Charcoal ink on it is в‰€5.9:1.
   static const Color actionAmber = Color(0xFFC98A16);
 
   /// Dark elevated cards — enough lift off [surfaceDark] so numbers read.
@@ -124,6 +124,27 @@ class AppBrand {
   static const Color groundDark = Color(0xFF0E1116);
 
   static const Color groundDeep = Color(0xFF07090C);
+
+  // ── The rail: a mossy stone in a forest night ─────────────────────────────
+  //
+  // The house is warm; the thing it is bolted to is not. The rail is a stone
+  // slab at night, damp, with moss where the water sits — green-black and
+  // matte. Nothing here glows.
+
+  static const Color forestDark = Color(0xFF0C1210);
+
+  static const Color forestDeep = Color(0xFF070B0A);
+
+  static const Color forestShade = Color(0xFF040706);
+
+  static const Color moss = Color(0xFF3E6B45);
+
+  static const Color mossLight = Color(0xFF7FA06A);
+
+  /// The slab in daylight: pale stone, still damp, still green at the foot.
+  static const Color stoneLight = Color(0xFFF0EDE6);
+
+  static const Color stoneShade = Color(0xFFBDB6A8);
 
   /// Cards on the night ground: cool charcoal, so a warm plate on top of them
   /// still separates by light rather than only by value.
@@ -175,7 +196,7 @@ class AppBrand {
 
   static const Color onSurfaceVariantDark = Color(0xFFC8C8D0);
 
-  /// Free quota HP bar: healthy → caution → critical, then depleted grey.
+  /// Free quota HP bar: healthy в†’ caution в†’ critical, then depleted grey.
   static const Color quotaHealthy = success;
   static const Color quotaCaution = livingHouse;
   static const Color quotaCritical = destructive;
@@ -246,7 +267,7 @@ class AppTheme {
       brightness: brightness,
       colorScheme: scheme,
       scaffoldBackgroundColor: bg,
-      fontFamily: 'Inter',
+      fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
       iconTheme: IconThemeData(color: onSurface, size: 24),
       textTheme: _buildTextTheme(scheme),
       appBarTheme: AppBarTheme(
@@ -256,7 +277,7 @@ class AppTheme {
         scrolledUnderElevation: 0,
         centerTitle: false,
         titleTextStyle: TextStyle(
-          fontFamily: 'Inter',
+          fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
           color: onSurface,
           fontSize: 28,
           fontWeight: FontWeight.w800,
@@ -297,7 +318,7 @@ class AppTheme {
           // it every button label silently falls back to the platform font and
           // the app ends up with two typefaces on one screen.
           textStyle: const TextStyle(
-            fontFamily: 'Inter',
+            fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
             fontSize: 16,
             fontWeight: FontWeight.w700,
             letterSpacing: -0.2,
@@ -310,7 +331,7 @@ class AppTheme {
           shape: const StadiumBorder(),
           side: BorderSide(color: line, width: 1),
           textStyle: const TextStyle(
-            fontFamily: 'Inter',
+            fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
             fontSize: 15,
             fontWeight: FontWeight.w600,
             letterSpacing: -0.1,
@@ -323,7 +344,7 @@ class AppTheme {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           shape: const StadiumBorder(),
           textStyle: const TextStyle(
-            fontFamily: 'Inter',
+            fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
             fontSize: 15,
             fontWeight: FontWeight.w600,
           ),
@@ -400,64 +421,64 @@ class AppTheme {
   static TextTheme _buildTextTheme(ColorScheme scheme) {
     return TextTheme(
       displayLarge: TextStyle(
-        fontFamily: 'Inter',
+        fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
         fontSize: 32,
         fontWeight: FontWeight.w800,
         letterSpacing: -0.5,
         color: scheme.onSurface,
       ),
       displayMedium: TextStyle(
-        fontFamily: 'Inter',
+        fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
         fontSize: 28,
         fontWeight: FontWeight.w800,
         color: scheme.onSurface,
       ),
       headlineLarge: TextStyle(
-        fontFamily: 'Inter',
+        fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
         fontSize: 24,
         fontWeight: FontWeight.w700,
         color: scheme.onSurface,
       ),
       headlineMedium: TextStyle(
-        fontFamily: 'Inter',
+        fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
         fontSize: 20,
         fontWeight: FontWeight.w700,
         color: scheme.onSurface,
       ),
       titleLarge: TextStyle(
-        fontFamily: 'Inter',
+        fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
         fontSize: 18,
         fontWeight: FontWeight.w700,
         color: scheme.onSurface,
       ),
       titleMedium: TextStyle(
-        fontFamily: 'Inter',
+        fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
         fontSize: 16,
         fontWeight: FontWeight.w600,
         color: scheme.onSurface,
       ),
       bodyLarge: TextStyle(
-        fontFamily: 'Inter',
+        fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
         fontSize: 16,
         fontWeight: FontWeight.w400,
         color: scheme.onSurface,
         height: 1.5,
       ),
       bodyMedium: TextStyle(
-        fontFamily: 'Inter',
+        fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
         fontSize: 14,
         fontWeight: FontWeight.w400,
         color: scheme.onSurfaceVariant,
         height: 1.4,
       ),
       labelLarge: TextStyle(
-        fontFamily: 'Inter',
+        fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
         fontSize: 14,
         fontWeight: FontWeight.w600,
         color: scheme.onSurface,
       ),
       labelSmall: TextStyle(
-        fontFamily: 'Inter',
+        fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
         fontSize: 11,
         fontWeight: FontWeight.w600,
         color: scheme.onSurfaceVariant,

@@ -4,10 +4,10 @@
 //
 // Renders the real screens at phone size and at window size, and writes PNGs to
 // ../.scratch/ui/, so a design pass can be judged from the actual pixels
-// instead of from code. Fonts are loaded from the asset bundle вЂ” the default
+// instead of from code. Fonts are loaded from the asset bundle — the default
 // test font would draw boxes and hide every type decision.
 //
-// Known: the run exits non-zero with "A Timer is still pending" вЂ” the screens
+// Known: the run exits non-zero with "A Timer is still pending" — the screens
 // keep 1s timers alive through singletons that outlive the tree. The PNGs are
 // written before that check, so the output is good; ignore the exit code.
 import 'dart:convert';
@@ -30,7 +30,7 @@ import 'package:proxydom/features/vpn/presentation/server_instrument.dart';
 import 'package:proxydom/features/vpn/presentation/server_instrument_parts.dart';
 import 'package:proxydom/l10n/app_localizations.dart';
 
-/// Logical 360x780 at DPR 3 вЂ” the same framing as the owner's device captures.
+/// Logical 360x780 at DPR 3 — the same framing as the owner's device captures.
 const Size _phone = Size(360, 780);
 const double _phoneDpr = 3;
 
@@ -140,7 +140,7 @@ Future<void> _capture(
   // Two frames: the first settles the tree, the second paints animations that
   // started on the first. Settle() would hang on the breathing house animation.
   // A few more let asynchronously decoded row assets (the QS tile glyph) land
-  // before the shutter вЂ” one pump renders them as an empty chip.
+  // before the shutter — one pump renders them as an empty chip.
   await tester.pump();
   // Image decoding is real async work: without a runAsync round trip the marks
   // are still blank when the shutter opens. Precache every asset the screens
@@ -237,20 +237,20 @@ void main() {
   testWidgets('server instrument', (tester) async {
     const nodes = [
       PoolServerLabel(
-        title: 'РњРѕСЃРєРІР°',
+        title: 'Москва',
         subtitle: 'eu1.proxydom.su:443',
         tile: PoolTile.flag,
-        flag: 'рџ‡·рџ‡є',
+        flag: '🇷🇺',
       ),
       PoolServerLabel(
-        title: 'РќРёРґРµСЂР»Р°РЅРґС‹',
+        title: 'Нидерланды',
         subtitle: 'nl3.proxydom.su:443',
         tile: PoolTile.flag,
-        flag: 'рџ‡ірџ‡±',
+        flag: '🇳🇱',
       ),
       PoolServerLabel(
-        title: 'РРіСЂРѕРІРѕР№',
-        subtitle: 'РЅРёР·РєРёР№ РїРёРЅРі',
+        title: 'Игровой',
+        subtitle: 'низкий пинг',
         tile: PoolTile.gaming,
         flag: '',
       ),
@@ -265,9 +265,9 @@ void main() {
             child: Padding(
               padding: const EdgeInsets.all(24),
               child: ProfileInstrument(
-                title: 'РўРµСЂРµРјРѕРє',
-                description: 'Р—РЅР°С‡РѕРє СЃРїСЂР°РІР° РІРµРґС‘С‚ РІ Р±РѕС‚Р°',
-                facts: ['2aq93K0', '15 Р“Р‘ РёР· 100 Р“Р‘', 'РѕР±РЅРѕРІР»РµРЅРѕ 04.10'],
+                title: 'Теремок',
+                description: 'Значок справа ведёт в бота',
+                facts: ['2aq93K0', '15 Р“Р‘ РёР· 100 Р“Р‘', 'РѕР±РЅРѕРІР»Рµно 04.10'],
                 selected: true,
                 selectedNodeTitle: 'РњРѕСЃРєРІР°',
                 onSelect: _ignore,

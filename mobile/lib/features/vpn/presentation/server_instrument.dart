@@ -64,18 +64,6 @@ class ProfileInstrument extends StatelessWidget {
     final mute = dark ? AppBrand.inkMutedDark : AppBrand.inkMutedLight;
     final l = AppL10n.of(context);
 
-    // The seller writes one block; the lines under it are detail. Splitting on
-    // the line break is honest to the document — `announce` is a short text
-    // with a headline and a few facts — and it stops the whole notice reading
-    // as one paragraph of equal weight.
-    final lines = description
-        .split('\n')
-        .map((line) => line.trim())
-        .where((line) => line.isNotEmpty)
-        .toList();
-    final headline = lines.isEmpty ? '' : lines.first;
-    final detail = lines.length < 2 ? const <String>[] : lines.sublist(1);
-
     return AppSurface(
       clip: true,
       child: Column(
@@ -146,81 +134,39 @@ class ProfileInstrument extends StatelessWidget {
                     ],
                   ),
                 ],
-                if (headline.isNotEmpty || detail.isNotEmpty) ...[
+                if (description.isNotEmpty) ...[
                   const SizedBox(height: 13),
-                  // Two blocks: what the seller says, and what the seller
-                  // wants me to know. Both are read, not scanned.
-                  LayoutBuilder(
-                    builder: (context, box) {
-                      // Bounded only: a Row with Expanded under an unbounded
-                      // width throws, and this card is also measured inside
-                      // unbounded probes.
-                      final wide = box.hasBoundedWidth &&
-                          box.maxWidth > 420 &&
-                          detail.isNotEmpty;
-                      final headlineBlock = headline.isEmpty
-                          ? null
-                          : _Block(
-                              accent: true,
-                              child: Text(
-                                headline,
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  fontSize: 13.5,
-                                  height: 1.45,
-                                  fontWeight: FontWeight.w600,
-                                  color: theme.colorScheme.onSurface
-                                      .withValues(alpha: 0.9),
-                                ),
-                              ),
-                            );
-                      final detailBlock = detail.isEmpty
-                          ? null
-                          : _Block(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  for (var i = 0; i < detail.length; i++) ...[
-                                    if (i > 0) const SizedBox(height: 4),
-                                    Text(
-                                      detail[i],
-                                      style: theme.textTheme.bodyMedium
-                                          ?.copyWith(
-                                        fontSize: 12.5,
-                                        height: 1.4,
-                                        color: mute,
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            );
-                      if (!wide) {
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            if (headlineBlock != null) headlineBlock,
-                            if (detailBlock != null) ...[
-                              const SizedBox(height: 8),
-                              detailBlock,
-                            ],
-                          ],
-                        );
-                      }
-                      return Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            flex: 5,
-                            child: headlineBlock ?? const SizedBox.shrink(),
+                  // One block, and the seller's link inside it. Two blocks
+                  // split one short text into two boxes and the link became a
+                  // button floating on the far side of the card; here the note
+                  // and the way to act on it are the same object.
+                  _Block(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            description,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontSize: 13.5,
+                              height: 1.45,
+                              fontWeight: FontWeight.w600,
+                              color: theme.colorScheme.onSurface
+                                  .withValues(alpha: 0.88),
+                            ),
                           ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            flex: 4,
-                            child: detailBlock ?? const SizedBox.shrink(),
+                        ),
+                        if (onTelegram != null) ...[
+                          const SizedBox(width: 12),
+                          ToolAction(
+                            icon: AppIcons.paperPlane,
+                            label: telegramLabel ?? l.freeTelegram,
+                            onTap: onTelegram,
+                            tone: AppActionTone.link,
                           ),
                         ],
-                      );
-                    },
+                      ],
+                    ),
                   ),
                 ],
               ],
@@ -251,15 +197,19 @@ class ProfileInstrument extends StatelessWidget {
                       color: AppBrand.mascotGoldLit,
                     ),
                   ),
-                  const Spacer(),
-                  // The seller lives with the servers: this is where a person
-                  // goes when the list does not have what they need.
-                  if (onTelegram != null)
-                    ToolAction(
-                      icon: AppIcons.paperPlane,
-                      label: telegramLabel ?? l.freeTelegram,
-                      onTap: onTelegram,
-                      tone: AppActionTone.link,
+                  if (selectedNodeTitle != null)
+                    Flexible(
+                      child: Text(
+                        selectedNodeTitle!.toUpperCase(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 10,
+                          letterSpacing: 1.4,
+                          fontWeight: FontWeight.w700,
+                          color: AppBrand.mascotGold.withValues(alpha: 0.9),
+                        ),
+                      ),
                     ),
                 ],
               ),
@@ -347,10 +297,9 @@ class _Toolbar extends StatelessWidget {
 
 /// One quiet block of text inside the card.
 class _Block extends StatelessWidget {
-  const _Block({required this.child, this.accent = false});
+  const _Block({required this.child});
 
   final Widget child;
-  final bool accent;
 
   @override
   Widget build(BuildContext context) {
@@ -362,10 +311,8 @@ class _Block extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
         border: Border(
           left: BorderSide(
-            color: accent
-                ? AppBrand.mascotGold.withValues(alpha: 0.55)
-                : theme.colorScheme.outline,
-            width: accent ? 2.5 : 1,
+            color: AppBrand.mascotGold.withValues(alpha: 0.55),
+            width: 2.5,
           ),
         ),
       ),
