@@ -93,7 +93,10 @@ class DiagnosticsService {
       ..writeln('vpn_stderr_tail:')
       ..writeln(redactTunnelLog(stderrTail ?? '(unsupported)'))
       ..writeln('ios_native_tail:')
-      ..writeln(nativeLogTail ?? '(unsupported)')
+      // Same mask as the stderr tail above. The iOS ring holds `pin=<node ip>`
+      // and unredacted engine error text, and this is the line that leaves the
+      // device when the user taps «Отправить отчёт».
+      ..writeln(redactTunnelLog(nativeLogTail ?? '(unsupported)'))
       ..writeln('ios_tunnel_health:')
       ..writeln(tunnelHealth)
       ..writeln('last_vpn_error: $lastVpnError')
@@ -137,13 +140,18 @@ class DiagnosticsService {
   }
 
   /// Dump the full bundle to `flutter run` / logcat (Cursor reads the terminal).
+  ///
+  /// Redacted first. `debugPrint` lands in the device system log, which on
+  /// older Android builds any app with READ_LOGS could read — a report is
+  /// meant to leave the phone, not to be broadcast from it.
   static void dumpReportToLogcat(String report) {
+    final safe = redactTunnelLog(report);
     debugPrint('=== DIAG-REPORT BEGIN ===', wrapWidth: logcatChunkChars);
-    for (var i = 0; i < report.length; i += logcatChunkChars) {
-      final end = i + logcatChunkChars > report.length
-          ? report.length
+    for (var i = 0; i < safe.length; i += logcatChunkChars) {
+      final end = i + logcatChunkChars > safe.length
+          ? safe.length
           : i + logcatChunkChars;
-      debugPrint(report.substring(i, end), wrapWidth: logcatChunkChars);
+      debugPrint(safe.substring(i, end), wrapWidth: logcatChunkChars);
     }
     debugPrint('=== DIAG-REPORT END ===', wrapWidth: logcatChunkChars);
   }

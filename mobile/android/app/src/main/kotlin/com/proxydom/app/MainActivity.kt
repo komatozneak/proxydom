@@ -6,7 +6,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.VpnService
 import android.os.Build
-import android.util.Log
 import androidx.activity.enableEdgeToEdge
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -54,7 +53,7 @@ class MainActivity : FlutterFragmentActivity() {
         if (intent?.action != ProxyDomTileService.ACTION_TILE_TOGGLE) return
         intent.action = Intent.ACTION_MAIN
         if (!ProxyDomVpnService.hasPersistedParams(this)) {
-            Log.i(TAG, "QS tile: no persisted session — Home")
+            NativeLog.i(TAG, "QS tile: no persisted session — Home")
             return
         }
         val prepareIntent = ProxyDomVpnService.prepareVpn(this)
@@ -63,13 +62,13 @@ class MainActivity : FlutterFragmentActivity() {
             return
         }
         pendingTileConnect = true
-        Log.i(TAG, "QS tile: launching VPN consent")
+        NativeLog.i(TAG, "QS tile: launching VPN consent")
         try {
             @Suppress("DEPRECATION")
             startActivityForResult(prepareIntent, REQUEST_VPN_PERMISSION)
         } catch (e: Exception) {
             pendingTileConnect = false
-            Log.w(TAG, "QS tile: consent launch failed", e)
+            NativeLog.w(TAG, "QS tile: consent launch failed", e)
         }
     }
 
@@ -93,7 +92,7 @@ class MainActivity : FlutterFragmentActivity() {
      */
     private fun ensureInternetPermission(flutterResult: MethodChannel.Result?) {
         if (hasInternetPermission()) {
-            Log.i(TAG, "INTERNET already granted")
+            NativeLog.i(TAG, "INTERNET already granted")
             flutterResult?.success(true)
             return
         }
@@ -110,7 +109,7 @@ class MainActivity : FlutterFragmentActivity() {
             }
         }
         if (!shouldRequest) return
-        Log.i(TAG, "Requesting runtime INTERNET (dangerous on Android 17+)")
+        NativeLog.i(TAG, "Requesting runtime INTERNET (dangerous on Android 17+)")
         ActivityCompat.requestPermissions(
             this,
             arrayOf(Manifest.permission.INTERNET),
@@ -128,7 +127,7 @@ class MainActivity : FlutterFragmentActivity() {
             shouldNotify = notifyAfterInternet
             notifyAfterInternet = false
         }
-        Log.i(TAG, "INTERNET granted=$granted queued=${queued.size}")
+        NativeLog.i(TAG, "INTERNET granted=$granted queued=${queued.size}")
         for (pending in queued) {
             pending.success(granted)
         }
@@ -166,7 +165,7 @@ class MainActivity : FlutterFragmentActivity() {
                     result.error("busy", "VPN permission request already in progress", null)
                 } else {
                     pendingPermissionResult = result
-                    Log.i(TAG, "Launching VPN consent dialog via VpnService.prepare()")
+                    NativeLog.i(TAG, "Launching VPN consent dialog via VpnService.prepare()")
                     try {
                         @Suppress("DEPRECATION")
                         startActivityForResult(prepareIntent, REQUEST_VPN_PERMISSION)
@@ -206,7 +205,7 @@ class MainActivity : FlutterFragmentActivity() {
             }
             pendingNotificationResult = result
         }
-        Log.i(TAG, "Requesting POST_NOTIFICATIONS")
+        NativeLog.i(TAG, "Requesting POST_NOTIFICATIONS")
         ActivityCompat.requestPermissions(
             this,
             arrayOf(Manifest.permission.POST_NOTIFICATIONS),
@@ -248,7 +247,7 @@ class MainActivity : FlutterFragmentActivity() {
             REQUEST_POST_NOTIFICATIONS -> {
                 val granted = grantResults.isNotEmpty() &&
                     grantResults[0] == PackageManager.PERMISSION_GRANTED
-                Log.i(TAG, "POST_NOTIFICATIONS granted=$granted")
+                NativeLog.i(TAG, "POST_NOTIFICATIONS granted=$granted")
                 pendingNotificationResult?.success(granted)
                 pendingNotificationResult = null
             }
@@ -262,7 +261,7 @@ class MainActivity : FlutterFragmentActivity() {
 
         val granted = resultCode == Activity.RESULT_OK && VpnService.prepare(this) == null
         val conflict = ProxyDomVpnService.queryVpnConflict(this)
-        Log.i(
+        NativeLog.i(
             TAG,
             "VPN permission resultCode=$resultCode, granted=$granted, conflict=$conflict",
         )

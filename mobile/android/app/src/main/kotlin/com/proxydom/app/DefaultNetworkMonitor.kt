@@ -8,7 +8,6 @@ import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 
 /**
  * Tracks the OS physical underlying network (cellular/wifi), not the VPN tunnel.
@@ -54,7 +53,7 @@ internal object DefaultNetworkMonitor {
             if (hasPhysical()) return true
             Thread.sleep(50)
         }
-        Log.e(TAG, "underlying network not ready after ${timeoutMs}ms")
+        NativeLog.e(TAG, "underlying network not ready after ${timeoutMs}ms")
         return false
     }
 
@@ -115,7 +114,7 @@ internal object DefaultNetworkMonitor {
                 if (lostPinned) {
                     defaultNetwork = null
                     currentInterfaceName = null
-                    Log.i(TAG, "physical underlying lost")
+                    NativeLog.i(TAG, "physical underlying lost")
                     DiagnosticRing.event("warn", "net.lost")
                 }
                 val active = cm.activeNetwork
@@ -134,9 +133,9 @@ internal object DefaultNetworkMonitor {
         try {
             cm.registerDefaultNetworkCallback(defaultCb, mainHandler)
             cm.registerNetworkCallback(physicalRequest(), physicalCb, mainHandler)
-            Log.i(TAG, "network monitor started (default + NOT_VPN)")
+            NativeLog.i(TAG, "network monitor started (default + NOT_VPN)")
         } catch (e: Exception) {
-            Log.e(TAG, "failed to start network monitor", e)
+            NativeLog.e(TAG, "failed to start network monitor", e)
             runCatching { cm.unregisterNetworkCallback(defaultCb) }
             runCatching { cm.unregisterNetworkCallback(physicalCb) }
             defaultCallback = null
@@ -173,26 +172,26 @@ internal object DefaultNetworkMonitor {
         if (caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN) ||
             iface?.startsWith("tun") == true
         ) {
-            Log.d(TAG, "skip vpn iface=${iface ?: "(none)"}")
+            NativeLog.d(TAG, "skip vpn iface=${iface ?: "(none)"}")
             return
         }
         if (!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
-            Log.i(TAG, "skip no-internet iface=${iface ?: "(none)"}")
+            NativeLog.i(TAG, "skip no-internet iface=${iface ?: "(none)"}")
             return
         }
         if (iface.isNullOrBlank()) {
-            Log.i(TAG, "skip no-iface")
+            NativeLog.i(TAG, "skip no-iface")
             return
         }
         val validated = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
         val current = defaultNetwork
         if (current != null && current != network) {
             if (!allowReplace) {
-                Log.i(TAG, "skip link-only other iface=$iface current=$currentInterfaceName")
+                NativeLog.i(TAG, "skip link-only other iface=$iface current=$currentInterfaceName")
                 return
             }
             if (!validated) {
-                Log.i(TAG, "skip unvalidated replace iface=$iface current=$currentInterfaceName")
+                NativeLog.i(TAG, "skip unvalidated replace iface=$iface current=$currentInterfaceName")
                 return
             }
         }
@@ -201,12 +200,12 @@ internal object DefaultNetworkMonitor {
 
     private fun rememberAndPin(network: Network, iface: String) {
         if (defaultNetwork == network && currentInterfaceName == iface) {
-            Log.d(TAG, "skip same iface=$iface")
+            NativeLog.d(TAG, "skip same iface=$iface")
             return
         }
         defaultNetwork = network
         currentInterfaceName = iface
-        Log.i(TAG, "default interface: $iface")
+        NativeLog.i(TAG, "default interface: $iface")
         DiagnosticRing.event("debug", "net.iface", "iface=$iface")
         val ctx = appContext
         if (ctx != null) {
@@ -227,7 +226,7 @@ internal object DefaultNetworkMonitor {
         val ctx = appContext ?: return
         val tunUp = ProxyDomVpnService.currentInstance()?.hasLiveTun() == true
         if (tunUp) {
-            Log.i(TAG, "keep process bind — TUN up, no replacement physical")
+            NativeLog.i(TAG, "keep process bind — TUN up, no replacement physical")
             DiagnosticRing.event("debug", "net.bind", "action=keep")
             return
         }

@@ -1,7 +1,6 @@
 package com.proxydom.app
 
 import android.net.TrafficStats
-import android.util.Log
 import hy2bind.Hy2bind
 
 /**
@@ -61,6 +60,6 @@ object TunByteCounters {
     private fun logSourceOnce(source: String) {
         if (loggedSource == source) return
         loggedSource = source
-        Log.i(TAG, "byte source=$source")
+        NativeLog.i(TAG, "byte source=$source")
     }
 }

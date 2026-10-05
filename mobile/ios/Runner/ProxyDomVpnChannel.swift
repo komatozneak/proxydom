@@ -45,6 +45,8 @@ enum ProxyDomVpnChannel {
   private static var pingHandler: StubMapStreamHandler?
   /// Last observed system VPN status (NEVPNStatusDidChange + load callbacks).
   private static var cachedNEVPNStatus: NEVPNStatus = .invalid
+  /// Last value written to the ring by `resolveStatus`; see the log gate there.
+  private static var lastResolvedStatus: String?
   /// After first `loadAllFromPreferences`, `.invalid` is treated like disconnected.
   private static var nevpnPreferencesLoaded = false
   private static var nevpnObserver: NSObjectProtocol?
@@ -87,9 +89,6 @@ enum ProxyDomVpnChannel {
       case "hasActiveSession":
         // Parity with Android KEY_ACTIVE — not live NEVPN (idle+session → reconnect).
         let active = ProxyDomVpnShared.isSessionActive()
-        ProxyDomVpnShared.appendNativeLog(
-          "channel.hasActiveSession=\(active) status=\(resolveStatus(log: false))"
-        )
         result(active)
       case "getLastError":
         result(UserDefaults(suiteName: appGroupId)?.string(forKey: lastErrorKey))
@@ -199,9 +198,17 @@ enum ProxyDomVpnChannel {
       out = "idle"
     }
     if log {
-      ProxyDomVpnShared.appendNativeLog(
-        "channel.resolve nevpn=\(cachedNEVPNStatus.rawValue) group=\(group) out=\(out)"
-      )
+      // Transitions only. Dart polls `getStatus` every 300 ms (80 ms while
+      // waiting), and the App Group ring holds 128 lines. Logging every poll
+      // filled that ring with `channel.resolve` within seconds and pushed
+      // `startFailed` / `exclude` / `connected` — the only lines anyone reads a
+      // report for — out of it.
+      if lastResolvedStatus != out {
+        lastResolvedStatus = out
+        ProxyDomVpnShared.appendNativeLog(
+          "channel.status out=\(out) nevpn=\(cachedNEVPNStatus.rawValue) group=\(group)"
+        )
+      }
     }
     return out
   }

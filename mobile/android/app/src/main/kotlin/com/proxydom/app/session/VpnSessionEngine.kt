@@ -1,6 +1,5 @@
 package com.proxydom.app.session
 
-import android.util.Log
 import com.proxydom.app.DefaultNetworkMonitor
 import com.proxydom.app.DiagnosticRing
 import java.util.concurrent.ExecutorService
@@ -89,7 +88,7 @@ class VpnSessionEngine(
         } else {
             generationClock.incrementAndGet()
         }
-        Log.i(TAG, "enqueueStart generation=$gen preferred=$preferredGeneration")
+        NativeLog.i(TAG, "enqueueStart generation=$gen preferred=$preferredGeneration")
         dispatcher.execute {
             runStart(gen, username, protocol, params)
         }
@@ -108,7 +107,7 @@ class VpnSessionEngine(
         } else {
             generationClock.incrementAndGet()
         }
-        Log.i(TAG, "enqueueAutoStart generation=$gen n=${candidates.size}")
+        NativeLog.i(TAG, "enqueueAutoStart generation=$gen n=${candidates.size}")
         dispatcher.execute {
             runAuto(gen, candidates)
         }
@@ -120,7 +119,7 @@ class VpnSessionEngine(
      */
     fun enqueueStop(markInactive: Boolean = true): Long {
         val gen = generationClock.incrementAndGet()
-        Log.i(TAG, "enqueueStop generation=$gen markInactive=$markInactive")
+        NativeLog.i(TAG, "enqueueStop generation=$gen markInactive=$markInactive")
         dispatcher.execute {
             runStop(gen)
         }
@@ -195,7 +194,7 @@ class VpnSessionEngine(
         params: Map<String, Any?>,
     ) {
         if (!isAlive(gen)) {
-            Log.i(TAG, "runStart skipped stale generation=$gen")
+            NativeLog.i(TAG, "runStart skipped stale generation=$gen")
             return
         }
         // Tear down any previous tunnel before establish.
@@ -220,7 +219,7 @@ class VpnSessionEngine(
                 },
             )
         } catch (e: Exception) {
-            Log.e(TAG, "establishGeneration failed gen=$gen", e)
+            NativeLog.e(TAG, "establishGeneration failed gen=$gen", e)
             if (isAlive(gen)) {
                 publish(
                     SessionSnapshot(
@@ -299,11 +298,11 @@ class VpnSessionEngine(
                     alive = { isAlive(gen) },
                 )
             } catch (e: Exception) {
-                Log.w(TAG, "auto prove ${cand.nodeId} threw: ${e.message}")
+                NativeLog.w(TAG, "auto prove ${cand.nodeId} threw: ${e.message}")
                 false
             }
             if (!socksOk) {
-                Log.i(TAG, "auto prove fail node=${cand.nodeId}")
+                NativeLog.i(TAG, "auto prove fail node=${cand.nodeId}")
                 DiagnosticRing.event(
                     "debug",
                     "vpn.prove",
@@ -312,7 +311,7 @@ class VpnSessionEngine(
                 host.teardownGeneration(gen)
                 return@firstSuccess false
             }
-            Log.i(TAG, "auto prove ok node=${cand.nodeId} — establishing TUN")
+            NativeLog.i(TAG, "auto prove ok node=${cand.nodeId} — establishing TUN")
             DiagnosticRing.event(
                 "info",
                 "vpn.prove",
@@ -330,7 +329,7 @@ class VpnSessionEngine(
                     },
                 )
             } catch (e: Exception) {
-                Log.e(TAG, "auto establish ${cand.nodeId} failed", e)
+                NativeLog.e(TAG, "auto establish ${cand.nodeId} failed", e)
                 false
             }
             if (!up) {
@@ -410,7 +409,7 @@ class VpnSessionEngine(
         if (snapshot.phase == SessionPhase.Stopping ||
             snapshot.phase == SessionPhase.Idle
         ) {
-            Log.i(TAG, "runStop skipped already phase=${snapshot.phase} gen=$gen")
+            NativeLog.i(TAG, "runStop skipped already phase=${snapshot.phase} gen=$gen")
             if (isAlive(gen) && snapshot.phase != SessionPhase.Idle) {
                 publish(SessionSnapshot.idle(gen))
             }
@@ -430,7 +429,7 @@ class VpnSessionEngine(
 
     private fun publish(next: SessionSnapshot) {
         snapshot = next
-        Log.i(
+        NativeLog.i(
             TAG,
             "snapshot phase=${next.phase} gen=${next.generation} " +
                 "reason=${next.reason} transport=${next.transport.toWire()} " +
@@ -463,7 +462,7 @@ class VpnSessionEngine(
 
         /** Pre-allocate generation before VpnService onStartCommand. */
         fun allocateGeneration(): Long = generationClock.incrementAndGet().also { allocated ->
-            Log.i(TAG, "allocateGeneration=$allocated")
+            NativeLog.i(TAG, "allocateGeneration=$allocated")
         }
 
         fun peekGeneration(): Long = generationClock.get()

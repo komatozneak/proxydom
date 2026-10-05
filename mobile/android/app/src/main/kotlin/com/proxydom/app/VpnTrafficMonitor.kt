@@ -4,7 +4,6 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
-import android.util.Log
 import java.util.Locale
 
 /**
@@ -54,7 +53,7 @@ class VpnTrafficMonitor(
         lastRx = -1L
         lastTx = -1L
         lastAt = 0L
-        Log.i(TAG, "traffic monitor started (tunnel counters)")
+        NativeLog.i(TAG, "traffic monitor started (tunnel counters)")
         worker = Thread(
             {
                 while (running) {

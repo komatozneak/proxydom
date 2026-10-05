@@ -456,16 +456,37 @@ void run_pipe(App& app) {
   sa.nLength = sizeof(sa);
   sa.lpSecurityDescriptor = sd;
 
+  // A failing pipe loop used to write a line per iteration: five a second for
+  // CreateNamedPipeW, and — because pipe_wait retried with a zero timeout —
+  // as fast as the API would return for ERROR_PIPE_BUSY. 18 000 lines an hour
+  // from one broken ACL fills the rotation before the service ever connects.
+  // The first failure is written with its code, then the loop backs off and
+  // reports every 100th, so a persistent fault stays visible without becoming
+  // the log.
+  unsigned long create_failures = 0;
+  unsigned long wait_failures = 0;
+  unsigned long reject_failures = 0;
+  DWORD last_pipe_error = ERROR_SUCCESS;
+
   while (WaitForSingleObject(g_stop, 0) != WAIT_OBJECT_0) {
     HANDLE pipe = CreateNamedPipeW(
         kPipeName, PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
         PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT | PIPE_REJECT_REMOTE_CLIENTS,
         1, 65536, 65536, 5000, &sa);
     if (pipe == INVALID_HANDLE_VALUE) {
-      app.log.write(0, "pipe_create", "win32", GetLastError());
-      if (WaitForSingleObject(g_stop, 200) == WAIT_OBJECT_0) break;
+      const DWORD pipe_error = GetLastError();
+      ++create_failures;
+      if (create_failures == 1 || create_failures % 100 == 0) {
+        app.log.write(0, "pipe_create", "win32", pipe_error);
+      }
+      last_pipe_error = pipe_error;
+      // Back off up to two seconds. Stop must still be observed promptly, so
+      // the wait stays a wait rather than a sleep.
+      const DWORD backoff = create_failures > 8 ? 2000 : 200;
+      if (WaitForSingleObject(g_stop, backoff) == WAIT_OBJECT_0) break;
       continue;
     }
+    create_failures = 0;
     OVERLAPPED connect_ov{};
     connect_ov.hEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
     bool ready = false;
@@ -490,18 +511,40 @@ void run_pipe(App& app) {
       CloseHandle(connect_ov.hEvent);
     }
     if (!ready) {
-      app.log.write(0, "pipe_wait", "win32", err);
+      ++wait_failures;
+      if (wait_failures == 1 || wait_failures % 100 == 0) {
+        app.log.write(0, "pipe_wait", "win32", err);
+      }
+      last_pipe_error = err;
       DisconnectNamedPipe(pipe);
       CloseHandle(pipe);
-      if (WaitForSingleObject(g_stop, 0) == WAIT_OBJECT_0) break;
+      // ERROR_PIPE_BUSY recurs while the previous instance is still closing;
+      // an immediate retry turns that into a spin. 100 ms is short enough that
+      // a real client reconnects without noticing.
+      if (WaitForSingleObject(g_stop, 100) == WAIT_OBJECT_0) break;
       continue;
     }
+    if (create_failures > 0 || wait_failures > 0) {
+      // The loop recovered. Without this the throttle would silently swallow
+      // the end of a fault, and the next failure would look like the first.
+      app.log.write(0, "pipe_recovered", "last_win32", last_pipe_error);
+    }
+    create_failures = 0;
+    wait_failures = 0;
     if (!client_is_controller(pipe)) {
-      if (ready) app.log.write(0, "reject_client", "image", GetLastError());
+      // GetLastError() here is meaningless — the rejection is this function's
+      // own verdict, not a Win32 failure. Say what was refused instead.
+      // Throttled like the others: a local process that spams the pipe must
+      // not be able to fill the rotation.
+      ++reject_failures;
+      if (reject_failures == 1 || reject_failures % 100 == 0) {
+        app.log.write(0, "reject_client", "not_controller", 0);
+      }
       DisconnectNamedPipe(pipe);
       CloseHandle(pipe);
       continue;
     }
+    reject_failures = 0;
     app.serve(pipe);
     DisconnectNamedPipe(pipe);
     CloseHandle(pipe);

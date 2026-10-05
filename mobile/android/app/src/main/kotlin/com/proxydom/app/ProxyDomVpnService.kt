@@ -15,7 +15,6 @@ import android.os.PowerManager
 import android.os.SystemClock
 import android.provider.Settings
 import android.system.OsConstants
-import android.util.Log
 import hy2bind.Hy2bind
 import java.net.InetAddress
 import java.net.InetSocketAddress
@@ -119,10 +118,10 @@ class ProxyDomVpnService : VpnService() {
                 val svc = service ?: currentInstance()
                 if (svc != null) {
                     fromRuntime = runCatching { svc.isLockdownEnabled }
-                        .onFailure { Log.w(TAG, "VpnService.isLockdownEnabled failed", it) }
+                        .onFailure { NativeLog.w(TAG, "VpnService.isLockdownEnabled failed", it) }
                         .getOrNull()
                     alwaysOnRuntime = runCatching { svc.isAlwaysOn }
-                        .onFailure { Log.w(TAG, "VpnService.isAlwaysOn failed", it) }
+                        .onFailure { NativeLog.w(TAG, "VpnService.isAlwaysOn failed", it) }
                         .getOrNull()
                 }
             }
@@ -151,7 +150,7 @@ class ProxyDomVpnService : VpnService() {
                 else -> null
             }
 
-            Log.i(
+            NativeLog.i(
                 TAG,
                 "lockdown snap Secure=$fromSecure runtime=$fromRuntime " +
                     "alwaysOnRuntime=$alwaysOnRuntime alwaysOnPkg=$alwaysOnPkg " +
@@ -198,7 +197,7 @@ class ProxyDomVpnService : VpnService() {
             } else {
                 null
             }
-            Log.i(
+            NativeLog.i(
                 TAG,
                 "vpnConflict foreign=$foreign pkg=$alwaysOnPkg label=$label " +
                     "lockdown=$lockdown oursAlwaysOn=$oursAlwaysOn " +
@@ -241,10 +240,10 @@ class ProxyDomVpnService : VpnService() {
             try {
                 Settings.Secure.getString(context.contentResolver, key)
             } catch (e: SecurityException) {
-                Log.w(TAG, "Settings.Secure.$key not readable: ${e.message}")
+                NativeLog.w(TAG, "Settings.Secure.$key not readable: ${e.message}")
                 null
             } catch (e: IllegalArgumentException) {
-                Log.w(TAG, "Settings.Secure.$key invalid: ${e.message}")
+                NativeLog.w(TAG, "Settings.Secure.$key invalid: ${e.message}")
                 null
             }
 
@@ -266,10 +265,10 @@ class ProxyDomVpnService : VpnService() {
                     else -> null
                 }
             } catch (e: SecurityException) {
-                Log.w(TAG, "Settings.Secure.$key not readable: ${e.message}")
+                NativeLog.w(TAG, "Settings.Secure.$key not readable: ${e.message}")
                 null
             } catch (e: IllegalArgumentException) {
-                Log.w(TAG, "Settings.Secure.$key invalid: ${e.message}")
+                NativeLog.w(TAG, "Settings.Secure.$key invalid: ${e.message}")
                 null
             }
         }
@@ -387,7 +386,7 @@ class ProxyDomVpnService : VpnService() {
             val store = sessionPrefs(context)
             val paramsJson = store.getString(KEY_PARAMS_JSON, null)
             if (paramsJson == null || !VpnShadePolicy.isUsableParamsJson(paramsJson)) {
-                Log.w(TAG, "startFromPersistedSession: no usable params")
+                NativeLog.w(TAG, "startFromPersistedSession: no usable params")
                 return false
             }
             val username = store.getString(KEY_USERNAME, "anonymous") ?: "anonymous"
@@ -407,7 +406,7 @@ class ProxyDomVpnService : VpnService() {
                 }
                 true
             } catch (e: Exception) {
-                Log.w(TAG, "startFromPersistedSession: start failed", e)
+                NativeLog.w(TAG, "startFromPersistedSession: start failed", e)
                 false
             }
         }
@@ -426,7 +425,7 @@ class ProxyDomVpnService : VpnService() {
          */
         fun wipePersistedSession(context: android.content.Context) {
             sessionPrefs(context).edit().clear().apply()
-            Log.i(TAG, "wipePersistedSession: cleared stored VPN params")
+            NativeLog.i(TAG, "wipePersistedSession: cleared stored VPN params")
         }
     }
 
@@ -506,11 +505,11 @@ class ProxyDomVpnService : VpnService() {
         }
 
         override fun onPathDegraded(generation: Long, detail: String) {
-            Log.w(TAG, "path degraded gen=$generation $detail")
+            NativeLog.w(TAG, "path degraded gen=$generation $detail")
         }
 
         override fun onPathDead(generation: Long, detail: String) {
-            Log.e(TAG, "path dead gen=$generation $detail")
+            NativeLog.e(TAG, "path dead gen=$generation $detail")
             DiagnosticRing.event("error", "vpn.path", "phase=dead gen=$generation $detail")
             recoverDeadTunnel("path_dead $detail")
         }
@@ -518,7 +517,7 @@ class ProxyDomVpnService : VpnService() {
         override fun suppressEstablishError(): Boolean = coreRecovering
 
         override fun onUnderlyingChangedWhileUp(generation: Long, iface: String?) {
-            Log.i(TAG, "underlying changed gen=$generation iface=$iface")
+            NativeLog.i(TAG, "underlying changed gen=$generation iface=$iface")
         }
 
         override fun proveCandidateSocks(
@@ -573,7 +572,7 @@ class ProxyDomVpnService : VpnService() {
             currentStatus = "idle"
             VpnStatusBroadcaster.emit(currentStatus)
         }
-        Log.i(TAG, "onCreate: VpnService создан status=$currentStatus")
+        NativeLog.i(TAG, "onCreate: VpnService создан status=$currentStatus")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -583,25 +582,26 @@ class ProxyDomVpnService : VpnService() {
                 val protocol = intent.getStringExtra(EXTRA_PROTOCOL) ?: "unknown"
                 val paramsJson = intent.getStringExtra(EXTRA_PARAMS_JSON) ?: "{}"
                 val appInitiated = intent.getBooleanExtra(EXTRA_APP_INITIATED, true)
-                Log.i(TAG, "onStartCommand: ACTION_START (user=$username, proto=$protocol)")
+                NativeLog.event("info", "vpn.service.start", "proto=$protocol user_set=${username != "anonymous"}")
                 // Persist before establish so Always-on / sticky restart after reboot
                 // can rebuild the tunnel without Flutter reinjecting params.
                 persistSession(username, protocol, paramsJson, appInitiated)
                 val params = runCatching { jsonToMap(JSONObject(paramsJson)) }
-                    .onFailure { Log.w(TAG, "failed to parse paramsJson, using defaults", it) }
+                    .onFailure { NativeLog.w(TAG, "failed to parse paramsJson, using defaults", it) }
                     .getOrDefault(emptyMap())
                 sessionEngine.enqueueStart(username, protocol, params)
             }
             ACTION_START_AUTO -> {
                 val raw = intent.getStringExtra(EXTRA_AUTO_CANDIDATES) ?: "[]"
                 val candidates = parseAutoCandidates(raw)
-                Log.i(TAG, "onStartCommand: ACTION_START_AUTO n=${candidates.size}")
+                NativeLog.i(TAG, "onStartCommand: ACTION_START_AUTO n=${candidates.size}")
                 // Whole Auto walk — hop teardownCores must not emit idle.
                 autoProving = true
                 sessionEngine.enqueueAutoStart(candidates)
             }
             ACTION_STOP -> {
-                Log.i(TAG, "onStartCommand: ACTION_STOP")
+                NativeLog.i(TAG, "onStartCommand: ACTION_STOP")
+                NativeLog.sessionId = null
                 autoProving = false
                 coreRecovering = false
                 cancelDeadRecoverRetry()
@@ -611,7 +611,7 @@ class ProxyDomVpnService : VpnService() {
             }
             else -> {
                 // Always-on VPN / START_STICKY restart: intent is often null.
-                Log.w(TAG, "onStartCommand: restore path action=${intent?.action}")
+                NativeLog.w(TAG, "onStartCommand: restore path action=${intent?.action}")
                 restoreSessionIfNeeded()
             }
         }
@@ -633,19 +633,19 @@ class ProxyDomVpnService : VpnService() {
             .putString(KEY_PROTOCOL, protocol)
             .putString(KEY_PARAMS_JSON, paramsJson)
             .apply()
-        Log.i(TAG, "persistSession: saved (${paramsJson.length} chars) appInitiated=$appInitiated")
+        NativeLog.i(TAG, "persistSession: saved (${paramsJson.length} chars) appInitiated=$appInitiated")
     }
 
     /** Intentional disconnect — keep last config for QS tile reconnect. */
     private fun markSessionInactive() {
         prefs().edit().putBoolean(KEY_ACTIVE, false).apply()
-        Log.i(TAG, "markSessionInactive: active=false (params retained)")
+        NativeLog.i(TAG, "markSessionInactive: active=false (params retained)")
     }
 
     /** Wipe params (corrupt session / no usable JSON). */
     private fun clearSession() {
         prefs().edit().clear().apply()
-        Log.i(TAG, "clearSession: wiped stored VPN params")
+        NativeLog.i(TAG, "clearSession: wiped stored VPN params")
     }
 
     /**
@@ -658,12 +658,12 @@ class ProxyDomVpnService : VpnService() {
      */
     private fun restoreSessionIfNeeded() {
         if (isRunning) {
-            Log.i(TAG, "restoreSessionIfNeeded: already running")
+            NativeLog.i(TAG, "restoreSessionIfNeeded: already running")
             return
         }
         val store = prefs()
         if (!store.getBoolean(KEY_ACTIVE, false)) {
-            Log.i(TAG, "restoreSessionIfNeeded: no active session")
+            NativeLog.i(TAG, "restoreSessionIfNeeded: no active session")
             if (currentStatus == "preparing") {
                 currentStatus = "idle"
                 VpnStatusBroadcaster.emit(currentStatus)
@@ -672,7 +672,7 @@ class ProxyDomVpnService : VpnService() {
         }
         val paramsJson = store.getString(KEY_PARAMS_JSON, null)
         if (paramsJson.isNullOrBlank()) {
-            Log.w(TAG, "restoreSessionIfNeeded: active flag without params — clearing")
+            NativeLog.w(TAG, "restoreSessionIfNeeded: active flag without params — clearing")
             clearSession()
             currentStatus = "idle"
             VpnStatusBroadcaster.emit(currentStatus)
@@ -680,10 +680,10 @@ class ProxyDomVpnService : VpnService() {
         }
         val username = store.getString(KEY_USERNAME, "anonymous") ?: "anonymous"
         val protocol = store.getString(KEY_PROTOCOL, "unknown") ?: "unknown"
-        Log.i(TAG, "restoreSessionIfNeeded: restarting (user=$username, proto=$protocol, was=$currentStatus)")
+        NativeLog.event("warn", "vpn.service.restore", "proto=$protocol was=$currentStatus")
         store.edit().putBoolean(KEY_APP_INITIATED, false).apply()
         val params = runCatching { jsonToMap(JSONObject(paramsJson)) }
-            .onFailure { Log.w(TAG, "restoreSessionIfNeeded: bad JSON", it) }
+            .onFailure { NativeLog.w(TAG, "restoreSessionIfNeeded: bad JSON", it) }
             .getOrDefault(emptyMap())
         if (params.isEmpty()) {
             clearSession()
@@ -710,7 +710,7 @@ class ProxyDomVpnService : VpnService() {
             elapsedSinceLastMs = elapsed,
         )
         if (!allowed) {
-            Log.w(
+            NativeLog.w(
                 TAG,
                 "recoverDeadTunnel skip reason=$reason attempts=$deadRecoverAttempts " +
                     "recovering=$coreRecovering status=$currentStatus",
@@ -726,7 +726,7 @@ class ProxyDomVpnService : VpnService() {
         lastDeadRecoverAt = SystemClock.elapsedRealtime()
         cancelDeadRecoverRetry()
         stopPathHealthWatch()
-        Log.i(
+        NativeLog.i(
             TAG,
             "beginDeadRecover reason=$reason attempt=$deadRecoverAttempts/" +
                 "${DeadTunnelReconnect.MAX_ATTEMPTS}",
@@ -738,7 +738,7 @@ class ProxyDomVpnService : VpnService() {
         )
         if (!enqueuePersistedStart(reason)) {
             coreRecovering = false
-            Log.w(TAG, "beginDeadRecover: no persisted session")
+            NativeLog.w(TAG, "beginDeadRecover: no persisted session")
         }
     }
 
@@ -750,10 +750,10 @@ class ProxyDomVpnService : VpnService() {
         val username = store.getString(KEY_USERNAME, "anonymous") ?: "anonymous"
         val protocol = store.getString(KEY_PROTOCOL, "unknown") ?: "unknown"
         val params = runCatching { jsonToMap(JSONObject(paramsJson)) }
-            .onFailure { Log.w(TAG, "enqueuePersistedStart: bad JSON", it) }
+            .onFailure { NativeLog.w(TAG, "enqueuePersistedStart: bad JSON", it) }
             .getOrDefault(emptyMap())
         if (params.isEmpty()) return false
-        Log.i(TAG, "enqueuePersistedStart reason=$reason user=$username proto=$protocol")
+        NativeLog.event("warn", "vpn.service.persisted_start", "reason=$reason proto=$protocol")
         sessionEngine.enqueueStart(username, protocol, params)
         return true
     }
@@ -768,11 +768,11 @@ class ProxyDomVpnService : VpnService() {
             VpnStatusBroadcaster.setError(message)
             currentStatus = "error"
             VpnStatusBroadcaster.emit(currentStatus)
-            Log.e(TAG, "dead recover exhausted: $message")
+            NativeLog.e(TAG, "dead recover exhausted: $message")
             return
         }
         val delay = DeadTunnelReconnect.backoffMs(deadRecoverAttempts)
-        Log.i(TAG, "dead recover retry in ${delay}ms attempt=$deadRecoverAttempts")
+        NativeLog.i(TAG, "dead recover retry in ${delay}ms attempt=$deadRecoverAttempts")
         val retry = Runnable {
             coreRecovering = false
             beginDeadRecover("retry $message")
@@ -805,11 +805,11 @@ class ProxyDomVpnService : VpnService() {
         params: Map<String, Any?>,
     ) {
         if (isAlwaysOnVpnLockdownSetting()) {
-            Log.i(TAG, "  skip excludeRoute: always_on_vpn_lockdown=1")
+            NativeLog.event("info", "vpn.bypass", "applied=false reason=always_on_lockdown")
             return
         }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-            Log.i(TAG, "  skip excludeRoute: API < 33")
+            NativeLog.event("info", "vpn.bypass", "applied=false reason=api_lt_33")
             return
         }
         val hosts = linkedSetOf<String>()
@@ -830,19 +830,37 @@ class ProxyDomVpnService : VpnService() {
                 hosts.add(host.trim())
             }
         }
+        // One line per host was the noisiest thing in a connect report: the same
+        // three hosts on every reconnect, each one unable to explain anything.
+        // The summary keeps the count and the failures; per-host detail is debug.
+        var excluded = 0
+        var skippedIpv6 = 0
+        var failed = 0
         for (host in hosts) {
             try {
                 val inet = InetAddress.getByName(host)
                 // Only IPv4 /32 bypass — IPv6 literals need separate handling.
                 if (inet.hostAddress?.contains(':') == true) {
-                    Log.w(TAG, "  skip excludeRoute IPv6 host=$host")
+                    skippedIpv6 += 1
+                    NativeLog.d(TAG, "  skip excludeRoute IPv6 host=$host")
                     continue
                 }
                 builder.excludeRoute(IpPrefix(inet, 32))
-                Log.i(TAG, "  excludeRoute: $host/32")
+                excluded += 1
+                NativeLog.d(TAG, "  excludeRoute: $host/32")
             } catch (e: Exception) {
-                Log.w(TAG, "  excludeRoute failed for $host", e)
+                failed += 1
+                NativeLog.w(TAG, "excludeRoute failed host=$host", e)
             }
+        }
+        if (excluded == 0 && failed == 0 && skippedIpv6 == 0) {
+            NativeLog.event("info", "vpn.bypass", "applied=false reason=no_hosts")
+        } else {
+            NativeLog.event(
+                if (failed > 0) "warn" else "debug",
+                "vpn.bypass",
+                "excluded=$excluded skipped_ipv6=$skippedIpv6 failed=$failed",
+            )
         }
     }
 
@@ -860,7 +878,7 @@ class ProxyDomVpnService : VpnService() {
         params: Map<String, Any?>,
     ) {
         runCatching { builder.addDisallowedApplication(packageName) }
-            .onFailure { Log.w(TAG, "addDisallowedApplication(self) failed", it) }
+            .onFailure { NativeLog.w(TAG, "addDisallowedApplication(self) failed", it) }
         @Suppress("UNCHECKED_CAST")
         val apps = params["disallowedApplications"] as? List<*> ?: return
         for (raw in apps) {
@@ -868,7 +886,7 @@ class ProxyDomVpnService : VpnService() {
             if (pkg.isEmpty() || pkg == packageName) continue
             runCatching { builder.addDisallowedApplication(pkg) }
                 .onFailure {
-                    Log.w(TAG, "addDisallowedApplication($pkg) failed", it)
+                    NativeLog.w(TAG, "addDisallowedApplication($pkg) failed", it)
                 }
         }
     }
@@ -948,7 +966,7 @@ class ProxyDomVpnService : VpnService() {
                 false
             }
         } catch (e: Exception) {
-            Log.w(TAG, "proveAutoCandidate failed: ${e.message}")
+            NativeLog.w(TAG, "proveAutoCandidate failed: ${e.message}")
             teardownCores()
             false
         }
@@ -980,7 +998,7 @@ class ProxyDomVpnService : VpnService() {
                 obfs = (params["hysteriaObfs"] as? String).orEmpty(),
                 obfsPassword = (params["hysteriaObfsPassword"] as? String).orEmpty(),
             )) {
-            Log.w(TAG, "proveHysteriaSocks: start failed ${hy.lastErrorMessage}")
+            NativeLog.w(TAG, "proveHysteriaSocks: start failed ${hy.lastErrorMessage}")
             return false
         }
         val health = PathHealth().proveEgress(
@@ -990,12 +1008,12 @@ class ProxyDomVpnService : VpnService() {
             candidateLabel = (params["hysteriaNodeId"] as? String) ?: server,
         )
         if (health !is PathHealth.HealthResult.Ok) {
-            Log.w(TAG, "proveHysteriaSocks: $health")
+            NativeLog.w(TAG, "proveHysteriaSocks: $health")
             hy.stop()
             return false
         }
         // Leave Hy2 up for establish — SOCKS prove already started the core.
-        Log.i(TAG, "proveHysteriaSocks: ok, Hy2 SOCKS kept for TUN")
+        NativeLog.i(TAG, "proveHysteriaSocks: ok, Hy2 SOCKS kept for TUN")
         return true
     }
 
@@ -1010,12 +1028,12 @@ class ProxyDomVpnService : VpnService() {
     ) {
         if (!alive()) return
         if (isRunning || HysteriaBridge.instance.running()) {
-            Log.w(TAG, "startVpn: previous hysteria still up — stop before establish")
+            NativeLog.w(TAG, "startVpn: previous hysteria still up — stop before establish")
             teardownCores()
         }
         if (!alive()) return
         if (establishInProgress) {
-            Log.w(TAG, "startVpn: establish already in progress")
+            NativeLog.w(TAG, "startVpn: establish already in progress")
             failStart("establish already in progress")
             return
         }
@@ -1050,7 +1068,7 @@ class ProxyDomVpnService : VpnService() {
             }
             failStart("unsupported vpnCore")
         } catch (e: Exception) {
-            Log.e(TAG, "startVpn: failed", e)
+            NativeLog.e(TAG, "startVpn: failed", e)
             failStart(e.message ?: e.toString())
         }
     }
@@ -1178,7 +1196,7 @@ class ProxyDomVpnService : VpnService() {
         acquireVpnLocks()
         startPathHealthWatch()
         startTrafficMonitor()
-        Log.i(TAG, "startVpn: Xray share established user=$username")
+        NativeLog.event("info", "vpn.core.established", "core=xray")
     }
 
     private fun startHysteriaOnWorker(
@@ -1223,7 +1241,7 @@ class ProxyDomVpnService : VpnService() {
         }
         ProtectGuard.reset()
         ProtectGuard.onFailure = {
-            Log.e(TAG, "Hysteria: protect() failed — stopping VPN")
+            NativeLog.e(TAG, "Hysteria: protect() failed — stopping VPN")
             Handler(Looper.getMainLooper()).post {
                 if (isRunning || establishInProgress) {
                     failStart("VpnService.protect() failed")
@@ -1342,7 +1360,7 @@ class ProxyDomVpnService : VpnService() {
         acquireVpnLocks()
         startPathHealthWatch()
         startTrafficMonitor()
-        Log.i(TAG, "startVpn: Hysteria established server=$server user=$username")
+        NativeLog.event("info", "vpn.core.established", "core=hysteria server=$server")
     }
 
     /**
@@ -1377,7 +1395,7 @@ class ProxyDomVpnService : VpnService() {
                     }
                     for (attempt in 1..XRAY_SOCKS_PROBE_ATTEMPTS) {
                         if (!VpnPingMonitor.isSocksReachable(timeoutMs = 800)) {
-                            Log.w(
+                            NativeLog.w(
                                 TAG,
                                 "SOCKS not reachable yet candidate=" +
                                     "${selected.id}@${selected.host} " +
@@ -1390,7 +1408,7 @@ class ProxyDomVpnService : VpnService() {
                             timeoutMs = XRAY_SOCKS_PROBE_TIMEOUT_MS,
                         )
                         if (outcome is VpnPingMonitor.SocksHttpsResult.Ok) {
-                            Log.i(
+                            NativeLog.i(
                                 TAG,
                                 "SOCKS CONNECT ${outcome.code}ms ok candidate=" +
                                     "${selected.id}@${selected.host} attempt=$attempt",
@@ -1398,7 +1416,7 @@ class ProxyDomVpnService : VpnService() {
                             okFlag.set(true)
                             return@Thread
                         }
-                        Log.w(
+                        NativeLog.w(
                             TAG,
                             "SOCKS CONNECT probe fail candidate=" +
                                 "${selected.id}@${selected.host} " +
@@ -1426,7 +1444,7 @@ class ProxyDomVpnService : VpnService() {
             false
         }
         if (!finished) {
-            Log.w(
+            NativeLog.w(
                 TAG,
                 "SOCKS CONNECT probe timeout candidate=${selected.id}@${selected.host}",
             )
@@ -1503,12 +1521,12 @@ class ProxyDomVpnService : VpnService() {
             "autoProving=$autoProving recovering=$coreRecovering",
         )
         if (autoProving) {
-            Log.w(TAG, "failStart during auto prove (no stopSelf): $message")
+            NativeLog.w(TAG, "failStart during auto prove (no stopSelf): $message")
             teardownCores()
             return
         }
         if (coreRecovering) {
-            Log.w(TAG, "failStart during dead recover (no stopSelf): $message")
+            NativeLog.w(TAG, "failStart during dead recover (no stopSelf): $message")
             teardownCores()
             scheduleDeadRecoverRetry(message)
             return
@@ -1530,18 +1548,18 @@ class ProxyDomVpnService : VpnService() {
         } catch (_: Exception) {
             -1
         }
-        Log.i(TAG, "closeTunOnce reason=$reason fd=$fd")
+        NativeLog.i(TAG, "closeTunOnce reason=$reason fd=$fd")
         try {
             pfd.close()
         } catch (e: Exception) {
-            Log.w(TAG, "closeTunOnce: close failed fd=$fd", e)
+            NativeLog.w(TAG, "closeTunOnce: close failed fd=$fd", e)
         }
     }
 
     /** Stop cores + TUN without [stopSelf] (engine re-establish). */
     private fun teardownCores() {
         if (!teardownInFlight.compareAndSet(false, true)) {
-            Log.w(TAG, "teardownCores: already in flight — skip")
+            NativeLog.w(TAG, "teardownCores: already in flight — skip")
             return
         }
         try {
@@ -1551,9 +1569,9 @@ class ProxyDomVpnService : VpnService() {
             HysteriaBridge.instance.stop()
             provenEgressIp = null
             closeTunOnce("teardownCores")
-            Log.i(TAG, "teardownCores: cores stopped, TUN closed if any")
+            NativeLog.i(TAG, "teardownCores: cores stopped, TUN closed if any")
         } catch (e: Exception) {
-            Log.e(TAG, "teardownCores: error", e)
+            NativeLog.e(TAG, "teardownCores: error", e)
         } finally {
             ProtectGuard.onFailure = null
             isRunning = false
@@ -1591,7 +1609,7 @@ class ProxyDomVpnService : VpnService() {
             }
             teardownCores()
         } catch (e: Exception) {
-            Log.e(TAG, "stopVpn: error", e)
+            NativeLog.e(TAG, "stopVpn: error", e)
         } finally {
             if (currentStatus != "revoked") {
                 currentStatus = "idle"
@@ -1670,7 +1688,7 @@ class ProxyDomVpnService : VpnService() {
                     currentStatus != "idle"
             },
         )
-        Log.i(TAG, "path health watch started")
+        NativeLog.i(TAG, "path health watch started")
     }
 
     private fun stopPathHealthWatch() {
@@ -1698,9 +1716,9 @@ class ProxyDomVpnService : VpnService() {
                 setReferenceCounted(false)
                 acquire()
             }
-            Log.i(TAG, "vpn wake lock acquired")
+            NativeLog.i(TAG, "vpn wake lock acquired")
         }.onFailure {
-            Log.w(TAG, "vpn wake lock failed", it)
+            NativeLog.w(TAG, "vpn wake lock failed", it)
             vpnWakeLock = null
         }
     }
@@ -1728,9 +1746,9 @@ class ProxyDomVpnService : VpnService() {
                 setReferenceCounted(false)
                 acquire()
             }
-            Log.i(TAG, "vpn wifi lock acquired")
+            NativeLog.i(TAG, "vpn wifi lock acquired")
         }.onFailure {
-            Log.w(TAG, "vpn wifi lock skipped", it)
+            NativeLog.w(TAG, "vpn wifi lock skipped", it)
             vpnWifiLock = null
         }
     }
@@ -1754,7 +1772,7 @@ class ProxyDomVpnService : VpnService() {
     }
 
     override fun onRevoke() {
-        Log.w(TAG, "onRevoke: VPN отозван системой или пользователем")
+        NativeLog.w(TAG, "onRevoke: VPN отозван системой или пользователем")
         currentStatus = "revoked"
         VpnStatusBroadcaster.emit(currentStatus)
         stopVpn()
@@ -1762,7 +1780,7 @@ class ProxyDomVpnService : VpnService() {
     }
 
     override fun onDestroy() {
-        Log.i(TAG, "onDestroy: VpnService уничтожен")
+        NativeLog.i(TAG, "onDestroy: VpnService уничтожен")
         if (instance === this) instance = null
         stopVpn()
         super.onDestroy()
@@ -1857,6 +1875,7 @@ object VpnChannelRegistry {
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "startAuto" -> {
+                        NativeLog.sessionId = call.argument<String>("sessionId")
                         val rows = call.argument<List<*>>("candidatesJson")
                             ?: emptyList<Any?>()
                         val arr = JSONArray()
@@ -1878,6 +1897,7 @@ object VpnChannelRegistry {
                         result.success(true)
                     }
                     "start" -> {
+                        NativeLog.sessionId = call.argument<String>("sessionId")
                         // paramsJson — JSON-строка с flat keys (см. VpnServiceConfig)
                         val paramsJson = call.argument<String>("paramsJson") ?: "{}"
                         val json = try {
@@ -1905,6 +1925,7 @@ object VpnChannelRegistry {
                         result.success(true)
                     }
                     "stop" -> {
+                        NativeLog.sessionId = null
                         val intent = Intent(
                             appContext,
                             ProxyDomVpnService::class.java,
@@ -1946,7 +1967,7 @@ object VpnChannelRegistry {
                         }.fold(
                             onSuccess = { result.success(it) },
                             onFailure = { e ->
-                                Log.w(
+                                NativeLog.w(
                                     ProxyDomVpnService.TAG,
                                     "isLockdownEnabled query failed",
                                     e,
@@ -1961,7 +1982,7 @@ object VpnChannelRegistry {
                         }.fold(
                             onSuccess = { result.success(it) },
                             onFailure = { e ->
-                                Log.w(
+                                NativeLog.w(
                                     ProxyDomVpnService.TAG,
                                     "getVpnConflict failed",
                                     e,
@@ -1990,7 +2011,7 @@ object VpnChannelRegistry {
                             }
                             val pm = (activity ?: appContext).packageManager
                             val resolved = intent.resolveActivity(pm)
-                            Log.i(
+                            NativeLog.i(
                                 ProxyDomVpnService.TAG,
                                 "openVpnSettings resolve=$resolved activity=${activity != null}",
                             )
@@ -2001,10 +2022,10 @@ object VpnChannelRegistry {
                             }
                             result.success(true)
                         } catch (e: ActivityNotFoundException) {
-                            Log.w(ProxyDomVpnService.TAG, "openVpnSettings: no activity", e)
+                            NativeLog.w(ProxyDomVpnService.TAG, "openVpnSettings: no activity", e)
                             result.error("VPN_SETTINGS_UNAVAILABLE", e.message, null)
                         } catch (e: Exception) {
-                            Log.w(ProxyDomVpnService.TAG, "openVpnSettings failed", e)
+                            NativeLog.w(ProxyDomVpnService.TAG, "openVpnSettings failed", e)
                             result.error("VPN_SETTINGS_FAILED", e.message, null)
                         }
                     }
@@ -2024,7 +2045,7 @@ object VpnChannelRegistry {
                             (activity ?: appContext).startActivity(intent)
                             result.success(true)
                         } catch (e: Exception) {
-                            Log.w(ProxyDomVpnService.TAG, "battery exemption failed", e)
+                            NativeLog.w(ProxyDomVpnService.TAG, "battery exemption failed", e)
                             result.success(false)
                         }
                     }
@@ -2036,10 +2057,14 @@ object VpnChannelRegistry {
                     }
                     "setCoreLogLevel" -> {
                         CoreLog.override = call.argument<String>("level")
+                        // Same gate for the native ring — the user picked one level,
+                        // and «Журнал» must honour it for Go *and* for Kotlin lines.
+                        NativeLog.level = CoreLog.resolve(appContext)
                         result.success(true)
                     }
                     "clearCoreLog" -> {
                         CoreLog.clear(appContext)
+                        DiagnosticRing.clear()
                         result.success(true)
                     }
                     "getUnderlyingNetworkInterface" -> {
@@ -2234,7 +2259,7 @@ object VpnStatusBroadcaster {
             try {
                 sink.success(replay)
             } catch (e: Exception) {
-                Log.w(ProxyDomVpnService.TAG, "VpnStatusBroadcaster.replay failed: ${e.message}")
+                NativeLog.w(ProxyDomVpnService.TAG, "VpnStatusBroadcaster.replay failed: ${e.message}")
             }
         }
     }
@@ -2258,7 +2283,7 @@ object VpnStatusBroadcaster {
                 try {
                     current.success(status)
                 } catch (e: Exception) {
-                    Log.w(ProxyDomVpnService.TAG, "VpnStatusBroadcaster.emit failed: ${e.message}")
+                    NativeLog.w(ProxyDomVpnService.TAG, "VpnStatusBroadcaster.emit failed: ${e.message}")
                 }
             }
         }
@@ -2300,7 +2325,7 @@ object VpnTrafficBroadcaster {
             try {
                 sink.success(payload)
             } catch (e: Exception) {
-                Log.w(ProxyDomVpnService.TAG, "VpnTrafficBroadcaster.replay failed: ${e.message}")
+                NativeLog.w(ProxyDomVpnService.TAG, "VpnTrafficBroadcaster.replay failed: ${e.message}")
             }
         }
     }
@@ -2332,7 +2357,7 @@ object VpnTrafficBroadcaster {
                 try {
                     current.success(payload)
                 } catch (e: Exception) {
-                    Log.w(ProxyDomVpnService.TAG, "VpnTrafficBroadcaster.emit failed: ${e.message}")
+                    NativeLog.w(ProxyDomVpnService.TAG, "VpnTrafficBroadcaster.emit failed: ${e.message}")
                 }
             }
         }
@@ -2364,7 +2389,7 @@ object VpnPingBroadcaster {
                 // keep a previous AsyncData from an older session.
                 sink.success(mapOf("delayMs" to replay))
             } catch (e: Exception) {
-                Log.w(ProxyDomVpnService.TAG, "VpnPingBroadcaster.replay failed: ${e.message}")
+                NativeLog.w(ProxyDomVpnService.TAG, "VpnPingBroadcaster.replay failed: ${e.message}")
             }
         }
     }
@@ -2381,7 +2406,7 @@ object VpnPingBroadcaster {
                 try {
                     current.success(mapOf("delayMs" to null))
                 } catch (e: Exception) {
-                    Log.w(ProxyDomVpnService.TAG, "VpnPingBroadcaster.clear emit failed: ${e.message}")
+                    NativeLog.w(ProxyDomVpnService.TAG, "VpnPingBroadcaster.clear emit failed: ${e.message}")
                 }
             }
         }
@@ -2396,7 +2421,7 @@ object VpnPingBroadcaster {
                 try {
                     current.success(payload)
                 } catch (e: Exception) {
-                    Log.w(ProxyDomVpnService.TAG, "VpnPingBroadcaster.emit failed: ${e.message}")
+                    NativeLog.w(ProxyDomVpnService.TAG, "VpnPingBroadcaster.emit failed: ${e.message}")
                 }
             }
         }

@@ -4,7 +4,6 @@ import android.app.Activity
 import android.content.Intent
 import android.net.VpnService
 import android.os.Bundle
-import android.util.Log
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -31,7 +30,7 @@ class DebugVpnActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Log.i(TAG, "onCreate: DebugVpnActivity")
+        NativeLog.i(TAG, "onCreate: DebugVpnActivity")
 
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -69,7 +68,7 @@ class DebugVpnActivity : Activity() {
         val logButton = Button(this).apply {
             text = "📋 View logcat for ProxyDomVpn"
             setOnClickListener {
-                Log.i(TAG, "Check logcat: adb logcat -s ProxyDomVpn:V DebugVpn:V")
+                NativeLog.i(TAG, "Check logcat: adb logcat -s ProxyDomVpn:V DebugVpn:V")
                 Toast.makeText(
                     this@DebugVpnActivity,
                     "Run: adb logcat -s ProxyDomVpn:V",
@@ -92,11 +91,11 @@ class DebugVpnActivity : Activity() {
         val prepareIntent = VpnService.prepare(this)
         if (prepareIntent != null) {
             // 2. Нужен запрос permission → запускаем системный диалог.
-            Log.i(TAG, "startVpnFlow: запрашиваем permission")
+            NativeLog.i(TAG, "startVpnFlow: запрашиваем permission")
             startActivityForResult(prepareIntent, VPN_REQUEST_CODE)
         } else {
             // 3. Уже есть permission — стартуем сразу.
-            Log.i(TAG, "startVpnFlow: permission уже есть, стартуем напрямую")
+            NativeLog.i(TAG, "startVpnFlow: permission уже есть, стартуем напрямую")
             launchVpnService()
         }
     }
@@ -105,10 +104,10 @@ class DebugVpnActivity : Activity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == VPN_REQUEST_CODE) {
             if (resultCode == Activity.RESULT_OK) {
-                Log.i(TAG, "onActivityResult: permission GRANTED")
+                NativeLog.i(TAG, "onActivityResult: permission GRANTED")
                 launchVpnService()
             } else {
-                Log.w(TAG, "onActivityResult: permission DENIED (result=$resultCode)")
+                NativeLog.w(TAG, "onActivityResult: permission DENIED (result=$resultCode)")
                 Toast.makeText(this, "VPN permission denied", Toast.LENGTH_SHORT).show()
             }
         }
@@ -121,7 +120,7 @@ class DebugVpnActivity : Activity() {
             putExtra(ProxyDomVpnService.EXTRA_PROTOCOL, "VLESS+Reality")
         }
         startService(intent)
-        Log.i(TAG, "launchVpnService: startService() отправлен")
+        NativeLog.i(TAG, "launchVpnService: startService() отправлен")
     }
 
     private fun stopVpn() {
@@ -129,6 +128,6 @@ class DebugVpnActivity : Activity() {
             action = ProxyDomVpnService.ACTION_STOP
         }
         startService(intent)
-        Log.i(TAG, "stopVpn: stop signal отправлен")
+        NativeLog.i(TAG, "stopVpn: stop signal отправлен")
     }
 }

@@ -5,7 +5,6 @@ import android.content.ComponentName
 import android.content.Context
 import android.graphics.drawable.Icon
 import android.os.Build
-import android.util.Log
 import androidx.core.content.ContextCompat
 import io.flutter.plugin.common.MethodChannel
 import java.util.concurrent.atomic.AtomicBoolean
@@ -74,7 +73,7 @@ object QsTilePrompter {
                 reply(mapped)
             }
         } catch (e: Exception) {
-            Log.w(TAG, "requestAddTileService failed", e)
+            NativeLog.w(TAG, "requestAddTileService failed", e)
             reply(VpnShadePolicy.ADD_TILE_MANUAL)
         }
     }

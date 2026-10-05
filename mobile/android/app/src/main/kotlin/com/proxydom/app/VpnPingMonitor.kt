@@ -1,6 +1,5 @@
 package com.proxydom.app
 
-import android.util.Log
 import java.io.BufferedReader
 import java.io.DataInputStream
 import java.io.DataOutputStream
@@ -178,7 +177,7 @@ class VpnPingMonitor(
                 hostHeader = PROBE_HTTPS_HOST,
             )
             if (ipv4.isOk) return ipv4
-            runCatching { Log.i(TAG, "HTTP 204 ipv4 fail (${ipv4.detail}) — domain :80") }
+            runCatching { NativeLog.i(TAG, "HTTP 204 ipv4 fail (${ipv4.detail}) — domain :80") }
             return socksHttpAfterConnect(
                 socksHost = socksHost,
                 socksPort = socksPort,
@@ -574,7 +573,7 @@ class VpnPingMonitor(
         worker =
             Thread(
                 {
-                    Log.i(TAG, "ping monitor started (SOCKS CONNECT RTT, then TUN TCP)")
+                    NativeLog.i(TAG, "ping monitor started (SOCKS CONNECT RTT, then TUN TCP)")
                     while (running.get()) {
                         probeOnce()
                         var waited = 0L
@@ -587,7 +586,7 @@ class VpnPingMonitor(
                             waited += 200
                         }
                     }
-                    Log.i(TAG, "ping monitor stopped")
+                    NativeLog.i(TAG, "ping monitor stopped")
                 },
                 "proxydom-ping-monitor",
             ).apply {
@@ -607,18 +606,18 @@ class VpnPingMonitor(
         val sample = measureSample()
         if (sample != null) {
             consecutiveFails.set(0)
-            Log.i(TAG, "ping sample path=${sample.path} ${sample.ms}ms")
+            NativeLog.i(TAG, "ping sample path=${sample.path} ${sample.ms}ms")
             runCatching { onSample(sample.ms) }
-                .onFailure { Log.w(TAG, "onSample failed: ${it.message}") }
+                .onFailure { NativeLog.w(TAG, "onSample failed: ${it.message}") }
             return
         }
 
         val fails = consecutiveFails.incrementAndGet()
-        Log.i(TAG, "ping sample failed consecutive=$fails")
+        NativeLog.i(TAG, "ping sample failed consecutive=$fails")
         if (fails >= FAIL_CLEAR_THRESHOLD) {
-            Log.i(TAG, "ping cleared after $fails consecutive failures")
+            NativeLog.i(TAG, "ping cleared after $fails consecutive failures")
             runCatching { onSample(null) }
-                .onFailure { Log.w(TAG, "onSample(null) failed: ${it.message}") }
+                .onFailure { NativeLog.w(TAG, "onSample(null) failed: ${it.message}") }
         }
     }
 
@@ -628,14 +627,14 @@ class VpnPingMonitor(
         if (isSocksReachable()) {
             val connectMs = socks5ConnectRttMs()
             if (connectMs == null) {
-                Log.i(TAG, "SOCKS CONNECT failed")
+                NativeLog.i(TAG, "SOCKS CONNECT failed")
             } else {
                 DiagnosticRing.event("debug", "net.path", "ok=true")
                 val clamped = clampDelayMs(connectMs) ?: return null
                 return Sample(clamped, "socks5")
             }
         } else {
-            Log.i(TAG, "SOCKS unreachable — trying TUN TCP")
+            NativeLog.i(TAG, "SOCKS unreachable — trying TUN TCP")
         }
 
         val tunMs = tcpConnectRttMs() ?: return null

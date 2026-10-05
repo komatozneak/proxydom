@@ -29,6 +29,9 @@ final class Hy2TunnelEngine: NSObject {
   /// IPv6 packets claimed then dropped (not forwarded to Hy2).
   private var ipv6DropCount: UInt64 = 0
   private var lastIpv6DropLogged: UInt64 = 0
+  /// Packets the Hy2 core refused. Counted, not printed — see `noteInjectFailure`.
+  private var injectFailureCount: UInt64 = 0
+  private var lastInjectFailureLogged: UInt64 = 0
 
   private var pathMonitor: Network.NWPathMonitor?
   private let pathQueue = DispatchQueue(label: "su.proxydom.app.vpn.path")
@@ -60,6 +63,8 @@ final class Hy2TunnelEngine: NSObject {
     healthLock.lock()
     ipv6DropCount = 0
     lastIpv6DropLogged = 0
+    injectFailureCount = 0
+    lastInjectFailureLogged = 0
     ingressPackets = 0
     ingressBytes = 0
     egressPackets = 0
@@ -422,7 +427,7 @@ final class Hy2TunnelEngine: NSObject {
         self.healthLock.unlock()
         let injectErr = Hy2bindInjectPacket(packet) ?? ""
         if !injectErr.isEmpty {
-          NSLog("[ProxyDom] injectPacket: %@", injectErr)
+          self.noteInjectFailure(injectErr)
         }
       }
       #else
@@ -441,6 +446,25 @@ final class Hy2TunnelEngine: NSObject {
       }
       self.persistHealth(force: false)
       self.pumpInbound()
+    }
+  }
+
+  /// Failures are counted, not printed. This used to be one `NSLog` per packet
+  /// inside the read loop: a stuck engine meant one unified-log line per
+  /// packet, forever, and `injectErr` is raw Go text that can echo the config
+  /// the engine was given. The ring is bounded and redacted on export; the
+  /// unified log is neither.
+  private func noteInjectFailure(_ error: String) {
+    healthLock.lock()
+    injectFailureCount += 1
+    let count = injectFailureCount
+    let shouldLog = count == 1 || count - lastInjectFailureLogged >= 64
+    if shouldLog {
+      lastInjectFailureLogged = count
+    }
+    healthLock.unlock()
+    if shouldLog {
+      ProxyDomVpnShared.appendNativeLog("PacketTunnel.inject_failed count=\(count)")
     }
   }
 

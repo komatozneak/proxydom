@@ -6,7 +6,6 @@ import android.net.Network
 import android.net.VpnService
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 
 /**
  * Bind TUN sockets to the **current OS default** underlying network.
@@ -58,7 +57,7 @@ internal object VpnUnderlyingNetworkPolicy {
     fun bindProcess(context: Context, timeoutMs: Long = 3_000): Boolean {
         DefaultNetworkMonitor.prewarm(context)
         if (!DefaultNetworkMonitor.awaitUnderlyingNetwork(context, timeoutMs)) {
-            Log.w(TAG, "bindProcess skipped — no underlying network")
+            NativeLog.w(TAG, "bindProcess skipped — no underlying network")
             return false
         }
         val net = DefaultNetworkMonitor.defaultNetwork ?: return false
@@ -75,11 +74,11 @@ internal object VpnUnderlyingNetworkPolicy {
         val cm = context.getSystemService(ConnectivityManager::class.java)
         return runCatching {
             val ok = cm.bindProcessToNetwork(network)
-            Log.i(TAG, "bindProcessToNetwork iface=$iface ok=$ok")
+            NativeLog.i(TAG, "bindProcessToNetwork iface=$iface ok=$ok")
             bindLog.record(iface, ok)
             ok
         }.getOrElse {
-            Log.w(TAG, "bindProcessToNetwork failed iface=$iface", it)
+            NativeLog.w(TAG, "bindProcessToNetwork failed iface=$iface", it)
             bindLog.record(iface, false)
             false
         }
@@ -93,7 +92,7 @@ internal object VpnUnderlyingNetworkPolicy {
         val cm = context.getSystemService(ConnectivityManager::class.java)
         return runCatching {
             val ok = cm.bindProcessToNetwork(null)
-            Log.i(TAG, "bindProcessToNetwork clear ok=$ok")
+            NativeLog.i(TAG, "bindProcessToNetwork clear ok=$ok")
             DiagnosticRing.event(
                 if (ok) "debug" else "error",
                 "net.bind",
@@ -101,7 +100,7 @@ internal object VpnUnderlyingNetworkPolicy {
             )
             ok
         }.getOrElse {
-            Log.w(TAG, "bindProcessToNetwork clear failed", it)
+            NativeLog.w(TAG, "bindProcessToNetwork clear failed", it)
             false
         }
     }
@@ -117,16 +116,16 @@ internal object VpnUnderlyingNetworkPolicy {
                 if (iface.isNullOrBlank()) null else Underlying(net, iface)
             }
         if (picked == null) {
-            Log.w(TAG, "applyTo skipped — no underlying network")
+            NativeLog.w(TAG, "applyTo skipped — no underlying network")
             return false
         }
         return runCatching {
             vpn.setUnderlyingNetworks(arrayOf(picked.network))
-            Log.i(TAG, "setUnderlyingNetworks iface=${picked.interfaceName}")
+            NativeLog.i(TAG, "setUnderlyingNetworks iface=${picked.interfaceName}")
             DiagnosticRing.event("debug", "net.iface", "iface=${picked.interfaceName}")
             true
         }.getOrElse {
-            Log.w(TAG, "setUnderlyingNetworks failed iface=${picked.interfaceName}", it)
+            NativeLog.w(TAG, "setUnderlyingNetworks failed iface=${picked.interfaceName}", it)
             DiagnosticRing.event(
                 "error",
                 "net.iface",
