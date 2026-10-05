@@ -450,6 +450,14 @@
   "tunnelLogsCopy": "Copy",
   "tunnelLogsExport": "Share",
   "tunnelLogsDelete": "Delete",
+  "tunnelLogsClearBlocked": "Could not delete: {files}. Stop the tunnel and try again.",
+  "@tunnelLogsClearBlocked": {
+    "placeholders": {
+      "files": {
+        "type": "String"
+      }
+    }
+  },
   "tunnelLogsCopied": "Log copied",
   "tunnelLogsDebugFile": "File to send: {path}",
   "@tunnelLogsDebugFile": {

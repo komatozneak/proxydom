@@ -195,17 +195,42 @@ class _TunnelLogScreenState extends State<TunnelLogScreen> {
     );
   }
 
-  Future<void> _delete() async {
-    UiLog.action('logs', 'clear', level: ProductLogLevel.info);
-    AppLogBuffer.instance.clear();
-    await AppLogBuffer.instance.flushPersist();
-    await VpnController.instance.clearCoreLog();
-    if (!mounted) return;
-    setState(() {
-      _lines = const [];
-      _frozen = _level == TunnelLogLevel.off ? const [] : null;
-    });
+  /// Empty every sink, not just the one this screen draws from.
+///
+/// The window ring, the persisted product.log, the core windows and — on
+/// Windows — the broker journal plus any exported proxydom-debug.txt all
+/// outlive the tap. Only the first of those is in this process, so the rest is
+/// deleted by path. Whatever the filesystem refuses (a live broker holds
+/// service.log open) is named back instead of swallowed.
+Future<void> _delete() async {
+  UiLog.action('logs', 'clear', level: ProductLogLevel.info);
+  AppLogBuffer.instance.clear();
+  await AppLogBuffer.instance.flushPersist();
+  await VpnController.instance.clearCoreLog();
+  final onDisk = await deleteWindowsServiceLog();
+  UiLog.action(
+    'logs',
+    'clear_files',
+    level: ProductLogLevel.info,
+    result: onDisk.isComplete ? 'ok' : 'partial',
+    extra: {
+      'deleted': onDisk.deleted.length,
+      'blocked': onDisk.blocked.length,
+    },
+  );
+  if (!mounted) return;
+  setState(() {
+    _lines = const [];
+    _frozen = _level == TunnelLogLevel.off ? const [] : null;
+  });
+  if (!onDisk.isComplete) {
+    final l = AppL10n.of(context);
+    showProxyDomToast(
+      l.tunnelLogsClearBlocked(onDisk.blocked.join(', ')),
+      tone: ToastTone.failure,
+    );
   }
+}
 
   @override
   Widget build(BuildContext context) {

@@ -724,6 +724,11 @@ class AppL10nRu extends AppL10n {
   String get tunnelLogsDelete => 'Удалить';
 
   @override
+  String tunnelLogsClearBlocked(String files) {
+    return 'Не удалось удалить: $files. Остановите туннель и повторите.';
+  }
+
+  @override
   String get tunnelLogsCopied => 'Лог скопирован';
 
   @override

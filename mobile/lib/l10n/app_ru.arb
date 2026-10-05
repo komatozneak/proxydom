@@ -309,6 +309,14 @@
   "tunnelLogsCopy": "Копировать",
   "tunnelLogsExport": "Поделиться",
   "tunnelLogsDelete": "Удалить",
+  "tunnelLogsClearBlocked": "Не удалось удалить: {files}. Остановите туннель и повторите.",
+  "@tunnelLogsClearBlocked": {
+    "placeholders": {
+      "files": {
+        "type": "String"
+      }
+    }
+  },
   "tunnelLogsCopied": "Лог скопирован",
   "tunnelLogsDebugFile": "Файл для отправки: {path}",
   "@tunnelLogsDebugFile": {

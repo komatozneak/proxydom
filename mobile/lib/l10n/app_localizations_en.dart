@@ -722,6 +722,11 @@ class AppL10nEn extends AppL10n {
   String get tunnelLogsDelete => 'Delete';
 
   @override
+  String tunnelLogsClearBlocked(String files) {
+    return 'Could not delete: $files. Stop the tunnel and try again.';
+  }
+
+  @override
   String get tunnelLogsCopied => 'Log copied';
 
   @override

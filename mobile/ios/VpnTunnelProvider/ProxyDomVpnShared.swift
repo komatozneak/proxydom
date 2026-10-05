@@ -18,6 +18,8 @@ enum ProxyDomVpnShared {
   /// Ring buffer for Runner + Packet Tunnel lines (no secrets) → diagnostics.
   static let nativeLogKey = "vpn.nativeLog"
   static let nativeLogMaxLines = 128
+  /// Level the user picked in the log screen, shared with the extension.
+  static let nativeLogLevelKey = "vpn.nativeLogLevel"
   /// Last tunnel health JSON (generation-scoped; survives appex stop).
   static let tunnelHealthKey = "vpn.tunnelHealth"
   static let lastStopReasonKey = "vpn.lastStopReason"

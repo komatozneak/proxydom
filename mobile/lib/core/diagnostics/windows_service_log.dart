@@ -55,3 +55,66 @@ Future<String?> writeWindowsDebugFile(String text) async {
   }
   return null;
 }
+
+/// Outcome of a delete attempt: what went, and what refused.
+class LogDeleteResult {
+  const LogDeleteResult({this.deleted = const [], this.blocked = const []});
+
+  final List<String> deleted;
+  final List<String> blocked;
+
+  bool get isComplete => blocked.isEmpty;
+}
+
+/// Paths the broker journal and the exported report live at.
+List<String> windowsServiceLogPaths() {
+  final root = Platform.environment['ProgramData'];
+  final base = (root == null || root.isEmpty) ? r'C:\ProgramData' : root;
+  return [
+    '$base\\Proxy Dom\\logs\\service.log.1',
+    '$base\\Proxy Dom\\logs\\service.log',
+  ];
+}
+
+String _serviceLogDirName() => 'logs\\service.log';
+
+/// Remove the broker journal and the exported report from disk.
+///
+/// «Удалить» in the log screen used to empty the window's own ring and stop
+/// there, which is why an exported `proxydom-debug.txt` kept coming back and
+/// old `service.log` entries kept accumulating across installs: these files
+/// belong to a different process and a different lifetime.
+///
+/// A running broker holds `service.log` open for append without
+/// FILE_SHARE_DELETE, so Windows refuses the delete. That is reported instead
+/// of swallowed - a delete that silently did nothing is the bug this replaces.
+Future<LogDeleteResult> deleteWindowsServiceLog() async {
+  if (!Platform.isWindows) {
+    return const LogDeleteResult();
+  }
+  final deleted = <String>[];
+  final blocked = <String>[];
+  final exported = <String>[
+    for (final folder in ['Downloads', 'Desktop'])
+      if (_profilePath(folder) case final path?) path,
+  ];
+  final targets = <String>[...windowsServiceLogPaths(), ...exported];
+  for (final path in targets) {
+    final file = File(path);
+    try {
+      if (!await file.exists()) continue;
+      await file.delete();
+      deleted.add(_displayName(path));
+    } on FileSystemException {
+      blocked.add(_displayName(path));
+    }
+  }
+  return LogDeleteResult(deleted: deleted, blocked: blocked);
+}
+
+String _displayName(String path) {
+  if (path.contains('Downloads') || path.contains('Desktop')) {
+    return path.split('\\').last;
+  }
+  return _serviceLogDirName();
+}

@@ -113,7 +113,20 @@ enum ProxyDomVpnChannel {
         }
       case "getSingBoxStderrTail", "getVpnCoreStderrTail":
         result(UserDefaults(suiteName: appGroupId)?.string(forKey: lastErrorKey))
-      case "setCoreLogLevel", "clearCoreLog":
+      case "setCoreLogLevel":
+        // Was a stub that answered `true` and touched nothing, so the level
+        // picker did nothing on this platform and the ring had no gate.
+        ProxyDomVpnShared.defaults?.set(
+          call.argument<String>("level") ?? "info",
+          forKey: ProxyDomVpnShared.nativeLogLevelKey
+        )
+        result(true)
+      case "clearCoreLog":
+        // Same reason: «Удалить» emptied the window and left the App Group ring
+        // sitting in the next report the user sent.
+        ProxyDomVpnShared.defaults?.removeObject(
+          forKey: ProxyDomVpnShared.nativeLogKey
+        )
         result(true)
       case "getUnderlyingNetworkInterface":
         result(nil)

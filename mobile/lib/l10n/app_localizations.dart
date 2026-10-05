@@ -1411,6 +1411,12 @@ abstract class AppL10n {
   /// **'Delete'**
   String get tunnelLogsDelete;
 
+  /// No description provided for @tunnelLogsClearBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not delete: {files}. Stop the tunnel and try again.'**
+  String tunnelLogsClearBlocked(String files);
+
   /// No description provided for @tunnelLogsCopied.
   ///
   /// In en, this message translates to:
