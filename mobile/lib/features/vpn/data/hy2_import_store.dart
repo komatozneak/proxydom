@@ -272,23 +272,25 @@ class Hy2ImportStore {
         );
       }
       final catalogs = _replaceCatalog(blob.catalogs, id, pulled);
-      final stillThere = key != null &&
-          pulled.lines.any((line) => shareServerKey(line) == key);
+      final stillListed = key != null &&
+          catalogs.any(
+            (catalog) => catalog.lines.any((line) => shareServerKey(line) == key),
+          );
       await _write(
         blob.copyWith(
           catalogs: catalogs,
-          selected: shareRefreshIndex(
+          selected: selectionAfterReload(
             catalogs: catalogs,
+            before: catalog,
             catalogId: id,
-            key: stillThere ? key : null,
-            owned: owned && !stillThere,
+            key: key,
           ),
         ),
       );
       return ShareRefreshOutcome(
         kind: ShareRefreshKind.updated,
         count: pulled.lines.length,
-        selectionLeftThisList: owned && !stillThere,
+        selectionLeftThisList: owned && !stillListed,
       );
     } on DocumentSyncException catch (e) {
       if (e.decision != DocumentSyncDecision.drop) {
@@ -934,6 +936,33 @@ bool _catalogOwnsKey(ShareCatalog catalog, String? key) {
     if (shareServerKey(line) == key) return true;
   }
   return false;
+}
+
+/// The line the tab keeps selected after one document has been reloaded.
+///
+/// [catalogs] is the whole store after the reload, [before] is the document as
+/// it was. The chosen server is looked for in **every** list, not only in the
+/// one being reloaded: a document that never owned the selection has no business
+/// ending it. Asking this of the reloaded list alone is how pressing «обновить»
+/// on one key quietly chose another one — the connected key stopped being the
+/// active one while the tunnel still ran it.
+int selectionAfterReload({
+  required List<ShareCatalog> catalogs,
+  required ShareCatalog before,
+  required String catalogId,
+  required String? key,
+}) {
+  final owned = _catalogOwnsKey(before, key);
+  final stillListed = key != null &&
+      catalogs.any(
+        (catalog) => catalog.lines.any((line) => shareServerKey(line) == key),
+      );
+  return shareRefreshIndex(
+    catalogs: catalogs,
+    catalogId: catalogId,
+    key: stillListed ? key : null,
+    owned: owned && !stillListed,
+  );
 }
 
 /// Keeps [key] when it is still in some list. When this list lost the

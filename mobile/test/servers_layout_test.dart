@@ -84,7 +84,6 @@ ProfileInstrument _instrument({
     description: 'Значок справа ведёт в бота',
     facts: facts,
     selected: false,
-    onSelect: () {},
     onNodeTap: (_) {},
     selectedNodeTitle: 'YouTube',
     telegramLabel: 'Telegram',

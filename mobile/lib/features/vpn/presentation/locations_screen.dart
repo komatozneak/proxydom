@@ -216,6 +216,33 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     await _applyImported(links);
   }
 
+  /// The saved documents a reload could actually reach.
+  List<ShareCatalog> get _reloadableDocuments => [
+        for (final catalog in _catalogs)
+          if (catalog.url != null && catalog.url!.isNotEmpty) catalog,
+      ];
+
+  /// Rereads every saved document from the key at the foot of this page.
+  ///
+  /// It goes through the same answer as the ring on a plate — one document at a
+  /// time, the selection kept against the list that still holds it — and it
+  /// leaves the person where they stood. The one thing it has to say to the
+  /// tunnel is that the chosen server is gone: a session left up on a key no
+  /// document lists any more is a session nobody asked to keep.
+  Future<void> _refreshEveryDocument() async {
+    final status = ref.read(vpnProvider);
+    final live = status is VpnConnected || status is VpnConnecting;
+    await refreshRemoteDocuments(
+      context,
+      scope: 'locations',
+      bottomInset: kActionBarBottomInset,
+      onSelectionLeft: () async {
+        if (!live) return;
+        await ref.read(vpnProvider.notifier).disconnect(reason: 'refresh');
+      },
+    );
+  }
+
   Future<void> _shareCatalog(ShareCatalog catalog) async {
     final key = catalog.subscriptionKey;
     if (key == null || !mounted) {
@@ -367,7 +394,9 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
         keyHandle: handle,
       ),
       selected: _catalogIsSelected(catalog),
-      onSelect: () => _chooseCatalog(catalog),
+      // The plate itself is not the pick: the line you tap is the line you get.
+      // This callback was required and never called, which read as «this card
+      // chooses something» to everyone but the person holding the mouse.
       onNodeTap: (_) {},
       nodes: [
         for (final index in [...lines.premium, ...lines.general])
@@ -421,23 +450,6 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       if (index >= 0 && _selectedId == '$index') return true;
     }
     return false;
-  }
-
-  Future<void> _chooseCatalog(ShareCatalog catalog) async {
-    for (final raw in catalog.lines) {
-      final index = _imported.indexWhere((link) => link.raw == raw);
-      if (index < 0) continue;
-      final link = _imported[index];
-      if (!canDialScheme(link.scheme, ios: false)) continue;
-      await _chooseImported(index, scheme: link.scheme);
-      return;
-    }
-    UiLog.action(
-      'locations',
-      'pick_profile',
-      result: 'rejected',
-      reason: 'no_dialable_line',
-    );
   }
 
   /// The page: one scroll of cards, one key bar under it.
@@ -556,9 +568,15 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
                 // The reload ring was dead here: the key was painted and had
                 // no handler, while every saved document on this tab is
                 // reloadable. Same question as the home key, same answer.
-                onRefresh: _catalogs.isEmpty
+                //
+                // It answers for this tab and stays on this tab: a reload is not
+                // a server pick, and the profile screen is where a pick goes —
+                // not where a reread goes. The key is here exactly when there
+                // is a saved document behind it, and a plate pasted as plain
+                // lines has none.
+                onRefresh: _reloadableDocuments.isEmpty
                     ? null
-                    : () => refreshRemoteDocuments(context, scope: 'locations'),
+                    : () => _refreshEveryDocument(),
               ),
             ),
           ),

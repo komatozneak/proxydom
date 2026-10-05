@@ -15,43 +15,77 @@ import '../data/hy2_import_store.dart';
 import '../data/subscription_label.dart';
 import 'server_glyph.dart';
 
+/// How one pass over the saved documents went.
+///
+/// [documents] is how many saved documents had a URL behind them, [failed] how
+/// many of those refused, [links] how many servers are on the tab afterwards.
+typedef DocumentReload = ({int links, int documents, int failed});
+
+/// Rereads every saved subscription document and counts what came back.
+///
+/// This is the one answer to « reread my links ». The home key and the servers
+/// key ask the same question and used to have two answers: one that reloaded
+/// and said nothing about the selection, one that also handled a selection the
+/// reload had dropped. A tunnel left up on a key that is no longer in any list
+/// is worse than a stale list, so the handling lives with the reloading.
+///
+/// [onSelectionLeft] is called when the chosen server is no longer in any
+/// document after the pass — the caller owns the tunnel and disconnects there.
+Future<DocumentReload> reloadSavedDocuments({
+  Future<void> Function()? onSelectionLeft,
+}) async {
+  final catalogs = await Hy2ImportStore.instance.catalogs();
+  final remote = [
+    for (final catalog in catalogs)
+      if (catalog.url != null && catalog.url!.isNotEmpty) catalog,
+  ];
+  var failed = 0;
+  var selectionLeft = false;
+  for (final catalog in remote) {
+    try {
+      final outcome = await Hy2ImportStore.instance.refreshCatalog(catalog.id);
+      if (outcome.selectionLeftThisList) selectionLeft = true;
+    } on Exception {
+      failed++;
+    }
+  }
+  final links = await Hy2ImportStore.instance.load();
+  if (selectionLeft && onSelectionLeft != null) await onSelectionLeft();
+  return (
+    links: links.length,
+    documents: remote.length,
+    failed: failed,
+  );
+}
+
 /// Reloads every saved subscription document and says how it went.
 ///
-/// The home key and the servers key ask the same question — reread my links —
-/// and they had two copies of the answer. One function, one count in the log,
-/// one message, so the two screens cannot drift apart.
+/// [scope] is the tab the key was pressed on, so the log says which one it was:
+/// the same press answers under the name of the screen it happened on, never
+/// under the name of another tab.
 Future<void> refreshRemoteDocuments(
   BuildContext context, {
   required String scope,
+  Future<void> Function()? onSelectionLeft,
+  double bottomInset = 0,
 }) async {
   UiLog.action(scope, 'refresh', level: ProductLogLevel.info);
   final l = AppL10n.of(context);
   try {
-    final catalogs = await Hy2ImportStore.instance.catalogs();
-    final remote = [
-      for (final catalog in catalogs)
-        if (catalog.url != null && catalog.url!.isNotEmpty) catalog,
-    ];
-    var failed = 0;
-    for (final catalog in remote) {
-      try {
-        await Hy2ImportStore.instance.refreshCatalog(catalog.id);
-      } on Exception {
-        failed++;
-      }
-    }
-    final links = await Hy2ImportStore.instance.load();
+    final result = await reloadSavedDocuments(
+      onSelectionLeft: onSelectionLeft,
+    );
     if (!context.mounted) return;
     // Every document failing is a different story from none of them being
     // there: the first is a word worth saying, the second is nothing to report.
-    if (remote.isNotEmpty && failed == remote.length) {
+    if (result.documents > 0 && result.failed == result.documents) {
       UiLog.action(
         scope,
         'refresh',
         level: ProductLogLevel.warn,
         result: 'fail',
       );
-      showProxyDomSnackBar(context, l.freeRefreshFail);
+      showProxyDomSnackBar(context, l.freeRefreshFail, bottomInset: bottomInset);
       return;
     }
     UiLog.action(
@@ -59,9 +93,13 @@ Future<void> refreshRemoteDocuments(
       'refresh',
       level: ProductLogLevel.info,
       result: 'ok',
-      extra: {'links': links.length, 'failed': failed},
+      extra: {'links': result.links, 'failed': result.failed},
     );
-    showProxyDomSnackBar(context, l.freeRefreshDone(links.length));
+    showProxyDomSnackBar(
+      context,
+      l.freeRefreshDone(result.links),
+      bottomInset: bottomInset,
+    );
   } catch (_) {
     if (!context.mounted) return;
     UiLog.action(
@@ -70,9 +108,17 @@ Future<void> refreshRemoteDocuments(
       level: ProductLogLevel.warn,
       result: 'fail',
     );
-    showProxyDomSnackBar(context, l.freeRefreshFail);
+    showProxyDomSnackBar(context, l.freeRefreshFail, bottomInset: bottomInset);
   }
 }
+
+/// How tall the key bar is, and how much of the page it keeps for itself.
+///
+/// The bar is pinned to the bottom edge of the page it belongs to, so anything
+/// that answers from that page has to stand above it — [kActionBarBottomInset]
+/// is that standing room: the keys plus the page's own padding above and below.
+const double kActionBarHeight = 54;
+const double kActionBarBottomInset = kActionBarHeight + 22;
 
 /// Paste, and on the phone a matching QR. Windows has no camera and no QR.
 ///
@@ -106,7 +152,7 @@ class FreeClientActionBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppL10n.of(context);
-    const barHeight = 54.0;
+    const barHeight = kActionBarHeight;
     const gap = SizedBox(width: 10);
     // Add server is the primary: it is the only thing a person has to do to get
     // this screen to work, so it wears the house's own gold. Reload wears the

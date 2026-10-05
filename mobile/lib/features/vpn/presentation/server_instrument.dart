@@ -26,7 +26,6 @@ class ProfileInstrument extends StatelessWidget {
     required this.description,
     required this.facts,
     required this.selected,
-    required this.onSelect,
     required this.nodes,
     required this.onNodeTap,
     this.selectedNodeTitle,
@@ -49,7 +48,6 @@ class ProfileInstrument extends StatelessWidget {
   final List<({String text, bool accent})> facts;
 
   final bool selected;
-  final VoidCallback onSelect;
 
   /// The pool, rendered as instrument lines rather than a list.
   final List<NodeLine> nodes;

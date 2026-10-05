@@ -855,7 +855,13 @@ class _FreeClientHome extends StatelessWidget {
           UiLog.action('home', 'scan');
           openFreeClientCapture(context);
         },
-        onRefresh: () => refreshRemoteDocuments(context, scope: 'home'),
+        onRefresh: () => refreshRemoteDocuments(
+          context,
+          scope: 'home',
+          // The answer stands above the keys, not on them: the toast used to
+          // land square on the bar this key belongs to.
+          bottomInset: kActionBarBottomInset,
+        ),
       ),
     ];
 

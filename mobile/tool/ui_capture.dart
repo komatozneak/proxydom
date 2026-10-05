@@ -22,6 +22,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:proxydom/core/theme.dart';
 import 'package:proxydom/core/widgets/proxydom_ground.dart';
+import 'package:proxydom/core/widgets/window_caption_bar.dart';
 import 'package:proxydom/features/home/presentation/home_screen.dart';
 import 'package:proxydom/features/settings/presentation/settings_screen.dart';
 import 'package:proxydom/features/shell/presentation/main_shell.dart';
@@ -121,11 +122,12 @@ Future<void> _capture(
   required Brightness brightness,
   bool desktop = false,
   int settlePumps = 4,
+  Size? size,
 }) async {
-  final size = desktop ? _desktop : _phone;
+  final shot = size ?? (desktop ? _desktop : _phone);
   final dpr = desktop ? _desktopDpr : _phoneDpr;
   tester.view
-    ..physicalSize = size * dpr
+    ..physicalSize = shot * dpr
     ..devicePixelRatio = dpr;
   addTearDown(tester.view.reset);
   if (desktop) {
@@ -230,6 +232,35 @@ void main() {
         brightness: Brightness.dark, desktop: true);
   });
 
+  // The caption is the one band of the window that is only ever seen at its own
+  // size, so it is photographed on its own: the lockup is judged by how the
+  // house sits against the top and bottom of the frame, and against the line of
+  // the word beside it — neither of which a full-screen shot shows at a size
+  // where the difference is visible.
+  testWidgets('windows caption', (tester) async {
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(
+      const MethodChannel('proxydom/window_chrome'),
+      (call) async => null,
+    );
+    addTearDown(() => messenger.setMockMethodCallHandler(
+          const MethodChannel('proxydom/window_chrome'),
+          null,
+        ));
+    await _capture(
+      tester,
+      'windows-caption',
+      const Align(
+        alignment: Alignment.topCenter,
+        child: WindowCaptionBar(label: 'Прокси', ink: AppBrand.inkDark),
+      ),
+      brightness: Brightness.dark,
+      desktop: true,
+      size: const Size(1120, 40),
+    );
+  });
+
   testWidgets('windows settings', (tester) async {
     await _capture(tester, 'windows-settings', const SettingsScreen(),
         brightness: Brightness.dark, desktop: true);
@@ -278,7 +309,6 @@ void main() {
                 ],
                 selected: true,
                 selectedNodeTitle: 'Москва',
-                onSelect: _ignore,
                 onNodeTap: _ignoreIndex,
                 telegramLabel: 'Telegram',
                 onTelegram: _ignore,

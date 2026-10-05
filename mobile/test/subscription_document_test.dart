@@ -88,6 +88,63 @@ void main() {
     );
   });
 
+  test('a reload of another list keeps the chosen key', () {
+    // The owner's own shape: one subscription document with four nodes, and one
+    // key pasted by hand, which is what the tunnel was actually running.
+    const document = ShareCatalog(
+      id: 'doc',
+      title: 'Teremok',
+      url: 'https://sub.proxydom.su/2aq93K0svSy2IRUj',
+      lines: [
+        'hysteria2://pw@203.0.113.1:443#YouTube',
+        'hysteria2://pw@203.0.113.2:443#Индия',
+        'hysteria2://pw@203.0.113.3:443#Игровой',
+        'hysteria2://pw@203.0.113.4:443#США',
+      ],
+    );
+    const pasted = ShareCatalog(
+      id: 'paste',
+      title: 'hy2test',
+      lines: ['hysteria2://pw@203.0.113.9:443#hy2test'],
+    );
+    const chosen = 'hysteria2|203.0.113.9:443';
+
+    // Reloading the document, which does not own the chosen key: the choice is
+    // the person's, not the document's, and it survives.
+    expect(
+      selectionAfterReload(
+        catalogs: const [document, pasted],
+        before: document,
+        catalogId: 'doc',
+        key: chosen,
+      ),
+      4,
+    );
+
+    // A document that did own the key and lost it lands on its own first row.
+    expect(
+      selectionAfterReload(
+        catalogs: const [pasted],
+        before: document,
+        catalogId: 'doc',
+        key: 'hysteria2|203.0.113.1:443',
+      ),
+      0,
+    );
+
+    // And a key that is gone from every list leaves the choice to fall back to
+    // the top of the page rather than to an arbitrary row.
+    expect(
+      selectionAfterReload(
+        catalogs: const [document, pasted],
+        before: pasted,
+        catalogId: 'paste',
+        key: 'hysteria2|203.0.113.8:443',
+      ),
+      0,
+    );
+  });
+
   test('share copies the document address, or the pasted lines', () {
     expect(
       const ShareCatalog(
