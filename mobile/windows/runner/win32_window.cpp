@@ -20,10 +20,13 @@ namespace {
 
 constexpr const wchar_t kWindowClassName[] = L"FLUTTER_RUNNER_WIN32_WINDOW";
 
-// Smallest frame the desktop layout stays honest in. Below it the rail, the
-// status plate and the action keys stop fitting side by side.
-constexpr int kMinWindowWidth = 940;
-constexpr int kMinWindowHeight = 640;
+// Smallest frame the desktop layout stays honest in. The window opens at
+// 826x591 (main.cpp) and is not resizable by hand, so this only bounds the
+// system-driven sizes: snap layouts, Aero shake and maximize. It tracks the
+// opening size rather than the old 940x640 floor, which used to push the window
+// back up to a frame the owner had already called too wide.
+constexpr int kMinWindowWidth = 720;
+constexpr int kMinWindowHeight = 520;
 
 // The window frame is fixed: there is no resize grab band. It used to be the
 // system frame (SM_CXSIZEFRAME + SM_CXPADDEDBORDER, about 16 physical px at
@@ -260,8 +263,8 @@ Win32Window::MessageHandler(HWND hwnd,
     }
 
     case WM_GETMINMAXINFO: {
-      // Below this the rail, the status plate and the keys stop fitting: the
-      // layout would fall back to the phone column inside a window frame.
+      // Floor for the sizes Windows picks on its own (snap, shake, maximize);
+      // see kMinWindowWidth above.
       MINMAXINFO* info = reinterpret_cast<MINMAXINFO*>(lparam);
       HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
       UINT dpi = FlutterDesktopGetDpiForMonitor(monitor);

@@ -15,7 +15,9 @@ import 'package:proxydom/l10n/app_localizations.dart';
 
 const Size _phone = Size(360, 780);
 const double _dpr = 3;
-const Size _window = Size(1120, 780);
+/// The size windows/runner/main.cpp opens the app at: a tab has to hold its
+/// measure in the window the owner actually looks at.
+const Size _window = Size(826, 591);
 const double _windowDpr = 2;
 
 /// Renders a tab and returns the left edge of the given text.

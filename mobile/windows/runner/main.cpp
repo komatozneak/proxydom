@@ -26,15 +26,20 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
 
   FlutterWindow window(project);
   // Centre the window on the primary monitor and open it at the size the
-  // desktop layout is drawn for: the rail plus the two-column home.
+  // desktop layout is drawn for: the rail plus the home column.
   HMONITOR monitor = MonitorFromPoint({}, MONITOR_DEFAULTTOPRIMARY);
   MONITORINFO monitor_info = {};
   monitor_info.cbSize = sizeof(monitor_info);
   // Size and Point are unsigned: every value here is already non-negative.
-  constexpr unsigned int kMinWidth = 940;
-  constexpr unsigned int kMinHeight = 640;
+  //
+  // 826x591 is what the owner sees as a sensible window (owner call, 2026-10):
+  // the old 1160x820 left the house floating in a half-empty frame and pushed
+  // the app past the edge of a laptop screen. The floor below only matters on a
+  // very small work area; the work-area clamp keeps the window on screen.
+  constexpr unsigned int kMinWidth = 720;
+  constexpr unsigned int kMinHeight = 520;
   Win32Window::Point origin(80, 60);
-  Win32Window::Size size(1160, 820);
+  Win32Window::Size size(826, 591);
   if (monitor != nullptr && GetMonitorInfo(monitor, &monitor_info)) {
     const unsigned int work_width = static_cast<unsigned int>(
         monitor_info.rcWork.right - monitor_info.rcWork.left);

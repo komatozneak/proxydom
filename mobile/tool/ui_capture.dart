@@ -38,7 +38,9 @@ const Size _phone = Size(360, 780);
 const double _phoneDpr = 3;
 
 /// A resized window, not a phone in a frame. DPR 2 keeps the text crisp.
-const Size _desktop = Size(1120, 780);
+/// 826x591 is the size windows/runner/main.cpp opens the app at — the captures
+/// have to be shot at the frame the owner actually looks at.
+const Size _desktop = Size(826, 591);
 const double _desktopDpr = 2;
 
 final _outDir = Directory('../.scratch/ui');
@@ -65,34 +67,48 @@ Future<void> _loadFonts() async {
 }
 
 /// Puts a bare screen body the way the shell does: on the night ground, and on
-/// Windows inside the rail.
+/// Windows inside the caption and the rail.
+///
+/// The ground goes behind the whole window, caption included — that is what
+/// MainShell does, and without it the caption is shot on an empty white band
+/// instead of on the night.
 Widget _frame(
   Widget child,
   BuildContext context, {
   required bool desktop,
+  required Brightness brightness,
   double glow = 0.75,
 }) {
   final state = GroundGlow()
     ..houseRadius = desktop ? 200 : 160
     ..houseCenter = const Alignment(0, -0.1);
   state.set(glow);
+  Widget page = Scaffold(backgroundColor: Colors.transparent, body: child);
+  if (desktop) {
+    page = Column(
+      children: [
+        WindowCaptionBar(
+          label: 'Прокси',
+          ink: brightness == Brightness.dark ? AppBrand.inkDark : AppBrand.inkLight,
+        ),
+        Expanded(
+          child: Row(
+            children: [
+              WindowsNavRail(selected: MainShell.homeIndex, onSelect: (_) {}),
+              Expanded(child: page),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
   // The screen publishes the house geometry into this scope; without it the
   // orbit would be drawn around a guess instead of around the house.
-  Widget content = GroundGlowScope(
+  return GroundGlowScope(
     notifier: state,
     child: Scaffold(
       backgroundColor: Colors.transparent,
-      body: ProxydomGround(state: state, child: child),
-    ),
-  );
-  if (!desktop) return content;
-  return Scaffold(
-    backgroundColor: Colors.transparent,
-    body: Row(
-      children: [
-        WindowsNavRail(selected: MainShell.homeIndex, onSelect: (_) {}),
-        Expanded(child: content),
-      ],
+      body: ProxydomGround(state: state, child: page),
     ),
   );
 }
@@ -110,7 +126,12 @@ Widget _app(
       supportedLocales: AppL10n.supportedLocales,
       locale: const Locale('ru'),
       home: Builder(
-          builder: (context) => _frame(child, context, desktop: desktop)),
+          builder: (context) => _frame(
+            child,
+            context,
+            desktop: desktop,
+            brightness: brightness,
+          )),
     ),
   );
 }
@@ -199,6 +220,9 @@ void main() {
       'proxydom/vpn/session',
       'proxydom/vpn/traffic',
       'proxydom/vpn/ping',
+      // The window caption asks the runner whether the window is maximized and
+      // where its buttons are. Without a stub it throws out of the build.
+      'proxydom/window_chrome',
     ]) {
       messenger.setMockMethodCallHandler(
         MethodChannel(name),

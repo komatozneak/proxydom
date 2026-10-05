@@ -74,7 +74,7 @@ double _domButtonBottom(double inset) {
 ///
 /// Windows hands a minimized window a 160x28 client rect (SM_CXMINIMIZED by
 /// SM_CYMINIMIZED) and keeps layout running at that size, even though not one
-/// pixel of it can be seen. The frame is fixed at 940x640, so no window that is
+/// pixel of it can be seen. The frame is fixed at 826x591, so no window that is
 /// actually on screen can come anywhere near this number.
 const double _minRealShell = 480;
 

@@ -577,10 +577,13 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
         status is VpnError && status.code == kVpnConflictErrorCode;
 
     // The house is the focal point. On a phone it fills the band between the
-    // panel and the keys; in a window it has its own column and grows with the
-    // frame, otherwise a tall window leaves the bottom half empty.
+    // panel and the keys; in a window it keeps to the same share of the frame.
+    // It used to be a fixed 300..440 of the window height: at the opening size
+    // (826x591) that left the house wider than the column it stands in and the
+    // artwork spilled over the readout above it. A window is a small window now,
+    // so the house is sized for it.
     final nestSize = windowsDesktop
-        ? math.min(440.0, math.max(300.0, size.height * 0.50))
+        ? math.min(300.0, math.max(200.0, size.height * 0.46))
         // A phone has no room to be generous: the house takes a little over half
         // the width and lets the night show around it. At 0.98 of the width it
         // became the wallpaper and the yard behind it stopped existing.
@@ -792,8 +795,10 @@ class _FreeClientHome extends StatelessWidget {
                 child: Transform.scale(
                   // The artwork is drawn inside a frame with its own margin, so
                   // the scale that fills a window's empty column would eat a
-                  // phone whole.
-                  scale: windowsDesktop ? 1.45 : 1.28,
+                  // phone whole. A window has no empty column to fill any more —
+                  // it opens at 826x591 — so both platforms use one scale and
+                  // the house spills ~15% past its box instead of 45%.
+                  scale: 1.28,
                   child: SignalNestHero(
                     key: kHomeSignalNestKey,
                     state: treeState,

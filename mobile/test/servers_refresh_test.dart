@@ -31,7 +31,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 const _phone = Size(360, 780);
 const _dpr = 3.0;
-const _window = Size(1160, 820);
+/// The window as the runner opens it (windows/runner/main.cpp).
+const _window = Size(826, 591);
 
 String _line(String name) =>
     'hysteria2://pw@eu1.proxydom.su:443?sni=eu1.proxydom.su&insecure=1#$name';
