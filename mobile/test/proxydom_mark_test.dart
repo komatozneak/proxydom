@@ -7,8 +7,9 @@ import 'package:proxydom/core/widgets/proxydom_mark.dart';
 
 /// The mark is traced by `tool/build_logo_mark.py`, so the drawing itself is
 /// not asserted here — that would only restate the SVG. What is asserted is the
-/// part a test can actually protect: that the asset ships, and that the lockup's
-/// offset keeps doing the arithmetic it documents.
+/// part a test can actually protect: that the asset ships, that the constants the
+/// lockup positions itself with still describe that file, and that the lockup
+/// keeps doing the arithmetic it documents.
 void main() {
   test('the traced mark ships with the app', () {
     final file = File(ProxyDomMark.asset);
@@ -26,30 +27,77 @@ void main() {
     expect(svg, contains('Z'));
   });
 
-  test('the lockup lifts the mark so DOM meets the word cap centre', () {
-    // DOM's centre sits 59.3% down the mark box; the cap centre sits 0.021 em
-    // above the middle of the text box. Both terms must be present, or the
-    // letters hang under the baseline.
-    const markSize = 26.0;
-    const fontSize = 15.0;
-    final lift = markSize * (0.593 - 0.5) + fontSize * 0.021;
-    expect(lift, closeTo(2.418 + 0.315, 0.001));
+  test('the mark is sized by the viewBox it was traced into', () {
+    // ProxyDomMark.aspect boxes the drawing by its height. If the tool ever
+    // re-traces into a different viewBox, the mark is letterboxed and the lockup
+    // no longer fills the band it was given, so this has to fail here rather
+    // than in a screenshot.
+    final svg = File(ProxyDomMark.asset).readAsStringSync();
+    final viewBox = RegExp(r'viewBox="0 0 (\d+(?:\.\d+)?) (\d+(?:\.\d+)?)"')
+        .firstMatch(svg);
+    expect(viewBox, isNotNull, reason: 'the file must carry a viewBox');
+    final width = double.parse(viewBox!.group(1)!);
+    final height = double.parse(viewBox.group(2)!);
+    expect(ProxyDomMark.aspect, closeTo(width / height, 0.0001));
+  });
 
-    // The mark must move up, never down: DOM is below the middle of its box.
-    expect(lift, greaterThan(0));
-    // And the lift has to stay small next to the mark, or the house detaches
-    // from the word it belongs to.
-    expect(lift, lessThan(markSize * 0.5));
+  test('the lockup fits the word to the letters inside the house', () {
+    // The word is sized so its cap band and the DOM band are the same height:
+    // DOM runs 97.62 units of a 279-unit drawing, Onest's caps are 0.753 em.
+    const size = 40.0;
+    const lockup = ProxyDomLockup(
+      label: 'Прокси',
+      ink: AppBrand.inkDark,
+      size: size,
+    );
+    final capHeight = lockup.fittedWordSize * 0.753;
+    const domHeight = size * 0.3499;
+    expect(capHeight, closeTo(domHeight, 0.001));
+    expect(capHeight, closeTo(14.0, 0.01));
+  });
+
+  test('the lockup drops the word onto DOM\'s line, not the other way round', () {
+    const size = 40.0;
+    const lockup = ProxyDomLockup(
+      label: 'Прокси',
+      ink: AppBrand.inkDark,
+      size: size,
+    );
+    // DOM's centre is 9.33% of the house's height below the box middle; the
+    // word's cap centre is 0.044 em above its own. The word moves down by both,
+    // which is the only way the house can keep the full height of the band.
+    final drop = size * (0.5933 - 0.5) + lockup.fittedWordSize * 0.044;
+    expect(drop, closeTo(3.732 + 0.818, 0.002));
+    expect(drop, greaterThan(0));
+
+    // Where the two centres land once the word has dropped: the house's own DOM
+    // centre. Anything else and the letters sit off the word's baseline.
+    const wordBoxMiddle = size / 2;
+    final capCentre = wordBoxMiddle + drop - lockup.fittedWordSize * 0.044;
+    expect(capCentre, closeTo(size * 0.5933, 0.001));
+  });
+
+  test('the lockup keeps a word space, not a seam', () {
+    const size = 40.0;
+    const lockup = ProxyDomLockup(
+      label: 'Прокси',
+      ink: AppBrand.inkDark,
+      size: size,
+    );
+    // The house's wall is where the word ends, so the gap has to read as space:
+    // under 0.1 of the mark the last letter reads as touching the house.
+    expect(lockup.gap, greaterThan(size * 0.1));
+    expect(lockup.gap, lessThan(size * 0.2));
   });
 
   testWidgets('the caption lockup renders one row without overflow', (
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(
+      const MaterialApp(
         home: Scaffold(
           backgroundColor: AppBrand.groundDark,
-          body: const Center(
+          body: Center(
             child: WindowCaptionProbe(),
           ),
         ),
@@ -60,6 +108,29 @@ void main() {
     expect(find.byType(ProxyDomLockup), findsOneWidget);
     expect(find.byType(ProxyDomMark), findsOneWidget);
   });
+
+  testWidgets('the house fills the caption it is given', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          backgroundColor: AppBrand.groundDark,
+          body: Center(child: WindowCaptionProbe()),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    // A caption is a band, and the mark is asked to take all of it: the house
+    // box and the mark box are the same height, with nothing letterboxed away.
+    final mark = tester.getSize(
+      find.descendant(
+        of: find.byType(ProxyDomLockup),
+        matching: find.byType(ProxyDomMark),
+      ),
+    );
+    expect(mark.height, closeTo(40, 0.001));
+    expect(mark.width, closeTo(40 * ProxyDomMark.aspect, 0.001));
+  });
 }
 
 /// Keeps the test free of the MethodChannel that the real caption bar talks to.
@@ -69,10 +140,9 @@ class WindowCaptionProbe extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const ProxyDomLockup(
-      label: 'Прокси Дом',
+      label: 'Прокси',
       ink: AppBrand.inkDark,
-      markSize: 26,
-      fontSize: 15,
+      size: 40,
     );
   }
 }

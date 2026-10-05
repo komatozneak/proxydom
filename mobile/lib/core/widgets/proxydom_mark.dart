@@ -19,14 +19,25 @@ class ProxyDomMark extends StatelessWidget {
   /// The colour the house is painted in. The letters and the door stay whatever
   /// is behind the mark, so it belongs to whatever ground it sits on.
   final Color ink;
+
+  /// Height of the drawing, in logical pixels — not the side of a square box.
+  /// The file's viewBox is 299x279, so a square box letterboxes the house into
+  /// 93% of its own height and the mark comes out smaller than the frame it was
+  /// asked to fill. Sizing by height is what lets the lockup take a whole band.
   final double size;
 
   static const String asset = 'assets/icon/logo_mark_word.svg';
 
+  /// The file's own proportions, from the viewBox `tool/build_logo_mark.py`
+  /// writes. `test/proxydom_mark_test.dart` reads the SVG back, so the two cannot
+  /// drift apart without a test going red.
+  static const double aspect = 299 / 279;
+
   @override
   Widget build(BuildContext context) {
-    return SizedBox.square(
-      dimension: size,
+    return SizedBox(
+      width: size * aspect,
+      height: size,
       child: SvgPicture.asset(
         asset,
         // The file is a mask: everything opaque stays, so the knockouts are
@@ -40,46 +51,70 @@ class ProxyDomMark extends StatelessWidget {
 
 /// The lockup: the word, then the mark that carries the second half of the name.
 ///
-/// The two are one mark, so they are laid out as one. That means two things the
-/// sidebar never had: a gap small enough to read as a word space rather than a
-/// seam, and DOM's centre sitting on the word's cap centre.
+/// The two are one mark, so they are laid out as one. That means three things.
 ///
-/// That offset is arithmetic, not taste. DOM's centre lands at 59.3% of the
-/// house's height — the body of a house sits low, the roof does not — so a mark
-/// centred against the word would hang its letters under the baseline. The cap
-/// centre, meanwhile, is not the middle of the text box either: it sits
-/// 0.021 em above it, from Onest's own metrics (ascent 0.970, descent 0.305,
-/// cap 0.707 — `(asc+desc)/2 - asc + cap/2`). Both terms are in the offset
-/// below, so the two centres meet at any size.
+/// First, scale. The word is fitted to the letters inside the house: its cap
+/// height is set to the height of DOM. At its own size it drew caps a third
+/// taller than the knockout letters beside it, and two sizes of type standing on
+/// one line is what made the pair read as a name and an illustration parked
+/// after it.
+///
+/// Second, the line. DOM's centre lands at 59.33% of the house's height — the
+/// body of a house sits low, the roof does not — while the cap centre is only
+/// 0.044 em above the middle of the text box (Onest, measured through
+/// TextPainter: a 1.5 em box, the baseline at 1.0825 em, caps at 0.753 em). Both
+/// terms are in [wordDrop], so the two bands meet whatever size the mark is.
+///
+/// Third, the direction. The word moves, not the house. The house is asked to
+/// fill the height of the frame it sits in, and lifting the mark to meet the word
+/// would push it out of that frame — so the word drops onto the line DOM is on.
 class ProxyDomLockup extends StatelessWidget {
   const ProxyDomLockup({
     super.key,
     required this.ink,
     required this.label,
-    this.markSize = 30,
-    this.fontSize = 17,
+    this.size = 40,
+    this.wordSize,
   });
 
   final Color ink;
   final String label;
-  final double markSize;
-  final double fontSize;
 
-  /// Where DOM's centre sits in the mark box, as a fraction of its height.
-  static const double _domCentre = 0.593;
+  /// Height of the house. Everything else in the lockup follows from it.
+  final double size;
 
-  /// How far the cap centre rises above the middle of the text box, in em.
-  /// Onest: (0.970 + 0.305) / 2 - 0.970 + 0.707 / 2.
-  static const double _capRise = 0.021;
+  /// Overrides the fitted word size. Null — the usual case — fits the word to the
+  /// letters inside the house.
+  final double? wordSize;
+
+  /// Where DOM sits in the drawing: its centre as a fraction of the height, and
+  /// its own height as a fraction of it. Both are read off logo_mark_word.svg,
+  /// where the letters run from y 116.72 to y 214.34 of a 279-unit viewBox.
+  static const double _domCentre = 0.5933;
+  static const double _domHeight = 0.3499;
+
+  /// Onest's own numbers: caps at 0.753 em, and a cap centre that rides 0.044 em
+  /// above the middle of the text box.
+  static const double _capHeight = 0.753;
+  static const double _capRise = 0.044;
+
+  /// The word size actually used: the fitted one, unless [wordSize] overrides it.
+  double get fittedWordSize => wordSize ?? size * _domHeight / _capHeight;
 
   /// Word space in the lockup, scaled off the mark so it holds at any size.
-  double get _gap => markSize * 0.115;
+  /// Wider than a normal word space on purpose: the house's left wall sits at
+  /// the vertical middle of the lockup, which is exactly where the word ends, so
+  /// a tight gap reads as the last letter touching the house.
+  double get gap => size * 0.14;
 
-  double get _markLift => markSize * (_domCentre - 0.5) + fontSize * _capRise;
+  /// How far the word sits below the centred axis to meet DOM's centre.
+  double get wordDrop =>
+      size * (_domCentre - 0.5) + fittedWordSize * _capRise;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final fontSize = fittedWordSize;
     final word = Text(
       label,
       maxLines: 1,
@@ -89,7 +124,9 @@ class ProxyDomLockup extends StatelessWidget {
         // The wordmark carries the weight the monogram used to: the mark sits
         // beside it now, not before it.
         fontWeight: FontWeight.w800,
-        letterSpacing: -0.6,
+        // Tracking in em, not px: at 40px the mark, 0.04 em is what the word
+        // looked like at 15px, and a fixed -0.6 would open it up as the type grows.
+        letterSpacing: fontSize * -0.04,
         fontSize: fontSize,
       ),
     );
@@ -97,12 +134,14 @@ class ProxyDomLockup extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Flexible(child: word),
-        SizedBox(width: _gap),
-        Transform.translate(
-          offset: Offset(0, -_markLift),
-          child: ProxyDomMark(size: markSize, ink: ink),
+        Flexible(
+          child: Transform.translate(
+            offset: Offset(0, wordDrop),
+            child: word,
+          ),
         ),
+        SizedBox(width: gap),
+        ProxyDomMark(size: size, ink: ink),
       ],
     );
   }
