@@ -443,7 +443,10 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
                                 _EmptyPreview(l.freeEmptyBody)
                               else
                                 for (var i = 0; i < _preview.length; i++) ...[
-                                  if (i > 0) const SizedBox(height: 7),
+                                  // The same ruled line the servers tab draws:
+                                  // this is the same list, one step before it is
+                                  // saved, so it has to look like itself.
+                                  if (i > 0) const NodeRule(),
                                   Builder(
                                     builder: (context) {
                                       final label =

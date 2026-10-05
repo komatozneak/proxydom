@@ -11,6 +11,9 @@ const _screenSources = [
   'lib/features/home/presentation/home_screen.dart',
   'lib/features/settings/presentation/settings_screen.dart',
   'lib/features/vpn/presentation/hy2_import_screen.dart',
+  'lib/features/vpn/presentation/locations_screen.dart',
+  'lib/features/vpn/presentation/server_instrument.dart',
+  'lib/features/vpn/presentation/server_instrument_parts.dart',
 ];
 
 Widget _wrap(Widget child, {ThemeData? theme}) {

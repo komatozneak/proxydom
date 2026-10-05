@@ -11,6 +11,7 @@ import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/proxydom_snackbar.dart';
+import '../../../core/widgets/terminal_type.dart';
 import '../../../l10n/app_localizations.dart';
 import 'windows_share_qr.dart';
 import '../../home/application/vpn_provider.dart';
@@ -28,6 +29,14 @@ import '../data/share_link_parser.dart';
 
 /// Key on the Locations Auto row flag (Home/Locations icon parity tests).
 const kLocationsAutoFlagKey = ValueKey<String>('locations-auto-flag');
+
+/// How wide the page reads on a window.
+///
+/// The same measure the home tab hangs its column in. It hangs off the reading
+/// edge rather than centring: the heading above is on the gutter, and a card
+/// that starts 200px to the right of its own title is the crooked page this
+/// tab is meant to stop having.
+const double _pageMeasure = 1080;
 
 /// Hot switch: Nest Connecting owns progress — do not block Locations with busy overlay.
 @visibleForTesting
@@ -82,10 +91,14 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
             windowsDesktop ? AppBrand.pageGutterWide : AppBrand.pageGutter,
         title: Row(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Text(l.freeServers),
-            const SizedBox(width: 16),
-            _ServerCountChip(
+            const SizedBox(width: 12),
+            // The count is a reading, not a badge. It was a 28px pill with its
+            // own outline and a Material label inside, which weighed more than
+            // the heading it sat next to and made the page open with furniture.
+            _ServerCount(
               count: _catalogs.isNotEmpty ? _catalogs.length : _imported.length,
             ),
           ],
@@ -110,21 +123,21 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
   }
 
   Future<void> _load() async {
-      // Paint the saved list before the subscription fetch. A 10s timeout
-      // on a saved URL must not hide paste behind the spinner.
-      try {
-        await paintImportedServers(
-          readLocal: () => Hy2ImportStore.instance.load(),
-          refresh: () => Hy2ImportStore.instance.refreshSavedUrl(),
-          paint: (links) async {
-            if (!mounted) return;
-            await _applyImported(links);
-          },
-        );
-      } catch (_) {
-        if (!mounted) return;
-        setState(() => _loading = false);
-      }
+    // Paint the saved list before the subscription fetch. A 10s timeout
+    // on a saved URL must not hide paste behind the spinner.
+    try {
+      await paintImportedServers(
+        readLocal: () => Hy2ImportStore.instance.load(),
+        refresh: () => Hy2ImportStore.instance.refreshSavedUrl(),
+        paint: (links) async {
+          if (!mounted) return;
+          await _applyImported(links);
+        },
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
   }
 
   Future<void> _chooseImported(int index, {String? scheme}) async {
@@ -342,46 +355,43 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     final handle = _keyHandle(catalog);
     final selectedLabel = _selectedLabel();
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: ProfileInstrument(
-        title: title,
-        description: noticeBody,
-        facts: profileFacts(
-          trafficMeta: catalog.trafficMeta,
-          lastUpdated: catalog.lastUpdated,
-          russian: Localizations.localeOf(context).languageCode == 'ru',
-          keyHandle: handle,
-        ),
-        selected: _catalogIsSelected(catalog),
-        onSelect: () => _chooseCatalog(catalog),
-        onNodeTap: (_) {},
-        nodes: [
-          for (final index in [...lines.premium, ...lines.general])
-            NodeLine(
-              label: labelForShareLink(_imported[index]),
-              endpoint: _imported[index].endpoint,
-              selected: _selectedId == '$index',
-              onTap: () => _chooseImported(index),
-            ),
-        ],
-        selectedNodeTitle: selectedLabel,
-        telegramLabel: subscriptionPlaneIsTelegram(planeUrl)
-            ? l.freeTelegram
-            : l.freeSharePool,
-        onTelegram: planeUrl.isEmpty
-            ? null
-            : () => openSubscriptionPlane(planeUrl),
-        onRefresh: catalog.url == null || catalog.url!.isEmpty
-            ? null
-            : () => _refreshCatalog(catalog),
-        refreshing: _refreshing.contains(catalog.id),
-        onShare: catalog.subscriptionKey == null
-            ? null
-            : () => _shareCatalog(catalog),
-        onDelete: () => _deleteProfile(catalog.id),
-        showTelegraph: planeUrl.isNotEmpty,
+    // The gap between cards belongs to the list, not to the card: one number
+    // for the distance between two profiles on this page.
+    return ProfileInstrument(
+      title: title,
+      description: noticeBody,
+      facts: profileFacts(
+        trafficMeta: catalog.trafficMeta,
+        lastUpdated: catalog.lastUpdated,
+        russian: Localizations.localeOf(context).languageCode == 'ru',
+        keyHandle: handle,
       ),
+      selected: _catalogIsSelected(catalog),
+      onSelect: () => _chooseCatalog(catalog),
+      onNodeTap: (_) {},
+      nodes: [
+        for (final index in [...lines.premium, ...lines.general])
+          NodeLine(
+            label: labelForShareLink(_imported[index]),
+            endpoint: _imported[index].endpoint,
+            selected: _selectedId == '$index',
+            onTap: () => _chooseImported(index),
+          ),
+      ],
+      selectedNodeTitle: selectedLabel,
+      telegramLabel: subscriptionPlaneIsTelegram(planeUrl)
+          ? l.freeTelegram
+          : l.freeSharePool,
+      onTelegram:
+          planeUrl.isEmpty ? null : () => openSubscriptionPlane(planeUrl),
+      onRefresh: catalog.url == null || catalog.url!.isEmpty
+          ? null
+          : () => _refreshCatalog(catalog),
+      refreshing: _refreshing.contains(catalog.id),
+      onShare:
+          catalog.subscriptionKey == null ? null : () => _shareCatalog(catalog),
+      onDelete: () => _deleteProfile(catalog.id),
+      showTelegraph: planeUrl.isNotEmpty,
     );
   }
 
@@ -393,9 +403,8 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     if (text.isEmpty) return '';
     if (!text.startsWith('http')) return '';
     final uri = Uri.tryParse(text);
-    final segment = uri?.pathSegments.isNotEmpty == true
-        ? uri!.pathSegments.last
-        : '';
+    final segment =
+        uri?.pathSegments.isNotEmpty == true ? uri!.pathSegments.last : '';
     if (segment.length < 6) return '';
     return segment.substring(0, 7);
   }
@@ -431,6 +440,12 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     );
   }
 
+  /// The page: one scroll of cards, one key bar under it.
+  ///
+  /// Both halves sit in the same measure and on the same gutter as the heading
+  /// above. The list used to run 44/16 while the heading ran on the shared
+  /// page gutter, so every card on this tab began 20px to the right of the
+  /// word that names it, and the key bar below sat on a third number again.
   Widget _buildImported(ThemeData theme) {
     final l = AppL10n.of(context);
     final filtered = <int>[];
@@ -441,115 +456,180 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       if (q.isEmpty || hay.contains(q)) filtered.add(i);
     }
     final connected = ref.watch(vpnProvider) is VpnConnected;
-    final grouped = _catalogs.isNotEmpty;
-    if (grouped) {
-      return Column(
-        children: [
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(44, 8, 16, 0),
-              children: [
-                for (var i = 0; i < _catalogs.length; i++) ...[
-                  if (i > 0) const SizedBox(height: 8),
-                  _catalogCard(theme, l, _catalogs[i]),
-                ],
+
+    final body = _catalogs.isNotEmpty
+        ? ListView(
+            padding: const EdgeInsets.only(top: 2),
+            children: [
+              for (var i = 0; i < _catalogs.length; i++) ...[
+                if (i > 0) const SizedBox(height: 12),
+                _catalogCard(theme, l, _catalogs[i]),
               ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
-            child: FreeClientActionBar(
-              onPaste: () {
-                UiLog.action('locations', 'paste');
-                context.push('/import?clipboard=1');
-              },
-              onScan: () {
-                UiLog.action('locations', 'scan');
-                openFreeClientCapture(context);
-              },
-            ),
-          ),
-        ],
-      );
-    }
+            ],
+          )
+        : Column(
+            children: [
+              // Nothing to search through yet: a search line over the empty
+              // state asks a question the page has not earned yet.
+              if (_imported.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2, bottom: 12),
+                  child: _SearchField(
+                    hint: l.freeSearch,
+                    onChanged: (value) => setState(() => _query = value),
+                  ),
+                ),
+              Expanded(
+                child: filtered.isEmpty
+                    ? const Center(child: FreeClientEmptyState())
+                    : ListView.separated(
+                        padding: EdgeInsets.zero,
+                        itemCount: filtered.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 10),
+                        itemBuilder: (context, i) {
+                          final index = filtered[i];
+                          final link = _imported[index];
+                          final selected = _selectedId == '$index';
+                          final schemeBlocked =
+                              !canDialScheme(link.scheme, ios: false);
+                          return ImportedProfileCard(
+                            name: link.name,
+                            scheme: link.scheme,
+                            endpoint: link.endpoint,
+                            // The same label the pool lines are drawn from, so
+                            // a pasted key and a node out of a list look like
+                            // the same kind of thing wherever they are shown.
+                            label: labelForShareLink(link),
+                            selected: selected,
+                            connected: selected && connected,
+                            dialable: !schemeBlocked,
+                            onDelete: () => _removeImported(index),
+                            onTap: () async {
+                              if (schemeBlocked) {
+                                UiLog.action(
+                                  'locations',
+                                  'pick',
+                                  result: 'blocked',
+                                  reason: 'scheme',
+                                  extra: {'scheme': link.scheme},
+                                );
+                                return;
+                              }
+                              await _chooseImported(index, scheme: link.scheme);
+                            },
+                          );
+                        },
+                      ),
+              ),
+            ],
+          );
+
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(44, 8, 16, 8),
-          child: TextField(
-            decoration: InputDecoration(
-              hintText: l.freeSearch,
-              prefixIcon: const AppIcon(AppIcons.search),
-              filled: true,
-              fillColor: theme.colorScheme.surfaceContainerHighest,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppBrand.radiusCard),
-                borderSide: BorderSide(color: theme.colorScheme.outline),
+        Expanded(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: _gutter),
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: _pageMeasure),
+                child: body,
               ),
             ),
-            onChanged: (value) => setState(() => _query = value),
           ),
         ),
-        Expanded(
-          child: filtered.isEmpty
-              ? const Center(child: FreeClientEmptyState())
-              : ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(44, 0, 16, 0),
-                  itemCount: filtered.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
-                  itemBuilder: (context, i) {
-                    final index = filtered[i];
-                    final link = _imported[index];
-                    final selected = _selectedId == '$index';
-                    final schemeBlocked =
-                        !canDialScheme(link.scheme, ios: false);
-                    return ImportedProfileCard(
-                      name: link.name,
-                      scheme: link.scheme,
-                      endpoint: link.endpoint,
-                      selected: selected,
-                      connected: selected && connected,
-                      dialable: !schemeBlocked,
-                      onDelete: () => _removeImported(index),
-                      onTap: () async {
-                        if (schemeBlocked) {
-                          UiLog.action(
-                            'locations',
-                            'pick',
-                            result: 'blocked',
-                            reason: 'scheme',
-                            extra: {'scheme': link.scheme},
-                          );
-                          return;
-                        }
-                        await _chooseImported(index, scheme: link.scheme);
-                      },
-                    );
-                  },
-                ),
-        ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
-          child: FreeClientActionBar(
-            onPaste: () {
-              UiLog.action('locations', 'paste');
-              context.push('/import?clipboard=1');
-            },
-            onScan: () {
-              UiLog.action('locations', 'scan');
-              openFreeClientCapture(context);
-            },
+          padding: EdgeInsets.fromLTRB(_gutter, 10, _gutter, 12),
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: _pageMeasure),
+              child: FreeClientActionBar(
+                onPaste: () {
+                  UiLog.action('locations', 'paste');
+                  context.push('/import?clipboard=1');
+                },
+                onScan: () {
+                  UiLog.action('locations', 'scan');
+                  openFreeClientCapture(context);
+                },
+                // The reload ring was dead here: the key was painted and had
+                // no handler, while every saved document on this tab is
+                // reloadable. Same question as the home key, same answer.
+                onRefresh: _catalogs.isEmpty
+                    ? null
+                    : () => refreshRemoteDocuments(context, scope: 'locations'),
+              ),
+            ),
           ),
         ),
       ],
     );
   }
 
+  /// The line every page in the app starts on.
+  double get _gutter =>
+      windowsDesktop ? AppBrand.pageGutterWide : AppBrand.pageGutter;
+
   Widget _buildBody(AppL10n l, ThemeData theme) {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
     return _buildImported(theme);
+  }
+}
+
+/// The search line, in the app's own voice.
+///
+/// It was a filled Material field with an outline on all four sides: the last
+/// piece of default Material on this tab, and it drew a box around the one
+/// thing on the page that is not a server. A wash of ink and a hairline says
+/// the same thing without it.
+class _SearchField extends StatelessWidget {
+  const _SearchField({required this.hint, required this.onChanged});
+
+  final String hint;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    final mute = dark ? AppBrand.inkMutedDark : AppBrand.inkMutedLight;
+    return Container(
+      height: 46,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.onSurface.withValues(alpha: 0.045),
+        borderRadius: BorderRadius.circular(AppBrand.radiusPill),
+        border: Border.all(
+          color: theme.colorScheme.outline.withValues(alpha: 0.6),
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      child: Row(
+        children: [
+          AppIcon(AppIcons.search, size: 17, color: mute),
+          const SizedBox(width: 10),
+          Expanded(
+            child: TextField(
+              onChanged: onChanged,
+              cursorColor: AppBrand.mascotGold,
+              style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14),
+              decoration: InputDecoration(
+                hintText: hint,
+                hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                  color: mute.withValues(alpha: 0.7),
+                  fontSize: 13.5,
+                ),
+                isDense: true,
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -685,33 +765,41 @@ class _SignalBars extends StatelessWidget {
   }
 }
 
-class _ServerCountChip extends StatelessWidget {
-  const _ServerCountChip({required this.count});
+/// How many servers this tab holds, as a reading beside its name.
+///
+/// It was a 28px pill with a fill, an outline and a Material label inside — a
+/// badge in the weight of a heading, and the first thing the eye landed on
+/// before the word that actually says what the page is. The count is a number
+/// on this app's instruments, not a badge: mono, in the house gold, inside a
+/// hairline circle that carries the same tracking as the reading under it.
+class _ServerCount extends StatelessWidget {
+  const _ServerCount({required this.count});
 
   final int count;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final dark = theme.brightness == Brightness.dark;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final gold = dark ? AppBrand.mascotGoldLit : AppBrand.mascotGoldDeep;
     final wide = count > 9;
     return Container(
-      width: wide ? null : 28,
-      height: 28,
-      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-      padding: EdgeInsets.symmetric(horizontal: wide ? 8 : 0),
+      width: wide ? null : 22,
+      height: 22,
+      constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
+      padding: EdgeInsets.symmetric(horizontal: wide ? 7 : 0),
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color:
-            dark ? AppBrand.surfaceVariantDark : AppBrand.surfaceElevatedLight,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: theme.colorScheme.outline),
+        shape: BoxShape.circle,
+        border: Border.all(color: AppBrand.mascotGold.withValues(alpha: 0.45)),
       ),
       child: Text(
         '$count',
-        style: theme.textTheme.labelLarge?.copyWith(
-          fontWeight: FontWeight.w800,
-          color: dark ? AppBrand.inkDark : AppBrand.inkLight,
+        style: terminalText(
+          context,
+          size: 11.5,
+          color: gold,
+          weight: 700,
+          spacing: 0.6,
         ),
       ),
     );
