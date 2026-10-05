@@ -53,7 +53,12 @@ class AppLogBuffer {
 
   void _append(String level, String message) {
     if (!minLevel.allows(level)) return;
-    final body = maskTunnelIpv4(message);
+    // Full redaction, not just the IPv4 mask. The ring is persisted to
+    // `product.log` on disk and shown on screen before anything is exported,
+    // so a line holding `hy2://user:pass@host` would sit in plain text for as
+    // long as the app existed. `redactTunnelLog` is idempotent, so masking an
+    // already-masked line changes nothing.
+    final body = redactTunnelLog(message);
     final source = tunnelLogSource(body);
     final line = '${tunnelLogStamp()} [$level] [$source] $body';
     // flutter run prints this; release sideload stays quiet.

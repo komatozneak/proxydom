@@ -64,9 +64,17 @@ internal object DiagnosticRing {
         return out
     }
 
+    /**
+     * Keys whose value must never leave the phone.
+     *
+     * `user`/`username`/`login` are here because the Hysteria2 share format puts
+     * the credential in the userinfo part: for a link with no `:password` the
+     * username *is* the password (`auth = username` in the Dart parser). A line
+     * like `user=8f3c…` is a leaked node password, not a label.
+     */
     private val AUTH_KV =
         Regex(
-            "(?i)\\b(auth|token|password|secret|hysteriaAuth|authorization)\\s*[=:]\\s*\\S+",
+            "(?i)\\b(auth|token|password|passwd|secret|hysteriaAuth|authorization|user|username|login)\\s*[=:]\\s*\\S+",
         )
     private val BEARER = Regex("(?i)\\bBearer\\s+\\S+")
     private val UUID_TOKEN =

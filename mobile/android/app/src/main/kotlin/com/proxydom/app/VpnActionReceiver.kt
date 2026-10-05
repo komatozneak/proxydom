@@ -3,13 +3,12 @@ package com.proxydom.app
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.util.Log
 
 /** Shade action: always stop the session (Amnezia contract). */
 class VpnActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         if (intent?.action != ACTION_DISCONNECT) return
-        Log.i(TAG, "notification disconnect tapped")
+        NativeLog.i(TAG, "notification disconnect tapped")
         ProxyDomVpnService.stopVpnService(context)
     }
 

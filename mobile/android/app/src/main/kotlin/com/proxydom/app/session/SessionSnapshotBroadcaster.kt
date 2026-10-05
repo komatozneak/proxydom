@@ -2,7 +2,6 @@ package com.proxydom.app.session
 
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import io.flutter.plugin.common.EventChannel
 import java.util.concurrent.atomic.AtomicReference
 
@@ -26,7 +25,7 @@ object SessionSnapshotBroadcaster {
         val snap = last.get()
         mainHandler.post {
             runCatching { events.success(snap.toJsonString()) }
-                .onFailure { Log.w(TAG, "replay failed: ${it.message}") }
+                .onFailure { NativeLog.w(TAG, "replay failed: ${it.message}") }
         }
     }
 
@@ -40,7 +39,7 @@ object SessionSnapshotBroadcaster {
         val events = sink ?: return
         mainHandler.post {
             runCatching { events.success(snapshot.toJsonString()) }
-                .onFailure { Log.w(TAG, "emit failed: ${it.message}") }
+                .onFailure { NativeLog.w(TAG, "emit failed: ${it.message}") }
         }
     }
 }

@@ -154,14 +154,14 @@ class VpnController {
   }
 
   /// Auto: sequential data-plane prove over already-minted [paramsJson] rows.
-  Future<bool> startAuto(List<String> paramsJsonList) async {
+  Future<bool> startAuto(List<String> paramsJsonList, {String? sessionId}) async {
     if (paramsJsonList.isEmpty) {
       throw VpnControllerException('auto pool empty');
     }
     try {
       final result = await _methodChannel.invokeMethod<bool>(
         'startAuto',
-        {'candidatesJson': paramsJsonList},
+        {'candidatesJson': paramsJsonList, if (sessionId != null) 'sessionId': sessionId},
       );
       return result ?? false;
     } on PlatformException catch (e) {
@@ -170,9 +170,14 @@ class VpnController {
   }
 
   /// Start Hysteria2 core (ADR 015). Native proves via local SOCKS, not QUIC-up.
+  ///
+  /// [sessionId] is the ShareSessionLog id for this attempt. The native layer
+  /// stamps it on every line so a report can be read as one timeline instead of
+  /// a Dart phase log next to an unrelated Android logcat.
   Future<bool> startHysteria(
     HysteriaProfile profile, {
     String? displayLabel,
+    String? sessionId,
   }) async {
     try {
       final disallowedApps = _isIosSplit
@@ -226,7 +231,10 @@ class VpnController {
 
       final result = await _methodChannel.invokeMethod<bool>(
         'start',
-        {'paramsJson': paramsJson},
+        {
+          'paramsJson': paramsJson,
+          if (sessionId != null) 'sessionId': sessionId,
+        },
       );
       return result ?? false;
     } on PlatformException catch (e) {
@@ -246,6 +254,7 @@ class VpnController {
   Future<bool> startXray(
     String configJson, {
     String? displayLabel,
+    String? sessionId,
   }) async {
     try {
       final disallowedApps = _isIosSplit
@@ -265,7 +274,10 @@ class VpnController {
       });
       final result = await _methodChannel.invokeMethod<bool>(
         'start',
-        {'paramsJson': paramsJson},
+        {
+          'paramsJson': paramsJson,
+          if (sessionId != null) 'sessionId': sessionId,
+        },
       );
       return result ?? false;
     } on PlatformException catch (e) {

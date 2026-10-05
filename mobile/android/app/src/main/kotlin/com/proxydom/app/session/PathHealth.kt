@@ -1,7 +1,6 @@
 package com.proxydom.app.session
 
 import android.os.SystemClock
-import android.util.Log
 import com.proxydom.app.DiagnosticRing
 import com.proxydom.app.GvisorTun2Socks
 import com.proxydom.app.VpnPingMonitor
@@ -93,14 +92,14 @@ class PathHealth {
             )
             val latencyMs = rtt ?: (SystemClock.elapsedRealtime() - startedAt)
             if (rtt != null) {
-                Log.i(
+                NativeLog.i(
                     TAG,
                     "prove tun-connect ok candidate=$candidateLabel underlying=$iface " +
                         "attempt=$attempt latency_ms=$latencyMs",
                 )
                 return HealthResult.Ok(rttMs = latencyMs, attempt = attempt)
             }
-            Log.w(
+            NativeLog.w(
                 TAG,
                 "prove tun-connect fail candidate=$candidateLabel underlying=$iface " +
                     "attempt=$attempt",
@@ -142,7 +141,7 @@ class PathHealth {
                     return HealthResult.Fail(SessionReason.Cancelled, "cancelled", attempt)
                 }
                 if (!VpnPingMonitor.isSocksReachable(timeoutMs = 800)) {
-                    Log.w(
+                    NativeLog.w(
                         TAG,
                         "prove socks not ready candidate=$candidateLabel " +
                             "underlying=$iface attempt=$attempt/$XRAY_SOCKS_PROBE_ATTEMPTS",
@@ -156,7 +155,7 @@ class PathHealth {
                 )
                 val latencyMs = SystemClock.elapsedRealtime() - startedAt
                 if (outcome is VpnPingMonitor.SocksHttpsResult.Ok) {
-                    Log.i(
+                    NativeLog.i(
                         TAG,
                         "prove ok candidate=$candidateLabel underlying=$iface " +
                             "attempt=$attempt latency_ms=$latencyMs",
@@ -168,7 +167,7 @@ class PathHealth {
                     )
                     return HealthResult.Ok(rttMs = latencyMs, attempt = attempt)
                 }
-                Log.w(
+                NativeLog.w(
                     TAG,
                     "prove fail candidate=$candidateLabel underlying=$iface " +
                         "attempt=$attempt/$XRAY_SOCKS_PROBE_ATTEMPTS " +

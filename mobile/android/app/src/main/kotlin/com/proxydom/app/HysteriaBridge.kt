@@ -1,7 +1,6 @@
 package com.proxydom.app
 
 import android.net.VpnService
-import android.util.Log
 import hy2bind.Hy2bind
 import hy2bind.Protector
 import java.util.concurrent.atomic.AtomicBoolean
@@ -52,7 +51,7 @@ class HysteriaBridge private constructor() {
             true
         } catch (t: Throwable) {
             lastErrorMessage = t.message ?: t.toString()
-            Log.e(TAG, "loadLibrary: hyjni failed", t)
+            NativeLog.e(TAG, "loadLibrary: hyjni failed", t)
             DiagnosticRing.event("error", "hy2.socks", "action=start ok=false reason=load_failed")
             false
         }
@@ -94,7 +93,7 @@ class HysteriaBridge private constructor() {
         }
         return try {
             lastErrorMessage = null
-            Log.i(
+            NativeLog.i(
                 TAG,
                 "start: Hy2bind.start server=$server sni=$sni socks=$socksListen " +
                     "directSuffixes=${suffixes.length()}",
@@ -103,12 +102,12 @@ class HysteriaBridge private constructor() {
             val err: String? = Hy2bind.start(CoreLog.enrich(svc, obj.toString()))
             if (!err.isNullOrBlank()) {
                 lastErrorMessage = err
-                Log.e(TAG, "start: Hy2bind.start error=$err")
+                NativeLog.e(TAG, "start: Hy2bind.start error=$err")
                 DiagnosticRing.event("error", "hy2.socks", "action=start ok=false reason=hy2_start")
                 return false
             }
             isRunning.set(true)
-            Log.i(TAG, "start: Hy2 SOCKS on $socksListen server=$server")
+            NativeLog.i(TAG, "start: Hy2 SOCKS on $socksListen server=$server")
             DiagnosticRing.event(
                 "info",
                 "hy2.socks",
@@ -117,7 +116,7 @@ class HysteriaBridge private constructor() {
             true
         } catch (t: Throwable) {
             lastErrorMessage = t.message ?: t.toString()
-            Log.e(TAG, "start: failed", t)
+            NativeLog.e(TAG, "start: failed", t)
             DiagnosticRing.event("error", "hy2.socks", "action=start ok=false reason=start_failed")
             false
         }
@@ -138,14 +137,14 @@ class HysteriaBridge private constructor() {
             val err: String? = Hy2bind.startTun(tunFd.toLong(), mtu.toLong())
             if (!err.isNullOrBlank()) {
                 lastErrorMessage = err
-                Log.e(TAG, "startTun: $err")
+                NativeLog.e(TAG, "startTun: $err")
                 return false
             }
-            Log.i(TAG, "startTun: fd=$tunFd mtu=$mtu")
+            NativeLog.i(TAG, "startTun: fd=$tunFd mtu=$mtu")
             true
         } catch (t: Throwable) {
             lastErrorMessage = t.message ?: t.toString()
-            Log.e(TAG, "startTun: failed", t)
+            NativeLog.e(TAG, "startTun: failed", t)
             false
         }
     }
@@ -163,15 +162,15 @@ class HysteriaBridge private constructor() {
             val err: String? = Hy2bind.startShare(configJson)
             if (!err.isNullOrBlank()) {
                 lastErrorMessage = err
-                Log.e(TAG, "startShare failed")
+                NativeLog.e(TAG, "startShare failed")
                 return false
             }
             isRunning.set(true)
-            Log.i(TAG, "startShare: local SOCKS ready")
+            NativeLog.i(TAG, "startShare: local SOCKS ready")
             true
         } catch (t: Throwable) {
             lastErrorMessage = t.message ?: t.toString()
-            Log.e(TAG, "startShare: failed", t)
+            NativeLog.e(TAG, "startShare: failed", t)
             false
         }
     }
@@ -181,13 +180,13 @@ class HysteriaBridge private constructor() {
             val err: String? = Hy2bind.startShareTun(tunFd.toLong(), mtu.toLong())
             if (!err.isNullOrBlank()) {
                 lastErrorMessage = err
-                Log.e(TAG, "startShareTun: $err")
+                NativeLog.e(TAG, "startShareTun: $err")
                 return false
             }
             true
         } catch (t: Throwable) {
             lastErrorMessage = t.message ?: t.toString()
-            Log.e(TAG, "startShareTun: failed", t)
+            NativeLog.e(TAG, "startShareTun: failed", t)
             false
         }
     }
@@ -198,7 +197,7 @@ class HysteriaBridge private constructor() {
             // Stop() already calls StopTun — do not stopTun()+stop() (double teardown).
             Hy2bind.stop()
         } catch (t: Throwable) {
-            Log.w(TAG, "stop: ${t.message}")
+            NativeLog.w(TAG, "stop: ${t.message}")
         }
         lastErrorMessage = null
     }
@@ -213,7 +212,7 @@ private class Hy2VpnProtector(
         val ok = try {
             svc.protect(fd)
         } catch (t: Throwable) {
-            Log.e("HysteriaBridge", "protect($fd) threw", t)
+            NativeLog.e("HysteriaBridge", "protect($fd) threw", t)
             false
         }
         if (!ok) {

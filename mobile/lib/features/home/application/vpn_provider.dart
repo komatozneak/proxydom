@@ -1161,6 +1161,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
               : await VpnController.instance.startHysteria(
                   profile,
                   displayLabel: shown.title,
+                  sessionId: _sid,
                 );
           started = raw && _dialGen == dial;
         } else {
