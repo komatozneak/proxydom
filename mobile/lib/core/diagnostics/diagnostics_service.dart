@@ -213,15 +213,32 @@ class DiagnosticsService {
   }
 }
 
+/// How many lines of a Flutter error report are copied into the log ring.
+///
+/// A layout overflow names the widget it happened in on the lines *after* the
+/// headline — "The relevant error-causing widget was:" plus the creator chain —
+/// and that is the only part that makes a field report actionable. Only the
+/// headline used to be kept, so an exported log could say that a RenderFlex
+/// overflowed by 52 pixels without ever saying where.
+///
+/// Bounded because the ring holds [AppLogBuffer.maxLines] lines and a layout
+/// error that repeats on every frame must not flush the session out of it.
+const int kFlutterErrorLogLines = 30;
+
 /// Captures Flutter framework errors for diagnostic reports.
 void installFlutterErrorHandler({void Function()? onCrashObserved}) {
   final previous = FlutterError.onError;
   FlutterError.onError = (details) {
     DiagnosticsService.lastFlutterError =
         details.exceptionAsString().split('\n').first;
-    AppLogBuffer.instance.debug(
-      'flutter: ${DiagnosticsService.lastFlutterError}',
-    );
+    // exceptionAsString() is the summary alone. FlutterErrorDetails.toString()
+    // is the whole report the console shows, because its diagnostics node pulls
+    // in the informationCollector that carries the widget chain and the stack.
+    var kept = 0;
+    for (final line in details.toString().split('\n')) {
+      AppLogBuffer.instance.debug('flutter: $line');
+      if (++kept >= kFlutterErrorLogLines) break;
+    }
     try {
       onCrashObserved?.call();
     } catch (_) {

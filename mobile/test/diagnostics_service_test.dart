@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:proxydom/core/diagnostics/app_log_buffer.dart';
 import 'package:proxydom/core/diagnostics/diagnostics_service.dart';
 import 'package:proxydom/core/diagnostics/egress_verify.dart';
+import 'package:proxydom/core/diagnostics/tunnel_log_level.dart';
 import 'package:proxydom/features/home/application/vpn_status.dart';
 import 'package:proxydom/features/vpn/data/vpn_controller.dart';
 
@@ -225,6 +228,51 @@ void main() {
       );
       expect(report, contains('ios_tunnel_health:'));
       expect(report, contains('(timeout)'));
+    });
+  });
+
+  group('installFlutterErrorHandler', () {
+    // A field report used to carry the headline of a layout overflow and
+    // nothing else, which is not enough to find the widget that overflowed.
+    // The handler now copies the whole report, so the creator chain survives
+    // into the file the owner sends.
+    test('keeps the creator chain, not just the headline', () {
+      final originalMinLevel = AppLogBuffer.instance.minLevel;
+      final originalHandler = FlutterError.onError;
+      addTearDown(() {
+        FlutterError.onError = originalHandler;
+        AppLogBuffer.instance.minLevel = originalMinLevel;
+        AppLogBuffer.instance.clear();
+      });
+      AppLogBuffer.instance.clear();
+      // debug() is filtered out at the default info level, and it is also what
+      // the owner had to raise to get these lines in the exported log at all.
+      AppLogBuffer.instance.minLevel = TunnelLogLevel.debug;
+      // Swallow the rethrow: the handler forwards to whatever it replaced, and
+      // the binding's own handler would fail this test on purpose.
+      FlutterError.onError = (details) {};
+      installFlutterErrorHandler();
+
+      FlutterError.onError!(
+        FlutterErrorDetails(
+          library: 'rendering library',
+          exception: FlutterError.fromParts(<DiagnosticsNode>[
+            ErrorSummary('A RenderFlex overflowed by 52 pixels on the right.'),
+          ]),
+          informationCollector: () => <DiagnosticsNode>[
+            ErrorDescription('The relevant error-causing widget was: Row'),
+          ],
+        ),
+      );
+
+      expect(
+        DiagnosticsService.lastFlutterError,
+        'A RenderFlex overflowed by 52 pixels on the right.',
+      );
+      final logged = AppLogBuffer.instance.recentLines().join('\n');
+      expect(logged, contains('A RenderFlex overflowed by 52 pixels'));
+      expect(logged, contains('error-causing widget was: Row'));
+      expect(logged, contains('CAUGHT BY RENDERING LIBRARY'));
     });
   });
 }
