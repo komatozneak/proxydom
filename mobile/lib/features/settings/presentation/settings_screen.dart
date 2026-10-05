@@ -11,10 +11,11 @@ import '../../../core/diagnostics/ui_log.dart';
 import '../../../core/ios_store_gates.dart';
 import '../../../core/support_contact.dart';
 import '../../../core/theme.dart';
+import '../../../core/toasts/proxy_dom_toast.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/app_surface.dart';
 import '../../../core/widgets/app_switch.dart';
-import '../../../core/widgets/proxydom_snackbar.dart';
+
 import '../../../l10n/app_localizations.dart';
 import '../application/locale_provider.dart';
 import '../application/theme_mode_provider.dart';
@@ -124,12 +125,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
       return;
     }
     final l = AppL10n.of(context);
-    final message = switch (result) {
-      'added' => l.settingsQsTileAdded,
-      'not_added' => l.settingsQsTileNotAdded,
-      _ => l.settingsQsTileManual,
+    final (message, tone) = switch (result) {
+      'added' => (l.settingsQsTileAdded, ToastTone.success),
+      'not_added' => (l.settingsQsTileNotAdded, ToastTone.failure),
+      _ => (l.settingsQsTileManual, ToastTone.info),
     };
-    showProxyDomSnackBar(context, message);
+    showProxyDomToast(message, tone: tone);
   }
 
   Future<void> _showQsTileRemoveDialog() async {

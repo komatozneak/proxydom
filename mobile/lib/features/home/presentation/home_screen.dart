@@ -11,6 +11,7 @@ import '../../../core/diagnostics/product_log.dart';
 import '../../../core/diagnostics/ui_log.dart';
 import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
+import '../../../core/toasts/proxy_dom_toast.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/app_surface.dart';
 import '../../../core/widgets/house_orbit.dart';
@@ -18,7 +19,7 @@ import '../../../core/widgets/proxydom_ground.dart';
 import '../../../core/widgets/connect_button.dart';
 import '../../../core/widgets/house_pulsar.dart';
 import '../../../core/widgets/signal_nest_hero.dart';
-import '../../../core/widgets/proxydom_snackbar.dart';
+
 import '../../../l10n/app_localizations.dart';
 import '../../settings/data/installed_apps_channel.dart';
 import '../../settings/data/split_tunnel_prefs.dart';
@@ -832,9 +833,9 @@ class _FreeClientHome extends StatelessWidget {
             );
             if (!context.mounted) return;
             if (!opened) {
-              showProxyDomSnackBar(
-                context,
+              showProxyDomToast(
                 settingsKillSwitchOpenFailedForPlatform(l),
+                tone: ToastTone.failure,
               );
             }
           },

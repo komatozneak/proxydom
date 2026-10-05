@@ -4,11 +4,12 @@ import '../../../core/diagnostics/product_log.dart';
 import '../../../core/diagnostics/ui_log.dart';
 import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
+import '../../../core/toasts/proxy_dom_toast.dart';
 import '../../../core/widgets/app_action_button.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/app_surface.dart';
 import '../../../core/widgets/interaction.dart';
-import '../../../core/widgets/proxydom_snackbar.dart';
+
 import '../../../core/widgets/terminal_type.dart';
 import '../../../l10n/app_localizations.dart';
 import '../data/hy2_import_store.dart';
@@ -85,7 +86,11 @@ Future<void> refreshRemoteDocuments(
         level: ProductLogLevel.warn,
         result: 'fail',
       );
-      showProxyDomSnackBar(context, l.freeRefreshFail, bottomInset: bottomInset);
+      showProxyDomToast(
+        l.freeRefreshFail,
+        tone: ToastTone.failure,
+        bottomInset: bottomInset,
+      );
       return;
     }
     UiLog.action(
@@ -95,9 +100,9 @@ Future<void> refreshRemoteDocuments(
       result: 'ok',
       extra: {'links': result.links, 'failed': result.failed},
     );
-    showProxyDomSnackBar(
-      context,
+    showProxyDomToast(
       l.freeRefreshDone(result.links),
+      tone: ToastTone.success,
       bottomInset: bottomInset,
     );
   } catch (_) {
@@ -108,7 +113,11 @@ Future<void> refreshRemoteDocuments(
       level: ProductLogLevel.warn,
       result: 'fail',
     );
-    showProxyDomSnackBar(context, l.freeRefreshFail, bottomInset: bottomInset);
+    showProxyDomToast(
+      l.freeRefreshFail,
+      tone: ToastTone.failure,
+      bottomInset: bottomInset,
+    );
   }
 }
 

@@ -9,6 +9,7 @@ import 'core/app_locale.dart';
 import 'core/ios_store_gates.dart';
 import 'core/router.dart';
 import 'core/theme.dart';
+import 'core/toasts/proxy_dom_toast_host.dart';
 import 'core/updates/update_check_service.dart';
 import 'features/settings/application/locale_provider.dart';
 import 'features/settings/application/theme_mode_provider.dart';
@@ -40,8 +41,10 @@ class ProxyDomApp extends ConsumerWidget {
       routerConfig: AppRouter.config,
       builder: (context, child) {
         final page = child ?? const SizedBox.shrink();
-        return _UpdateCheckHost(
-          child: windowsDesktop ? _WindowsExit(child: page) : page,
+        return ProxyDomToastHost(
+          child: _UpdateCheckHost(
+            child: windowsDesktop ? _WindowsExit(child: page) : page,
+          ),
         );
       },
     );

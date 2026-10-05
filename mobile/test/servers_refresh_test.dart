@@ -24,6 +24,8 @@ import 'package:proxydom/core/diagnostics/app_log_buffer.dart';
 import 'package:proxydom/core/diagnostics/tunnel_log_level.dart';
 import 'package:proxydom/core/theme.dart';
 import 'package:proxydom/core/widgets/app_action_button.dart';
+import 'package:proxydom/core/toasts/proxy_dom_toast.dart';
+import 'package:proxydom/core/toasts/proxy_dom_toast_host.dart';
 import 'package:proxydom/features/vpn/presentation/free_client_chrome.dart';
 import 'package:proxydom/features/vpn/presentation/locations_screen.dart';
 import 'package:proxydom/l10n/app_localizations.dart';
@@ -106,6 +108,10 @@ Future<GoRouter> _pumpServers(WidgetTester tester) async {
         localizationsDelegates: AppL10n.localizationsDelegates,
         supportedLocales: AppL10n.supportedLocales,
         locale: const Locale('ru'),
+        // Where the app puts it: above the navigator, inside the theme.
+        builder: (context, child) => ProxyDomToastHost(
+          child: child ?? const SizedBox.shrink(),
+        ),
       ),
     ),
   );
@@ -161,6 +167,8 @@ void main() {
       reason: 'a tab that lists saved documents has to offer a refresh',
     );
     expect(router.routeInformationProvider.value.uri.path, '/locations');
+    // The alert this tab raises is a timer: let it end inside the test.
+    ProxyDomToasts.instance.dismiss();
     debugDefaultTargetPlatformOverride = null;
   });
 
@@ -187,6 +195,8 @@ void main() {
     );
     expect(path, '/locations');
     expect(find.text('ПРОФИЛЬ'), findsNothing);
+    // The alert this tab raises is a timer: let it end inside the test.
+    ProxyDomToasts.instance.dismiss();
     debugDefaultTargetPlatformOverride = null;
   });
 
@@ -206,6 +216,8 @@ void main() {
       reason: 'reloading a document is not picking a server',
     );
     expect(find.text('ПРОФИЛЬ'), findsNothing);
+    // The alert this tab raises is a timer: let it end inside the test.
+    ProxyDomToasts.instance.dismiss();
     debugDefaultTargetPlatformOverride = null;
   });
 
@@ -215,11 +227,14 @@ void main() {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     await _pumpServers(tester);
 
-    // The keys sit on the bottom edge of the page and the answer rises from
-    // the bottom of the same Scaffold. Without standing room the toast owns
-    // that whole band: for 2.2 seconds the refresh key cannot be pressed again,
-    // which reads as a dead button and sends the person looking for the answer
-    // somewhere else.
+    // The answer is up and standing over the bottom of the page. If it owned
+    // the band the keys sit in, the key that just asked could not be asked
+    // again for as long as the answer lives — which reads as a dead button.
+    showProxyDomToast('Обновлено: 5', bottomInset: kActionBarBottomInset);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(find.text('Обновлено: 5'), findsOneWidget);
+
     AppLogBuffer.instance.clear();
     await tester.tapAt(tester.getCenter(_barRefresh()));
     await tester.pump();
@@ -232,6 +247,8 @@ void main() {
       isTrue,
       reason: 'the answer was still up and the key did not answer',
     );
+    // The alert this tab raises is a timer: let it end inside the test.
+    ProxyDomToasts.instance.dismiss();
     debugDefaultTargetPlatformOverride = null;
   });
 
@@ -249,6 +266,8 @@ void main() {
     await tester.tap(refresh, warnIfMissed: true);
     await tester.pump();
     expect(pressed, 1, reason: 'the key was painted but had no handler');
+    // The alert this tab raises is a timer: let it end inside the test.
+    ProxyDomToasts.instance.dismiss();
     debugDefaultTargetPlatformOverride = null;
   });
 
@@ -262,6 +281,8 @@ void main() {
     // No document behind anything on the page: one key, the one that adds.
     expect(find.byType(AppActionButton), findsOneWidget);
     expect(find.widgetWithText(AppActionButton, 'Обновить'), findsNothing);
+    // The alert this tab raises is a timer: let it end inside the test.
+    ProxyDomToasts.instance.dismiss();
     debugDefaultTargetPlatformOverride = null;
   });
 }

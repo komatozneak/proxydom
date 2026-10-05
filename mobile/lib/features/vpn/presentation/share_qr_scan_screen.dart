@@ -4,7 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../../core/diagnostics/ui_log.dart';
-import '../../../core/widgets/proxydom_snackbar.dart';
+import '../../../core/toasts/proxy_dom_toast.dart';
+
 import '../../../l10n/app_localizations.dart';
 import '../../home/application/vpn_provider.dart';
 import '../../home/application/vpn_status.dart';
@@ -42,7 +43,10 @@ class _ShareQrScanScreenState extends ConsumerState<ShareQrScanScreen> {
     try {
       await Hy2ImportStore.instance.saveInput(raw);
       if (!mounted) return;
-      showProxyDomSnackBar(context, AppL10n.of(context).freeServerAdded);
+      showProxyDomToast(
+        AppL10n.of(context).freeServerAdded,
+        tone: ToastTone.success,
+      );
       final status = ref.read(vpnProvider);
       if (status is VpnConnected || status is VpnConnecting) {
         await ref.read(vpnProvider.notifier).disconnect(reason: 'import');

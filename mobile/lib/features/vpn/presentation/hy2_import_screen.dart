@@ -5,11 +5,12 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/diagnostics/ui_log.dart';
 import '../../../core/theme.dart';
+import '../../../core/toasts/proxy_dom_toast.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/app_action_button.dart';
 import '../../../core/widgets/proxydom_ground.dart';
 import '../../../core/widgets/app_surface.dart';
-import '../../../core/widgets/proxydom_snackbar.dart';
+
 import '../../../l10n/app_localizations.dart';
 import '../../home/application/vpn_provider.dart';
 import '../../home/application/vpn_status.dart';
@@ -205,7 +206,10 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
         result: 'ok',
         extra: {'links': links.length, 'connect': true},
       );
-      showProxyDomSnackBar(context, AppL10n.of(context).freeServerAdded);
+      showProxyDomToast(
+        AppL10n.of(context).freeServerAdded,
+        tone: ToastTone.success,
+      );
       if (links.isEmpty) {
         context.go('/locations');
         return;

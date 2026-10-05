@@ -14,8 +14,9 @@ import '../../../core/diagnostics/ui_log.dart';
 import '../../../core/diagnostics/windows_service_log.dart';
 import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
+import '../../../core/toasts/proxy_dom_toast.dart';
 import '../../../core/widgets/app_icon.dart';
-import '../../../core/widgets/proxydom_snackbar.dart';
+
 import '../../../l10n/app_localizations.dart';
 import '../../vpn/data/vpn_controller.dart';
 
@@ -140,9 +141,9 @@ class _TunnelLogScreenState extends State<TunnelLogScreen> {
     await Clipboard.setData(ClipboardData(text: text));
     if (!mounted) return;
     final l = AppL10n.of(context);
-    showProxyDomSnackBar(
-      context,
+    showProxyDomToast(
       saved == null ? l.tunnelLogsCopied : l.tunnelLogsDebugFile(saved),
+      tone: ToastTone.success,
     );
   }
 
@@ -156,14 +157,14 @@ class _TunnelLogScreenState extends State<TunnelLogScreen> {
       extra: {'lines': lines.length},
     );
     if (lines.isEmpty && !windowsDesktop) {
-      showProxyDomSnackBar(context, l.tunnelLogsEmpty);
+      showProxyDomToast(l.tunnelLogsEmpty);
       return;
     }
     final text = await _bundle(lines);
     final saved = windowsDesktop ? await writeWindowsDebugFile(text) : null;
     if (!mounted) return;
     if (saved != null) {
-      showProxyDomSnackBar(context, l.tunnelLogsDebugFile(saved));
+      showProxyDomToast(l.tunnelLogsDebugFile(saved), tone: ToastTone.success);
       final box = context.findRenderObject();
       final origin = box is RenderBox && box.hasSize
           ? box.localToGlobal(Offset.zero) & box.size
@@ -180,7 +181,7 @@ class _TunnelLogScreenState extends State<TunnelLogScreen> {
       return;
     }
     if (text.isEmpty) {
-      showProxyDomSnackBar(context, l.tunnelLogsEmpty);
+      showProxyDomToast(l.tunnelLogsEmpty);
       return;
     }
     final box = context.findRenderObject();

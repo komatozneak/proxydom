@@ -9,8 +9,9 @@ import '../../../core/diagnostics/product_log.dart';
 import '../../../core/diagnostics/ui_log.dart';
 import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
+import '../../../core/toasts/proxy_dom_toast.dart';
 import '../../../core/widgets/app_icon.dart';
-import '../../../core/widgets/proxydom_snackbar.dart';
+
 import '../../../core/widgets/terminal_type.dart';
 import '../../../l10n/app_localizations.dart';
 import 'windows_share_qr.dart';
@@ -265,12 +266,12 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
         result: 'fail',
         reason: e.runtimeType.toString(),
       );
-      showProxyDomSnackBar(context, l.freeShareFail);
+      showProxyDomToast(l.freeShareFail, tone: ToastTone.failure);
       return;
     }
     if (!mounted) return;
     UiLog.action('locations', 'share', result: 'copied');
-    showProxyDomSnackBar(context, l.freeShareCopied);
+    showProxyDomToast(l.freeShareCopied, tone: ToastTone.success);
   }
 
   Future<void> _refreshCatalog(ShareCatalog catalog) async {
@@ -333,7 +334,10 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
           'restart': false,
         },
       );
-      showProxyDomSnackBar(context, l.freeRefreshDone(outcome.count));
+      showProxyDomToast(
+        l.freeRefreshDone(outcome.count),
+        tone: ToastTone.success,
+      );
       if (outcome.selectionLeftThisList && live) {
         await ref.read(vpnProvider.notifier).disconnect(reason: 'refresh');
       }
@@ -346,7 +350,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
         result: 'fail',
         reason: e.runtimeType.toString(),
       );
-      showProxyDomSnackBar(context, l.freeRefreshFail);
+      showProxyDomToast(l.freeRefreshFail, tone: ToastTone.failure);
     } finally {
       if (mounted) setState(() => _refreshing.remove(catalog.id));
     }

@@ -7,8 +7,9 @@ import 'package:go_router/go_router.dart';
 import '../../../core/diagnostics/ui_log.dart';
 import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
+import '../../../core/toasts/proxy_dom_toast.dart';
 import '../../../core/widgets/app_icon.dart';
-import '../../../core/widgets/proxydom_snackbar.dart';
+
 import '../../../l10n/app_localizations.dart';
 import '../../home/application/vpn_provider.dart';
 import '../../home/application/vpn_status.dart';
@@ -123,9 +124,9 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
       final ok = await ref.read(vpnProvider.notifier).reconnectToApplyRouting();
       UiLog.action('no_vpn', 'reconnect', result: ok ? 'ok' : 'fail');
       if (!mounted) return;
-      showProxyDomSnackBar(
-        context,
+      showProxyDomToast(
         ok ? l.splitTunnelApplied : l.splitTunnelApplyFailed,
+        tone: ok ? ToastTone.success : ToastTone.failure,
       );
       await _afterMutation();
     } finally {
