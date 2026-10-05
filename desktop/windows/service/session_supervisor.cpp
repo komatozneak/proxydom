@@ -543,6 +543,7 @@ void TunnelSupervisor::emit_flow_rate() {
 
   std::string code = "win_ms=" + std::to_string(flow_window_ms_) +
                      " worst_quiet_ms=" + std::to_string(flow_worst_quiet_ms_);
+  bool any_flow = false;
   for (const auto& entry : stalls_) {
     const std::string& key = entry.first;
     const FlowStall& stall = entry.second;
@@ -551,6 +552,7 @@ void TunnelSupervisor::emit_flow_rate() {
     if (live_keys.count(key) == 0 && stall.count == 0 && stall.running_ms == 0) continue;
     const std::uint64_t down = seconds == 0 ? 0 : rate_down_[key] / 1024 / seconds;
     const std::uint64_t up = seconds == 0 ? 0 : rate_up_[key] / 1024 / seconds;
+    any_flow = true;
     code += " " + journal_token(key) + "=dn_kbps:" + std::to_string(down) +
             "/up_kbps:" + std::to_string(up) +
             " stall_ms:" + std::to_string(stall.worst_ms) +
@@ -558,7 +560,11 @@ void TunnelSupervisor::emit_flow_rate() {
             " quiet_ms:" + std::to_string(stall.running_ms);
     if (live_counts.count(key) != 0) code += " live:" + std::to_string(live_counts[key]);
   }
-  log_.write(ledger_.generation, "flow_rate", code, 0);
+  // An idle session used to write `win_ms=… worst_quiet_ms=…` four times a
+  // minute, forever. At ~500 bytes a line that fills the 1 MB rotation in a
+  // working day and pushes out the connect/disconnect/failure lines the journal
+  // exists for. Silence is the right answer when nothing moved.
+  if (any_flow) log_.write(ledger_.generation, "flow_rate", code, 0);
 
   rate_up_.clear();
   rate_down_.clear();
@@ -645,7 +651,14 @@ TunnelSnapshot TunnelSupervisor::publish(TunnelCode code,
     published_ = snap;
     if (!cleanup_verified) files_.store(ledger_);
   }
-  log_.write(snap.generation, phase_name(snap.phase), code_name(snap.code), routes_.last_error());
+  // routes_.last_error() is whatever the LAST route operation left behind, not
+  // something this outcome produced. Attaching it unconditionally wrote
+  // `code=auth_rejected win32=1460` — a rejected key labelled with a socket
+  // timeout from the canary fetch — which sends a reader after the wrong cause.
+  // Only RouteFailed actually came out of the route manager.
+  const unsigned long route_error =
+      snap.code == TunnelCode::RouteFailed ? routes_.last_error() : 0ul;
+  log_.write(snap.generation, phase_name(snap.phase), code_name(snap.code), route_error);
   if (observer_) observer_(snap);
   return snap;
 }

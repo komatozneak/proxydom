@@ -1,5 +1,7 @@
 #include "session_supervisor.h"
 
+#include "log_sanitizer.h"
+
 #include <algorithm>
 #include <iostream>
 #include <memory>
@@ -918,6 +920,48 @@ void test_stderr_after_info_is_not_cut() {
   expect(!leaked, "the password is not in the service log");
 }
 
+// The sanitizer is the only thing between an engine error and a journal file a
+// non-admin user can read. Each shape below is one that reached the file at
+// some point: a share line pasted into a log, a query-string secret, a
+// credential key the key list did not know about, and a secret cut in half by
+// the 4096-byte window.
+void test_sanitizer_covers_every_credential_shape() {
+  const std::string share =
+      "dial hy2://alice:s3cr3t@cdn.example:443"
+      "?obfs=salamander&obfs-password=obfsSecret&sni=cdn.example";
+  const std::string masked = sanitize_engine_output_full(share);
+  expect(masked.find("s3cr3t") == std::string::npos, "the userinfo password is masked");
+  expect(masked.find("obfsSecret") == std::string::npos, "a query-string obfs password is masked");
+  expect(masked.find("hy2://***@cdn.example") != std::string::npos, "the host survives userinfo masking");
+  expect(masked.find("sni=cdn.example") != std::string::npos, "sni is not a credential");
+
+  const std::string json =
+      "{\"secret\":\"clashToken\",\"uuid\":\"11111111-2222-3333-4444-555555555555\","
+      "\"user\":\"nodePassword\",\"public_key\":\"kept-visible\"}";
+  const std::string json_masked = sanitize_engine_output_full(json);
+  expect(json_masked.find("clashToken") == std::string::npos, "the clash secret is masked");
+  expect(json_masked.find("11111111-2222") == std::string::npos, "the uuid is masked");
+  expect(json_masked.find("nodePassword") == std::string::npos, "a bare username is masked");
+  expect(json_masked.find("kept-visible") != std::string::npos,
+         "the Reality public key stays readable");
+
+  // The window cut used to run before redaction, so a secret that straddled
+  // the boundary lost its `"password":"` prefix and survived whole.
+  std::string wide(4000, 'x');
+  wide += " \"password\":\"boundarySecret\"";
+  const std::string wide_masked = sanitize_engine_output_full(wide);
+  expect(wide_masked.find("boundarySecret") == std::string::npos,
+         "a secret at the window edge is masked");
+  expect(wide_masked.size() <= 4096, "the window bound still holds");
+
+  // Idempotent: a masked line is masked again without turning *** into junk.
+  expect(sanitize_engine_output_full(masked) == masked, "redaction is idempotent");
+
+  const std::string kept = "event=egress code=timeout win32=1460 pid=1234";
+  expect(sanitize_engine_output_full(kept) == kept,
+         "ordinary fields are left alone");
+}
+
 void test_resolve_and_route_table_failures() {
   Harness names;
   names.names.fail = true;
@@ -1325,6 +1369,7 @@ int main() {
   test_classify_tun_wait();
   test_tun_timeout_log_names_the_adapter();
   test_stderr_after_info_is_not_cut();
+  test_sanitizer_covers_every_credential_shape();
   test_resolve_and_route_table_failures();
   test_flow_counters_record_the_outbound();
   test_connections_body_parses();
