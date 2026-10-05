@@ -121,8 +121,10 @@ class _WindowCaptionBarState extends State<WindowCaptionBar> {
                 child: ProxyDomLockup(
                   label: widget.label,
                   ink: widget.ink,
-                  markSize: 26,
-                  fontSize: 15,
+                  // The house takes the whole height of the band: the caption is
+                  // a frame, and a mark that stops short of its top and bottom
+                  // reads as an icon dropped into a bar rather than as the name.
+                  size: widget.height,
                 ),
               ),
             ),
