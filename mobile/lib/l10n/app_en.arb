@@ -450,7 +450,7 @@
   "tunnelLogsCopy": "Copy",
   "tunnelLogsExport": "Share",
   "tunnelLogsDelete": "Delete",
-  "tunnelLogsClearBlocked": "Could not delete: {files}. Stop the tunnel and try again.",
+  "tunnelLogsClearBlocked": "Could not delete: {files}. Administrator rights are required.",
   "@tunnelLogsClearBlocked": {
     "placeholders": {
       "files": {

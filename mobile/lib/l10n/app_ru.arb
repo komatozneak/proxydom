@@ -309,7 +309,7 @@
   "tunnelLogsCopy": "Копировать",
   "tunnelLogsExport": "Поделиться",
   "tunnelLogsDelete": "Удалить",
-  "tunnelLogsClearBlocked": "Не удалось удалить: {files}. Остановите туннель и повторите.",
+  "tunnelLogsClearBlocked": "Не удалось удалить: {files}. Нужны права администратора.",
   "@tunnelLogsClearBlocked": {
     "placeholders": {
       "files": {

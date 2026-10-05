@@ -725,7 +725,7 @@ class AppL10nRu extends AppL10n {
 
   @override
   String tunnelLogsClearBlocked(String files) {
-    return 'Не удалось удалить: $files. Остановите туннель и повторите.';
+    return 'Не удалось удалить: $files. Нужны права администратора.';
   }
 
   @override

@@ -12,6 +12,7 @@ import '../../../core/diagnostics/tunnel_log_prefs.dart';
 import '../../../core/diagnostics/tunnel_log_redact.dart';
 import '../../../core/diagnostics/ui_log.dart';
 import '../../../core/diagnostics/windows_service_log.dart';
+import '../../vpn/data/windows_tunnel.dart';
 import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
 import '../../../core/toasts/proxy_dom_toast.dart';
@@ -197,25 +198,33 @@ class _TunnelLogScreenState extends State<TunnelLogScreen> {
 
   /// Empty every sink, not just the one this screen draws from.
 ///
-/// The window ring, the persisted product.log, the core windows and — on
-/// Windows — the broker journal plus any exported proxydom-debug.txt all
-/// outlive the tap. Only the first of those is in this process, so the rest is
-/// deleted by path. Whatever the filesystem refuses (a live broker holds
-/// service.log open) is named back instead of swallowed.
+/// The window ring, the persisted product.log, the core windows, the broker
+/// journal and any exported proxydom-debug.txt all outlive the tap.
+///
+/// The journal needs someone else's hands. It lives under Program Data, where
+/// this user holds `Write` but not `Delete`, so deleting it from here failed
+/// on the ACL — and the broker opens `service.log` only for the microseconds
+/// of one line, so no handle was ever the blocker. Telling the user to stop
+/// the tunnel was advice that could not work. The broker owns the files and
+/// runs as SYSTEM, so it clears them.
 Future<void> _delete() async {
   UiLog.action('logs', 'clear', level: ProductLogLevel.info);
   AppLogBuffer.instance.clear();
   await AppLogBuffer.instance.flushPersist();
   await VpnController.instance.clearCoreLog();
   final onDisk = await deleteWindowsServiceLog();
+  final blocked = <String>[
+    if (windowsDesktop) ...await WindowsTunnel.instance.clearServiceLog(),
+    ...onDisk.blocked,
+  ];
   UiLog.action(
     'logs',
     'clear_files',
     level: ProductLogLevel.info,
-    result: onDisk.isComplete ? 'ok' : 'partial',
+    result: blocked.isEmpty ? 'ok' : 'partial',
     extra: {
       'deleted': onDisk.deleted.length,
-      'blocked': onDisk.blocked.length,
+      'blocked': blocked.length,
     },
   );
   if (!mounted) return;
@@ -223,10 +232,10 @@ Future<void> _delete() async {
     _lines = const [];
     _frozen = _level == TunnelLogLevel.off ? const [] : null;
   });
-  if (!onDisk.isComplete) {
+  if (blocked.isNotEmpty) {
     final l = AppL10n.of(context);
     showProxyDomToast(
-      l.tunnelLogsClearBlocked(onDisk.blocked.join(', ')),
+      l.tunnelLogsClearBlocked(blocked.join(', ')),
       tone: ToastTone.failure,
     );
   }

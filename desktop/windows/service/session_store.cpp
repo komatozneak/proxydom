@@ -210,3 +210,22 @@ void Win32TunnelLog::write(std::int64_t generation,
   WriteFile(file, line, static_cast<DWORD>(std::strlen(line)), &written, nullptr);
   CloseHandle(file);
 }
+
+std::vector<std::string> clear_journal_files() {
+  std::vector<std::string> remaining;
+  ensure_dir(log_dir());
+  const wchar_t* names[] = {L"service.log.1", L"service.log"};
+  for (const wchar_t* name : names) {
+    const std::wstring path = log_dir() + L"\\" + name;
+    if (GetFileAttributesW(path.c_str()) == INVALID_FILE_ATTRIBUTES) continue;
+    if (!DeleteFileW(path.c_str())) {
+      // A short retry: write() holds the file for microseconds, so a delete
+      // that landed between open and close loses to timing, not to a lock.
+      Sleep(50);
+      if (!DeleteFileW(path.c_str())) {
+        remaining.emplace_back(reinterpret_cast<const char*>(name));
+      }
+    }
+  }
+  return remaining;
+}

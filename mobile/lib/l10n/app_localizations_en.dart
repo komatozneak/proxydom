@@ -723,7 +723,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String tunnelLogsClearBlocked(String files) {
-    return 'Could not delete: $files. Stop the tunnel and try again.';
+    return 'Could not delete: $files. Administrator rights are required.';
   }
 
   @override

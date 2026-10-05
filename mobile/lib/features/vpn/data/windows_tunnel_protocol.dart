@@ -100,6 +100,14 @@ Map<String, Object?> tunnelDisconnect(int generation) => {
       'generation': generation,
     };
 
+/// Ask the broker to delete its own journal. The window cannot: under Program
+/// Data the interactive user has `Write` but not `Delete`, so a delete from
+/// here fails on the ACL whether or not a tunnel is up.
+Map<String, Object?> tunnelClearLog() => const {
+      'command': 'clear_log',
+      'protocol_version': kTunnelProtocolVersion,
+    };
+
 bool tunnelDomainAllowed(String host) {
   if (host.isEmpty || host.length > 253) return false;
   if (host.startsWith('.') || host.endsWith('.') || host.contains('..')) {

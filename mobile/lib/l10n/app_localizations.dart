@@ -1414,7 +1414,7 @@ abstract class AppL10n {
   /// No description provided for @tunnelLogsClearBlocked.
   ///
   /// In en, this message translates to:
-  /// **'Could not delete: {files}. Stop the tunnel and try again.'**
+  /// **'Could not delete: {files}. Administrator rights are required.'**
   String tunnelLogsClearBlocked(String files);
 
   /// No description provided for @tunnelLogsCopied.

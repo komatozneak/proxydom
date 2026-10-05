@@ -388,6 +388,30 @@ class WindowsTunnel {
     }
   }
 
+  /// Ask the broker to remove its journal. Returns the files it could not
+  /// delete; empty means the journal is gone.
+  ///
+  /// The broker does the deleting, not this process: under Program Data the
+  /// window's user has `Write` but not `Delete`, which is why deleting the file
+  /// from here failed even with the tunnel stopped.
+  Future<List<String>> clearServiceLog() async {
+    if (_commands == null) return const ['служба недоступна'];
+    final started = _seq;
+    try {
+      await _send(tunnelClearLog());
+      final ack = await _waitFor(
+        (event) => event.event == 'ack' && event.command == 'clear_log',
+        afterSeq: started,
+        timeout: const Duration(seconds: 5),
+      );
+      final code = ack.code ?? '';
+      if (ack.accepted == true || code == 'cleared') return const [];
+      return code.isEmpty ? const ['журнал службы'] : code.split(' ');
+    } catch (_) {
+      return const ['служба недоступна'];
+    }
+  }
+
   WindowsConnectResult _failClosed() {
     cleanupVerified = false;
     phase = 'disconnecting';

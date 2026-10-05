@@ -3,6 +3,7 @@
 #include "session_supervisor.h"
 
 #include <string>
+#include <vector>
 
 std::wstring proxy_dom_engine_config_path();
 
@@ -29,3 +30,12 @@ class Win32TunnelLog : public TunnelLog {
              const std::string& code,
              unsigned long win32) override;
 };
+
+/// Delete the broker journal windows. Called by the service itself: the files
+/// live under Program Data, where the interactive user holds `Write` but not
+/// `Delete`, so a delete attempted from the window fails on the ACL no matter
+/// what the tunnel is doing. Running as SYSTEM, the service can remove its own
+/// log without the window ever needing rights.
+///
+/// Returns the names that survived, empty when the journal is gone.
+std::vector<std::string> clear_journal_files();

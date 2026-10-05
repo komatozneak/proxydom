@@ -322,6 +322,21 @@ struct App {
       emit(supervisor.snapshot());
       return true;
     }
+    // The window cannot delete the journal itself: under Program Data the
+    // interactive user holds `Write` but not `Delete`, so the attempt failed on
+    // the ACL no matter whether a tunnel was up. The service owns the files and
+    // runs as SYSTEM, so it clears them and reports what survived.
+    if (command.command == "clear_log") {
+      const std::vector<std::string> remaining = clear_journal_files();
+      std::string code = remaining.empty() ? "cleared" : "blocked";
+      for (const std::string& name : remaining) {
+        if (!code.empty()) code += " ";
+        code += name;
+      }
+      log.write(supervisor.snapshot().generation, "logs", code, 0);
+      ack("clear_log", remaining.empty(), supervisor.snapshot().generation, code, {});
+      return true;
+    }
     log.write(supervisor.snapshot().generation, command.command, "rx", 0);
     if (command.command == "prove") {
       const auto now = supervisor.snapshot();
