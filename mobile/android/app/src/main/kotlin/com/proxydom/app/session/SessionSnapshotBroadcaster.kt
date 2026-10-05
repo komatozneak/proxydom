@@ -1,5 +1,7 @@
 package com.proxydom.app.session
 
+import com.proxydom.app.NativeLog
+
 import android.os.Handler
 import android.os.Looper
 import io.flutter.plugin.common.EventChannel

@@ -70,7 +70,9 @@ internal object NativeLog {
     private fun mirror(level: String, tag: String, message: String, error: Throwable?) {
         if (!allows(level)) return
         val body = if (error == null) message else "$message: ${error.javaClass.simpleName}"
-        DiagnosticRing.event(level, "${sourceFor(tag)}.$camelTag(tag)}", withSession(body))
+        // `${camelTag(...)}` and not `$camelTag(...)`: inside a Kotlin template a
+        // bare `$name` is a field read, and the compiler asks for the call.
+        DiagnosticRing.event(level, "${sourceFor(tag)}.${camelTag(tag)}", withSession(body))
     }
 
     private fun withSession(fields: String): String {

@@ -1,5 +1,7 @@
 package com.proxydom.app.session
 
+import com.proxydom.app.NativeLog
+
 import android.os.SystemClock
 import com.proxydom.app.DiagnosticRing
 import com.proxydom.app.GvisorTun2Socks

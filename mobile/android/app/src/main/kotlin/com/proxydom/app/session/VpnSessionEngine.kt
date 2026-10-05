@@ -1,5 +1,7 @@
 package com.proxydom.app.session
 
+import com.proxydom.app.NativeLog
+
 import com.proxydom.app.DefaultNetworkMonitor
 import com.proxydom.app.DiagnosticRing
 import java.util.concurrent.ExecutorService
