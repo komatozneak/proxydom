@@ -52,6 +52,20 @@
                 <data android:scheme="proxydom" android:host="import"/>
                 <data android:scheme="proxydom" android:host="sub"/>
             </intent-filter>
+            <!-- Android App Links for the document host. A tap on
+                 https://sub.proxydom.su/<token> in the system browser opens the
+                 app instead of showing the raw Hysteria2 lines. Google verifies
+                 this filter against the assetlinks.json the backend serves on
+                 that same host, so the signing fingerprint in
+                 ANDROID_APP_LINK_FINGERPRINTS has to match the installed build.
+                 Verified links are handled by the SYSTEM, not by a WebView:
+                 Telegram's in-app browser still shows the document text. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https" android:host="sub.proxydom.su"/>
+            </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
