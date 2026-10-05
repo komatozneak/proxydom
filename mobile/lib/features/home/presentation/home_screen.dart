@@ -80,8 +80,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   /// Publishes the lit level to the night behind the screen.
   void _setYard(double value) {
-    setState(() => _yardGlow = value);
     GroundGlowScope.maybeOf(context)?.set(value);
+    if (_yardGlow == value) return;
+    setState(() => _yardGlow = value);
   }
 
   void _setCharged(bool value) {
@@ -118,11 +119,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     return _yardResting;
   }
 
+  /// Makes the lamp agree with the tunnel.
+  ///
+  /// A server pick drops the tunnel without touching the house. The press
+  /// flash is the only other owner of the lamp, and it has its own timer: if
+  /// that timer is quiet, a disconnected tunnel is a dark house. Skipping the
+  /// update while the yard was already fully lit left the rings burning on a
+  /// screen that already said it was disconnected.
+  void _applyTunnelLight(VpnStatus status) {
+    final live = status is VpnConnected || status is VpnConnecting;
+    if (live) {
+      _chargeTimer?.cancel();
+      _yardTimer?.cancel();
+      _setCharged(true);
+      _setYard(_yardFor(status));
+      return;
+    }
+    if (_chargeTimer?.isActive == true) return;
+    _yardTimer?.cancel();
+    _setCharged(false);
+    _setYard(_yardResting);
+  }
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      // The listener only hears changes. A house that opens onto a tunnel
+      // that is already up (or already down) still has to match it.
+      _applyTunnelLight(ref.read(vpnProvider));
       unawaited(_onHomeReady());
     });
   }
@@ -383,8 +410,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     });
 
     ref.listen(vpnProvider, (prev, next) {
-      // The tunnel decides how bright the house is.
-      if (_yardGlow != 1.0) _setYard(_yardFor(next));
+      _applyTunnelLight(next);
       if (prev is! VpnConnected && next is VpnConnected) {
         unawaited(_maybeAskBattery());
       }
@@ -608,6 +634,7 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
       treeState: treeState,
       status: status,
       serverTitle: widget.serverTitle,
+      serverSubtitle: widget.serverSubtitle,
       serverFlag: widget.serverFlag,
       trafficMeta: widget.trafficMeta,
       onNestTap: widget.onNestTap,
@@ -626,6 +653,7 @@ class _FreeClientHome extends StatelessWidget {
     required this.treeState,
     required this.status,
     required this.serverTitle,
+    this.serverSubtitle,
     this.serverFlag,
     this.trafficMeta,
     required this.onNestTap,
@@ -642,6 +670,9 @@ class _FreeClientHome extends StatelessWidget {
   final TreeState treeState;
   final VpnStatus status;
   final String serverTitle;
+
+  /// The node's own note, under the name in the terminal head.
+  final String? serverSubtitle;
 
   /// The flag shown beside the server name in the terminal head.
   final String? serverFlag;
@@ -740,6 +771,7 @@ class _FreeClientHome extends StatelessWidget {
       status: statusText,
       serverName: profile,
       serverFlag: serverFlag,
+      serverSubtitle: empty ? null : serverSubtitle,
       tile: tileForName(profile),
       uptime: uptime,
       trafficLabel: traffic,

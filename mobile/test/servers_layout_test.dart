@@ -76,13 +76,14 @@ ProfileInstrument _instrument({
   List<({String text, bool accent})> facts = const [
     (text: '2aq93K0', accent: false),
     (text: '14 ГБ', accent: true),
-    (text: 'обновлено 04.10', accent: false),
   ],
+  String? updated = 'обновлено 04.10',
 }) {
   return ProfileInstrument(
     title: 'Теремок',
     description: 'Значок справа ведёт в бота',
     facts: facts,
+    updated: updated,
     selected: false,
     onNodeTap: (_) {},
     selectedNodeTitle: 'YouTube',
@@ -113,16 +114,21 @@ void main() {
   test('only the traffic reading wears colour', () {
     final facts = profileFacts(
       trafficMeta: 'upload=1; download=2; total=15000000000',
-      lastUpdated: '2026-10-04T12:22:09Z',
       russian: true,
       keyHandle: '2aq93K0',
     );
-    expect(facts.map((fact) => fact.text),
-        ['2aq93K0', '14 ГБ', 'обновлено 04.10']);
-    expect(facts.map((fact) => fact.accent), [false, true, false]);
+    expect(facts.map((fact) => fact.text), ['2aq93K0', '14 ГБ']);
+    expect(facts.map((fact) => fact.accent), [false, true]);
+    expect(
+      profileUpdatedLabel(
+        lastUpdated: '2026-10-04T12:22:09Z',
+        russian: true,
+      ),
+      'обновлено 04.10',
+    );
   });
 
-  testWidgets('the facts are one line of readings, not three boxes',
+  testWidgets('the update stamp sits under the rings, not beside the traffic',
       (tester) async {
     tester.view
       ..physicalSize = const Size(520, 800) * _dpr
@@ -135,14 +141,16 @@ void main() {
     final handle = tester.getRect(find.text('2AQ93K0'));
     final traffic = tester.getRect(find.text('14 ГБ'));
     final updated = tester.getRect(find.text('ОБНОВЛЕНО 04.10'));
+    final rings = find.byType(AppRingButton);
+    var span = tester.getRect(rings.at(0));
+    span = span.expandToInclude(tester.getRect(rings.at(1)));
+    span = span.expandToInclude(tester.getRect(rings.at(2)));
 
-    // One reading, one baseline: the three facts sat as separate pills before,
-    // so they wrapped onto a second row and the card grew taller with nothing
-    // new said on it. Below this width they wrap as one group, which is the
-    // point — they are a line of readings, not three boxes.
+    // The key and the traffic are one line. The stamp used to be the third
+    // reading on that line, jammed against the figure it does not describe.
     expect(traffic.center.dy, closeTo(handle.center.dy, 2));
-    expect(updated.center.dy, closeTo(handle.center.dy, 2));
-    expect(updated.right, greaterThan(handle.right));
+    expect(updated.top, greaterThan(span.bottom - 1));
+    expect(updated.right, closeTo(span.right, 1.5));
   });
 
   testWidgets('the actions are three rings, not three framed squares',
@@ -156,6 +164,20 @@ void main() {
         in tester.widgetList<AppRingButton>(find.byType(AppRingButton))) {
       expect(ring.size, lessThan(34));
     }
+  });
+
+  testWidgets('copy wears the add-server gold and delete wears clay',
+      (tester) async {
+    await tester.pumpWidget(_wrap(_instrument()));
+    await tester.pump();
+
+    final rings = tester
+        .widgetList<AppRingButton>(find.byType(AppRingButton))
+        .toList();
+    expect(rings, hasLength(3));
+    expect(rings[0].color, AppBrand.actionSky);
+    expect(rings[1].color, AppBrand.mascotGold);
+    expect(rings[2].color, AppBrand.actionClay);
   });
 
   testWidgets('the pool is ruled lines on one plate', (tester) async {
@@ -185,6 +207,29 @@ void main() {
     expect(find.byType(NodeRule), findsNWidgets(3));
     expect(find.text('УЗЛЫ'), findsOneWidget);
     expect(find.text('АКТИВЕН'), findsOneWidget);
+  });
+
+  testWidgets('a saved announcement is on the profile card', (tester) async {
+    tester.view
+      ..physicalSize = _phone * _dpr
+      ..devicePixelRatio = _dpr;
+    addTearDown(tester.view.reset);
+    _seedTeremok();
+
+    await tester.pumpWidget(_wrap(const LocationsScreen()));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 4));
+
+    final note = find.text('Значок справа ведёт в бота');
+    expect(note, findsOneWidget);
+    expect(tester.getSize(note).height, greaterThan(8));
+
+    // Between the traffic reading and the pool, not dropped off the plate.
+    final traffic = tester.getRect(find.textContaining('ГБ'));
+    final nodes = tester.getRect(find.text('УЗЛЫ'));
+    final body = tester.getRect(note);
+    expect(body.top, greaterThan(traffic.bottom));
+    expect(body.bottom, lessThan(nodes.top));
   });
 
   testWidgets('the page starts on the gutter its heading is on',

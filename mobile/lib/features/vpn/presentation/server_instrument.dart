@@ -25,6 +25,7 @@ class ProfileInstrument extends StatelessWidget {
     required this.title,
     required this.description,
     required this.facts,
+    this.updated,
     required this.selected,
     required this.nodes,
     required this.onNodeTap,
@@ -43,9 +44,13 @@ class ProfileInstrument extends StatelessWidget {
   /// The seller's own words — the `announce` field, read as prose.
   final String description;
 
-  /// «Ключ · активен · ещё 27 дней», already formatted. One reading may be the
-  /// traffic figure, which is the only fact on the card worth a colour.
+  /// «Ключ · 14 ГБ», already formatted. One reading may be the traffic figure,
+  /// which is the only fact on the card worth a colour. The update stamp is
+  /// not one of these: it sits under the rings, not in this line.
   final List<({String text, bool accent})> facts;
+
+  /// «обновлено 04.10», already formatted. Drawn under the three rings.
+  final String? updated;
 
   final bool selected;
 
@@ -76,19 +81,18 @@ class ProfileInstrument extends StatelessWidget {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 14, 14, 13),
-            // The name and its controls share the line; the readings take the
-            // whole width under them. Beside three 30px rings the fact line had
-            // 170px to live in, so it broke after the second reading and left a
-            // separator hanging at the end of the row.
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min,
+            // The stamp used to ride in the fact line, hard against the
+            // traffic figure. It belongs to the rings: they are what produced
+            // it. The key and the traffic stay under the name, on the left.
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Expanded(
-                      child: Text(
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
                         title.toUpperCase(),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -103,8 +107,18 @@ class ProfileInstrument extends StatelessWidget {
                           spacing: 1.6,
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
+                      if (facts.isNotEmpty) ...[
+                        const SizedBox(height: 9),
+                        _FactsLine(facts: facts, mute: mute),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                     _Toolbar(
                       busy: refreshing,
                       refreshLabel: l.freeRefresh,
@@ -114,12 +128,20 @@ class ProfileInstrument extends StatelessWidget {
                       deleteLabel: l.freeDelete,
                       onDelete: onDelete,
                     ),
+                    if (updated != null && updated!.trim().isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        updated!.trim().toUpperCase(),
+                        style: terminalText(
+                          context,
+                          size: 10.5,
+                          color: mute,
+                          spacing: 1.4,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
-                if (facts.isNotEmpty) ...[
-                  const SizedBox(height: 9),
-                  _FactsLine(facts: facts, mute: mute),
-                ],
               ],
             ),
           ),
@@ -238,14 +260,13 @@ class ProfileInstrument extends StatelessWidget {
   }
 }
 
-/// «2AQ93K0 · 14 ГБ · ОБНОВЛЕНО 04.10».
+/// «2AQ93K0 · 14 ГБ». The update stamp is not in this line.
 ///
 /// They were three grey pills: three small boxes carrying three small grey
 /// words, and louder on the card than the note under them. A line of tracked
-/// mono with a dot between the readings says one thing — this is what you have,
-/// and when it was last checked — and it is the same rule the home head runs
-/// its traffic along. The traffic figure itself wears the house gold, because
-/// it is the one number a person watches run down.
+/// mono with a dot between the readings says what you have. The traffic figure
+/// itself wears the house gold, because it is the one number a person watches
+/// run down. When the document was last read sits under the rings.
 class _FactsLine extends StatelessWidget {
   const _FactsLine({required this.facts, required this.mute});
 
@@ -352,9 +373,9 @@ class _LiveNode extends StatelessWidget {
 /// Three bordered squares in the corner of a card were the loudest thing on it:
 /// a red-framed box for the trash and two more beside it, all the same weight as
 /// the mark in the name. Rings keep the same three answers and the same target,
-/// and leave the name the loudest thing on the plate. The trash wears no alarm
-/// colour here — it destroys nothing yet, and the dialog it opens is where the
-/// decision is made.
+/// and leave the name the loudest thing on the plate. Refresh stays the sky of
+/// a network call. Copy wears the same gold as «Добавить сервер». The bin is
+/// clay, not an alarm: the dialog it opens is where the decision is made.
 ///
 /// There is no connect key. It said «Подключено» in one place and
 /// «Подключить» in another, and it asked the card a question the node list
@@ -383,12 +404,13 @@ class _Toolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final dark = theme.brightness == Brightness.dark;
-    // Refresh is the one control that talks to the network, so it keeps the
-    // cool counterpart of the house gold that the rest of the app gives it.
+    // Refresh talks to the network, so it keeps the cool counterpart of the
+    // house gold. Copy is the same gold as the key that adds a server. The
+    // bin is clay: red enough to be the destructive one, quiet enough to sit
+    // on the plate.
     const wire = AppBrand.actionSky;
-    final quiet = dark ? AppBrand.inkMutedDark : AppBrand.inkMutedLight;
+    const copy = AppBrand.mascotGold;
+    const bin = AppBrand.actionClay;
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -406,7 +428,7 @@ class _Toolbar extends StatelessWidget {
         if (onShare != null) ...[
           _ring(
             icon: AppIcons.share,
-            color: quiet,
+            color: copy,
             tooltip: shareLabel,
             onTap: onShare,
           ),
@@ -415,7 +437,7 @@ class _Toolbar extends StatelessWidget {
         if (onDelete != null)
           _ring(
             icon: AppIcons.trash,
-            color: quiet,
+            color: bin,
             tooltip: deleteLabel,
             onTap: onDelete,
           ),
@@ -504,11 +526,10 @@ class _Block extends StatelessWidget {
 /// Facts for the instrument header, built from what the document really says.
 ///
 /// The traffic figure comes back flagged, because it is the one number on the
-/// card worth a colour; the key handle and the update stamp are captions and
-/// stay quiet.
+/// card worth a colour; the key handle is a caption and stays quiet. The
+/// update stamp is [profileUpdatedLabel], drawn under the rings.
 List<({String text, bool accent})> profileFacts({
   required String? trafficMeta,
-  required String? lastUpdated,
   required bool russian,
   required String keyHandle,
 }) {
@@ -520,9 +541,16 @@ List<({String text, bool accent})> profileFacts({
   if (label.trim().isNotEmpty) {
     out.add((text: label.trim(), accent: true));
   }
-  final updated = _updatedLabel(lastUpdated, russian: russian);
-  if (updated != null) out.add((text: updated, accent: false));
   return out;
+}
+
+/// `обновлено 04.10` — the day the document was last read, for the slot under
+/// the rings. Null when the store has no stamp.
+String? profileUpdatedLabel({
+  required String? lastUpdated,
+  required bool russian,
+}) {
+  return _updatedLabel(lastUpdated, russian: russian);
 }
 
 /// `обновлено 04.10` — never the raw stamp.

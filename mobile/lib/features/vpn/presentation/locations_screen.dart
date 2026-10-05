@@ -385,6 +385,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     final noticeBody = notice.text?.trim() ?? '';
     final handle = _keyHandle(catalog);
     final selectedLabel = _selectedLabel();
+    final russian = Localizations.localeOf(context).languageCode == 'ru';
 
     // The gap between cards belongs to the list, not to the card: one number
     // for the distance between two profiles on this page.
@@ -393,9 +394,12 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       description: noticeBody,
       facts: profileFacts(
         trafficMeta: catalog.trafficMeta,
-        lastUpdated: catalog.lastUpdated,
-        russian: Localizations.localeOf(context).languageCode == 'ru',
+        russian: russian,
         keyHandle: handle,
+      ),
+      updated: profileUpdatedLabel(
+        lastUpdated: catalog.lastUpdated,
+        russian: russian,
       ),
       selected: _catalogIsSelected(catalog),
       // The plate itself is not the pick: the line you tap is the line you get.

@@ -89,6 +89,11 @@ class AppBrand {
   /// orange. Charcoal ink on it is в‰€5.9:1.
   static const Color actionAmber = Color(0xFFC98A16);
 
+  /// Clay red for the delete ring. [destructive] is an alarm; this is that
+  /// hue stepped toward the house ember, so the bin sits in the night instead
+  /// of shouting over the name. The ring paints it at a low fill.
+  static const Color actionClay = Color(0xFFC46256);
+
   /// Dark elevated cards — enough lift off [surfaceDark] so numbers read.
   static const Color surfaceVariantDark = Color(0xFF2C2C32);
 

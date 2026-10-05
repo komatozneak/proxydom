@@ -43,16 +43,20 @@ class ServerGlyph extends StatelessWidget {
           size: size,
           fill: AppBrand.youtubePlay,
           radius: size * 0.28,
-          child: const AppIcon(AppIcons.play, size: 15, color: AppBrand.mascotCream),
+          child: AppIcon(
+            AppIcons.play,
+            size: _glyph(size, 15),
+            color: AppBrand.mascotCream,
+          ),
         );
       case PoolTile.gaming:
         return _Tile(
           size: size,
           fill: AppBrand.moss.withValues(alpha: 0.9),
           radius: size * 0.28,
-          child: const AppIcon(
+          child: AppIcon(
             AppIcons.gamepad,
-            size: 18,
+            size: _glyph(size, 18),
             color: AppBrand.mascotCream,
           ),
         );
@@ -65,7 +69,7 @@ class ServerGlyph extends StatelessWidget {
             radius: size * 0.28,
             child: AppIcon(
               AppIcons.globe,
-              size: 17,
+              size: _glyph(size, 17),
               color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
             ),
           );
@@ -134,6 +138,14 @@ class FlagMark extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Glyph inside a tile. List tiles stay at the size they were drawn for.
+/// A head that asks for a tile twice as wide gets a glyph twice as wide too,
+/// or the mark is an empty square with a speck in it.
+double _glyph(double tile, double designed) {
+  if (tile <= 40) return designed;
+  return designed * tile / 38;
 }
 
 class _Tile extends StatelessWidget {

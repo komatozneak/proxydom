@@ -279,8 +279,8 @@ class FreeClientEmptyState extends StatelessWidget {
 /// Not the green-on-black hightech cliché — this is a lamp on a night, read at
 /// a glance. Monospace and letterspaced so the numbers line up like an
 /// instrument, warm gold instead of neon, and nothing brighter than the house
-/// itself. The three fields are spread across the width with the state in the
-/// middle: where it is going, what it is doing, how long it has been up.
+/// itself. The node is centred and large. The state sits at the left, on the
+/// traffic label, and the clock — when there is one — stays at the right.
 class ConnectionTerminal extends StatelessWidget {
   const ConnectionTerminal({
     super.key,
@@ -289,6 +289,7 @@ class ConnectionTerminal extends StatelessWidget {
     required this.accent,
     this.tile = PoolTile.flag,
     this.serverFlag,
+    this.serverSubtitle,
     this.uptime,
     this.trafficLabel,
     this.trafficUsed = 0,
@@ -301,6 +302,10 @@ class ConnectionTerminal extends StatelessWidget {
   /// The server, with its flag, inside the terminal next to the state.
   final String serverName;
   final String? serverFlag;
+
+  /// The node's own note («низкий пинг»), under the name. Empty when the
+  /// line has nothing to say beyond the name.
+  final String? serverSubtitle;
 
   /// What the mark beside the name is: a country, YouTube, or a gamepad.
   final PoolTile tile;
@@ -357,7 +362,8 @@ class ConnectionTerminal extends StatelessWidget {
         // «подключено». One screen, one name, one state: the head opens with
         // the node.
         //
-        // Where you are, in the middle and large.
+        // Where you are, in the middle and large. The mark and the name are
+        // twice the old reading: the node is the thing this screen is about.
         Center(
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -366,8 +372,8 @@ class ConnectionTerminal extends StatelessWidget {
               // globe here and a red YouTube tile there, for the same line:
               // one node, one mark, wherever it appears.
               if (tile == PoolTile.flag) ...[
-                FlagMark(flag: serverFlag ?? '', width: 38),
-                const SizedBox(width: 12),
+                FlagMark(flag: serverFlag ?? '', width: 76),
+                const SizedBox(width: 16),
               ] else ...[
                 ServerGlyph(
                   label: PoolServerLabel(
@@ -376,9 +382,9 @@ class ConnectionTerminal extends StatelessWidget {
                     tile: tile,
                     flag: '',
                   ),
-                  size: 38,
+                  size: 76,
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 16),
               ],
               Flexible(
                 child: Text(
@@ -387,7 +393,7 @@ class ConnectionTerminal extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: _mono(
                     context,
-                    size: 21,
+                    size: 42,
                     color: ink,
                     weight: 700,
                     spacing: 1.6,
@@ -397,45 +403,53 @@ class ConnectionTerminal extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 10),
-        // The state under it, small: the lamp is the signal, the word is the
-        // caption. Centred, because everything above it is — and the clock on
-        // the counter at the right, the one other reading that belongs to the
-        // screen rather than to the state.
+        if (serverSubtitle != null && serverSubtitle!.trim().isNotEmpty) ...[
+          const SizedBox(height: 6),
+          SizedBox(
+            width: double.infinity,
+            child: Text(
+              serverSubtitle!.trim(),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontSize: 15,
+                height: 1.3,
+                color: mute,
+              ),
+            ),
+          ),
+        ],
+        const SizedBox(height: 12),
+        // The state sits on the traffic label, at the left. It used to be
+        // centred under the name, which put «не подключено» in the middle of
+        // a screen whose only other reading starts at the left edge. The
+        // clock, when there is one, stays at the right of that same line.
         Row(
           children: [
-            Expanded(
-              child: Center(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _Lamp(color: accent, size: 8),
-                    const SizedBox(width: 9),
-                    Flexible(
-                      child: Text(
-                        status.toUpperCase(),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: _mono(
-                          context,
-                          size: 11,
-                          color: accent,
-                          weight: 700,
-                          spacing: 2.2,
-                        ),
-                      ),
-                    ),
-                  ],
+            _Lamp(color: accent, size: 8),
+            const SizedBox(width: 9),
+            Flexible(
+              child: Text(
+                status.toUpperCase(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: _mono(
+                  context,
+                  size: 11,
+                  color: accent,
+                  weight: 700,
+                  spacing: 2.2,
                 ),
               ),
             ),
             if (windowsDesktop && uptime != null) ...[
-              const SizedBox(width: 10),
+              const Spacer(),
               _uptimeField(context, ink, mute, uptime),
             ],
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 8),
         // The rail the traffic runs on, with the spent GB at its end.
         _TrafficRail(
           label: trafficLabel ?? '--',

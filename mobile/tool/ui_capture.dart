@@ -329,8 +329,8 @@ void main() {
                 facts: const [
                   (text: '2aq93K0', accent: false),
                   (text: '15 ГБ из 100 ГБ', accent: true),
-                  (text: 'обновлено 04.10', accent: false),
                 ],
+                updated: 'обновлено 04.10',
                 selected: true,
                 selectedNodeTitle: 'Москва',
                 onNodeTap: _ignoreIndex,
