@@ -1,13 +1,78 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/diagnostics/product_log.dart';
+import '../../../core/diagnostics/ui_log.dart';
 import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_action_button.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/app_surface.dart';
+import '../../../core/widgets/interaction.dart';
+import '../../../core/widgets/proxydom_snackbar.dart';
+import '../../../core/widgets/terminal_type.dart';
 import '../../../l10n/app_localizations.dart';
+import '../data/hy2_import_store.dart';
 import '../data/subscription_label.dart';
 import 'server_glyph.dart';
+
+/// Reloads every saved subscription document and says how it went.
+///
+/// The home key and the servers key ask the same question — reread my links —
+/// and they had two copies of the answer. One function, one count in the log,
+/// one message, so the two screens cannot drift apart.
+Future<void> refreshRemoteDocuments(
+  BuildContext context, {
+  required String scope,
+}) async {
+  UiLog.action(scope, 'refresh', level: ProductLogLevel.info);
+  final l = AppL10n.of(context);
+  try {
+    final catalogs = await Hy2ImportStore.instance.catalogs();
+    final remote = [
+      for (final catalog in catalogs)
+        if (catalog.url != null && catalog.url!.isNotEmpty) catalog,
+    ];
+    var failed = 0;
+    for (final catalog in remote) {
+      try {
+        await Hy2ImportStore.instance.refreshCatalog(catalog.id);
+      } on Exception {
+        failed++;
+      }
+    }
+    final links = await Hy2ImportStore.instance.load();
+    if (!context.mounted) return;
+    // Every document failing is a different story from none of them being
+    // there: the first is a word worth saying, the second is nothing to report.
+    if (remote.isNotEmpty && failed == remote.length) {
+      UiLog.action(
+        scope,
+        'refresh',
+        level: ProductLogLevel.warn,
+        result: 'fail',
+      );
+      showProxyDomSnackBar(context, l.freeRefreshFail);
+      return;
+    }
+    UiLog.action(
+      scope,
+      'refresh',
+      level: ProductLogLevel.info,
+      result: 'ok',
+      extra: {'links': links.length, 'failed': failed},
+    );
+    showProxyDomSnackBar(context, l.freeRefreshDone(links.length));
+  } catch (_) {
+    if (!context.mounted) return;
+    UiLog.action(
+      scope,
+      'refresh',
+      level: ProductLogLevel.warn,
+      result: 'fail',
+    );
+    showProxyDomSnackBar(context, l.freeRefreshFail);
+  }
+}
 
 /// Paste, and on the phone a matching QR. Windows has no camera and no QR.
 ///
@@ -58,8 +123,7 @@ class FreeClientActionBar extends StatelessWidget {
     if (windowsDesktop) {
       // Windows has no camera, so the reload takes the free slot as a full key.
       if (refresh == null) {
-        return SizedBox(
-            height: barHeight, width: double.infinity, child: add);
+        return SizedBox(height: barHeight, width: double.infinity, child: add);
       }
       return SizedBox(
         height: barHeight,
@@ -197,25 +261,24 @@ class ConnectionTerminal extends StatelessWidget {
   final Color? trafficColor;
 
   /// The terminal's own type.
-///
-/// A real monospace, bundled: JetBrains Mono has native Cyrillic, which the
-/// platform's `monospace` does not promise and which showed up as tofu on a
-/// machine with no mono installed. Everything else is Onest.
-TextStyle _mono(
+  ///
+  /// It lives in core/widgets/terminal_type.dart because the servers tab, the
+  /// import steps and this head are one voice: the same face, the same weight
+  /// rule, the same tracking. A private copy of it is how two screens end up
+  /// set in two different faces.
+  TextStyle _mono(
     BuildContext context, {
     required double size,
     required Color color,
     double weight = 600,
     double spacing = 1.1,
   }) {
-    return TextStyle(
-      fontFamily: 'JetBrainsMono',
-      fontFamilyFallback: const ['Onest', 'Inter'],
-      fontSize: size,
-      fontWeight: weight >= 700 ? FontWeight.w700 : FontWeight.w400,
+    return terminalText(
+      context,
+      size: size,
       color: color,
-      letterSpacing: spacing,
-      height: 1.2,
+      weight: weight,
+      spacing: spacing,
     );
   }
 
@@ -386,8 +449,11 @@ class _TrafficRail extends StatelessWidget {
   final double value;
   final bool capped;
   final Color color;
-  final TextStyle Function(BuildContext, {required double size, required Color color, double weight, double spacing})
-  mono;
+  final TextStyle Function(BuildContext,
+      {required double size,
+      required Color color,
+      double weight,
+      double spacing}) mono;
 
   @override
   Widget build(BuildContext context) {
@@ -496,12 +562,10 @@ class _SegmentBarPainter extends CustomPainter {
         ),
         Paint()
           ..color = i < filled
-              ? (isHead
-                    ? color
-                    : color.withValues(alpha: night ? 0.55 : 0.88))
+              ? (isHead ? color : color.withValues(alpha: night ? 0.55 : 0.88))
               : (night
-                    ? color.withValues(alpha: 0.12)
-                    : AppBrand.inkLight.withValues(alpha: 0.16)),
+                  ? color.withValues(alpha: 0.12)
+                  : AppBrand.inkLight.withValues(alpha: 0.16)),
       );
     }
   }
@@ -722,6 +786,14 @@ class _InstrumentRow extends StatelessWidget {
   }
 }
 
+/// One imported server, drawn as a plate with a row on it.
+///
+/// It was a Material tile: a grey slab with a hairline, the scheme in a boxed
+/// chip on the left, the host in the default subtitle, and the trash on a
+/// square of paper colour. Nothing on it belonged to the same app as the
+/// profile cards. This is the row grammar of a pool line, promoted to a plate of
+/// its own: the same mark, the same name-over-subtitle stack, the same gold wash
+/// for the chosen one and the same ring for the one thing you can do to it.
 class ImportedProfileCard extends StatelessWidget {
   const ImportedProfileCard({
     super.key,
@@ -729,6 +801,7 @@ class ImportedProfileCard extends StatelessWidget {
     required this.scheme,
     required this.endpoint,
     required this.selected,
+    this.label,
     this.connected = false,
     this.dialable = true,
     this.onTap,
@@ -738,6 +811,11 @@ class ImportedProfileCard extends StatelessWidget {
   final String name;
   final String scheme;
   final String endpoint;
+
+  /// The same label the pool lines use, so a pasted key and a node out of a
+  /// list are one object drawn once.
+  final PoolServerLabel? label;
+
   final bool selected;
   final bool connected;
   final bool dialable;
@@ -747,60 +825,161 @@ class ImportedProfileCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
     final l = AppL10n.of(context);
-    return Material(
-      color: selected
-          ? theme.colorScheme.primaryContainer
-          : theme.colorScheme.surfaceContainerHighest,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppBrand.radiusCard),
-        side: BorderSide(
-          color:
-              selected ? theme.colorScheme.primary : theme.colorScheme.outline,
-          width: selected ? 1.6 : 1,
-        ),
-      ),
-      child: ListTile(
+    final mute = dark ? AppBrand.inkMutedDark : AppBrand.inkMutedLight;
+    final gold = dark ? AppBrand.mascotGoldLit : AppBrand.mascotGoldDeep;
+    final mark = label ??
+        PoolServerLabel(
+          title: name,
+          subtitle: '',
+          tile: PoolTile.flag,
+          flag: '',
+        );
+    final title = label == null || label!.title.isEmpty ? name : label!.title;
+    final subtitle = !dialable
+        ? l.freeSchemeParked
+        : (label != null && label!.subtitle.isNotEmpty
+            ? label!.subtitle
+            : endpoint);
+
+    return AppSurface(
+      clip: true,
+      child: HoverBuilder(
         onTap: onTap,
-        title: Text(
-          name,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        subtitle: Text(
-          dialable ? endpoint : l.freeSchemeParked,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-        leading: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: theme.colorScheme.outline),
-          ),
-          child: Text(
-            scheme.toUpperCase(),
-            style: theme.textTheme.labelSmall?.copyWith(
-              fontWeight: FontWeight.w800,
+        builder: (context, hover) {
+          return AnimatedContainer(
+            duration: const Duration(milliseconds: 140),
+            color: selected
+                ? gold.withValues(alpha: dark ? 0.13 : 0.10)
+                : (hover
+                    ? theme.colorScheme.onSurface.withValues(alpha: 0.04)
+                    : Colors.transparent),
+            child: Stack(
+              children: [
+                if (selected)
+                  const Positioned(
+                    left: 0,
+                    top: 8,
+                    bottom: 8,
+                    width: 2.5,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: AppBrand.mascotGold,
+                        borderRadius: BorderRadius.horizontal(
+                          right: Radius.circular(2),
+                        ),
+                      ),
+                    ),
+                  ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 11, 10, 11),
+                  child: Row(
+                    children: [
+                      ServerGlyph(label: mark, size: 32),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14.5,
+                                height: 1.25,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              subtitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color:
+                                    dialable ? mute : theme.colorScheme.error,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      // The lamp, not a tick in a circle: green is the one hue
+                      // in the palette that means a thing is working, and this
+                      // is the only place on the servers tab that does.
+                      if (connected) ...[
+                        Container(
+                          width: 7,
+                          height: 7,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: dark ? AppBrand.mossLight : AppBrand.moss,
+                            boxShadow: [
+                              BoxShadow(
+                                color:
+                                    (dark ? AppBrand.mossLight : AppBrand.moss)
+                                        .withValues(alpha: 0.45),
+                                blurRadius: 8,
+                                spreadRadius: -2,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      _schemeTag(context, mute, gold),
+                      if (onDelete != null) ...[
+                        const SizedBox(width: 6),
+                        AppRingButton(
+                          icon: AppIcons.trash,
+                          color: mute,
+                          onPressed: onDelete,
+                          tooltip: l.freeDelete,
+                          size: 30,
+                          iconSize: 15,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ),
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (connected)
-              const Icon(AppIcons.checkCircleFill,
-                  color: AppBrand.success, size: 18),
-            if (onDelete != null)
-              SheetTintTrashButton(
-                tooltip: l.freeDelete,
-                onPressed: onDelete!,
-              ),
-          ],
+          );
+        },
+      ),
+    );
+  }
+
+  /// The protocol, in the terminal's voice over a wash of the house gold —
+  /// the same tag a node line wears. A parked scheme says so in plain ink
+  /// instead: it is not something you can act on here.
+  Widget _schemeTag(BuildContext context, Color mute, Color gold) {
+    final dial = dialable;
+    final ink = dial ? gold : mute;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: dial
+            ? AppBrand.mascotGold.withValues(
+                alpha: Theme.of(context).brightness == Brightness.dark
+                    ? 0.16
+                    : 0.13,
+              )
+            : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        scheme.toUpperCase(),
+        style: terminalText(
+          context,
+          size: 9.5,
+          color: ink,
+          weight: 700,
+          spacing: 1.4,
         ),
       ),
     );

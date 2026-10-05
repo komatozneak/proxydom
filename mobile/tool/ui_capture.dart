@@ -26,9 +26,11 @@ import 'package:proxydom/features/home/presentation/home_screen.dart';
 import 'package:proxydom/features/settings/presentation/settings_screen.dart';
 import 'package:proxydom/features/shell/presentation/main_shell.dart';
 import 'package:proxydom/features/vpn/data/subscription_label.dart';
+import 'package:proxydom/features/vpn/presentation/locations_screen.dart';
 import 'package:proxydom/features/vpn/presentation/server_instrument.dart';
 import 'package:proxydom/features/vpn/presentation/server_instrument_parts.dart';
 import 'package:proxydom/l10n/app_localizations.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Logical 360x780 at DPR 3 — the same framing as the owner's device captures.
 const Size _phone = Size(360, 780);
@@ -106,7 +108,8 @@ Widget _app(
       localizationsDelegates: AppL10n.localizationsDelegates,
       supportedLocales: AppL10n.supportedLocales,
       locale: const Locale('ru'),
-      home: Builder(builder: (context) => _frame(child, context, desktop: desktop)),
+      home: Builder(
+          builder: (context) => _frame(child, context, desktop: desktop)),
     ),
   );
 }
@@ -117,6 +120,7 @@ Future<void> _capture(
   Widget child, {
   required Brightness brightness,
   bool desktop = false,
+  int settlePumps = 4,
 }) async {
   final size = desktop ? _desktop : _phone;
   final dpr = desktop ? _desktopDpr : _phoneDpr;
@@ -156,7 +160,7 @@ Future<void> _capture(
       await precacheImage(AssetImage(asset), context);
     }
   });
-  for (var i = 0; i < 4; i++) {
+  for (var i = 0; i < settlePumps; i++) {
     await tester.pump(const Duration(milliseconds: 200));
   }
 
@@ -267,7 +271,11 @@ void main() {
               child: ProfileInstrument(
                 title: 'Теремок',
                 description: 'Значок справа ведёт в бота',
-                facts: ['2aq93K0', '15 ГБ из 100 ГБ', 'обновлено 04.10'],
+                facts: const [
+                  (text: '2aq93K0', accent: false),
+                  (text: '15 ГБ из 100 ГБ', accent: true),
+                  (text: 'обновлено 04.10', accent: false),
+                ],
                 selected: true,
                 selectedNodeTitle: 'Москва',
                 onSelect: _ignore,
@@ -282,7 +290,7 @@ void main() {
                     NodeLine(
                       label: node,
                       endpoint: node.subtitle,
-                      selected: node.title == 'РњРѕСЃРєРІР°',
+                      selected: node.title == 'Москва',
                       onTap: _ignore,
                     ),
                 ],
@@ -295,10 +303,72 @@ void main() {
       desktop: true,
     );
   });
+
+  // The Servers tab itself. It reads its profiles out of the store on boot, so
+  // it is seeded through the same key the app writes and then captured as the
+  // real screen: this tab was the last one still built on its own numbers, and
+  // a page is judged from pixels, not from a widget tree.
+  //
+  // Phone only. A window keeps its documents in a file under LOCALAPPDATA, so a
+  // seeded store does not reach it — and a harness has no business writing into
+  // the real app data of the machine it runs on. The window measure is covered
+  // by page_gutter_test, which measures the heading against the shared gutter.
+  testWidgets('servers light', (tester) async {
+    _seedSavedProfile();
+    await _capture(
+      tester,
+      'servers-light',
+      const LocationsScreen(),
+      brightness: Brightness.light,
+      settlePumps: 10,
+    );
+  });
+
+  testWidgets('servers dark', (tester) async {
+    _seedSavedProfile();
+    await _capture(
+      tester,
+      'servers-dark',
+      const LocationsScreen(),
+      brightness: Brightness.dark,
+      settlePumps: 10,
+    );
+  });
+}
+
+/// One saved profile, in the store's own key and the app's own shape.
+String _savedLine(String name) => 'hysteria2://pw@eu1.proxydom.su:443'
+    '?sni=eu1.proxydom.su&insecure=1#$name';
+
+void _seedSavedProfile() {
+  // This harness lives in tool/, not test/, so the analyzer reads the mock
+  // setter as a test-only member. Seeding the store is the whole reason the
+  // Servers tab can be photographed here at all.
+  // ignore: invalid_use_of_visible_for_testing_member
+  SharedPreferences.setMockInitialValues({
+    'hy2_import_v1': jsonEncode({
+      'catalogs': [
+        {
+          'id': 'teremok',
+          'title': 'Теремок',
+          'url': 'https://panel.proxydom.su/teremok',
+          'trafficMeta': 'upload=1; download=2; total=15000000000',
+          'lastUpdated': '2026-10-04T12:22:09Z',
+          'announce': 'Значок справа ведёт в бота',
+          'supportUrl': 'https://t.me/proxydom_bot',
+          'lines': [
+            _savedLine('YouTube · без рекламы'),
+            _savedLine('Индия · дешёвые подписки'),
+            _savedLine('Игровой · низкий пинг'),
+            _savedLine('США · нейросети'),
+          ],
+        },
+      ],
+      'selected': 0,
+    }),
+  });
 }
 
 void _ignore() {}
 
 void _ignoreIndex(int index) {}
-
-

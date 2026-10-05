@@ -264,27 +264,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   Future<void> _refreshServerCardBody() async {
     final selected = await Hy2ImportStore.instance.selected();
-      final trafficMeta = await Hy2ImportStore.instance.selectedTrafficMeta();
-      if (!mounted) return;
-      final ru = Localizations.localeOf(context).languageCode == 'ru';
-      setState(() {
-        _selectionIsAuto = false;
-        _autoPoolFlags = const [];
-        _trafficMeta = selected == null ? null : trafficMeta;
-        if (selected == null) {
-          _serverTitle = ru ? 'Нет ссылки' : 'No link';
-          _serverSubtitle = ru ? 'Вставьте ключ' : 'Paste a key';
-          _importedScheme = null;
-          _serverFlag = kFlagGlobe;
-        } else {
-          final label = labelForShareLink(selected);
-          _serverTitle = label.title;
-          _serverSubtitle =
-              label.subtitle.isEmpty ? selected.endpoint : label.subtitle;
-          _importedScheme = selected.scheme;
-          _serverFlag = label.flag.isEmpty ? kFlagGlobe : label.flag;
-        }
-      });
+    final trafficMeta = await Hy2ImportStore.instance.selectedTrafficMeta();
+    if (!mounted) return;
+    final ru = Localizations.localeOf(context).languageCode == 'ru';
+    setState(() {
+      _selectionIsAuto = false;
+      _autoPoolFlags = const [];
+      _trafficMeta = selected == null ? null : trafficMeta;
+      if (selected == null) {
+        _serverTitle = ru ? 'Нет ссылки' : 'No link';
+        _serverSubtitle = ru ? 'Вставьте ключ' : 'Paste a key';
+        _importedScheme = null;
+        _serverFlag = kFlagGlobe;
+      } else {
+        final label = labelForShareLink(selected);
+        _serverTitle = label.title;
+        _serverSubtitle =
+            label.subtitle.isEmpty ? selected.endpoint : label.subtitle;
+        _importedScheme = selected.scheme;
+        _serverFlag = label.flag.isEmpty ? kFlagGlobe : label.flag;
+      }
+    });
   }
 
   Future<void> _onNestTap() async {
@@ -412,9 +412,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   ? l.regionAutoTitle
                   : _serverTitle,
               serverSubtitle: _serverSubtitle.isEmpty
-                  ? (_selectionIsAuto
-                        ? l.regionAutoSubtitle
-                        : l.homeStatServer)
+                  ? (_selectionIsAuto ? l.regionAutoSubtitle : l.homeStatServer)
                   : _serverSubtitle,
               trafficMeta: _trafficMeta,
               serverFlag: _serverFlag,
@@ -617,55 +615,6 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
   }
 }
 
-Future<void> _refreshHomeDocuments(BuildContext context) async {
-  UiLog.action('home', 'refresh', level: ProductLogLevel.info);
-  final l = AppL10n.of(context);
-  try {
-    final catalogs = await Hy2ImportStore.instance.catalogs();
-    final remote = [
-      for (final catalog in catalogs)
-        if (catalog.url != null && catalog.url!.isNotEmpty) catalog,
-    ];
-    var failed = 0;
-    for (final catalog in remote) {
-      try {
-        await Hy2ImportStore.instance.refreshCatalog(catalog.id);
-      } on Exception {
-        failed++;
-      }
-    }
-    final links = await Hy2ImportStore.instance.load();
-    if (!context.mounted) return;
-    if (remote.isNotEmpty && failed == remote.length) {
-      UiLog.action(
-        'home',
-        'refresh',
-        level: ProductLogLevel.warn,
-        result: 'fail',
-      );
-      showProxyDomSnackBar(context, l.freeRefreshFail);
-      return;
-    }
-    UiLog.action(
-      'home',
-      'refresh',
-      level: ProductLogLevel.info,
-      result: 'ok',
-      extra: {'links': links.length, 'failed': failed},
-    );
-    showProxyDomSnackBar(context, l.freeRefreshDone(links.length));
-  } catch (_) {
-    if (!context.mounted) return;
-    UiLog.action(
-      'home',
-      'refresh',
-      level: ProductLogLevel.warn,
-      result: 'fail',
-    );
-    showProxyDomSnackBar(context, l.freeRefreshFail);
-  }
-}
-
 class _FreeClientHome extends StatelessWidget {
   const _FreeClientHome({
     required this.nestSize,
@@ -718,9 +667,8 @@ class _FreeClientHome extends StatelessWidget {
       TrafficRemainderBand.none => null,
     };
     final current = status;
-    final uptime = current is VpnConnected
-        ? _formatUptime(current.connectedSince)
-        : null;
+    final uptime =
+        current is VpnConnected ? _formatUptime(current.connectedSince) : null;
     final profile = empty ? l.freeNoProfile : serverTitle;
     final statusText = switch (status) {
       VpnConnecting() => l.homeConnecting,
@@ -751,8 +699,8 @@ class _FreeClientHome extends StatelessWidget {
         homeVpnPermissionHintForPlatform(l),
       VpnError(:final code) when code == kVpnPathIncompatibleErrorCode =>
         l.homePathIncompatibleHint,
-      VpnError(:final code) when code == 'share_ios_hy2_only' ||
-              code == 'share_unsupported' =>
+      VpnError(:final code)
+          when code == 'share_ios_hy2_only' || code == 'share_unsupported' =>
         l.freeSchemeParked,
       VpnError(:final code) when code == 'device_limit' =>
         l.freeSubscriptionDeviceLimit,
@@ -797,7 +745,7 @@ class _FreeClientHome extends StatelessWidget {
       trafficUsed: parsedTraffic == null || parsedTraffic.unlimited
           ? 0
           : (parsedTraffic.upload + parsedTraffic.download) /
-                parsedTraffic.total,
+              parsedTraffic.total,
       trafficCap: parsedTraffic == null || parsedTraffic.unlimited
           ? 0
           : parsedTraffic.total.toDouble(),
@@ -819,9 +767,8 @@ class _FreeClientHome extends StatelessWidget {
               // drawn around the button and only while the button burns.
               Positioned.fill(
                 child: HouseOrbit(
-                  burning: charged
-                      ? 1.0
-                      : (status is VpnConnecting ? 0.45 : 0.0),
+                  burning:
+                      charged ? 1.0 : (status is VpnConnecting ? 0.45 : 0.0),
                 ),
               ),
               // The familiar pulse: it answers the finger whether or not
@@ -908,7 +855,7 @@ class _FreeClientHome extends StatelessWidget {
           UiLog.action('home', 'scan');
           openFreeClientCapture(context);
         },
-        onRefresh: () => _refreshHomeDocuments(context),
+        onRefresh: () => refreshRemoteDocuments(context, scope: 'home'),
       ),
     ];
 
@@ -1006,103 +953,102 @@ class _NoVpnHomeRow extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(AppBrand.radiusPill),
           child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 48),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            // Same two Expanded halves + 8dp gap as FreeClientActionBar.
-            child: Row(
-              children: [
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        // Ghost icon+gap so the label sits on the «Вставить» line.
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const SizedBox(width: 18),
-                            const SizedBox(width: 8),
-                            Flexible(
-                              child: Text(
-                                label,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  fontSize: 15.5,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 0.1,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: AppIcon(
-                            AppIcons.chevronLeft,
-                            size: 18,
-                            color: mute,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  width: 8,
-                  child: Center(
-                    child: Container(
-                      width: 1.5,
-                      height: 22,
-                      color: line,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        if (showAppsPin)
-                          // Ghost icon+gap so the count sits on the «QR» text line.
+            constraints: const BoxConstraints(minHeight: 48),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              // Same two Expanded halves + 8dp gap as FreeClientActionBar.
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          // Ghost icon+gap so the label sits on the «Вставить» line.
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               const SizedBox(width: 18),
                               const SizedBox(width: 8),
-                              Text(
-                                '$enabled / $total',
-                                style: theme.textTheme.labelLarge?.copyWith(
-                                  color: ink,
-                                  fontWeight: FontWeight.w700,
+                              Flexible(
+                                child: Text(
+                                  label,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontSize: 15.5,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.1,
+                                  ),
                                 ),
                               ),
                             ],
                           ),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: AppIcon(
-                            AppIcons.chevronRight,
-                            size: 18,
-                            color: mute,
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: AppIcon(
+                              AppIcons.chevronLeft,
+                              size: 18,
+                              color: mute,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                  SizedBox(
+                    width: 8,
+                    child: Center(
+                      child: Container(
+                        width: 1.5,
+                        height: 22,
+                        color: line,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          if (showAppsPin)
+                            // Ghost icon+gap so the count sits on the «QR» text line.
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const SizedBox(width: 18),
+                                const SizedBox(width: 8),
+                                Text(
+                                  '$enabled / $total',
+                                  style: theme.textTheme.labelLarge?.copyWith(
+                                    color: ink,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: AppIcon(
+                              AppIcons.chevronRight,
+                              size: 18,
+                              color: mute,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
         ),
       ),
     );
   }
 }
-

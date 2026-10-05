@@ -70,6 +70,14 @@ double _domButtonBottom(double inset) {
   return inset - _domAboveBar;
 }
 
+/// Below this the window is not small, it is minimized.
+///
+/// Windows hands a minimized window a 160x28 client rect (SM_CXMINIMIZED by
+/// SM_CYMINIMIZED) and keeps layout running at that size, even though not one
+/// pixel of it can be seen. The frame is fixed at 940x640, so no window that is
+/// actually on screen can come anywhere near this number.
+const double _minRealShell = 480;
+
 /// Authenticated shell — branch indices MUST match [AppRouter] StatefulShellRoute:
 /// 0=Locations, 1=Home(VPN), 2=Settings.
 class MainShell extends ConsumerStatefulWidget {
@@ -137,6 +145,7 @@ class _MainShellState extends ConsumerState<MainShell> {
       // the same lockup in the caption is what makes the window read as one
       // object instead of a frame with a sidebar that happens to say a name.
       final rail = WindowsNavRail(selected: selected, onSelect: _onTap);
+      final shell = widget.navigationShell;
       page = Column(
         children: [
           WindowCaptionBar(
@@ -148,12 +157,25 @@ class _MainShellState extends ConsumerState<MainShell> {
                 : 'Proxy',
             ink: dark ? AppBrand.inkDark : AppBrand.inkLight,
           ),
-          Expanded(child: Row(children: [rail, Expanded(child: page)])),
+          Expanded(child: Row(children: [rail, Expanded(child: shell)])),
         ],
       );
       return _yard(
         context,
-        child: Scaffold(backgroundColor: Colors.transparent, body: page),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            // Nothing to draw on a minimized window, and laying the shell out
+            // at 160x28 is not harmless: the caption alone is taller than 28,
+            // so every minimize reported a RenderFlex overflow of 12 pixels on
+            // the bottom, and any wide row could overflow to the right on the
+            // same pass. Skip the layout rather than paper over each overflow.
+            if (constraints.maxWidth < _minRealShell ||
+                constraints.maxHeight < _minRealShell) {
+              return const SizedBox.shrink();
+            }
+            return Scaffold(backgroundColor: Colors.transparent, body: page);
+          },
+        ),
       );
     }
 

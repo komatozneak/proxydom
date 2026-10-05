@@ -11,11 +11,13 @@
 // inherited from by classes that wish to specialize with custom
 // rendering and input handling
 // The window draws its own caption: Flutter paints the lockup and the three
-// window buttons, so the system frame is off. Everything the frame used to do
-// — dragging, snap layouts, resizing, the system menu — is still done by the OS,
-// not reimplemented: WM_NCCALCSIZE hands the whole window to the client area,
-// and WM_NCHITTEST answers HTCAPTION over the band the way it would have
-// answered over the real caption.
+// window buttons, so the system frame is off. Everything the frame still has to
+// do — dragging, snap layouts, the system menu — is done by the OS, not
+// reimplemented: WM_NCCALCSIZE hands the whole window to the client area, and
+// WM_NCHITTEST answers HTCAPTION over the band the way it would have answered
+// over the real caption. Resizing is deliberately not among them: the frame is
+// fixed, because a draggable edge answers HTRIGHT over the scrollbar that every
+// desktop scroll view keeps flush against the window edge.
 constexpr UINT kSetCaptionHitTestRectMsg = WM_APP + 1;
 
 class Win32Window {

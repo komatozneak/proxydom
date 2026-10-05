@@ -25,6 +25,21 @@ constexpr const wchar_t kWindowClassName[] = L"FLUTTER_RUNNER_WIN32_WINDOW";
 constexpr int kMinWindowWidth = 940;
 constexpr int kMinWindowHeight = 640;
 
+// The window frame is fixed: there is no resize grab band. It used to be the
+// system frame (SM_CXSIZEFRAME + SM_CXPADDEDBORDER, about 16 physical px at
+// 100% DPI), but WM_NCCALCSIZE below gives the entire window to the client
+// area, so that band was drawn *inside* the Flutter view — which is exactly
+// where the desktop scrollbar lives: MaterialScrollBehavior attaches a
+// scrollbar flush to the trailing edge of every scroll view on Windows. The
+// whole 15 px thumb fell inside HTRIGHT, so pressing the log scrollbar resized
+// the window instead of scrolling. Fixed by owner decision (2026-10-04), so
+// the band is gone entirely and the window edge belongs to the app.
+//
+// WS_THICKFRAME stays on the window style on purpose: it is what DWM uses to
+// draw the drop shadow and what keeps the snap layouts and Aero peek working.
+// Only the hit test changed — the frame is drawn and owned by Flutter, so the
+// OS is never offered a chance to resize it by hand.
+
 /// Registry key for app theme preference.
 ///
 /// A value of 0 indicates apps should use dark mode. A non-zero or missing
@@ -141,14 +156,16 @@ bool Win32Window::Create(const std::wstring& title,
   UINT dpi = FlutterDesktopGetDpiForMonitor(monitor);
   double scale_factor = dpi / 96.0;
 
-  // The window has to be resizable and maximizable: a fixed-size frame is the
-  // loudest non-desktop signal there is, and the desktop layout is designed to
-  // use extra width instead of stretching a phone column.
+  // Maximizable, but not resizable by hand: the frame is fixed at the size
+  // main.cpp asks for and only the layout below, maximize, and moving it change
+  // that. A draggable edge would otherwise sit on top of the desktop scrollbar,
+  // which lives flush against the trailing edge of every scroll view.
   //
-  // No system caption: Flutter draws it. WS_THICKFRAME stays so the window keeps
-  // a resize border and the Aero snap layout, and WM_NCCALCSIZE below gives the
-  // whole window to the client area — without that the invisible system frame
-  // would still steal the top 30px the lockup is drawn into.
+  // No system caption: Flutter draws it. WS_THICKFRAME stays on the style for
+  // the drop shadow and the Aero snap layouts even though the hit test refuses
+  // every edge, and WM_NCCALCSIZE below gives the whole window to the client
+  // area — without that the invisible system frame would still steal the top
+  // 30px the lockup is drawn into.
   constexpr DWORD kFixedWindowStyle =
       WS_POPUP | WS_THICKFRAME | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
   HWND window = CreateWindow(
@@ -217,30 +234,13 @@ Win32Window::MessageHandler(HWND hwnd,
       POINT point{GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
       ScreenToClient(hwnd, &point);
 
-      RECT client{};
-      GetClientRect(hwnd, &client);
-
-      // GetSystemMetrics is the physical border width, so this holds at any DPI
-      // without the caller having to scale anything.
-      const int border = GetSystemMetrics(SM_CXSIZEFRAME) +
-                         GetSystemMetrics(SM_CXPADDEDBORDER);
-      const bool left = point.x < border;
-      const bool right = point.x >= (client.right - border);
-      const bool top = point.y < border;
-      const bool bottom = point.y >= (client.bottom - border);
-
-      // The resize frame, over the whole window — not just beside the caption.
-      // Order matters: corners win over edges, so the diagonal cursors appear
-      // exactly at the corners.
-      if (top && left) return HTTOPLEFT;
-      if (top && right) return HTTOPRIGHT;
-      if (bottom && left) return HTBOTTOMLEFT;
-      if (bottom && right) return HTBOTTOMRIGHT;
-      if (left) return HTLEFT;
-      if (right) return HTRIGHT;
-      if (top) return HTTOP;
-      if (bottom) return HTBOTTOM;
-
+      // No resize band on purpose, see kMinWindowWidth above: every edge,
+      // corners included, answers HTCLIENT so the engine gets the press. That
+      // is what lets the scrollbar — which sits flush against the trailing
+      // edge of every scroll view on desktop — be grabbed instead of turning
+      // into a window drag. The frame is fixed at the size Create() opened it
+      // and is only ever changed by the layout below, by maximize, or by
+      // moving it.
       if (point.y < caption_height_) {
         // The buttons are ours to click, so they must not start a drag.
         if (PtInRect(&caption_buttons_, point)) {
