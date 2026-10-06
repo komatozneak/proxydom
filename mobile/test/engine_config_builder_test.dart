@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:proxydom/features/vpn/data/vpn_session_inputs.dart';
-import 'package:proxydom/features/vpn/data/xray_config_builder.dart';
+import 'package:proxydom/features/vpn/data/engine_config_builder.dart';
 
 void main() {
   const testCreds = VlessRealityCreds(
@@ -83,11 +83,11 @@ void main() {
 
   Map<String, dynamic> buildAndParse(VpnSessionInputs inputs) {
     final json =
-        XrayConfigBuilder.buildCandidateConfigs(inputs).first.configJson;
+        EngineConfigBuilder.buildCandidateConfigs(inputs).first.configJson;
     return jsonDecode(json) as Map<String, dynamic>;
   }
 
-  group('XrayConfigBuilder (modeless, Ogon-style)', () {
+  group('EngineConfigBuilder (modeless, Ogon-style)', () {
     test('produces valid JSON with required top-level keys', () {
       final config = buildAndParse(makeInputs());
       expect((config['log'] as Map)['loglevel'], 'warning');
@@ -152,9 +152,7 @@ void main() {
         isNot(contains('geoip:private')),
       );
       final catchAllIdx = rules.lastIndexWhere(
-        (r) =>
-            (r as Map)['network'] == 'tcp' &&
-            r['outboundTag'] == 'proxy',
+        (r) => (r as Map)['network'] == 'tcp' && r['outboundTag'] == 'proxy',
       );
       final resolverIdx = rules.indexOf(resolverRule);
       expect(catchAllIdx, greaterThanOrEqualTo(0));
@@ -265,7 +263,8 @@ void main() {
       expect(ads['outboundTag'], 'ads-reject');
     });
 
-    test('gVisor default: tun-in + SOCKS + no FakeDNS + IPIfNonMatch + final proxy',
+    test(
+        'gVisor default: tun-in + SOCKS + no FakeDNS + IPIfNonMatch + final proxy',
         () {
       final config = buildAndParse(makeInputs());
       expect(config.containsKey('fakedns'), isFalse);
@@ -283,7 +282,8 @@ void main() {
       expect(quicOb['protocol'], 'freedom');
       expect((quicOb['settings'] as Map)['redirect'], '127.0.0.1:9');
       expect(
-        (config['inbounds'] as List).any((i) => (i as Map)['protocol'] == 'tun'),
+        (config['inbounds'] as List)
+            .any((i) => (i as Map)['protocol'] == 'tun'),
         isTrue,
       );
       final socks = (config['inbounds'] as List).firstWhere(
@@ -299,8 +299,7 @@ void main() {
       // Nest YT contract: residual UDP blocked; final TCP → proxy.
       expect(
         rules.any(
-          (r) =>
-              (r as Map)['network'] == 'udp' && r['outboundTag'] == 'block',
+          (r) => (r as Map)['network'] == 'udp' && r['outboundTag'] == 'block',
         ),
         isTrue,
       );
@@ -357,7 +356,8 @@ void main() {
       final inbounds = config['inbounds'] as List;
       expect(inbounds, hasLength(2));
       expect(inbounds.any((i) => (i as Map)['protocol'] == 'tun'), isTrue);
-      final socks = inbounds.firstWhere((i) => (i as Map)['protocol'] == 'socks') as Map;
+      final socks =
+          inbounds.firstWhere((i) => (i as Map)['protocol'] == 'socks') as Map;
       expect(socks['listen'], '127.0.0.1');
       expect(socks['port'], 10808);
       expect(socks['tag'], 'socks-in');
@@ -378,7 +378,7 @@ void main() {
 
     test('build rejects combined candidates', () {
       expect(
-        () => XrayConfigBuilder.build(makeInputs()),
+        () => EngineConfigBuilder.build(makeInputs()),
         throwsArgumentError,
       );
     });
@@ -402,7 +402,7 @@ void main() {
     });
 
     test('runtime configs preserve backend order and isolate candidates', () {
-      final runtime = XrayConfigBuilder.buildCandidateConfigs(makeInputs());
+      final runtime = EngineConfigBuilder.buildCandidateConfigs(makeInputs());
 
       expect(runtime.map((item) => item.id), ['node1', 'node2']);
       expect(runtime.map((item) => item.host), ['1.2.3.4', '5.6.7.8']);
@@ -506,13 +506,15 @@ void main() {
       expect(ytIdx, lessThan(ruIdx));
     });
 
-    test('RU bundle ON: geosite-ru + geoip:ru direct, YT force-proxy first', () {
+    test('RU bundle ON: geosite-ru + geoip:ru direct, YT force-proxy first',
+        () {
       final config = buildAndParse(makeInputs(includeBundledRu: true));
       final rules = (config['routing'] as Map)['rules'] as List;
       expect(
         rules.any(
           (r) =>
-              ((r as Map)['domain'] as List?)?.contains('geosite:category-ru') ??
+              ((r as Map)['domain'] as List?)
+                  ?.contains('geosite:category-ru') ??
               false,
         ),
         isTrue,
@@ -535,7 +537,8 @@ void main() {
       expect(
         rules.any(
           (r) =>
-              ((r as Map)['domain'] as List?)?.contains('geosite:category-ru') ??
+              ((r as Map)['domain'] as List?)
+                  ?.contains('geosite:category-ru') ??
               false,
         ),
         isFalse,
@@ -679,7 +682,7 @@ void main() {
         tun: testTun,
       );
 
-      final runtime = XrayConfigBuilder.buildCandidateConfigs(inputs);
+      final runtime = EngineConfigBuilder.buildCandidateConfigs(inputs);
       expect(runtime, hasLength(2));
       for (final c in runtime) {
         final config = jsonDecode(c.configJson) as Map<String, dynamic>;
@@ -739,7 +742,7 @@ void main() {
     });
 
     test('each candidate keeps its own port, credentials, and transport', () {
-      final runtime = XrayConfigBuilder.buildCandidateConfigs(makeInputs());
+      final runtime = EngineConfigBuilder.buildCandidateConfigs(makeInputs());
       final config = jsonDecode(runtime[1].configJson) as Map<String, dynamic>;
       final vless = (config['outbounds'] as List)
           .where((outbound) => (outbound as Map)['protocol'] == 'vless')
@@ -778,7 +781,7 @@ void main() {
         path: '/teremok/xhttp',
         mode: 'stream-one',
       );
-      final runtime = XrayConfigBuilder.buildCandidateConfigs(
+      final runtime = EngineConfigBuilder.buildCandidateConfigs(
         const VpnSessionInputs(
           hops: [
             EgressHop(
@@ -792,15 +795,15 @@ void main() {
           tun: testTun,
         ),
       );
-      final config = jsonDecode(runtime.single.configJson) as Map<String, dynamic>;
+      final config =
+          jsonDecode(runtime.single.configJson) as Map<String, dynamic>;
       final vless = (config['outbounds'] as List)
           .where((outbound) => (outbound as Map)['protocol'] == 'vless')
           .cast<Map>()
           .single;
-      final user =
-          ((((vless['settings'] as Map)['vnext'] as List).single as Map)['users']
-                  as List)
-              .single as Map;
+      final user = ((((vless['settings'] as Map)['vnext'] as List).single
+              as Map)['users'] as List)
+          .single as Map;
       final stream = vless['streamSettings'] as Map;
       final xhttp = stream['xhttpSettings'] as Map;
 
@@ -826,7 +829,7 @@ void main() {
         spiderX: '/',
         path: '/teremok/xhttp',
       );
-      final runtime = XrayConfigBuilder.buildCandidateConfigs(
+      final runtime = EngineConfigBuilder.buildCandidateConfigs(
         const VpnSessionInputs(
           hops: [
             EgressHop(
@@ -840,7 +843,8 @@ void main() {
           tun: testTun,
         ),
       );
-      final config = jsonDecode(runtime.single.configJson) as Map<String, dynamic>;
+      final config =
+          jsonDecode(runtime.single.configJson) as Map<String, dynamic>;
       final vless = (config['outbounds'] as List)
           .where((outbound) => (outbound as Map)['protocol'] == 'vless')
           .cast<Map>()

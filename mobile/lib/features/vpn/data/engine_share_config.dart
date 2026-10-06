@@ -2,12 +2,17 @@ import 'dart:convert';
 
 import 'share_link_parser.dart';
 
-/// Local SOCKS port for an in-process Xray core (MPL-2.0). Not Hy2's :10808.
-const xraySocksPort = 10809;
+/// Local SOCKS port for the in-process VLESS core. Not Hy2's :10808.
+const shareSocksPort = 10809;
 
-/// JSON for `hy2bind.StartShare`. Returns null for Hysteria2 or a link we
-/// cannot describe. Callers must not log the result: it contains secrets.
-String? buildXraySocksConfig(ParsedShareLink link) {
+/// JSON for `hy2bind.StartShare`. The Go loader turns this document into
+/// v2ray-core protobuf. It is not the full v2ray JSON schema: that loader
+/// also compiles WireGuard. Returns null for Hysteria2 or a link we cannot
+/// describe. Callers must not log the result: it contains secrets.
+///
+/// `network` stays the share-link short name (`ws`, `kcp`). The loader maps
+/// those onto the names v2ray-core registers (`websocket`, `mkcp`).
+String? buildShareSocksConfig(ParsedShareLink link) {
   if (link.isHysteria2) return null;
   final outbound = _outbound(link);
   if (outbound == null) return null;
@@ -17,7 +22,7 @@ String? buildXraySocksConfig(ParsedShareLink link) {
     'inbounds': [
       {
         'listen': '127.0.0.1',
-        'port': xraySocksPort,
+        'port': shareSocksPort,
         'protocol': 'socks',
         'settings': {'udp': true, 'auth': 'noauth'},
         'tag': 'socks-in',
@@ -88,7 +93,8 @@ Map<String, Object?>? _vless(ParsedShareLink link) {
         },
       ],
     },
-    'streamSettings': _stream(q, network: network, security: security, sni: sni),
+    'streamSettings':
+        _stream(q, network: network, security: security, sni: sni),
   };
 }
 
@@ -113,7 +119,8 @@ Map<String, Object?>? _trojan(ParsedShareLink link) {
         },
       ],
     },
-    'streamSettings': _stream(q, network: network, security: security, sni: sni),
+    'streamSettings':
+        _stream(q, network: network, security: security, sni: sni),
   };
 }
 
@@ -227,10 +234,16 @@ Map<String, Object?> _stream(
   };
   if (security == 'tls') {
     final allowInsecure = q['allowInsecure'] == '1' || q['insecure'] == '1';
+    final alpn = (q['alpn'] ?? '')
+        .split(',')
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList();
     stream['tlsSettings'] = {
       'serverName': sni,
       if ((q['fp'] ?? '').isNotEmpty) 'fingerprint': q['fp'],
       if (allowInsecure) 'allowInsecure': true,
+      if (alpn.isNotEmpty) 'alpn': alpn,
     };
   } else if (security == 'reality') {
     stream['realitySettings'] = {
@@ -259,7 +272,8 @@ String? _b64(String payload) {
   final normalized = payload.replaceAll('-', '+').replaceAll('_', '/');
   final pad = normalized.length % 4 == 0
       ? normalized
-      : normalized.padRight(normalized.length + (4 - normalized.length % 4), '=');
+      : normalized.padRight(
+          normalized.length + (4 - normalized.length % 4), '=');
   try {
     return utf8.decode(base64Decode(pad));
   } on FormatException {

@@ -323,7 +323,7 @@ class ProxyDomVpnService : VpnService() {
         fun readSingBoxStderrTail(context: android.content.Context, maxLines: Int): String {
             val ring = DiagnosticRing.tail(maxLines)
             val core = CoreLog.readTail(context, maxLines)
-            val file = java.io.File(context.filesDir, "xray/stderr.log")
+            val file = java.io.File(context.filesDir, "vless/stderr.log")
             val fileTail = if (!file.exists()) {
                 ""
             } else {
@@ -1062,7 +1062,7 @@ class ProxyDomVpnService : VpnService() {
                 startHysteriaOnWorker(username, protocol, params, alive)
                 return
             }
-            if (isXrayShareCore(params)) {
+            if (isVlessShareCore(params)) {
                 startShareOnWorker(username, params)
                 return
             }
@@ -1081,8 +1081,8 @@ class ProxyDomVpnService : VpnService() {
             return !((params["hysteriaServer"] as? String).isNullOrBlank()) &&
                 !((params["hysteriaAuth"] as? String).isNullOrBlank())
         }
-        if (isXrayShareCore(params)) {
-            return !((params["xrayConfig"] as? String).isNullOrBlank())
+        if (isVlessShareCore(params)) {
+            return !((params["vlessConfig"] as? String).isNullOrBlank())
         }
         return false
     }
@@ -1093,10 +1093,10 @@ class ProxyDomVpnService : VpnService() {
     ) {
         val configJson = CoreLog.enrich(
             this,
-            (params["xrayConfig"] as? String)?.trim().orEmpty(),
+            (params["vlessConfig"] as? String)?.trim().orEmpty(),
         )
         if (configJson.isEmpty()) {
-            failStart("xray config missing")
+            failStart("vless config missing")
             return
         }
         val sessionName = (params["sessionName"] as? String)
@@ -1142,17 +1142,17 @@ class ProxyDomVpnService : VpnService() {
         val hy = HysteriaBridge.instance
         hy.bind(this)
         if (!hy.startShare(configJson)) {
-            failStart(hy.lastErrorMessage ?: "Xray start failed")
+            failStart(hy.lastErrorMessage ?: "VLESS start failed")
             return
         }
         val tunFd = try {
             ParcelFileDescriptor.dup(activeTun.fileDescriptor).detachFd()
         } catch (t: Throwable) {
-            failStart("Xray tun fd dup failed")
+            failStart("VLESS tun fd dup failed")
             return
         }
         if (!hy.startShareTun(tunFd = tunFd, mtu = mtu)) {
-            failStart(hy.lastErrorMessage ?: "Xray tun pump failed")
+            failStart(hy.lastErrorMessage ?: "VLESS tun pump failed")
             return
         }
         val kcp = configJson.contains("\"network\":\"kcp\"") ||
@@ -1165,7 +1165,7 @@ class ProxyDomVpnService : VpnService() {
         if (probe !is VpnPingMonitor.SocksHttpsResult.Ok) {
             val reason = (probe as? VpnPingMonitor.SocksHttpsResult.Fail)?.reason
                 ?: "unknown"
-            failStart("Xray SOCKS probe failed: $reason")
+            failStart("VLESS SOCKS probe failed: $reason")
             return
         }
         val protectErr = Hy2bind.lastProtectError()?.trim().orEmpty()
@@ -1179,7 +1179,7 @@ class ProxyDomVpnService : VpnService() {
         if (exitIp.isNullOrBlank() || exitIp == carrierIp) {
             val reach = tcpReach(serverHost, serverPort)
             failStart(
-                "Xray egress empty exit=$exitIp carrier=$carrierIp " +
+                "VLESS egress empty exit=$exitIp carrier=$carrierIp " +
                     "reason=${exit.reason} server=$serverHost:$serverPort tcp=$reach",
             )
             return
@@ -1196,7 +1196,7 @@ class ProxyDomVpnService : VpnService() {
         acquireVpnLocks()
         startPathHealthWatch()
         startTrafficMonitor()
-        NativeLog.event("info", "vpn.core.established", "core=xray")
+        NativeLog.event("info", "vpn.core.established", "core=vless")
     }
 
     private fun startHysteriaOnWorker(

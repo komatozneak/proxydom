@@ -4,17 +4,21 @@ import 'vpn_route_policy.dart';
 import 'vpn_session_inputs.dart';
 
 /// Tag used as the traffic selector.
-const kXrayProxyTag = 'proxy';
+const kEngineProxyTag = 'proxy';
 
 /// Regions that identify YouTube-optimized catalog nodes (no-AdSense exits).
 /// Used by UI / catalog filters — not by a dual-outbound Xray balancer.
 /// `al` — Albania (legacy); `uz` — Uzbekistan (primary target, Issue #83).
-const kXrayYoutubeRegions = <String>['al', 'uz'];
+const kEngineYoutubeRegions = <String>['al', 'uz'];
 
 /// Local SOCKS inbound for probes / diagnostics (not the app traffic path).
-const kXraySocksPort = 10808;
+const kEngineSocksPort = 10808;
 
-/// Pure Xray-core JSON constructor for libXray on Android.
+/// Candidate JSON kept for the parked VLESS document tests.
+///
+/// The connect path does not load this file. `buildShareSocksConfig` is the
+/// document `loadShareConfig` turns into v2ray-core protobuf. This builder
+/// still describes Reality fields; Reality is not dialed.
 ///
 /// Packet path: default gVisor `protocol:tun` + setTunFd (Огонь 0.84 SoT).
 /// Hev → SOCKS when [RoutePolicy.useHevTunBridge] is true (DedProxy A/B).
@@ -42,21 +46,21 @@ const kXraySocksPort = 10808;
 /// 13. final TCP → proxy
 ///
 /// Dual-core (ADR 006): TrustTunnel is a separate native core selected by
-/// catalog `protocol=trusttunnel` — this builder only produces Xray JSON.
-class XrayConfigBuilder {
-  XrayConfigBuilder._();
+/// catalog `protocol=trusttunnel` — this builder only produces the candidate JSON.
+class EngineConfigBuilder {
+  EngineConfigBuilder._();
 
   /// Build one isolated runtime config per backend-ordered candidate.
   ///
   /// Each config owns the canonical SOCKS inbound on 127.0.0.1:10808 and has
-  /// exactly one VLESS outbound tagged `proxy`, so Android can stop Xray and
+  /// exactly one VLESS outbound tagged `proxy`, so Android can stop the core and
   /// try the next complete candidate sequentially.
-  static List<XrayRuntimeCandidateConfig> buildCandidateConfigs(
+  static List<EngineRuntimeCandidateConfig> buildCandidateConfigs(
     VpnSessionInputs inputs,
   ) {
     return [
       for (final hop in inputs.hops)
-        XrayRuntimeCandidateConfig(
+        EngineRuntimeCandidateConfig(
           id: hop.id,
           host: hop.host,
           label: hop.label ?? hop.host,
@@ -71,14 +75,14 @@ class XrayConfigBuilder {
     ];
   }
 
-  /// Build complete Xray JSON config string from typed inputs.
+  /// Build the candidate JSON string from typed inputs.
   static String build(VpnSessionInputs inputs) {
     final hops = inputs.hops;
     if (hops.length != 1) {
       throw ArgumentError.value(
         hops.length,
         'inputs.hops.length',
-        'build requires exactly one isolated Xray candidate',
+        'build requires exactly one isolated candidate',
       );
     }
     final route = inputs.route;
@@ -89,7 +93,8 @@ class XrayConfigBuilder {
     final useHev = route.useHevTunBridge;
     final tunMtu = inputs.tun.mtu;
 
-    final vlessOutbound = _vlessOutbound(hop: hops.single, tag: kXrayProxyTag);
+    final vlessOutbound =
+        _vlessOutbound(hop: hops.single, tag: kEngineProxyTag);
 
     final directCidrs = inputs.directCidrs().toList();
     final adsDomains = (!useOgonAdsAll && route.includeAdsBlock)
@@ -108,10 +113,8 @@ class XrayConfigBuilder {
     };
     final customDirect = _normalizeSuffixes(
       route.directDomainSuffixes.where((s) {
-        final bare = s
-            .trim()
-            .toLowerCase()
-            .replaceFirst(RegExp(r'^domain:'), '');
+        final bare =
+            s.trim().toLowerCase().replaceFirst(RegExp(r'^domain:'), '');
         return bare.isNotEmpty && !forceProxyBare.contains(bare);
       }),
     );
@@ -142,7 +145,7 @@ class XrayConfigBuilder {
     ];
 
     Map<String, dynamic> viaProxy(Map<String, dynamic> fields) {
-      return {'type': 'field', ...fields, 'outboundTag': kXrayProxyTag};
+      return {'type': 'field', ...fields, 'outboundTag': kEngineProxyTag};
     }
 
     final ytGoogleForceProxy = viaProxy({
@@ -238,7 +241,7 @@ class XrayConfigBuilder {
       'network': 'udp',
       'port': '53',
       'ip': ['8.8.8.8', '8.8.4.4'],
-      'outboundTag': kXrayProxyTag,
+      'outboundTag': kEngineProxyTag,
     });
     rules.add({
       'type': 'field',
@@ -261,12 +264,12 @@ class XrayConfigBuilder {
     final dnsServers = <dynamic>[
       {
         'address': '1.1.1.1',
-        'outboundTag': kXrayProxyTag,
+        'outboundTag': kEngineProxyTag,
         'domains': googleDnsDomains,
       },
       {
         'address': '8.8.8.8',
-        'outboundTag': kXrayProxyTag,
+        'outboundTag': kEngineProxyTag,
         'domains': googleDnsDomains,
       },
       {
@@ -308,7 +311,7 @@ class XrayConfigBuilder {
       // Probe/diagnostics when gVisor; device path via hev when enabled.
       {
         'listen': '127.0.0.1',
-        'port': kXraySocksPort,
+        'port': kEngineSocksPort,
         'protocol': 'socks',
         'settings': {
           'auth': 'noauth',
@@ -357,9 +360,7 @@ class XrayConfigBuilder {
                 'id': creds.uuid,
                 'encryption': 'none',
                 // Vision flow is incompatible with XHTTP.
-                if (!isXhttp &&
-                    creds.flow != null &&
-                    creds.flow!.isNotEmpty)
+                if (!isXhttp && creds.flow != null && creds.flow!.isNotEmpty)
                   'flow': creds.flow,
               },
             ],
@@ -374,9 +375,8 @@ class XrayConfigBuilder {
         'security': creds.security,
         if (isXhttp)
           'xhttpSettings': {
-            'path': (creds.path == null || creds.path!.isEmpty)
-                ? '/'
-                : creds.path,
+            'path':
+                (creds.path == null || creds.path!.isEmpty) ? '/' : creds.path,
             'mode': (creds.mode == null || creds.mode!.isEmpty)
                 ? 'stream-up'
                 : creds.mode,
@@ -412,9 +412,9 @@ class XrayConfigBuilder {
   }
 }
 
-/// Native failover item. Metadata stays outside Xray JSON for precise errors.
-final class XrayRuntimeCandidateConfig {
-  const XrayRuntimeCandidateConfig({
+/// Native failover item. Metadata stays outside the candidate JSON.
+final class EngineRuntimeCandidateConfig {
+  const EngineRuntimeCandidateConfig({
     required this.id,
     required this.host,
     required this.label,

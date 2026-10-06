@@ -149,7 +149,7 @@ class TunParams {
   }
 }
 
-/// All inputs for [XrayConfigBuilder.build] — one hop per Xray candidate.
+/// All inputs for `EngineConfigBuilder.build` — one hop per candidate.
 class VpnSessionInputs {
   const VpnSessionInputs({
     required this.hops,
