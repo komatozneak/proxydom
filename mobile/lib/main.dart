@@ -8,6 +8,7 @@ import 'package:rive/rive.dart';
 
 import 'app.dart';
 import 'core/config.dart';
+import 'core/legal/third_party_notices.dart';
 import 'core/diagnostics/app_log_buffer.dart';
 import 'core/diagnostics/diagnostics_service.dart';
 import 'core/diagnostics/tunnel_log_prefs.dart';
@@ -65,6 +66,7 @@ void main() async {
   }
 
   await AppRouter.warmWelcomeFlag();
+  registerThirdPartyNotices();
 
   AppLogBuffer.instance.debug(
     'app.boot runApp ms=${boot.elapsedMilliseconds}',

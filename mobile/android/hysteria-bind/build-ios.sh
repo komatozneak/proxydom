@@ -23,6 +23,10 @@ fi
 go get "github.com/apernet/hysteria/core/v2@${HYSTERIA_TAG}"
 go get -tool golang.org/x/mobile/cmd/gobind
 go mod tidy
+# tidy can pull a module the committed go.mod did not have. ADR 036: do not
+# bind an xcframework until the guard has read that graph. A known violation
+# warns and the test still passes; copyleft without an entry stops the build.
+go test -count=1 -run 'TestLicenseGuard$' .
 gomobile init >/dev/null 2>&1 || true
 
 # ios + simulator fat xcframework. Do not commit the binary.

@@ -412,6 +412,8 @@
   "@settingsDarkTheme": {},
   "settingsAppearance": "Appearance",
   "@settingsAppearance": {},
+  "settingsLicensesHint": "Licenses of the engine and the libraries it links",
+  "@settingsLicensesHint": {},
   "settingsThemeSystem": "Auto",
   "@settingsThemeSystem": {},
   "settingsThemeDark": "Dark",

@@ -413,6 +413,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
             subtitle: _themeModeLabel(l, themeMode),
             onTap: _pickThemeMode,
           ),
+          _SettingsRow(
+            icon: AppIcons.info,
+            title: l.homeAbout,
+            subtitle: l.settingsLicensesHint,
+            onTap: () {
+              UiLog.action('settings', 'licenses');
+              showLicensePage(
+                context: context,
+                applicationName: l.appTitle,
+                applicationVersion:
+                    _versionLabel.isEmpty ? null : _versionLabel,
+              );
+            },
+          ),
         ],
       ),
     ];

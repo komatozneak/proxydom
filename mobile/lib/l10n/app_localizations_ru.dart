@@ -644,6 +644,10 @@ class AppL10nRu extends AppL10n {
   String get settingsAppearance => 'Оформление';
 
   @override
+  String get settingsLicensesHint =>
+      'Лицензии движка и библиотек, с которыми он собран';
+
+  @override
   String get settingsThemeSystem => 'Авто';
 
   @override

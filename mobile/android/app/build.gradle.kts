@@ -157,8 +157,9 @@ androidComponents {
 }
 
 dependencies {
-    // Official Hy2 AAR (`hysteria-bind/build-aar.sh`). VLESS Reality runs
-    // inside this binary via xtls/xray-core. Do not also link libs/libXray.aar.
+    // Official Hy2 AAR (`hysteria-bind/build-aar.sh`). Do not add
+    // libs/libXray.aar: it embeds sagernet/sing (GPL-3.0) and was removed
+    // (ADR 036).
     val hy2Aar = file("libs/hysteria-client.aar")
     if (hy2Aar.exists()) {
         implementation(files(hy2Aar))

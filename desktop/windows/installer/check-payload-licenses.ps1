@@ -31,8 +31,10 @@ $Allowed = @{
     "share_plus_plugin.dll"                     = "share_plus, BSD-3-Clause"
     "url_launcher_windows_plugin.dll"           = "url_launcher_windows, BSD-3-Clause"
     "dartjni.dll"                               = "jni, BSD-3-Clause"
-    # Not on the ADR 036 permissive list and not copyleft: WireGuard LLC lets
-    # it be redistributed unmodified next to software that only calls wintun.h.
+    # Sole non-OSI license in the payload. Owner decision 2026-10-06: keep it.
+    # WireGuard LLC Prebuilt Binaries License — redistribution of the unmodified
+    # DLL is allowed beside software that only calls wintun.h. Not copyleft, and
+    # it does not require publishing source. See ADR 036.
     "wintun.dll"                                = "Wintun Prebuilt Binaries License (WireGuard LLC)"
 }
 

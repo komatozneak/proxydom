@@ -642,6 +642,10 @@ class AppL10nEn extends AppL10n {
   String get settingsAppearance => 'Appearance';
 
   @override
+  String get settingsLicensesHint =>
+      'Licenses of the engine and the libraries it links';
+
+  @override
   String get settingsThemeSystem => 'Auto';
 
   @override

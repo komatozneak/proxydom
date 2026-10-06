@@ -276,6 +276,7 @@
   "settingsPrivacyPlaceholder": "Политика конфиденциальности",
   "settingsDarkTheme": "Оформление",
   "settingsAppearance": "Оформление",
+  "settingsLicensesHint": "Лицензии движка и библиотек, с которыми он собран",
   "settingsThemeSystem": "Авто",
   "settingsThemeDark": "Тёмное",
   "settingsThemeLight": "Светлое",

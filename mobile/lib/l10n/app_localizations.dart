@@ -1255,6 +1255,12 @@ abstract class AppL10n {
   /// **'Appearance'**
   String get settingsAppearance;
 
+  /// No description provided for @settingsLicensesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Licenses of the engine and the libraries it links'**
+  String get settingsLicensesHint;
+
   /// No description provided for @settingsThemeSystem.
   ///
   /// In en, this message translates to:
