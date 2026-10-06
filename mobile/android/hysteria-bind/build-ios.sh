@@ -2,11 +2,13 @@
 # Build Hy2bind.xcframework for iOS Packet Tunnel (ADR 019).
 # Run on macOS with Go + Xcode + gomobile. Pin matches Android build-aar.sh.
 #
-#   HYSTERIA_TAG=v2.6.2 bash build-ios.sh
+#   HYSTERIA_TAG=v2.13.0 bash build-ios.sh
 #
+# v2.13.0 matches build-aar.sh: older hysteria does not compile against the
+# quic-go module v2ray-core v5.54.2 selects.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
-HYSTERIA_TAG="${HYSTERIA_TAG:-v2.6.2}"
+HYSTERIA_TAG="${HYSTERIA_TAG:-v2.13.0}"
 OUT_DIR="${OUT_DIR:-$ROOT/../../ios/Frameworks}"
 mkdir -p "$OUT_DIR"
 

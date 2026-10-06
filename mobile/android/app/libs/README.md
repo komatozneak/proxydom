@@ -10,7 +10,7 @@ this folder is not committed. The AARs already tracked (`hysteria-client.aar`,
 `trusttunnel-client-android.aar`) stay tracked. `trusttunnel-client-android.aar`
 is not on the Gradle classpath.
 
-`hysteria-client.aar` still carries `github.com/sagernet/sing` through
-`xtls/xray-core` until `docs/ops/engine-migration/03-mobile-engine-swap.md`
-lands. The license guard in `mobile/android/hysteria-bind/license_guard_test.go`
-reports it as a known violation.
+`hysteria-client.aar` links `apernet/hysteria` and `v2fly/v2ray-core` (MIT).
+`xtls/xray-core` is not in the module graph. The license guard in
+`mobile/android/hysteria-bind/license_guard_test.go` has an empty
+`knownViolations` map: a copyleft module in this archive fails the build.
