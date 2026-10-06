@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	clog "github.com/xtls/xray-core/common/log"
+	clog "github.com/v2fly/v2ray-core/v5/common/log"
 )
 
 func TestKeepCoreRecordDropsPacketNoise(t *testing.T) {
@@ -35,6 +35,7 @@ func TestKeepCoreRecordDecisions(t *testing.T) {
 		"app/dns: UDP:1.1.1.1:53 querying DNS for: youtube.com.",
 		"app/dns: UDP:1.1.1.1:53 got answer: youtube.com. TypeA -> [203.0.113.8], rtt: 134ms",
 		"transport/internet/tcp: listening TCP on 127.0.0.1:10809",
+		"V2Ray 5.54.2 (V2Fly, a community-driven edition of V2Ray.)",
 		"failed to process outbound traffic > proxy/hysteria: connection ends > write: broken pipe",
 	}
 	for _, line := range keep {
@@ -82,8 +83,8 @@ func TestCoreLogRotatesWindow(t *testing.T) {
 	coreLevel = "info"
 	coreMu.Unlock()
 
-	appendCoreLine("info", "core.xray first")
-	appendCoreLine("info", "core.xray second line that pushes the window over the cap")
+	appendCoreLine("info", "core.vless first")
+	appendCoreLine("info", "core.vless second line that pushes the window over the cap")
 	prev, err := os.ReadFile(filepath.Join(dir, "core.1.log"))
 	if err != nil {
 		t.Fatal(err)

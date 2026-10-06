@@ -1,40 +1,39 @@
 package hy2bind
 
 import (
-	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	stdnet "net"
 	"strings"
 
-	"github.com/xtls/xray-core/app/dispatcher"
-	xraylog "github.com/xtls/xray-core/app/log"
-	"github.com/xtls/xray-core/app/proxyman"
-	"github.com/xtls/xray-core/app/router"
-	clog "github.com/xtls/xray-core/common/log"
-	"github.com/xtls/xray-core/common/net"
-	"github.com/xtls/xray-core/common/protocol"
-	"github.com/xtls/xray-core/common/serial"
-	xcore "github.com/xtls/xray-core/core"
-	"github.com/xtls/xray-core/proxy/freedom"
-	"github.com/xtls/xray-core/proxy/shadowsocks"
-	"github.com/xtls/xray-core/proxy/socks"
-	"github.com/xtls/xray-core/proxy/trojan"
-	vless "github.com/xtls/xray-core/proxy/vless"
-	vlessout "github.com/xtls/xray-core/proxy/vless/outbound"
-	vmess "github.com/xtls/xray-core/proxy/vmess"
-	vmessout "github.com/xtls/xray-core/proxy/vmess/outbound"
-	"github.com/xtls/xray-core/transport/internet"
-	"github.com/xtls/xray-core/transport/internet/kcp"
-	"github.com/xtls/xray-core/transport/internet/reality"
-	"github.com/xtls/xray-core/transport/internet/tls"
-	"github.com/xtls/xray-core/transport/internet/websocket"
-	"google.golang.org/protobuf/proto"
+	v2core "github.com/v2fly/v2ray-core/v5"
+	"github.com/v2fly/v2ray-core/v5/app/dispatcher"
+	v2log "github.com/v2fly/v2ray-core/v5/app/log"
+	"github.com/v2fly/v2ray-core/v5/app/proxyman"
+	"github.com/v2fly/v2ray-core/v5/app/router"
+	routercommon "github.com/v2fly/v2ray-core/v5/app/router/routercommon"
+	clog "github.com/v2fly/v2ray-core/v5/common/log"
+	"github.com/v2fly/v2ray-core/v5/common/net"
+	"github.com/v2fly/v2ray-core/v5/common/protocol"
+	"github.com/v2fly/v2ray-core/v5/common/serial"
+	"github.com/v2fly/v2ray-core/v5/proxy/freedom"
+	"github.com/v2fly/v2ray-core/v5/proxy/shadowsocks"
+	"github.com/v2fly/v2ray-core/v5/proxy/socks"
+	"github.com/v2fly/v2ray-core/v5/proxy/trojan"
+	vless "github.com/v2fly/v2ray-core/v5/proxy/vless"
+	vlessout "github.com/v2fly/v2ray-core/v5/proxy/vless/outbound"
+	vmess "github.com/v2fly/v2ray-core/v5/proxy/vmess"
+	vmessout "github.com/v2fly/v2ray-core/v5/proxy/vmess/outbound"
+	"github.com/v2fly/v2ray-core/v5/transport/internet"
+	"github.com/v2fly/v2ray-core/v5/transport/internet/kcp"
+	"github.com/v2fly/v2ray-core/v5/transport/internet/tls"
+	utls "github.com/v2fly/v2ray-core/v5/transport/internet/tls/utls"
+	"github.com/v2fly/v2ray-core/v5/transport/internet/websocket"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
-// shareDocument is the JSON emitted by buildXraySocksConfig. It is not the
-// full Xray JSON schema: that loader pulls WireGuard into this binary.
+// shareDocument is the JSON emitted by buildShareSocksConfig. It is not the
+// full v2ray JSON schema: that loader pulls WireGuard into this binary.
 type shareDocument struct {
 	Inbounds []struct {
 		Listen   string `json:"listen"`
@@ -82,9 +81,10 @@ type shareStream struct {
 	Network  string `json:"network"`
 	Security string `json:"security"`
 	TLS      *struct {
-		ServerName  string `json:"serverName"`
-		Fingerprint string `json:"fingerprint"`
-		Allow       bool   `json:"allowInsecure"`
+		ServerName  string   `json:"serverName"`
+		Fingerprint string   `json:"fingerprint"`
+		Allow       bool     `json:"allowInsecure"`
+		ALPN        []string `json:"alpn"`
 	} `json:"tlsSettings"`
 	Reality *struct {
 		ServerName  string `json:"serverName"`
@@ -101,19 +101,19 @@ type shareStream struct {
 	} `json:"kcpSettings"`
 }
 
-func loadShareConfig(configJSON string) (*xcore.Config, error) {
+func loadShareConfig(configJSON string) (*v2core.Config, error) {
 	var doc shareDocument
 	if err := json.Unmarshal([]byte(configJSON), &doc); err != nil {
 		return nil, err
 	}
 	if len(doc.Inbounds) == 0 || len(doc.Outbounds) == 0 {
-		return nil, fmt.Errorf("xray config missing inbound or outbound")
+		return nil, fmt.Errorf("share config missing inbound or outbound")
 	}
 	inbound, err := shareInbound(doc.Inbounds[0])
 	if err != nil {
 		return nil, err
 	}
-	var outbounds []*xcore.OutboundHandlerConfig
+	var outbounds []*v2core.OutboundHandlerConfig
 	for _, item := range doc.Outbounds {
 		outbound, err := shareOutboundHandler(item)
 		if err != nil {
@@ -125,21 +125,20 @@ func loadShareConfig(configJSON string) (*xcore.Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &xcore.Config{
-		App: []*serial.TypedMessage{
-			// None: Xray's own logger would write every Info line. Our handler
+	return &v2core.Config{
+		App: []*anypb.Any{
+			// None: the core logger would write every Info line. Our handler
 			// keeps the decision lines after New() replaces the process logger.
-			serial.ToTypedMessage(&xraylog.Config{
-				ErrorLogType:  xraylog.LogType_None,
-				ErrorLogLevel: clog.Severity_Info,
-				AccessLogType: xraylog.LogType_None,
+			serial.ToTypedMessage(&v2log.Config{
+				Error:  &v2log.LogSpecification{Type: v2log.LogType_None, Level: clog.Severity_Info},
+				Access: &v2log.LogSpecification{Type: v2log.LogType_None},
 			}),
 			serial.ToTypedMessage(&dispatcher.Config{}),
 			serial.ToTypedMessage(&proxyman.InboundConfig{}),
 			serial.ToTypedMessage(&proxyman.OutboundConfig{}),
 			serial.ToTypedMessage(&router.Config{Rule: rules}),
 		},
-		Inbound:  []*xcore.InboundHandlerConfig{inbound},
+		Inbound:  []*v2core.InboundHandlerConfig{inbound},
 		Outbound: outbounds,
 	}, nil
 }
@@ -152,7 +151,7 @@ func shareInbound(in struct {
 	Settings struct {
 		UDP bool `json:"udp"`
 	} `json:"settings"`
-}) (*xcore.InboundHandlerConfig, error) {
+}) (*v2core.InboundHandlerConfig, error) {
 	if in.Protocol != "socks" {
 		return nil, fmt.Errorf("unsupported inbound %q", in.Protocol)
 	}
@@ -161,11 +160,11 @@ func shareInbound(in struct {
 		listen = "127.0.0.1"
 	}
 	port := uint32(in.Port)
-	return &xcore.InboundHandlerConfig{
+	return &v2core.InboundHandlerConfig{
 		Tag: in.Tag,
 		ReceiverSettings: serial.ToTypedMessage(&proxyman.ReceiverConfig{
-			PortList: &net.PortList{Range: []*net.PortRange{{From: port, To: port}}},
-			Listen:   net.NewIPOrDomain(net.ParseAddress(listen)),
+			PortRange: &net.PortRange{From: port, To: port},
+			Listen:    net.NewIPOrDomain(net.ParseAddress(listen)),
 		}),
 		ProxySettings: serial.ToTypedMessage(&socks.ServerConfig{
 			AuthType:   socks.AuthType_NO_AUTH,
@@ -174,12 +173,12 @@ func shareInbound(in struct {
 	}, nil
 }
 
-func shareOutboundHandler(item shareOutbound) (*xcore.OutboundHandlerConfig, error) {
+func shareOutboundHandler(item shareOutbound) (*v2core.OutboundHandlerConfig, error) {
 	proxySettings, err := shareProxy(item)
 	if err != nil {
 		return nil, err
 	}
-	var sender *serial.TypedMessage
+	var sender *anypb.Any
 	if item.Stream != nil && item.Protocol != "freedom" {
 		stream, err := shareStreamConfig(item.Stream)
 		if err != nil {
@@ -187,27 +186,23 @@ func shareOutboundHandler(item shareOutbound) (*xcore.OutboundHandlerConfig, err
 		}
 		sender = serial.ToTypedMessage(&proxyman.SenderConfig{StreamSettings: stream})
 	}
-	return &xcore.OutboundHandlerConfig{
+	return &v2core.OutboundHandlerConfig{
 		Tag:            item.Tag,
 		SenderSettings: sender,
 		ProxySettings:  proxySettings,
 	}, nil
 }
 
-func shareProxy(item shareOutbound) (*serial.TypedMessage, error) {
+func shareProxy(item shareOutbound) (*anypb.Any, error) {
 	switch item.Protocol {
 	case "freedom":
 		return serial.ToTypedMessage(&freedom.Config{}), nil
 	case "vless":
-		return serial.ToTypedMessage(&vlessout.Config{Vnext: []*protocol.ServerEndpoint{mustEndpoint(item, func(user shareUser) proto.Message {
-			return &vless.Account{Id: user.ID, Encryption: orNone(user.Encryption), Flow: user.Flow}
-		})}}), nil
+		return serial.ToTypedMessage(&vlessout.Config{Vnext: []*protocol.ServerEndpoint{vlessEndpoint(item)}}), nil
 	case "vmess":
 		return serial.ToTypedMessage(vmessOutbound(item)), nil
 	case "trojan":
-		return serial.ToTypedMessage(&trojan.ClientConfig{Server: []*protocol.ServerEndpoint{mustEndpoint(item, func(user shareUser) proto.Message {
-			return &trojan.Account{Password: user.Password}
-		})}}), nil
+		return serial.ToTypedMessage(&trojan.ClientConfig{Server: []*protocol.ServerEndpoint{trojanEndpoint(item)}}), nil
 	case "shadowsocks":
 		if len(item.Settings.Servers) == 0 {
 			return nil, fmt.Errorf("shadowsocks server missing")
@@ -240,35 +235,41 @@ type shareUser struct {
 	Password   string
 }
 
-func mustEndpoint(item shareOutbound, account func(shareUser) proto.Message) *protocol.ServerEndpoint {
-	if len(item.Settings.Vnext) > 0 {
-		next := item.Settings.Vnext[0]
-		user := shareUser{}
-		if len(next.Users) > 0 {
-			user = shareUser{
-				ID:         next.Users[0].ID,
-				Encryption: next.Users[0].Encryption,
-				Flow:       next.Users[0].Flow,
-				Security:   next.Users[0].Security,
-			}
-		}
-		return &protocol.ServerEndpoint{
-			Address: net.NewIPOrDomain(net.ParseAddress(next.Address)),
-			Port:    uint32(next.Port),
-			User:    []*protocol.User{{Account: serial.ToTypedMessage(account(user))}},
+func vlessEndpoint(item shareOutbound) *protocol.ServerEndpoint {
+	next := item.Settings.Vnext[0]
+	user := shareUser{}
+	if len(next.Users) > 0 {
+		user = shareUser{
+			ID:         next.Users[0].ID,
+			Encryption: next.Users[0].Encryption,
+			Flow:       next.Users[0].Flow,
 		}
 	}
+	return &protocol.ServerEndpoint{
+		Address: net.NewIPOrDomain(net.ParseAddress(next.Address)),
+		Port:    uint32(next.Port),
+		User: []*protocol.User{{
+			Account: serial.ToTypedMessage(&vless.Account{
+				Id:         user.ID,
+				Encryption: orNone(user.Encryption),
+				Flow:       user.Flow,
+			}),
+		}},
+	}
+}
+
+func trojanEndpoint(item shareOutbound) *protocol.ServerEndpoint {
 	server := item.Settings.Servers[0]
 	return &protocol.ServerEndpoint{
 		Address: net.NewIPOrDomain(net.ParseAddress(server.Address)),
 		Port:    uint32(server.Port),
 		User: []*protocol.User{{
-			Account: serial.ToTypedMessage(account(shareUser{Password: server.Password})),
+			Account: serial.ToTypedMessage(&trojan.Account{Password: server.Password}),
 		}},
 	}
 }
 
-func vmessOutbound(item shareOutbound) proto.Message {
+func vmessOutbound(item shareOutbound) *vmessout.Config {
 	next := item.Settings.Vnext[0]
 	user := next.Users[0]
 	return &vmessout.Config{Receiver: []*protocol.ServerEndpoint{{
@@ -283,13 +284,26 @@ func vmessOutbound(item shareOutbound) proto.Message {
 	}}}
 }
 
-func shareStreamConfig(stream *shareStream) (*internet.StreamConfig, error) {
-	network := stream.Network
-	if network == "" {
-		network = "tcp"
+// engineTransport maps a share-link network name onto the name v2ray-core
+// registers. websocket/config.go sets protocolName = "websocket"; "ws" is
+// only the JSON short name and is not a dialer.
+func engineTransport(network string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(network)) {
+	case "", "tcp":
+		return "tcp", nil
+	case "ws", "websocket":
+		return "websocket", nil
+	case "kcp", "mkcp":
+		return "mkcp", nil
+	default:
+		return "", fmt.Errorf("unsupported transport %q", network)
 	}
-	if network == "kcp" {
-		network = "mkcp"
+}
+
+func shareStreamConfig(stream *shareStream) (*internet.StreamConfig, error) {
+	network, err := engineTransport(stream.Network)
+	if err != nil {
+		return nil, err
 	}
 	cfg := &internet.StreamConfig{ProtocolName: network}
 	if network == "mkcp" {
@@ -303,9 +317,9 @@ func shareStreamConfig(stream *shareStream) (*internet.StreamConfig, error) {
 		}}
 	}
 	if stream.WS != nil {
-		headers := stream.WS.Headers
-		if headers == nil {
-			headers = map[string]string{}
+		var headers []*websocket.Header
+		for key, value := range stream.WS.Headers {
+			headers = append(headers, &websocket.Header{Key: key, Value: value})
 		}
 		ws := serial.ToTypedMessage(&websocket.Config{Path: stream.WS.Path, Header: headers})
 		cfg.TransportSettings = []*internet.TransportConfig{{
@@ -319,32 +333,26 @@ func shareStreamConfig(stream *shareStream) (*internet.StreamConfig, error) {
 		tlsCfg := &tls.Config{}
 		if stream.TLS != nil {
 			tlsCfg.ServerName = stream.TLS.ServerName
-			tlsCfg.Fingerprint = stream.TLS.Fingerprint
 			tlsCfg.AllowInsecure = stream.TLS.Allow
+			if len(stream.TLS.ALPN) > 0 {
+				tlsCfg.NextProtocol = append([]string(nil), stream.TLS.ALPN...)
+			}
 		}
-		msg := serial.ToTypedMessage(tlsCfg)
-		cfg.SecurityType = msg.Type
-		cfg.SecuritySettings = []*serial.TypedMessage{msg}
+		var msg *anypb.Any
+		if stream.TLS != nil && stream.TLS.Fingerprint != "" {
+			msg = serial.ToTypedMessage(&utls.Config{
+				TlsConfig: tlsCfg,
+				Imitate:   stream.TLS.Fingerprint,
+			})
+		} else {
+			msg = serial.ToTypedMessage(tlsCfg)
+		}
+		// V2Type is the proto name without the types.v2fly.org/ prefix.
+		// StreamConfig compares that name to SecurityType before unmarshalling.
+		cfg.SecurityType = serial.V2Type(msg)
+		cfg.SecuritySettings = []*anypb.Any{msg}
 	case "reality":
-		if stream.Reality == nil {
-			return nil, fmt.Errorf("reality settings missing")
-		}
-		pub, err := decodeKey(stream.Reality.PublicKey)
-		if err != nil {
-			return nil, fmt.Errorf("reality public key: %w", err)
-		}
-		sid, err := decodeShortID(stream.Reality.ShortID)
-		if err != nil {
-			return nil, err
-		}
-		msg := serial.ToTypedMessage(&reality.Config{
-			ServerName:  stream.Reality.ServerName,
-			PublicKey:   pub,
-			ShortId:     sid,
-			Fingerprint: stream.Reality.Fingerprint,
-		})
-		cfg.SecurityType = msg.Type
-		cfg.SecuritySettings = []*serial.TypedMessage{msg}
+		return nil, fmt.Errorf("unsupported security %q", stream.Security)
 	default:
 		return nil, fmt.Errorf("unsupported security %q", stream.Security)
 	}
@@ -357,7 +365,7 @@ func shareRules(rules []struct {
 }) ([]*router.RoutingRule, error) {
 	var out []*router.RoutingRule
 	for _, rule := range rules {
-		var cidrs []*router.CIDR
+		var cidrs []*routercommon.CIDR
 		for _, raw := range rule.IP {
 			cidr, err := parseCIDR(raw)
 			if err != nil {
@@ -367,38 +375,19 @@ func shareRules(rules []struct {
 		}
 		out = append(out, &router.RoutingRule{
 			TargetTag: &router.RoutingRule_Tag{Tag: rule.OutboundTag},
-			Geoip:     []*router.GeoIP{{Cidr: cidrs}},
+			Geoip:     []*routercommon.GeoIP{{Cidr: cidrs}},
 		})
 	}
 	return out, nil
 }
 
-func parseCIDR(raw string) (*router.CIDR, error) {
+func parseCIDR(raw string) (*routercommon.CIDR, error) {
 	_, network, err := stdnet.ParseCIDR(raw)
 	if err != nil {
 		return nil, err
 	}
 	ones, _ := network.Mask.Size()
-	return &router.CIDR{Ip: network.IP, Prefix: uint32(ones)}, nil
-}
-
-func decodeKey(raw string) ([]byte, error) {
-	raw = strings.TrimSpace(raw)
-	if decoded, err := base64.RawURLEncoding.DecodeString(raw); err == nil {
-		return decoded, nil
-	}
-	return base64.URLEncoding.DecodeString(raw)
-}
-
-func decodeShortID(raw string) ([]byte, error) {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return nil, nil
-	}
-	if decoded, err := hex.DecodeString(raw); err == nil {
-		return decoded, nil
-	}
-	return []byte(raw), nil
+	return &routercommon.CIDR{Ip: network.IP, Prefix: uint32(ones)}, nil
 }
 
 func ssCipher(method string) (shadowsocks.CipherType, error) {
@@ -409,8 +398,6 @@ func ssCipher(method string) (shadowsocks.CipherType, error) {
 		return shadowsocks.CipherType_AES_256_GCM, nil
 	case "chacha20-ietf-poly1305", "chacha20-poly1305":
 		return shadowsocks.CipherType_CHACHA20_POLY1305, nil
-	case "xchacha20-ietf-poly1305", "xchacha20-poly1305":
-		return shadowsocks.CipherType_XCHACHA20_POLY1305, nil
 	case "none":
 		return shadowsocks.CipherType_NONE, nil
 	default:

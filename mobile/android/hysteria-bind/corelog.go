@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	clog "github.com/xtls/xray-core/common/log"
-	xcore "github.com/xtls/xray-core/core"
+	v2core "github.com/v2fly/v2ray-core/v5"
+	clog "github.com/v2fly/v2ray-core/v5/common/log"
 )
 
 // Two windows, about 8 MiB together. A minute of SOCKS packet lines is
@@ -60,15 +60,15 @@ func coreLevelSnapshot() string {
 	return coreLevel
 }
 
-// bindCoreLogHandler replaces Xray's log.Instance. That instance is the only
-// process-wide handler and would either write every Info line or none.
+// bindCoreLogHandler replaces the core log handler. That handler is the only
+// process-wide one and would either write every Info line or none.
 func bindCoreLogHandler() {
 	clog.RegisterHandler(coreLogHandler{})
 }
 
 func noteShareCore() {
-	appendCoreLine("info", "core.xray dns=system socks="+shareSocks)
-	appendCoreLine("info", "core.xray started version="+xcore.Version())
+	appendCoreLine("info", "core.vless dns=system socks="+shareSocks)
+	appendCoreLine("info", "core.vless started version="+v2core.Version())
 }
 
 type coreLogHandler struct{}
@@ -112,7 +112,7 @@ func coreTag(text string) string {
 		strings.Contains(lower, "will use dns") {
 		return "core.dns"
 	}
-	return "core.xray"
+	return "core.vless"
 }
 
 func redactCoreSecrets(text string) string {
@@ -170,7 +170,7 @@ func isCoreDecision(text string) bool {
 	case strings.Contains(text, "got answer"):
 	case strings.Contains(text, "listening TCP"):
 	case strings.Contains(text, "Logger started"):
-	case strings.Contains(text, "Xray "):
+	case strings.Contains(text, "V2Ray "):
 	default:
 		return false
 	}

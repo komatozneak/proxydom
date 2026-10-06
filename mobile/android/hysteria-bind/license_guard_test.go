@@ -14,9 +14,7 @@ import (
 // task; while it is present the check warns instead of failing so that CI stays
 // green during the migration. Re-adding a module after its entry was deleted
 // fails the build — that is the point.
-var knownViolations = map[string]string{
-	"github.com/sagernet/sing": "removed by docs/ops/engine-migration/03-mobile-engine-swap.md",
-}
+var knownViolations = map[string]string{}
 
 // reviewedLicense is a license a person has read because the markers could not
 // classify it (no license file at the module root, or unusual wording).

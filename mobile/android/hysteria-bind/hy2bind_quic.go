@@ -75,17 +75,18 @@ func createTunStack(ep stack.LinkEndpoint) (*stack.Stack, error) {
 // tun2socks dials. DialUDP's error only closes the accepted socket, so the
 // first QUIC packet is eaten and Cronet waits out a PTO (about 300–800ms).
 func installUDPForwarder(s *stack.Stack) {
-	fwd := udp.NewForwarder(s, func(r *udp.ForwarderRequest) {
+	fwd := udp.NewForwarder(s, func(r *udp.ForwarderRequest) bool {
 		var wq waiter.Queue
 		ep, err := r.CreateEndpoint(&wq)
 		if err != nil {
-			return
+			return false
 		}
 		id := r.ID()
 		tunnel.T().HandleUDP(&stackUDP{
 			UDPConn: gonet.NewUDPConn(&wq, ep),
 			id:      id,
 		})
+		return true
 	})
 	s.SetTransportProtocolHandler(udp.ProtocolNumber, func(id stack.TransportEndpointID, pkt *stack.PacketBuffer) bool {
 		if id.LocalPort == 443 {
@@ -101,7 +102,7 @@ type stackUDP struct {
 	id stack.TransportEndpointID
 }
 
-func (c *stackUDP) ID() *stack.TransportEndpointID { return &c.id }
+func (c *stackUDP) ID() stack.TransportEndpointID { return c.id }
 
 var quicRejectLogAt atomic.Int64
 

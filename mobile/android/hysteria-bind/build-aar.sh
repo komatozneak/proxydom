@@ -8,10 +8,13 @@
 #   gomobile init
 #
 # Usage (from this directory):
-#   HYSTERIA_TAG=v2.6.2 bash build-aar.sh
+#   HYSTERIA_TAG=v2.13.0 bash build-aar.sh
+#
+# v2.13.0 is the hysteria release that compiles against the quic-go module
+# version selected by v2ray-core v5.54.2. An older pin fails the build.
 set -euo pipefail
 
-HYSTERIA_TAG="${HYSTERIA_TAG:-v2.6.2}"
+HYSTERIA_TAG="${HYSTERIA_TAG:-v2.13.0}"
 OUT_DIR="$(cd "$(dirname "$0")/../app/libs" && pwd)"
 OUT_AAR="$OUT_DIR/hysteria-client.aar"
 
@@ -21,8 +24,9 @@ go get "github.com/apernet/hysteria/core/v2@${HYSTERIA_TAG}"
 go get -tool golang.org/x/mobile/cmd/gobind
 go mod tidy
 gomobile bind -v -target=android -androidapi=26 -o "$OUT_AAR" .
-# libXray already owns go.Seq + libgojni.so. Relocate this AAR or AGP fails
-# checkDebugDuplicateClasses.
+# Relocate go.Seq and libgojni.so. A second gomobile archive on the classpath
+# (the removed libXray.aar) collided on those names, and AGP still rejects
+# the stock names via checkDebugDuplicateClasses.
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 if command -v python3 >/dev/null 2>&1; then
   python3 "$SCRIPT_DIR/namespace_aar.py" "$OUT_AAR"
