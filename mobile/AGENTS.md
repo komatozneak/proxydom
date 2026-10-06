@@ -14,7 +14,7 @@ Name rule: `.cursor/rules/05-product-names.mdc`.
 
 ## Dial set
 
-**Hysteria2 only** — `hy2://` and `hysteria2://`, including `obfs=salamander` and port hop — on Android, iOS, and Windows. VLESS and VLESS Reality dial is **parked** on every platform (ADR 033): the parser still reads `vless://`, the dial gate does not admit it. Trojan, Shadowsocks, and VMess are out of the product. Engines: hy2bind is the one that runs. `libXray.aar` was removed because it embeds `sagernet/sing` (GPL-3.0, ADR 036); do not fetch it back. `libbox` is sing-box and must not be vendored. hev stays dormant — do not call it from the active connect path. Policy: `docs/product-policy.md`. Authority: `docs/decisions/033-client-hy2-only-dial-set.md`.
+**Hysteria2 only** — `hy2://` and `hysteria2://`, including `obfs=salamander` and port hop — on Android, iOS, and Windows. VLESS and VLESS Reality dial is **parked** on every platform (ADR 033): the parser still reads `vless://`, the dial gate does not admit it. Trojan, Shadowsocks, and VMess are out of the product. The running engine is hy2bind. The parked VLESS path inside that same binary is `v2fly/v2ray-core` (MIT), not `xray-core`; Reality is not part of that engine. `libXray.aar` was removed because it embeds `sagernet/sing` (GPL-3.0, ADR 036); do not fetch it back. `libbox` is sing-box and must not be vendored. hev stays dormant — do not call it from the active connect path. Policy: `docs/product-policy.md`. Authority: `docs/decisions/033-client-hy2-only-dial-set.md`.
 
 ## Brand / palette
 
