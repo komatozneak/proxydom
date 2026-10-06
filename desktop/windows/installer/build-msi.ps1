@@ -63,8 +63,14 @@ function Ensure-WixExtension([string]$Name) {
 
 function Ensure-ThirdParty {
     New-Item -ItemType Directory -Force -Path $ThirdParty | Out-Null
+    # sing-box.exe is GPL-3.0, and the broker still launches it. Deleting it
+    # belongs to task 05, in the same change as its replacement; doing it here
+    # breaks Connect. The payload check warns while the entry exists
+    # (KnownPayloadViolations in check-payload-licenses.ps1).
     $sing = Join-Path $ThirdParty "sing-box.exe"
     $wintun = Join-Path $ThirdParty "wintun.dll"
+    # The prebuilt-binaries license travels with the DLL it covers.
+    $wintunLicense = Join-Path $ThirdParty "wintun-LICENSE.txt"
     if (-not (Test-Path $sing)) {
         $zip = Join-Path $ThirdParty "sing-box.zip"
         $url = "https://github.com/SagerNet/sing-box/releases/download/v1.14.2/sing-box-1.14.2-windows-amd64.zip"
@@ -76,7 +82,7 @@ function Ensure-ThirdParty {
         if (-not $found) { throw "sing-box.exe was not in the release zip." }
         Copy-Item $found.FullName $sing -Force
     }
-    if (-not (Test-Path $wintun)) {
+    if (-not (Test-Path $wintun) -or -not (Test-Path $wintunLicense)) {
         $zip = Join-Path $ThirdParty "wintun.zip"
         Invoke-WebRequest -Uri "https://www.wintun.net/builds/wintun-0.14.1.zip" -OutFile $zip
         $unpack = Join-Path $ThirdParty "wintun-unpack"
@@ -85,6 +91,9 @@ function Ensure-ThirdParty {
         $found = Get-ChildItem $unpack -Recurse -Filter "wintun.dll" | Where-Object { $_.FullName -match "amd64" } | Select-Object -First 1
         if (-not $found) { throw "wintun.dll amd64 was not in the zip." }
         Copy-Item $found.FullName $wintun -Force
+        $license = Get-ChildItem $unpack -Recurse -Filter "LICENSE.txt" | Select-Object -First 1
+        if (-not $license) { throw "LICENSE.txt was not in the Wintun zip." }
+        Copy-Item $license.FullName $wintunLicense -Force
     }
 }
 
@@ -172,6 +181,18 @@ Copy-Item (Join-Path $FlutterRelease "*") $Payload -Recurse -Force
 Ensure-ThirdParty
 Copy-Item (Join-Path $ThirdParty "sing-box.exe") $Payload -Force
 Copy-Item (Join-Path $ThirdParty "wintun.dll") $Payload -Force
+Copy-Item (Join-Path $ThirdParty "wintun-LICENSE.txt") $Payload -Force
+# Also inside data\flutter_assets; a copy next to the executables is the one a
+# person finds in Program Files.
+Copy-Item (Join-Path $Mobile "assets\legal\THIRD-PARTY-NOTICES.md") $Payload -Force
+Write-Warning ("This MSI is not for release: it still ships sing-box.exe (GPL-3.0). " +
+    "Task 05 (docs/ops/engine-migration/05-windows-engine-swap.md) removes it together " +
+    "with the replacement engine. Removing it earlier breaks Connect, because the " +
+    "broker still launches sing-box.exe.")
+
+Write-Host "Checking payload licenses"
+$licenseCheck = Join-Path $Installer "check-payload-licenses.ps1"
+Invoke-Native { & $licenseCheck -Payload $Payload } "Payload license check"
 
 Ensure-WixExtension "WixToolset.UI.wixext"
 Ensure-WixExtension "WixToolset.Util.wixext"

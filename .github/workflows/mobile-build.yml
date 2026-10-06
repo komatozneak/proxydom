@@ -107,6 +107,7 @@ jobs:
           filters: |
             go:
               - 'mobile/android/hysteria-bind/**'
+              - 'mobile/assets/legal/**'
               - '.github/workflows/mobile-build.yml'
 
   hy2bind-go-test:
@@ -121,6 +122,10 @@ jobs:
         with:
           go-version: "1.25.x"
           cache-dependency-path: mobile/android/hysteria-bind/go.sum
+      # Verbose so a known violation prints its warning; ADR 036.
+      - name: License guard and third-party notices
+        working-directory: mobile/android/hysteria-bind
+        run: go test -count=1 -v -run 'TestLicenseGuard|TestLicenseClassifier|TestThirdPartyNotices' .
       - name: go test
         working-directory: mobile/android/hysteria-bind
         run: go test ./...
