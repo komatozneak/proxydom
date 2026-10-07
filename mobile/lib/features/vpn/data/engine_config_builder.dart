@@ -7,22 +7,34 @@ import 'vpn_session_inputs.dart';
 const kEngineProxyTag = 'proxy';
 
 /// Regions that identify YouTube-optimized catalog nodes (no-AdSense exits).
-/// Used by UI / catalog filters — not by a dual-outbound Xray balancer.
+/// Used by UI / catalog filters — not by a dual-outbound engine balancer.
 /// `al` — Albania (legacy); `uz` — Uzbekistan (primary target, Issue #83).
 const kEngineYoutubeRegions = <String>['al', 'uz'];
 
 /// Local SOCKS inbound for probes / diagnostics (not the app traffic path).
 const kEngineSocksPort = 10808;
 
-/// Candidate JSON kept for the parked VLESS document tests.
+/// JSON config constructor for the parked VLESS engine on Android.
 ///
-/// The connect path does not load this file. `buildShareSocksConfig` is the
-/// document `loadShareConfig` turns into v2ray-core protobuf. This builder
-/// still describes Reality fields; Reality is not dialed.
+/// The engine is `v2fly/v2ray-core` (MIT). It replaced `xtls/xray-core`, which
+/// pulled `sagernet/sing` (GPL-3.0) into the AAR and the xcframework; see
+/// `docs/decisions/036-permissive-only-engine-stack.md` and
+/// `docs/ops/engine-migration/03-mobile-engine-swap.md`.
 ///
-/// Packet path: default gVisor `protocol:tun` + setTunFd (Огонь 0.84 SoT).
-/// Hev → SOCKS when [RoutePolicy.useHevTunBridge] is true (DedProxy A/B).
-/// SOCKS 10808 is always present (probes / hev hop).
+/// Two Xray features do not exist in this engine and are refused here rather
+/// than emitted for the loader to reject later ([_unsupportedSecurity],
+/// [_unsupportedTransport]):
+///
+///   - **Reality** — v2ray-core carries no Reality at all, and `xtls/reality`
+///     ships only the server half (docs/ops/engine-migration/02-reality-spike-findings.md).
+///   - **XHTTP** — an Xray-only transport; v2ray-core has no `xhttp` dialer.
+///
+/// Both sit behind the parked VLESS gate (ADR 033), so refusing them changes no
+/// user-visible behaviour today.
+///
+/// Packet path: `hy2bind.StartShare` runs the engine with the SOCKS inbound
+/// below; `StartShareTun` pumps the VpnService TUN into that SOCKS port through
+/// tun2socks. The engine config therefore needs no `tun` inbound.
 /// FakeDNS **OFF**. `quic-reject` UDP/443.
 ///
 /// Modeless routing (Огонь-style):
@@ -31,7 +43,7 @@ const kEngineSocksPort = 10808;
 /// - everything else → proxy (final).
 ///
 /// ## Routing rule order (deterministic, top → bottom)
-/// 1. port 53 → dns-out (socks-in; + tun-in when gVisor)
+/// 1. port 53 → dns-out (socks-in)
 /// 2. control-plane domains + egress/control IPs → direct
 /// 3. DNS resolver IPs / RFC1918 → direct (Yandex + private; not 1.1.1.1/8.8.8.8)
 /// 4. UDP/443 → quic-reject
@@ -41,20 +53,20 @@ const kEngineSocksPort = 10808;
 /// 8. RU geosite → direct (bundle ON)
 /// 9. geoip:ru → direct when flagged
 /// 10. user no-VPN domains/CIDRs → direct (force-proxy suffixes stripped)
-/// 11. xray.system UDP/53 → 8.8.8.8/proxy, 1.1.1.1+Yandex/direct
+/// 11. engine DNS UDP/53 → 8.8.8.8/proxy, 1.1.1.1+Yandex/direct
 /// 12. residual UDP → block
 /// 13. final TCP → proxy
 ///
 /// Dual-core (ADR 006): TrustTunnel is a separate native core selected by
-/// catalog `protocol=trusttunnel` — this builder only produces the candidate JSON.
+/// catalog `protocol=trusttunnel` — this builder only produces engine JSON.
 class EngineConfigBuilder {
   EngineConfigBuilder._();
 
   /// Build one isolated runtime config per backend-ordered candidate.
   ///
   /// Each config owns the canonical SOCKS inbound on 127.0.0.1:10808 and has
-  /// exactly one VLESS outbound tagged `proxy`, so Android can stop the core and
-  /// try the next complete candidate sequentially.
+  /// exactly one VLESS outbound tagged `proxy`, so Android can stop the engine
+  /// and try the next complete candidate sequentially.
   static List<EngineRuntimeCandidateConfig> buildCandidateConfigs(
     VpnSessionInputs inputs,
   ) {
@@ -75,26 +87,26 @@ class EngineConfigBuilder {
     ];
   }
 
-  /// Build the candidate JSON string from typed inputs.
+  /// Build the complete engine JSON config string from typed inputs.
   static String build(VpnSessionInputs inputs) {
     final hops = inputs.hops;
     if (hops.length != 1) {
       throw ArgumentError.value(
         hops.length,
         'inputs.hops.length',
-        'build requires exactly one isolated candidate',
+        'build requires exactly one isolated engine candidate',
       );
     }
     final route = inputs.route;
-    // Experimental only — prod keeps kXrayOgonAdsAllEnabled false.
+    // Experimental only — prod keeps kEngineOgonAdsAllEnabled false.
     final useOgonAdsAll = route.includeOgonAdsAll;
     const useSocksUdp = true;
     const useQuicReject = true;
-    final useHev = route.useHevTunBridge;
-    final tunMtu = inputs.tun.mtu;
+    // route.useHevTunBridge and inputs.tun.mtu no longer shape this document:
+    // the engine gets one SOCKS inbound and the TUN is attached to that port by
+    // StartShareTun. The hev bridge stays dormant (mobile/AGENTS.md).
 
-    final vlessOutbound =
-        _vlessOutbound(hop: hops.single, tag: kEngineProxyTag);
+    final vlessOutbound = _vlessOutbound(hop: hops.single, tag: kEngineProxyTag);
 
     final directCidrs = inputs.directCidrs().toList();
     final adsDomains = (!useOgonAdsAll && route.includeAdsBlock)
@@ -113,8 +125,10 @@ class EngineConfigBuilder {
     };
     final customDirect = _normalizeSuffixes(
       route.directDomainSuffixes.where((s) {
-        final bare =
-            s.trim().toLowerCase().replaceFirst(RegExp(r'^domain:'), '');
+        final bare = s
+            .trim()
+            .toLowerCase()
+            .replaceFirst(RegExp(r'^domain:'), '');
         return bare.isNotEmpty && !forceProxyBare.contains(bare);
       }),
     );
@@ -155,7 +169,7 @@ class EngineConfigBuilder {
     final rules = <Map<String, dynamic>>[
       {
         'type': 'field',
-        'inboundTag': useHev ? ['socks-in'] : ['tun-in', 'socks-in'],
+        'inboundTag': ['socks-in'],
         'port': '53',
         'outboundTag': 'dns-out',
       },
@@ -233,9 +247,10 @@ class EngineConfigBuilder {
         {'type': 'field', 'ip': customDirectCidrs, 'outboundTag': 'direct'},
     ];
 
-    // Xray DNS module queries use inbound tag xray.system.* — they do NOT
-    // match tun-in/socks-in → dns-out. Without these rules, residual UDP→block
-    // blackholes resolver traffic (Pixel: udp:1.1.1.1:53 → block → hang).
+    // The engine's own DNS module issues queries from an internal inbound tag
+    // that is not `socks-in`, so they do NOT match the port-53 → dns-out rule
+    // above. Without these rules, residual UDP→block blackholes resolver
+    // traffic (Pixel: udp:1.1.1.1:53 → block → hang).
     rules.add({
       'type': 'field',
       'network': 'udp',
@@ -297,18 +312,12 @@ class EngineConfigBuilder {
     };
 
     final inbounds = <Map<String, dynamic>>[
-      // gVisor TUN only when hev bridge is OFF (LibXray.setTunFd).
-      if (!useHev)
-        {
-          'protocol': 'tun',
-          'tag': 'tun-in',
-          'settings': {
-            'name': 'xray0',
-            'mtu': tunMtu,
-          },
-          'sniffing': sniffing,
-        },
-      // Probe/diagnostics when gVisor; device path via hev when enabled.
+      // SOCKS only. hy2bind's loader accepts a single `socks` inbound
+      // (mobile/android/hysteria-bind/hy2bind_engine_load.go, shareInbound) and
+      // rejects anything else; the VpnService TUN is attached to this port by
+      // StartShareTun through tun2socks, so the config itself carries no `tun`
+      // inbound. RoutePolicy.useHevTunBridge no longer selects an inbound here
+      // for the same reason.
       {
         'listen': '127.0.0.1',
         'port': kEngineSocksPort,
@@ -341,12 +350,22 @@ class EngineConfigBuilder {
     required String tag,
   }) {
     final creds = hop.creds;
-    // Marzban may emit type=raw; Xray-core 26.6.x expects tcp for Reality+Vision.
+    final security = creds.security.trim().toLowerCase();
+    // v2ray-core has no Reality engine, and xtls/reality ships only the server
+    // half. Emitting realitySettings would produce a document the loader
+    // refuses anyway; refuse it here so the failure names the feature.
+    if (security == 'reality') {
+      throw _unsupportedSecurity('reality', 'VLESS Reality is parked (ADR 033)');
+    }
+    // Marzban may emit type=raw; the engine dials it as plain TCP.
     final network = switch (creds.transport.trim().toLowerCase()) {
       'raw' || 'tcp' => 'tcp',
       final other => other,
     };
-    final isXhttp = network == 'xhttp' || network == 'splithttp';
+    // XHTTP is an Xray-only transport; v2ray-core has no `xhttp` dialer.
+    if (network == 'xhttp' || network == 'splithttp') {
+      throw _unsupportedTransport(network);
+    }
     return {
       'protocol': creds.protocol,
       'tag': tag,
@@ -359,44 +378,64 @@ class EngineConfigBuilder {
               {
                 'id': creds.uuid,
                 'encryption': 'none',
-                // Vision flow is incompatible with XHTTP.
-                if (!isXhttp && creds.flow != null && creds.flow!.isNotEmpty)
+                if (creds.flow != null && creds.flow!.isNotEmpty)
                   'flow': creds.flow,
               },
             ],
           },
         ],
         // Required for Vision UDP (non-443); 443 is intercepted by Vision itself.
-        if (!isXhttp && creds.flow != null && creds.flow!.isNotEmpty)
+        if (creds.flow != null && creds.flow!.isNotEmpty)
           'packetEncoding': 'xudp',
       },
       'streamSettings': {
         'network': network,
-        'security': creds.security,
-        if (isXhttp)
-          'xhttpSettings': {
-            'path':
-                (creds.path == null || creds.path!.isEmpty) ? '/' : creds.path,
-            'mode': (creds.mode == null || creds.mode!.isEmpty)
-                ? 'stream-up'
-                : creds.mode,
-          },
-        if (creds.security == 'reality')
-          'realitySettings': {
-            'show': false,
-            'fingerprint': creds.fingerprint,
+        'security': security.isEmpty ? 'none' : security,
+        // The engine reads serverName / fingerprint / allowInsecure / alpn from
+        // `tlsSettings` (mobile/android/hysteria-bind/hy2bind_engine_load.go,
+        // shareStreamConfig). VlessRealityCreds carries no allowInsecure or alpn,
+        // so only the two fields below are emitted.
+        if (security == 'tls' && creds.serverName.isNotEmpty)
+          'tlsSettings': {
             'serverName': creds.serverName,
-            'publicKey': creds.publicKey,
-            'shortId': creds.shortId,
-            'spiderX': creds.spiderX,
+            if (creds.fingerprint.isNotEmpty) 'fingerprint': creds.fingerprint,
+          },
+        // The engine names this transport `websocket` and reads its path from
+        // `wsSettings`; `network` stays "ws" and the loader normalizes it
+        // (hy2bind_engine_load.go, shareStreamConfig).
+        if (network == 'ws' || network == 'websocket')
+          'wsSettings': {
+            'path': (creds.path == null || creds.path!.isEmpty)
+                ? '/'
+                : creds.path,
           },
         // Огонь-adjacent TCP tuning (safe with Vision; no Mux).
-        // tcpFastOpen omitted — hangs Reality handshake on some RF paths.
+        // tcpFastOpen omitted — it hangs the TLS handshake on some RF paths.
         'sockopt': {
           'tcpNoDelay': true,
         },
       },
     };
+  }
+
+  /// v2ray-core has no Reality engine (see the class docstring).
+  static ArgumentError _unsupportedSecurity(String security, String why) {
+    return ArgumentError.value(
+      security,
+      'creds.security',
+      'the v2ray engine cannot express this security ($why); '
+      'see docs/ops/engine-migration/02-reality-spike-findings.md',
+    );
+  }
+
+  /// v2ray-core has no dialer for this transport (see the class docstring).
+  static ArgumentError _unsupportedTransport(String network) {
+    return ArgumentError.value(
+      network,
+      'creds.transport',
+      'the v2ray engine has no "$network" transport; '
+      'the node stays behind the closed VLESS gate (ADR 033)',
+    );
   }
 
   static List<String> _normalizeSuffixes(Iterable<String> suffixes) {
@@ -412,7 +451,7 @@ class EngineConfigBuilder {
   }
 }
 
-/// Native failover item. Metadata stays outside the candidate JSON.
+/// Native failover item. Metadata stays outside the engine JSON for precise errors.
 final class EngineRuntimeCandidateConfig {
   const EngineRuntimeCandidateConfig({
     required this.id,

@@ -38,7 +38,7 @@ class AppConfig {
   static const String vpsHostname = 'api.proxydom.su';
 
   /// Compile-time override for the control-plane A-record used by TUN
-  /// `excludeRoute` and Xray DNS `hosts` pin. Empty → [vpsIpv4Fallback].
+  /// `excludeRoute` and engine DNS `hosts` pin. Empty → [vpsIpv4Fallback].
   ///
   /// Override: `--dart-define=VPS_CONTROL_PLANE_IPV4=1.2.3.4`
   static const String _vpsControlPlaneIpv4Override = String.fromEnvironment(
@@ -48,7 +48,7 @@ class AppConfig {
 
   /// Last-known good A-record for [vpsHostname] (API host, 195.225.108.81).
   /// Prefer override / DNS resolution at runtime where available; this is the
-  /// offline fallback so TUN bypass and Xray hosts pin stay valid if DNS fails
+  /// offline fallback so TUN bypass and engine hosts pin stay valid if DNS fails
   /// under VPN. Must match the live `api.proxydom.su` A-record.
   static const String vpsIpv4Fallback = '195.225.108.81';
 

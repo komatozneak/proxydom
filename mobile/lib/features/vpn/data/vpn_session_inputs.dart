@@ -3,7 +3,7 @@ import 'vpn_config.dart';
 import 'vpn_route_policy.dart';
 import 'vpn_service_config.dart';
 
-/// VLESS + Reality credentials for one egress hop (Xray builder input).
+/// VLESS + Reality credentials for one egress hop ([EngineConfigBuilder] input).
 class VlessRealityCreds {
   const VlessRealityCreds({
     required this.protocol,
@@ -35,7 +35,7 @@ class VlessRealityCreds {
   final String? path;
   final String? mode;
 
-  factory VlessRealityCreds.fromCandidate(XrayCandidate candidate) {
+  factory VlessRealityCreds.fromCandidate(EngineCandidate candidate) {
     return VlessRealityCreds(
       protocol: candidate.protocol,
       uuid: candidate.uuid,
@@ -79,22 +79,22 @@ class EgressHop {
 /// user «Что работает без VPN?» → direct; residual UDP blocked; final TCP → proxy.
 class RoutePolicy {
   const RoutePolicy({
-    this.includeAdsBlock = kXrayAdsBlockEnabled,
-    this.includeOgonAdsAll = kXrayOgonAdsAllEnabled,
+    this.includeAdsBlock = kEngineAdsBlockEnabled,
+    this.includeOgonAdsAll = kEngineOgonAdsAllEnabled,
     this.includeGeoipRu = kGeoipRuEnabled,
     this.includeBundledRuRuleSets = true,
     this.includeGovRuRuleSets = false,
     this.useHevTunBridge = kUseHevTunBridge,
-    this.adsBlockDomains = kXrayAdsBlockDomains,
+    this.adsBlockDomains = kEngineAdsBlockDomains,
     this.proxyIpCidrs = const [],
     this.directDomainSuffixes = const [],
     this.directIpCidrs = const [],
   });
 
-  /// Defaults to [kXrayAdsBlockEnabled]; tests may force ON with curated domains.
+  /// Defaults to [kEngineAdsBlockEnabled]; tests may force ON with curated domains.
   final bool includeAdsBlock;
 
-  /// Огонь `geosite:category-ads-all`. Prod keeps [kXrayOgonAdsAllEnabled] false.
+  /// Огонь `geosite:category-ads-all`. Prod keeps [kEngineOgonAdsAllEnabled] false.
   final bool includeOgonAdsAll;
 
   /// Defaults to [kGeoipRuEnabled]; nest home-speed keeps RU IPs direct.
@@ -106,10 +106,12 @@ class RoutePolicy {
   /// geosite:category-gov-ru → direct (Огонь «Сайты госорганов РФ»).
   final bool includeGovRuRuleSets;
 
-  /// When true, SOCKS-only Xray inbound + hev TUN bridge (no `protocol:tun`).
+  /// Dormant. The engine config is always SOCKS-only now — the TUN is attached
+  /// to the SOCKS port by `StartShareTun`, so this flag no longer picks an
+  /// inbound (see [EngineConfigBuilder.build]).
   final bool useHevTunBridge;
 
-  /// Curated ads hosts. See [kXrayAdsBlockDomains].
+  /// Curated ads hosts. See [kEngineAdsBlockDomains].
   final List<String> adsBlockDomains;
 
   /// YouTube/Google CIDRs (youtube-google.cidr) → force-proxy before RU direct.
@@ -149,7 +151,7 @@ class TunParams {
   }
 }
 
-/// All inputs for `EngineConfigBuilder.build` — one hop per candidate.
+/// All inputs for [EngineConfigBuilder.build] — one hop per candidate.
 class VpnSessionInputs {
   const VpnSessionInputs({
     required this.hops,
@@ -167,9 +169,9 @@ class VpnSessionInputs {
     required VpnServiceConfig service,
     required RoutePolicy route,
   }) {
-    final profile = config.xrayProfile;
+    final profile = config.engineProfile;
     if (profile == null) {
-      throw StateError('xray_profile required for Xray session inputs');
+      throw StateError('xray_profile required for engine session inputs');
     }
     final hops = [
       for (final candidate in profile.candidates)
@@ -214,7 +216,7 @@ class VpnSessionInputs {
 
 final _ipv4Host = RegExp(r'^(\d{1,3}\.){3}\d{1,3}$');
 
-/// Xray `ip` rules need an address, not a DNS name.
+/// Engine `ip` rules need an address, not a DNS name.
 String? ipv4Cidr(String host) {
   if (host.isEmpty || host == 'unknown') return null;
   if (_ipv4Host.hasMatch(host)) return '$host/32';

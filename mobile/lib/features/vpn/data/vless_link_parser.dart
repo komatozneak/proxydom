@@ -100,8 +100,8 @@ String? _firstNonEmpty(String? primary, String? fallback) {
   return null;
 }
 
-/// Build a single [XrayCandidate] from a VLESS URI (legacy `/vpn/config` fallback).
-XrayCandidate xrayCandidateFromVlessLink(
+/// Build a single [EngineCandidate] from a VLESS URI (legacy `/vpn/config` fallback).
+EngineCandidate engineCandidateFromVlessLink(
   String link, {
   String? id,
   String? label,
@@ -133,7 +133,7 @@ XrayCandidate xrayCandidateFromVlessLink(
     );
   }
   final host = parsed.host;
-  return XrayCandidate(
+  return EngineCandidate(
     id: id ?? host,
     label: label ?? parsed.name ?? host,
     host: host,

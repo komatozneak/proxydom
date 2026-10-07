@@ -19,7 +19,7 @@ import 'package:proxydom/features/vpn/data/vpn_service_config.dart';
 import 'package:proxydom/l10n/app_localizations.dart';
 
 /// Minimal valid Reality candidate for smoke fixtures (schema_version 1).
-Map<String, dynamic> _xrayCandidate({
+Map<String, dynamic> _engineCandidate({
   String id = 'de-1',
   String host = 'vpn-dev.example',
   int port = 443,
@@ -63,7 +63,7 @@ Map<String, dynamic> _vpnJson({
       if (nodeHost != null) 'node_host': nodeHost,
       'xray_profile': {
         'schema_version': 1,
-        'candidates': [candidate ?? _xrayCandidate()],
+        'candidates': [candidate ?? _engineCandidate()],
       },
     };
 
@@ -182,7 +182,7 @@ void main() {
     final config = VpnConfig.fromJson(
       _vpnJson(
         links: ['vless://abc@server:443?type=tcp#test_user'],
-        candidate: _xrayCandidate(
+        candidate: _engineCandidate(
           host: 'vpn-dev.example',
           publicKey: 'pk',
           shortId: 'abcd',
@@ -192,8 +192,8 @@ void main() {
     );
     expect(config.username, 'test_user');
     expect(config.links, hasLength(1));
-    expect(config.xrayProfile!.schemaVersion, 1);
-    expect(config.xrayProfile!.candidates, hasLength(1));
+    expect(config.engineProfile!.schemaVersion, 1);
+    expect(config.engineProfile!.candidates, hasLength(1));
     final primary = config.primaryCandidate;
     expect(primary.host, 'vpn-dev.example');
     expect(primary.port, 443);
@@ -316,7 +316,7 @@ void main() {
       final cfg = VpnConfig.fromJson(
         _vpnJson(
           links: ['vless://...'],
-          candidate: _xrayCandidate(host: 'unknown-vps.example'),
+          candidate: _engineCandidate(host: 'unknown-vps.example'),
         ),
       );
       final service = VpnServiceConfig.fromVpnConfig(cfg);
@@ -336,7 +336,7 @@ void main() {
       final config = VpnConfig.fromJson(
         _vpnJson(
           username: 'real_user',
-          candidate: _xrayCandidate(
+          candidate: _engineCandidate(
             host: 'real-server.example',
             port: 8443,
             uuid: 'real-uuid-1234',
@@ -370,7 +370,7 @@ void main() {
         _vpnJson(
           username: 'u_3',
           nodeHost: '185.139.228.192',
-          candidate: _xrayCandidate(
+          candidate: _engineCandidate(
             host: 'cdn-front.example',
             uuid: 'uuid-1',
             flow: null,
@@ -387,7 +387,7 @@ void main() {
       final config = VpnConfig.fromJson(
         _vpnJson(
           username: 'u_3',
-          candidate: _xrayCandidate(
+          candidate: _engineCandidate(
             host: 'unknown-vps.example',
             uuid: 'uuid-1',
             flow: null,
@@ -407,7 +407,7 @@ void main() {
         _vpnJson(
           username: 'u_3',
           nodeHost: '185.139.228.192',
-          candidate: _xrayCandidate(
+          candidate: _engineCandidate(
             host: '185.139.228.192',
             uuid: 'uuid-1',
             flow: null,
@@ -424,7 +424,7 @@ void main() {
       final cfg = VpnConfig.fromJson(
         _vpnJson(
           username: 'flat',
-          candidate: _xrayCandidate(
+          candidate: _engineCandidate(
             host: 's',
             uuid: 'u',
             flow: null,
