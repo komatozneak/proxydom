@@ -7,7 +7,7 @@
 #   keytool -genkey -v -keystore ../teremok-upload.jks \
 #     -storetype JKS -keyalg RSA -keysize 2048 -validity 10000 \
 #     -alias upload \
-#     -dname "CN=Proxy Dom, OU=Mobile, O=UMICUM, L=Pavlodar, ST=Pavlodar, C=KZ"
+#     -dname "CN=Proxy Dom, OU=Mobile, O=UMIKUM, L=Pavlodar, ST=Pavlodar, C=KZ"
 #
 # Пароли НЕ хранить в git — только в локальном key.properties.
 storeFile=../teremok-upload.jks
