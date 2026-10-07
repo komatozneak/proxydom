@@ -14,6 +14,7 @@ import '../../../core/widgets/app_surface.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../home/application/vpn_provider.dart';
 import '../../home/application/vpn_status.dart';
+import '../data/dial_set.dart';
 import '../data/hy2_import_store.dart';
 import '../data/route_document.dart';
 import '../data/share_link_parser.dart';
@@ -116,9 +117,9 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
                   result.links,
                   fromDocument: true,
                 )) {
-                  ShareImportDial.noneHy2 => 'no_hy2',
+                  ShareImportDial.noneDialable => 'no_hy2',
                   ShareImportDial.singleUnsupported => 'hy2_only',
-                  ShareImportDial.hasHy2 => null,
+                  ShareImportDial.dialable => null,
                 };
         });
       }).catchError((Object error) {
@@ -160,8 +161,8 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
                 ? 'empty'
                 : switch (dial) {
                     ShareImportDial.singleUnsupported => 'hy2_only',
-                    ShareImportDial.noneHy2 => 'no_hy2',
-                    ShareImportDial.hasHy2 => null,
+                    ShareImportDial.noneDialable => 'no_hy2',
+                    ShareImportDial.dialable => null,
                   };
       });
     } on FormatException {
@@ -216,9 +217,7 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
       }
       await _stopLiveTunnel(reason: 'import');
       if (!mounted) return;
-      final canStart = links.any(
-        (link) => canDialScheme(link.scheme, ios: false),
-      );
+      final canStart = links.any(canDialLink);
       context.go(canStart ? '/home' : '/locations');
       return;
     } on SubscriptionDocumentException catch (error) {
@@ -455,12 +454,15 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
                                     builder: (context) {
                                       final label =
                                           labelForShareLink(_preview[i]);
-                                      final dialable = canDialScheme(
-                                        _preview[i].scheme,
-                                        ios: false,
+                                      final dialable = canDialLink(
+                                        _preview[i],
                                       );
                                       return NodeLine(
                                         label: label,
+                                        protocol: protocolMark(
+                                          _preview[i].scheme,
+                                        ),
+                                        dialable: dialable,
                                         endpoint: dialable
                                             ? (label.subtitle.isEmpty
                                                 ? _preview[i].endpoint

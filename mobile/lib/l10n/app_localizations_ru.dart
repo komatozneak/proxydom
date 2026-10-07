@@ -1496,10 +1496,11 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get freeHy2OnlyAdd =>
-      'Не удалось добавить узел: поддерживается только протокол Hysteria2.';
+      'Не удалось добавить узел: этот протокол не запускается на этом устройстве.';
 
   @override
-  String get freeNoHy2Lines => 'В источнике нет доступных линий Hysteria2.';
+  String get freeNoHy2Lines =>
+      'В источнике нет линий, которые клиент может запустить.';
 
   @override
   String get freeSchemeParked =>

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'dial_set.dart';
 import 'share_link_parser.dart';
 
 /// How a remote document body should be treated. Not an account.
@@ -61,39 +62,33 @@ class DocumentSyncException implements Exception {
 
   final DocumentSyncDecision decision;
 }
-/// Whether [scheme] may start a system tunnel (ADR 033).
-///
-/// Hysteria2 only, on every OS. [ios] stays on the signature so existing
-/// call sites compile; it no longer changes the answer.
-bool canDialScheme(String scheme, {required bool ios}) {
-  final name = scheme.toLowerCase();
-  return name == 'hysteria2' || name == 'hy2';
-}
 
-/// How a parsed paste should behave on the add screen (ADR 033).
+/// How a parsed paste should behave on the add screen (ADR 035).
 enum ShareImportDial {
-  /// At least one Hysteria2 line can start.
-  hasHy2,
+  /// At least one line can start on this platform.
+  dialable,
 
-  /// One pasted URI that is not Hysteria2 — do not add it.
+  /// One pasted URI this platform cannot start — do not add it.
   singleUnsupported,
 
-  /// A document with no Hysteria2 line. Keep it; nothing starts.
-  noneHy2,
+  /// A document with no line this platform can start. Keep it; nothing starts.
+  noneDialable,
 }
 
 ShareImportDial shareImportDial(
   List<ParsedShareLink> links, {
   required bool fromDocument,
 }) {
-  if (links.any((link) => canDialScheme(link.scheme, ios: false))) {
-    return ShareImportDial.hasHy2;
+  // Per link, not per scheme: a vless line with Reality must not count as
+  // dialable just because the scheme is admitted on this OS.
+  if (links.any(canDialLink)) {
+    return ShareImportDial.dialable;
   }
-  if (links.isEmpty) return ShareImportDial.hasHy2;
+  if (links.isEmpty) return ShareImportDial.dialable;
   if (!fromDocument && links.length == 1) {
     return ShareImportDial.singleUnsupported;
   }
-  return ShareImportDial.noneHy2;
+  return ShareImportDial.noneDialable;
 }
 
 String? _tryBase64(String text) {

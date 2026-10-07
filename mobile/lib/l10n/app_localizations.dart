@@ -2812,13 +2812,13 @@ abstract class AppL10n {
   /// No description provided for @freeHy2OnlyAdd.
   ///
   /// In en, this message translates to:
-  /// **'Could not add the node: only Hysteria2 is supported.'**
+  /// **'Could not add the node: this protocol cannot start on this device.'**
   String get freeHy2OnlyAdd;
 
   /// No description provided for @freeNoHy2Lines.
   ///
   /// In en, this message translates to:
-  /// **'This source has no Hysteria2 lines.'**
+  /// **'This source has no lines the client can start.'**
   String get freeNoHy2Lines;
 
   /// No description provided for @freeSchemeParked.

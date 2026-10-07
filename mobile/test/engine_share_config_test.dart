@@ -78,8 +78,150 @@ void main() {
     expect((stream['kcpSettings'] as Map)['seed'], 'standKcp');
   });
 
+  test('alpn from the link reaches tlsSettings', () {
+    const raw =
+        'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:2083'
+        '?security=tls&sni=front.example&type=ws&path=%2Fvless-ws'
+        '&alpn=http%2F1.1&fp=chrome#WS';
+    final json = buildShareSocksConfig(parseShareLink(raw));
+    final decoded = jsonDecode(json!) as Map<String, dynamic>;
+    final stream =
+        ((decoded['outbounds'] as List).first as Map)['streamSettings'] as Map;
+    expect(stream['network'], 'ws');
+    expect((stream['wsSettings'] as Map)['path'], '/vless-ws');
+    final tls = stream['tlsSettings'] as Map;
+    expect(tls['serverName'], 'front.example');
+    // `fp=chrome` is not a v2ray-core uTLS preset. The builder translates it.
+    expect(tls['fingerprint'], 'chrome_auto');
+    // A front that serves only http/1.1 refuses a WS upgrade offered under h2.
+    expect(tls['alpn'], ['http/1.1']);
+  });
+
+  test('a multi-value alpn list is split, and its absence stays absent', () {
+    const withList =
+        'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
+        '?security=tls&sni=a.example&alpn=h2,http%2F1.1#A';
+    final decoded = jsonDecode(buildShareSocksConfig(parseShareLink(withList))!)
+        as Map<String, dynamic>;
+    final tls = (((decoded['outbounds'] as List).first as Map)['streamSettings']
+        as Map)['tlsSettings'] as Map;
+    expect(tls['alpn'], ['h2', 'http/1.1']);
+
+    const without =
+        'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
+        '?security=tls&sni=a.example#A';
+    final plain = jsonDecode(buildShareSocksConfig(parseShareLink(without))!)
+        as Map<String, dynamic>;
+    final plainTls =
+        (((plain['outbounds'] as List).first as Map)['streamSettings']
+            as Map)['tlsSettings'] as Map;
+    expect(plainTls.containsKey('alpn'), isFalse);
+  });
+
+  test('an unknown fingerprint is omitted rather than sent to the core', () {
+    const raw =
+        'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
+        '?security=tls&sni=a.example&fp=not-a-preset#A';
+    final decoded = jsonDecode(buildShareSocksConfig(parseShareLink(raw))!)
+        as Map<String, dynamic>;
+    final tls = (((decoded['outbounds'] as List).first as Map)['streamSettings']
+        as Map)['tlsSettings'] as Map;
+    expect(tls.containsKey('fingerprint'), isFalse);
+  });
+
   test('hysteria2 is not an engine document', () {
     const raw = 'hysteria2://user:pass@203.0.113.12:443/?sni=c.example#Charlie';
     expect(buildShareSocksConfig(parseShareLink(raw)), isNull);
+  });
+
+  // The loader accepts only tcp, websocket and mkcp. Offering anything else as
+  // active means the user taps the line and the start fails with no name.
+  test('transports the loader cannot express are refused', () {
+    for (final transport in const [
+      'grpc',
+      'quic',
+      'httpupgrade',
+      'xhttp',
+      'splithttp',
+    ]) {
+      final raw =
+          'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
+          '?security=tls&sni=a.example&type=$transport#T';
+      expect(
+        buildShareSocksConfig(parseShareLink(raw)),
+        isNull,
+        reason: 'type=$transport must not reach the loader',
+      );
+    }
+  });
+
+  // shareStreamConfig() rejects every security except none and tls.
+  test('securities the loader cannot express are refused', () {
+    for (final security in const ['xtls', 'reality']) {
+      final raw =
+          'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
+          '?security=$security&sni=a.example#S';
+      expect(
+        buildShareSocksConfig(parseShareLink(raw)),
+        isNull,
+        reason: 'security=$security must not reach the loader',
+      );
+    }
+  });
+
+  // The loader has no tcpSettings, so HTTP obfuscation cannot be expressed.
+  // Dropping it would dial plain TCP and report a generic failure.
+  test('tcp obfuscation is refused rather than silently dropped', () {
+    const http =
+        'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:80'
+        '?security=none&type=tcp&headerType=http&host=cdn.example#Obfs';
+    expect(buildShareSocksConfig(parseShareLink(http)), isNull);
+
+    // `headerType=none` asks for no obfuscation and must still build.
+    const none =
+        'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:80'
+        '?security=none&type=tcp&headerType=none#Plain';
+    expect(buildShareSocksConfig(parseShareLink(none)), isNotNull);
+  });
+
+  // Guards the allowlist against over-refusing: every transport and security
+  // the loader does express must still produce a document.
+  test('every transport and security the loader expresses still builds', () {
+    for (final transport in const ['tcp', 'ws', 'websocket', 'kcp']) {
+      final raw =
+          'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
+          '?security=tls&sni=a.example&type=$transport&path=%2Fp#T';
+      final json = buildShareSocksConfig(parseShareLink(raw));
+      expect(json, isNotNull, reason: 'type=$transport must build');
+      final outbound =
+          (jsonDecode(json!) as Map<String, dynamic>)['outbounds'] as List;
+      expect(
+        ((outbound.first as Map)['streamSettings'] as Map)['network'],
+        transport == 'websocket' ? 'websocket' : transport,
+      );
+    }
+    for (final security in const ['none', 'tls']) {
+      final raw =
+          'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
+          '?security=$security&sni=a.example#S';
+      expect(
+        buildShareSocksConfig(parseShareLink(raw)),
+        isNotNull,
+        reason: 'security=$security must build',
+      );
+    }
+  });
+
+  // A WS front is reached by Host, not by the address in the link.
+  test('the ws Host header from the link survives into wsSettings', () {
+    const raw =
+        'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
+        '?security=tls&sni=front.example&type=ws&path=%2Fws'
+        '&host=cdn.example#WS';
+    final json = buildShareSocksConfig(parseShareLink(raw))!;
+    final decoded = jsonDecode(json) as Map<String, dynamic>;
+    final stream =
+        ((decoded['outbounds'] as List).first as Map)['streamSettings'] as Map;
+    expect((stream['wsSettings'] as Map)['headers'], {'Host': 'cdn.example'});
   });
 }

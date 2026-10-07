@@ -19,7 +19,7 @@ import '../../home/application/vpn_provider.dart';
 import '../../home/application/vpn_status.dart';
 import '../application/imported_profiles_provider.dart';
 import '../data/hy2_import_store.dart';
-import '../data/route_document.dart';
+import '../data/dial_set.dart';
 import '../data/subscription_label.dart';
 import '../data/subscription_notice.dart';
 import 'free_client_chrome.dart';
@@ -374,6 +374,31 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     return (premium: premium, general: general);
   }
 
+  NodeLine _nodeLine(AppL10n l, int index) {
+    final link = _imported[index];
+    final dialable = canDialLink(link);
+    return NodeLine(
+      label: labelForShareLink(link),
+      protocol: protocolMark(link.scheme),
+      dialable: dialable,
+      endpoint: dialable ? link.endpoint : l.freeSchemeParked,
+      selected: _selectedId == '$index',
+      onTap: () {
+        if (!dialable) {
+          UiLog.action(
+            'locations',
+            'pick',
+            result: 'blocked',
+            reason: 'scheme',
+            extra: {'scheme': link.scheme},
+          );
+          return;
+        }
+        _chooseImported(index, scheme: link.scheme);
+      },
+    );
+  }
+
   Widget _catalogCard(ThemeData theme, AppL10n l, ShareCatalog catalog) {
     final title = catalog.title.trim().isEmpty ? l.freeServers : catalog.title;
     final lines = _catalogLineIndexes(catalog);
@@ -408,12 +433,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       onNodeTap: (_) {},
       nodes: [
         for (final index in [...lines.premium, ...lines.general])
-          NodeLine(
-            label: labelForShareLink(_imported[index]),
-            endpoint: _imported[index].endpoint,
-            selected: _selectedId == '$index',
-            onTap: () => _chooseImported(index),
-          ),
+          _nodeLine(l, index),
       ],
       selectedNodeTitle: selectedLabel,
       telegramLabel: subscriptionPlaneIsTelegram(planeUrl)
@@ -510,8 +530,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
                           final index = filtered[i];
                           final link = _imported[index];
                           final selected = _selectedId == '$index';
-                          final schemeBlocked =
-                              !canDialScheme(link.scheme, ios: false);
+                          final schemeBlocked = !canDialLink(link);
                           return ImportedProfileCard(
                             name: link.name,
                             scheme: link.scheme,
