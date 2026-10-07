@@ -12,8 +12,8 @@ TUN → `LibXray.setTunFd` / `protocol:tun` (gVisor). Google/YouTube force-proxy
 via `assets/rules/youtube-google.cidr` + domain suffixes; nest `geoip:ru →
 direct`; `quic-reject` UDP/443.
 
-**Ads:** curated OFF during speed bench (`kXrayAdsBlockEnabled = false`).
-Re-enable curated after YT play ≤10s. `kXrayOgonAdsAllEnabled` stays **false**.
+**Ads:** curated OFF during speed bench (`kEngineAdsBlockEnabled = false`).
+Re-enable curated after YT play ≤10s. `kEngineOgonAdsAllEnabled` stays **false**.
 Mid-roll SSAI on `googlevideo.com` is not removable via VPN.
 
 **Pin:** client uses libXray **26.6.27** — keep geosite/geoip compatible with
