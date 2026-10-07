@@ -16,7 +16,7 @@ on:
 
 env:
   FLUTTER_VERSION: "3.35.1"
-  HYSTERIA_TAG: "v2.6.2"
+  HYSTERIA_TAG: "v2.13.0"
   GO_VERSION: "1.25.x"
   APP_BUNDLE_ID: su.proxydom.app
   TUNNEL_BUNDLE_ID: su.proxydom.app.VpnTunnelProvider

@@ -50,7 +50,7 @@ type hyDialer struct {
 	directDial func(network, addr string) (net.Conn, error)
 }
 
-var _ proxy.Dialer = (*hyDialer)(nil)
+var _ proxy.Proxy = (*hyDialer)(nil)
 
 func (d *hyDialer) DialContext(_ context.Context, m *M.Metadata) (net.Conn, error) {
 	if shouldSkipCDN(m.DstIP) {

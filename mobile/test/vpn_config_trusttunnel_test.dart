@@ -14,7 +14,7 @@ void main() {
 
     expect(config.activeCore, VpnActiveCore.trusttunnel);
     expect(config.isTrustTunnelSession, isTrue);
-    expect(config.xrayProfile, isNull);
+    expect(config.engineProfile, isNull);
 
     final tt = config.trusttunnelProfile;
     expect(tt, isNotNull);
@@ -59,7 +59,7 @@ void main() {
     final config = VpnConfig.fromJson(payload);
     expect(config.activeCore, VpnActiveCore.xray);
     expect(config.trusttunnelProfile, isNull);
-    expect(config.xrayProfile, isNotNull);
+    expect(config.engineProfile, isNotNull);
   });
 
   test('active_core=trusttunnel without profile → FormatException', () {
@@ -146,7 +146,7 @@ void main() {
     expect(config.activeCore, VpnActiveCore.hysteria);
     expect(config.isHysteriaSession, isTrue);
     expect(config.hysteriaProfile!.server, 'hy2.teremokconnect.online:443');
-    expect(config.xrayProfile, isNull);
+    expect(config.engineProfile, isNull);
     expect(config.trusttunnelProfile, isNull);
 
     final node = VpnNode.fromJson({

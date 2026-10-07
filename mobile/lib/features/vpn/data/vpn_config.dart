@@ -7,14 +7,14 @@ enum VpnActiveCore {
   hysteria,
 }
 
-/// Immutable models for `GET /api/v1/vpn/config` (Xray XOR TrustTunnel).
+/// Immutable models for `GET /api/v1/vpn/config` (parked VLESS XOR TrustTunnel).
 class VpnConfig {
   const VpnConfig({
     required this.username,
     required this.links,
     required this.expire,
     required this.activeCore,
-    this.xrayProfile,
+    this.engineProfile,
     this.trusttunnelProfile,
     this.hysteriaProfile,
     this.nodeHost,
@@ -27,8 +27,9 @@ class VpnConfig {
   /// Authoritative core for this connect session.
   final VpnActiveCore activeCore;
 
-  /// Native-runtime Xray profile (schema 1|2). Required when [activeCore] is xray.
-  final XrayProfile? xrayProfile;
+  /// Backend `xray_profile` wire payload (schema 1|2). Required when
+  /// [activeCore] is [VpnActiveCore.xray].
+  final EngineProfile? engineProfile;
 
   /// TrustTunnel core profile. Required when [activeCore] is trusttunnel.
   final TrustTunnelProfile? trusttunnelProfile;
@@ -63,7 +64,7 @@ class VpnConfig {
         if (addr.isNotEmpty) return addr;
       }
     }
-    final candidates = xrayProfile?.candidates ?? const <XrayCandidate>[];
+    final candidates = engineProfile?.candidates ?? const <EngineCandidate>[];
     if (candidates.isEmpty) return null;
     final candidateHost = candidates.first.host.trim();
     if (candidateHost.isNotEmpty && candidateHost != 'unknown') {
@@ -79,7 +80,7 @@ class VpnConfig {
       return host == null ? const [] : [host];
     }
     return [
-      for (final candidate in xrayProfile?.candidates ?? const <XrayCandidate>[])
+      for (final candidate in engineProfile?.candidates ?? const <EngineCandidate>[])
         if (candidate.host.isNotEmpty && candidate.host != 'unknown')
           candidate.host,
     ];
@@ -87,11 +88,11 @@ class VpnConfig {
 
   /// Preferred hop: match [nodeHost], else first candidate.
   ///
-  /// Only valid for Xray sessions — callers must not use this for TT.
-  XrayCandidate get primaryCandidate {
-    final profile = xrayProfile;
+  /// Only valid for parked-VLESS sessions — callers must not use this for TT.
+  EngineCandidate get primaryCandidate {
+    final profile = engineProfile;
     if (profile == null || profile.candidates.isEmpty) {
-      throw StateError('primaryCandidate requires an Xray profile');
+      throw StateError('primaryCandidate requires an engine profile');
     }
     final host = nodeHost?.trim();
     if (host != null && host.isNotEmpty) {
@@ -111,8 +112,8 @@ class VpnConfig {
       links: links,
       expire: expire,
       activeCore: VpnActiveCore.xray,
-      xrayProfile: XrayProfile(
-        schemaVersion: xrayProfile!.schemaVersion,
+      engineProfile: EngineProfile(
+        schemaVersion: engineProfile!.schemaVersion,
         candidates: [primary],
       ),
       trusttunnelProfile: trusttunnelProfile,
@@ -132,7 +133,7 @@ class VpnConfig {
         ? HysteriaProfile.fromJson(Map<String, dynamic>.from(rawHy))
         : null;
     final rawCore = (json['active_core'] as String?)?.trim().toLowerCase();
-    final hasXrayMap = json['xray_profile'] is Map;
+    final hasEngineMap = json['xray_profile'] is Map;
 
     final VpnActiveCore activeCore;
     if (rawCore == 'trusttunnel') {
@@ -141,9 +142,9 @@ class VpnConfig {
       activeCore = VpnActiveCore.hysteria;
     } else if (rawCore == 'xray') {
       activeCore = VpnActiveCore.xray;
-    } else if (hy != null && !hasXrayMap && tt == null) {
+    } else if (hy != null && !hasEngineMap && tt == null) {
       activeCore = VpnActiveCore.hysteria;
-    } else if (tt != null && !hasXrayMap) {
+    } else if (tt != null && !hasEngineMap) {
       // Legacy payload without active_core: TT-only body.
       activeCore = VpnActiveCore.trusttunnel;
     } else {
@@ -165,7 +166,7 @@ class VpnConfig {
           isUtc: true,
         ),
         activeCore: VpnActiveCore.trusttunnel,
-        xrayProfile: null,
+        engineProfile: null,
         trusttunnelProfile: tt,
         hysteriaProfile: null,
         nodeHost: (nodeHost != null && nodeHost.isNotEmpty)
@@ -189,7 +190,7 @@ class VpnConfig {
           isUtc: true,
         ),
         activeCore: VpnActiveCore.hysteria,
-        xrayProfile: null,
+        engineProfile: null,
         trusttunnelProfile: null,
         hysteriaProfile: hy,
         nodeHost: (nodeHost != null && nodeHost.isNotEmpty)
@@ -198,7 +199,7 @@ class VpnConfig {
       );
     }
 
-    final xrayProfile = _resolveXrayProfile(json, links: links);
+    final engineProfile = _resolveEngineProfile(json, links: links);
     final nodeHost = json['node_host'] as String?;
     return VpnConfig(
       username: json['username'] as String,
@@ -208,12 +209,12 @@ class VpnConfig {
         isUtc: true,
       ),
       activeCore: VpnActiveCore.xray,
-      xrayProfile: xrayProfile,
+      engineProfile: engineProfile,
       trusttunnelProfile: tt,
       hysteriaProfile: hy,
       nodeHost: nodeHost?.isNotEmpty == true
           ? nodeHost
-          : xrayProfile.candidates.first.host,
+          : engineProfile.candidates.first.host,
     );
   }
 
@@ -226,20 +227,20 @@ class VpnConfig {
           VpnActiveCore.hysteria => 'hysteria',
           VpnActiveCore.xray => 'xray',
         },
-        if (xrayProfile != null) 'xray_profile': xrayProfile!.toJson(),
+        if (engineProfile != null) 'xray_profile': engineProfile!.toJson(),
         if (trusttunnelProfile != null)
           'trusttunnel_profile': trusttunnelProfile!.toJson(),
         if (hysteriaProfile != null) 'hysteria_profile': hysteriaProfile!.toJson(),
         if (nodeHost != null) 'node_host': nodeHost,
       };
 
-  static XrayProfile _resolveXrayProfile(
+  static EngineProfile _resolveEngineProfile(
     Map<String, dynamic> json, {
     required List<String> links,
   }) {
     final rawProfile = json['xray_profile'];
     if (rawProfile is Map) {
-      return XrayProfile.fromJson(Map<String, dynamic>.from(rawProfile));
+      return EngineProfile.fromJson(Map<String, dynamic>.from(rawProfile));
     }
 
     final vless = pickVlessLink(
@@ -252,11 +253,11 @@ class VpnConfig {
       );
     }
     final fallback = _realityFallbackFromSingBox(json['sing_box_config']);
-    final candidate = xrayCandidateFromVlessLink(
+    final candidate = engineCandidateFromVlessLink(
       vless,
       realityFallback: fallback,
     );
-    return XrayProfile(schemaVersion: 1, candidates: [candidate]);
+    return EngineProfile(schemaVersion: 1, candidates: [candidate]);
   }
 
   /// Fill blank Reality fields from legacy sing-box outbound when present.
@@ -281,16 +282,16 @@ class VpnConfig {
 }
 
 /// Backend `xray_profile` (schema 1|2).
-class XrayProfile {
-  const XrayProfile({
+class EngineProfile {
+  const EngineProfile({
     required this.schemaVersion,
     required this.candidates,
   });
 
   final int schemaVersion;
-  final List<XrayCandidate> candidates;
+  final List<EngineCandidate> candidates;
 
-  factory XrayProfile.fromJson(Map<String, dynamic> json) {
+  factory EngineProfile.fromJson(Map<String, dynamic> json) {
     final schemaVersion = json['schema_version'] as int;
     if (schemaVersion != 1 && schemaVersion != 2) {
       throw FormatException(
@@ -300,7 +301,7 @@ class XrayProfile {
     final rawCandidates = json['candidates'] as List;
     final candidates = rawCandidates
         .map(
-          (candidate) => XrayCandidate.fromJson(
+          (candidate) => EngineCandidate.fromJson(
             Map<String, dynamic>.from(candidate as Map),
           ),
         )
@@ -308,7 +309,7 @@ class XrayProfile {
     if (candidates.isEmpty) {
       throw const FormatException('xray_profile candidates must not be empty');
     }
-    return XrayProfile(
+    return EngineProfile(
       schemaVersion: schemaVersion,
       candidates: candidates,
     );
@@ -321,9 +322,9 @@ class XrayProfile {
       };
 }
 
-/// Complete credentials and transport settings for one Xray egress.
-class XrayCandidate {
-  const XrayCandidate({
+/// Complete credentials and transport settings for one egress hop.
+class EngineCandidate {
+  const EngineCandidate({
     required this.id,
     required this.label,
     required this.host,
@@ -363,18 +364,18 @@ class XrayCandidate {
   final String? path;
   final String? mode;
 
-  factory XrayCandidate.fromJson(Map<String, dynamic> json) {
+  factory EngineCandidate.fromJson(Map<String, dynamic> json) {
     final protocol = json['protocol'] as String? ?? '';
     if (protocol != 'vless') {
-      throw FormatException('Unsupported Xray protocol: $protocol');
+      throw FormatException('Unsupported VLESS protocol: $protocol');
     }
     final security = json['security'] as String? ?? '';
     if (security != 'reality') {
-      throw FormatException('Unsupported Xray security: $security');
+      throw FormatException('Unsupported VLESS security: $security');
     }
     final port = _asInt(json['port']);
     if (port < 1 || port > 65535) {
-      throw FormatException('Invalid Xray candidate port: $port');
+      throw FormatException('Invalid candidate port: $port');
     }
     final publicKey = (json['public_key'] as String? ?? '').trim();
     final serverName = (json['server_name'] as String? ?? '').trim();
@@ -385,14 +386,14 @@ class XrayCandidate {
         shortId.isEmpty ||
         fingerprint.isEmpty) {
       throw const FormatException(
-        'Xray candidate missing Reality fields '
+        'candidate missing Reality fields '
         '(public_key/server_name/short_id/fingerprint)',
       );
     }
     final host = json['host'] as String? ?? '';
     final path = (json['path'] as String?)?.trim();
     final mode = (json['mode'] as String?)?.trim();
-    return XrayCandidate(
+    return EngineCandidate(
       id: json['id'] as String? ?? host,
       label: json['label'] as String? ?? host,
       host: host,

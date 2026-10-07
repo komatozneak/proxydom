@@ -40,5 +40,5 @@ internal fun isHysteriaCore(params: Map<String, Any?>): Boolean =
     params["vpnCore"] == ProxyDomVpnService.VPN_CORE_HYSTERIA
 
 /** Pasted non-Hy2 profile. Same gomobile runtime as Hy2 (ADR 026). */
-internal fun isXrayShareCore(params: Map<String, Any?>): Boolean =
-    params["vpnCore"] == "xray"
+internal fun isVlessShareCore(params: Map<String, Any?>): Boolean =
+    params["vpnCore"] == "vless"

@@ -77,7 +77,7 @@ func StartPacketTun(mtu int) string {
 	dev := &packetDevice{Endpoint: ep}
 	ep.AddNotify(dev)
 
-	tunnel.T().SetDialer(&hyDialer{c: hyClient})
+	tunnel.T().SetProxy(&hyDialer{c: hyClient})
 	st, err := createTunStack(ep)
 	if err != nil {
 		ep.Close()

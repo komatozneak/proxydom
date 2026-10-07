@@ -47,7 +47,7 @@ class VpnNode {
 
   bool get isConnected => status.toLowerCase() == 'connected';
 
-  /// TrustTunnel node → client starts the TT core instead of Xray.
+  /// TrustTunnel node → client starts the TT core instead of the VLESS engine.
   bool get isTrustTunnel => protocol == kVpnNodeProtocolTrusttunnel;
 
   /// Hysteria2 Free LTE path (ADR 015). In Free Auto via data-plane prove.
@@ -71,8 +71,8 @@ class VpnNode {
   /// Premium India geo exit (local apps / prices). Never Auto.
   bool get isGeoIn => (purpose ?? '').toLowerCase() == 'geo-in';
 
-  /// Xray node eligible for Auto / General section (never TT / YT / coming-soon).
-  bool get isGeneralXray =>
+  /// VLESS node eligible for Auto / General section (never TT / YT / coming-soon).
+  bool get isGeneralEngine =>
       !isTrustTunnel &&
       !isYoutube &&
       !isGaming &&
@@ -82,8 +82,8 @@ class VpnNode {
 
   /// True when this row may be tried in Auto for [isPremium].
   ///
-  /// Free: metered Xray / Hy2. TT, YouTube, gaming, geo-in never.
-  /// Retired EU Xray (`eu-primary`) never enters Auto.
+  /// Free: metered VLESS / Hy2. TT, YouTube, gaming, geo-in never.
+  /// Retired EU VLESS (`eu-primary`) never enters Auto.
   bool inAutoPool({required bool isPremium}) {
     if (host.isEmpty || host == '0.0.0.0') return false;
     if (isComingSoon) return false;
@@ -98,7 +98,7 @@ class VpnNode {
       }
       return isHysteria ||
           protocol == kVpnNodeProtocolVlessReality ||
-          isGeneralXray ||
+          isGeneralEngine ||
           isGeoUs;
     }
     return true;

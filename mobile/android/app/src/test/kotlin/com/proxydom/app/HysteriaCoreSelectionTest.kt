@@ -10,7 +10,7 @@ class HysteriaCoreSelectionTest {
     fun `vpnCore hysteria selects Hy2`() {
         assertTrue(isHysteriaCore(mapOf("vpnCore" to "hysteria")))
         assertFalse(isHysteriaCore(emptyMap()))
-        assertFalse(isHysteriaCore(mapOf("vpnCore" to "xray")))
+        assertFalse(isHysteriaCore(mapOf("vpnCore" to "vless")))
         assertFalse(isHysteriaCore(mapOf("vpnCore" to "trusttunnel")))
         assertEquals("hysteria", ProxyDomVpnService.VPN_CORE_HYSTERIA)
     }

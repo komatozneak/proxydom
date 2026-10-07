@@ -107,7 +107,7 @@ class _TunnelLogScreenState extends State<TunnelLogScreen> {
       _LogGroup.ui => line.contains('[ui]'),
       _LogGroup.core => line.contains('[hy2]') ||
           line.contains('[core]') ||
-          line.contains('core.xray'),
+          line.contains('core.vless'),
       _LogGroup.dns => line.contains('dns='),
       _LogGroup.fetch => line.contains('[doc]'),
       _LogGroup.network => line.contains('[net]'),
@@ -197,49 +197,49 @@ class _TunnelLogScreenState extends State<TunnelLogScreen> {
   }
 
   /// Empty every sink, not just the one this screen draws from.
-///
-/// The window ring, the persisted product.log, the core windows, the broker
-/// journal and any exported proxydom-debug.txt all outlive the tap.
-///
-/// The journal needs someone else's hands. It lives under Program Data, where
-/// this user holds `Write` but not `Delete`, so deleting it from here failed
-/// on the ACL — and the broker opens `service.log` only for the microseconds
-/// of one line, so no handle was ever the blocker. Telling the user to stop
-/// the tunnel was advice that could not work. The broker owns the files and
-/// runs as SYSTEM, so it clears them.
-Future<void> _delete() async {
-  UiLog.action('logs', 'clear', level: ProductLogLevel.info);
-  AppLogBuffer.instance.clear();
-  await AppLogBuffer.instance.flushPersist();
-  await VpnController.instance.clearCoreLog();
-  final onDisk = await deleteWindowsServiceLog();
-  final blocked = <String>[
-    if (windowsDesktop) ...await WindowsTunnel.instance.clearServiceLog(),
-    ...onDisk.blocked,
-  ];
-  UiLog.action(
-    'logs',
-    'clear_files',
-    level: ProductLogLevel.info,
-    result: blocked.isEmpty ? 'ok' : 'partial',
-    extra: {
-      'deleted': onDisk.deleted.length,
-      'blocked': blocked.length,
-    },
-  );
-  if (!mounted) return;
-  setState(() {
-    _lines = const [];
-    _frozen = _level == TunnelLogLevel.off ? const [] : null;
-  });
-  if (blocked.isNotEmpty) {
-    final l = AppL10n.of(context);
-    showProxyDomToast(
-      l.tunnelLogsClearBlocked(blocked.join(', ')),
-      tone: ToastTone.failure,
+  ///
+  /// The window ring, the persisted product.log, the core windows, the broker
+  /// journal and any exported proxydom-debug.txt all outlive the tap.
+  ///
+  /// The journal needs someone else's hands. It lives under Program Data, where
+  /// this user holds `Write` but not `Delete`, so deleting it from here failed
+  /// on the ACL — and the broker opens `service.log` only for the microseconds
+  /// of one line, so no handle was ever the blocker. Telling the user to stop
+  /// the tunnel was advice that could not work. The broker owns the files and
+  /// runs as SYSTEM, so it clears them.
+  Future<void> _delete() async {
+    UiLog.action('logs', 'clear', level: ProductLogLevel.info);
+    AppLogBuffer.instance.clear();
+    await AppLogBuffer.instance.flushPersist();
+    await VpnController.instance.clearCoreLog();
+    final onDisk = await deleteWindowsServiceLog();
+    final blocked = <String>[
+      if (windowsDesktop) ...await WindowsTunnel.instance.clearServiceLog(),
+      ...onDisk.blocked,
+    ];
+    UiLog.action(
+      'logs',
+      'clear_files',
+      level: ProductLogLevel.info,
+      result: blocked.isEmpty ? 'ok' : 'partial',
+      extra: {
+        'deleted': onDisk.deleted.length,
+        'blocked': blocked.length,
+      },
     );
+    if (!mounted) return;
+    setState(() {
+      _lines = const [];
+      _frozen = _level == TunnelLogLevel.off ? const [] : null;
+    });
+    if (blocked.isNotEmpty) {
+      final l = AppL10n.of(context);
+      showProxyDomToast(
+        l.tunnelLogsClearBlocked(blocked.join(', ')),
+        tone: ToastTone.failure,
+      );
+    }
   }
-}
 
   @override
   Widget build(BuildContext context) {

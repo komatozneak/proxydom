@@ -195,7 +195,7 @@ func StartTun(fd int, mtu int) string {
 		closeTunFd(fd)
 		return fmt.Sprintf("tun fd: %v", err)
 	}
-	tunnel.T().SetDialer(&hyDialer{c: hyClient})
+	tunnel.T().SetProxy(&hyDialer{c: hyClient})
 	st, err := createTunStack(dev)
 	if err != nil {
 		dev.Close()

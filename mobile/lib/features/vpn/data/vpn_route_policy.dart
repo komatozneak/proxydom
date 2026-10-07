@@ -1,23 +1,23 @@
-// Single source of truth for runtime route feature flags (Xray-core / ADR 005).
+// Single source of truth for runtime route feature flags (VLESS engine / ADR 005).
 //
-// Ads policy: curated auction hosts via TLS sniff when [kXrayAdsBlockEnabled]
+// Ads policy: curated auction hosts via TLS sniff when [kEngineAdsBlockEnabled]
 // is true. Огонь `geosite:category-ads-all` stays experimental
-// ([kXrayOgonAdsAllEnabled]). Mid-roll SSAI on `googlevideo.com` is not
+// ([kEngineOgonAdsAllEnabled]). Mid-roll SSAI on `googlevideo.com` is not
 // removable via VPN routing. Default both OFF during speed benches; tests may
 // force ON via RoutePolicy.
 
 /// Curated-list ads reject (no FakeDNS). OFF by default — sniffing collateral.
-const bool kXrayAdsBlockEnabled = false;
+const bool kEngineAdsBlockEnabled = false;
 
 /// Legacy alias for callers still using the sing-box-era name.
-const bool kAdsBlockEnabled = kXrayAdsBlockEnabled;
+const bool kAdsBlockEnabled = kEngineAdsBlockEnabled;
 
 /// Огонь FakeDNS + `geosite:category-ads-all`. Prod stays OFF.
-const bool kXrayOgonAdsAllEnabled = false;
+const bool kEngineOgonAdsAllEnabled = false;
 
-/// Exact/suffix hosts eligible for `ads-reject` when [kXrayAdsBlockEnabled] is true.
+/// Exact/suffix hosts eligible for `ads-reject` when [kEngineAdsBlockEnabled] is true.
 /// Auction/tracker only — never video CDN (`googlevideo.com`, `gvt1.com`, …).
-const kXrayAdsBlockDomains = <String>[
+const kEngineAdsBlockDomains = <String>[
   'doubleclick.net',
   'googleadservices.com',
   'googlesyndication.com',

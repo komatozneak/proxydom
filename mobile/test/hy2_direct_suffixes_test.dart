@@ -142,15 +142,16 @@ void main() {
     );
   });
 
-  test('Android VLESS start sends app exclusions and no site suffixes', () async {
+  test('Android VLESS start sends app exclusions and no site suffixes',
+      () async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     SharedPreferences.setMockInitialValues({});
     await SplitTunnelPrefs.setDisallowedPackage('ru.yandex.taxi', true);
     final map = await _captureStartParams(
-      () => VpnController.instance.startXray('{"outbounds":[]}'),
+      () => VpnController.instance.startVless('{"outbounds":[]}'),
     );
-    expect(map['vpnCore'], 'xray');
-    expect(map['xrayConfig'], '{"outbounds":[]}');
+    expect(map['vpnCore'], 'vless');
+    expect(map['vlessConfig'], '{"outbounds":[]}');
     expect(
       List<String>.from(map['disallowedApplications'] as List<dynamic>),
       ['ru.yandex.taxi'],
@@ -163,7 +164,7 @@ void main() {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     SharedPreferences.setMockInitialValues({});
     final map = await _captureStartParams(
-      () => VpnController.instance.startXray('{}'),
+      () => VpnController.instance.startVless('{}'),
     );
     expect(map, isNot(contains('disallowedApplications')));
     expect(map, isNot(contains('directDomainSuffixes')));
@@ -174,7 +175,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     await SplitTunnelPrefs.setDisallowedPackage('ru.yandex.taxi', true);
     final map = await _captureStartParams(
-      () => VpnController.instance.startXray('{}'),
+      () => VpnController.instance.startVless('{}'),
     );
     expect(map, isNot(contains('disallowedApplications')));
     expect(map, isNot(contains('directDomainSuffixes')));

@@ -151,7 +151,7 @@ class VpnShadePolicyTest {
         assertFalse(VpnShadePolicy.isUsableParamsJson("{}"))
         assertFalse(VpnShadePolicy.isUsableParamsJson("{not-json"))
         assertTrue(VpnShadePolicy.isUsableParamsJson("""{"vpnCore":"hysteria"}"""))
-        assertTrue(VpnShadePolicy.isUsableParamsJson("""{"vpnCore":"xray"}"""))
+        assertTrue(VpnShadePolicy.isUsableParamsJson("""{"vpnCore":"vless"}"""))
         assertTrue(VpnShadePolicy.isUsableParamsJson("""{"address":"172.19.0.1"}"""))
         assertTrue(VpnShadePolicy.isUsableParamsJson("""{"outboundServer":"10.0.0.1"}"""))
         assertTrue(VpnShadePolicy.isUsableParamsJson("""{"xrayCandidateConfigs":[]}"""))

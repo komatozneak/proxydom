@@ -154,14 +154,18 @@ class VpnController {
   }
 
   /// Auto: sequential data-plane prove over already-minted [paramsJson] rows.
-  Future<bool> startAuto(List<String> paramsJsonList, {String? sessionId}) async {
+  Future<bool> startAuto(List<String> paramsJsonList,
+      {String? sessionId}) async {
     if (paramsJsonList.isEmpty) {
       throw VpnControllerException('auto pool empty');
     }
     try {
       final result = await _methodChannel.invokeMethod<bool>(
         'startAuto',
-        {'candidatesJson': paramsJsonList, if (sessionId != null) 'sessionId': sessionId},
+        {
+          'candidatesJson': paramsJsonList,
+          if (sessionId != null) 'sessionId': sessionId
+        },
       );
       return result ?? false;
     } on PlatformException catch (e) {
@@ -244,14 +248,15 @@ class VpnController {
     }
   }
 
-  /// Start in-process Xray (same gomobile runtime as Hy2). [configJson] has
-  /// secrets; it is not logged.
+  /// Start the in-process VLESS core (v2ray-core, same gomobile runtime as
+  /// Hy2). The dial gate stays closed; this is the parked path. [configJson]
+  /// has secrets; it is not logged.
   ///
   /// Android app exclusions use the same package list as Hysteria2. Site
   /// suffixes stay out of this start: VLESS does not apply them, and
   /// [SplitTunnelPrefs.markApplied] would hide that the site draft is still
   /// pending.
-  Future<bool> startXray(
+  Future<bool> startVless(
     String configJson, {
     String? displayLabel,
     String? sessionId,
@@ -263,13 +268,13 @@ class VpnController {
             ..sort());
       final paramsJson = jsonEncode({
         'schemaVersion': 2,
-        'vpnCore': 'xray',
+        'vpnCore': 'vless',
         'sessionName': kVpnBrandSessionName,
         'displayLabel': (displayLabel?.trim().isNotEmpty == true)
             ? displayLabel!.trim()
             : kVpnBrandSessionName,
-        'outboundType': 'xray',
-        'xrayConfig': configJson,
+        'outboundType': 'vless',
+        'vlessConfig': configJson,
         if (disallowedApps.isNotEmpty) 'disallowedApplications': disallowedApps,
       });
       final result = await _methodChannel.invokeMethod<bool>(
@@ -281,7 +286,7 @@ class VpnController {
       );
       return result ?? false;
     } on PlatformException catch (e) {
-      throw VpnControllerException('xray start failed: ${e.code}');
+      throw VpnControllerException('vless start failed: ${e.code}');
     }
   }
 
@@ -435,7 +440,7 @@ class VpnController {
     }
   }
 
-  /// Core decision log level. Applied on the next Xray start.
+  /// Core decision log level. Applied on the next VLESS start.
   Future<void> setCoreLogLevel(String level) async {
     try {
       await _methodChannel.invokeMethod<void>(
@@ -460,7 +465,7 @@ class VpnController {
     }
   }
 
-  /// Last N lines of VPN core stderr (Xray / legacy sing-box working dir).
+  /// Last N lines of the VLESS core log (and any leftover stderr file).
   Future<String?> getVpnCoreStderrTail({int maxLines = 400}) async {
     try {
       return await _methodChannel.invokeMethod<String>(

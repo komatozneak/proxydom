@@ -12,9 +12,9 @@ void main() {
   });
 
   test('warning token folds to warn', () {
-    final badge = tunnelLogBadge('[Warning] core.xray started');
+    final badge = tunnelLogBadge('[Warning] core.vless started');
     expect(badge!.label, 'warn');
-    expect(badge.after, ' core.xray started');
+    expect(badge.after, ' core.vless started');
   });
 
   test('a line without a level stays whole', () {

@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:proxydom/features/vpn/data/vpn_session_inputs.dart';
-import 'package:proxydom/features/vpn/data/xray_config_builder.dart';
+import 'package:proxydom/features/vpn/data/engine_config_builder.dart';
 
 void main() {
   const testCreds = VlessRealityCreds(
@@ -11,7 +11,7 @@ void main() {
     serverPort: 443,
     flow: 'xtls-rprx-vision',
     transport: 'tcp',
-    security: 'reality',
+    security: 'tls',
     serverName: 'www.cloudflare.com',
     publicKey: 'testPublicKey123',
     shortId: 'abcd1234',
@@ -24,7 +24,7 @@ void main() {
     uuid: 'alternate-uuid',
     serverPort: 8443,
     transport: 'raw',
-    security: 'reality',
+    security: 'tls',
     serverName: 'alternate.example',
     publicKey: 'alternatePublicKey',
     shortId: 'ef567890',
@@ -83,11 +83,11 @@ void main() {
 
   Map<String, dynamic> buildAndParse(VpnSessionInputs inputs) {
     final json =
-        XrayConfigBuilder.buildCandidateConfigs(inputs).first.configJson;
+        EngineConfigBuilder.buildCandidateConfigs(inputs).first.configJson;
     return jsonDecode(json) as Map<String, dynamic>;
   }
 
-  group('XrayConfigBuilder (modeless, Ogon-style)', () {
+  group('EngineConfigBuilder (modeless, Ogon-style)', () {
     test('produces valid JSON with required top-level keys', () {
       final config = buildAndParse(makeInputs());
       expect((config['log'] as Map)['loglevel'], 'warning');
@@ -161,7 +161,7 @@ void main() {
       expect(resolverIdx, lessThan(catchAllIdx));
     });
 
-    test('port 53 DNS hijack covers tun-in + socks-in (gVisor default)', () {
+    test('port 53 DNS hijack covers the socks inbound', () {
       final config = buildAndParse(makeInputs());
       final rules = (config['routing'] as Map)['rules'] as List;
       final dnsRule = rules.firstWhere(
@@ -169,7 +169,7 @@ void main() {
       ) as Map;
       expect(dnsRule['port'], '53');
       expect(dnsRule['outboundTag'], 'dns-out');
-      expect(dnsRule['inboundTag'], ['tun-in', 'socks-in']);
+      expect(dnsRule['inboundTag'], ['socks-in']);
     });
 
     test('system DNS UDP/53 resolvers bypass residual UDP block', () {
@@ -265,7 +265,7 @@ void main() {
       expect(ads['outboundTag'], 'ads-reject');
     });
 
-    test('gVisor default: tun-in + SOCKS + no FakeDNS + IPIfNonMatch + final proxy',
+    test('SOCKS inbound + no FakeDNS + IPIfNonMatch + final proxy',
         () {
       final config = buildAndParse(makeInputs());
       expect(config.containsKey('fakedns'), isFalse);
@@ -284,7 +284,7 @@ void main() {
       expect((quicOb['settings'] as Map)['redirect'], '127.0.0.1:9');
       expect(
         (config['inbounds'] as List).any((i) => (i as Map)['protocol'] == 'tun'),
-        isTrue,
+        isFalse,
       );
       final socks = (config['inbounds'] as List).firstWhere(
         (i) => (i as Map)['protocol'] == 'socks',
@@ -309,20 +309,23 @@ void main() {
       expect(last['network'], 'tcp');
     });
 
-    test('gVisor mode: emits tun-in when useHevTunBridge is false', () {
+    test('useHevTunBridge no longer changes the engine inbound', () {
+      // The engine config is always SOCKS-only: hy2bind attaches the
+      // VpnService TUN to that port (StartShareTun), and the loader rejects
+      // a `tun` inbound (hy2bind_engine_load.go, shareInbound).
       final config = buildAndParse(makeInputs(useHevTunBridge: false));
       expect(config.containsKey('fakedns'), isFalse);
-      final tun = (config['inbounds'] as List).firstWhere(
-        (i) => (i as Map)['protocol'] == 'tun',
-      ) as Map;
-      expect(tun['tag'], 'tun-in');
-      expect(tun['sniffing']['routeOnly'], isFalse);
+      final inbounds = config['inbounds'] as List;
+      expect(inbounds, hasLength(1));
+      final socks = inbounds.single as Map;
+      expect(socks['protocol'], 'socks');
+      expect(socks['tag'], 'socks-in');
       expect(
-        (tun['sniffing']['destOverride'] as List).cast<String>(),
+        (socks['sniffing']['destOverride'] as List).cast<String>(),
         isNot(contains('fakedns')),
       );
       expect((config['routing'] as Map)['rules'].first['inboundTag'],
-          ['tun-in', 'socks-in']);
+          ['socks-in']);
     });
 
     test('hev mode: SOCKS-only inbound when useHevTunBridge is true', () {
@@ -352,11 +355,11 @@ void main() {
       expect(pinned, isEmpty);
     });
 
-    test('inbounds: tun-in + socks-in for gVisor default', () {
+    test('inbounds: a single SOCKS inbound', () {
       final config = buildAndParse(makeInputs());
       final inbounds = config['inbounds'] as List;
-      expect(inbounds, hasLength(2));
-      expect(inbounds.any((i) => (i as Map)['protocol'] == 'tun'), isTrue);
+      expect(inbounds, hasLength(1));
+      expect(inbounds.any((i) => (i as Map)['protocol'] == 'tun'), isFalse);
       final socks = inbounds.firstWhere((i) => (i as Map)['protocol'] == 'socks') as Map;
       expect(socks['listen'], '127.0.0.1');
       expect(socks['port'], 10808);
@@ -378,7 +381,7 @@ void main() {
 
     test('build rejects combined candidates', () {
       expect(
-        () => XrayConfigBuilder.build(makeInputs()),
+        () => EngineConfigBuilder.build(makeInputs()),
         throwsArgumentError,
       );
     });
@@ -402,7 +405,7 @@ void main() {
     });
 
     test('runtime configs preserve backend order and isolate candidates', () {
-      final runtime = XrayConfigBuilder.buildCandidateConfigs(makeInputs());
+      final runtime = EngineConfigBuilder.buildCandidateConfigs(makeInputs());
 
       expect(runtime.map((item) => item.id), ['node1', 'node2']);
       expect(runtime.map((item) => item.host), ['1.2.3.4', '5.6.7.8']);
@@ -414,13 +417,13 @@ void main() {
             .cast<Map>()
             .where((outbound) => outbound['protocol'] == 'vless')
             .toList();
-        expect(inbounds, hasLength(2));
+        expect(inbounds, hasLength(1));
         final socks = inbounds.firstWhere((i) => i['protocol'] == 'socks');
         expect(socks['listen'], '127.0.0.1');
         expect(socks['port'], 10808);
         expect(
           inbounds.any((i) => i['protocol'] == 'tun'),
-          isTrue,
+          isFalse,
         );
         expect(vless, hasLength(1));
         expect(vless.single['tag'], 'proxy');
@@ -679,7 +682,7 @@ void main() {
         tun: testTun,
       );
 
-      final runtime = XrayConfigBuilder.buildCandidateConfigs(inputs);
+      final runtime = EngineConfigBuilder.buildCandidateConfigs(inputs);
       expect(runtime, hasLength(2));
       for (final c in runtime) {
         final config = jsonDecode(c.configJson) as Map<String, dynamic>;
@@ -719,19 +722,20 @@ void main() {
       expect(ips, contains('10.0.0.1/32'));
     });
 
-    test('VLESS outbound has Reality settings', () {
+    test('VLESS outbound carries TLS settings and no Reality block', () {
       final config = buildAndParse(makeInputs());
       final outbounds = config['outbounds'] as List;
       final vless = outbounds.firstWhere(
         (o) => (o as Map)['protocol'] == 'vless',
       ) as Map;
       final stream = vless['streamSettings'] as Map;
-      expect(stream['security'], 'reality');
-      final reality = stream['realitySettings'] as Map;
-      expect(reality['publicKey'], 'testPublicKey123');
-      expect(reality['shortId'], 'abcd1234');
-      expect(reality['fingerprint'], 'chrome');
-      expect(reality['serverName'], 'www.cloudflare.com');
+      expect(stream['security'], 'tls');
+      // v2ray-core has no Reality engine; the builder refuses it instead of
+      // emitting a block the loader would reject.
+      expect(stream.containsKey('realitySettings'), isFalse);
+      final tlsSettings = stream['tlsSettings'] as Map;
+      expect(tlsSettings['serverName'], 'www.cloudflare.com');
+      expect(tlsSettings['fingerprint'], 'chrome');
       expect(vless['settings']['packetEncoding'], 'xudp');
       final sockopt = stream['sockopt'] as Map;
       expect(sockopt['tcpNoDelay'], isTrue);
@@ -739,7 +743,7 @@ void main() {
     });
 
     test('each candidate keeps its own port, credentials, and transport', () {
-      final runtime = XrayConfigBuilder.buildCandidateConfigs(makeInputs());
+      final runtime = EngineConfigBuilder.buildCandidateConfigs(makeInputs());
       final config = jsonDecode(runtime[1].configJson) as Map<String, dynamic>;
       final vless = (config['outbounds'] as List)
           .where((outbound) => (outbound as Map)['protocol'] == 'vless')
@@ -750,26 +754,26 @@ void main() {
           ((alternate['settings'] as Map)['vnext'] as List).single as Map;
       final user = (next['users'] as List).single as Map;
       final stream = alternate['streamSettings'] as Map;
-      final reality = stream['realitySettings'] as Map;
+      final tlsSettings = stream['tlsSettings'] as Map;
 
       expect(next['address'], '5.6.7.8');
       expect(next['port'], 8443);
       expect(user['id'], 'alternate-uuid');
       expect(user.containsKey('flow'), isFalse);
       expect(stream['network'], 'tcp');
-      expect(reality['serverName'], 'alternate.example');
-      expect(reality['publicKey'], 'alternatePublicKey');
-      expect(reality['spiderX'], '/probe');
+      expect(stream['security'], 'tls');
+      expect(tlsSettings['serverName'], 'alternate.example');
+      expect(tlsSettings['fingerprint'], 'firefox');
     });
 
-    test('xhttp stream-one emits xhttpSettings and omits vision flow', () {
+    test('xhttp transport is refused by the parked engine', () {
       const xhttpCreds = VlessRealityCreds(
         protocol: 'vless',
         uuid: 'xhttp-uuid',
         serverPort: 443,
-        flow: 'xtls-rprx-vision', // must be ignored for xhttp
+        flow: 'xtls-rprx-vision',
         transport: 'xhttp',
-        security: 'reality',
+        security: 'tls',
         serverName: 'www.cloudflare.com',
         publicKey: 'xhttpPublicKey',
         shortId: '7711c319',
@@ -778,75 +782,59 @@ void main() {
         path: '/teremok/xhttp',
         mode: 'stream-one',
       );
-      final runtime = XrayConfigBuilder.buildCandidateConfigs(
-        const VpnSessionInputs(
-          hops: [
-            EgressHop(
-              id: 'eu-primary',
-              host: '31.59.103.144',
-              label: 'EU',
-              creds: xhttpCreds,
-            ),
-          ],
-          route: RoutePolicy(),
-          tun: testTun,
+      // v2ray-core has no `xhttp` dialer, so the builder refuses the
+      // candidate instead of emitting an xhttpSettings block.
+      expect(
+        () => EngineConfigBuilder.buildCandidateConfigs(
+          const VpnSessionInputs(
+            hops: [
+              EgressHop(
+                id: 'eu-primary',
+                host: '31.59.103.144',
+                label: 'EU',
+                creds: xhttpCreds,
+              ),
+            ],
+            route: RoutePolicy(),
+            tun: testTun,
+          ),
         ),
+        throwsArgumentError,
       );
-      final config = jsonDecode(runtime.single.configJson) as Map<String, dynamic>;
-      final vless = (config['outbounds'] as List)
-          .where((outbound) => (outbound as Map)['protocol'] == 'vless')
-          .cast<Map>()
-          .single;
-      final user =
-          ((((vless['settings'] as Map)['vnext'] as List).single as Map)['users']
-                  as List)
-              .single as Map;
-      final stream = vless['streamSettings'] as Map;
-      final xhttp = stream['xhttpSettings'] as Map;
-
-      expect(user.containsKey('flow'), isFalse);
-      expect(vless['settings'].containsKey('packetEncoding'), isFalse);
-      expect(stream['network'], 'xhttp');
-      expect(xhttp['path'], '/teremok/xhttp');
-      expect(xhttp['mode'], 'stream-one');
-      expect(stream['security'], 'reality');
     });
 
-    test('xhttp omitted mode defaults to stream-up', () {
-      const xhttpCreds = VlessRealityCreds(
+    test('reality security is refused by the parked engine', () {
+      const realityCreds = VlessRealityCreds(
         protocol: 'vless',
-        uuid: 'xhttp-uuid',
+        uuid: 'reality-uuid',
         serverPort: 443,
-        transport: 'xhttp',
+        transport: 'tcp',
         security: 'reality',
         serverName: 'www.cloudflare.com',
-        publicKey: 'xhttpPublicKey',
+        publicKey: 'realityPublicKey',
         shortId: '7711c319',
         fingerprint: 'chrome',
         spiderX: '/',
-        path: '/teremok/xhttp',
       );
-      final runtime = XrayConfigBuilder.buildCandidateConfigs(
-        const VpnSessionInputs(
-          hops: [
-            EgressHop(
-              id: 'eu-primary',
-              host: '31.59.103.144',
-              label: 'EU',
-              creds: xhttpCreds,
-            ),
-          ],
-          route: RoutePolicy(),
-          tun: testTun,
+      // v2ray-core carries no Reality engine, and xtls/reality ships only
+      // the server half (docs/ops/engine-migration/02-reality-spike-findings.md).
+      expect(
+        () => EngineConfigBuilder.buildCandidateConfigs(
+          const VpnSessionInputs(
+            hops: [
+              EgressHop(
+                id: 'eu-primary',
+                host: '31.59.103.144',
+                label: 'EU',
+                creds: realityCreds,
+              ),
+            ],
+            route: RoutePolicy(),
+            tun: testTun,
+          ),
         ),
+        throwsArgumentError,
       );
-      final config = jsonDecode(runtime.single.configJson) as Map<String, dynamic>;
-      final vless = (config['outbounds'] as List)
-          .where((outbound) => (outbound as Map)['protocol'] == 'vless')
-          .cast<Map>()
-          .single;
-      final xhttp = (vless['streamSettings'] as Map)['xhttpSettings'] as Map;
-      expect(xhttp['mode'], 'stream-up');
     });
 
     test('routing domainStrategy is IPIfNonMatch', () {

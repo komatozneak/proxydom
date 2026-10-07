@@ -34,7 +34,7 @@ String sessionProtocolLabel({
       selected == kVpnNodeProtocolTrusttunnel) {
     return 'TRUSTTUNNEL';
   }
-  if (config?.xrayProfile?.candidates.isNotEmpty == true) {
+  if (config?.engineProfile?.candidates.isNotEmpty == true) {
     return friendlyProtocolLabel(config!.primaryCandidate.protocol);
   }
   if (selected.isNotEmpty) {
@@ -77,8 +77,8 @@ String resolveVpnDisplayLabel(VpnConfig config, {String? displayLabel}) {
 
   addHost(config.nodeHost);
   addHost(config.expectedEgressHost);
-  final xray = config.xrayProfile;
-  if (xray != null && xray.candidates.isNotEmpty) {
+  final profile = config.engineProfile;
+  if (profile != null && profile.candidates.isNotEmpty) {
     addHost(config.primaryCandidate.host);
   }
 

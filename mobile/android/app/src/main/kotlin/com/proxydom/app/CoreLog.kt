@@ -27,7 +27,7 @@ internal object CoreLog {
     fun enrich(context: Context, configJson: String): String {
         return try {
             val obj = JSONObject(configJson)
-            val dir = File(context.filesDir, "xray")
+            val dir = File(context.filesDir, "vless")
             dir.mkdirs()
             obj.put("proxydomLogDir", dir.absolutePath)
             obj.put("proxydomLogLevel", resolve(context))
@@ -38,7 +38,7 @@ internal object CoreLog {
     }
 
     fun readTail(context: Context, maxLines: Int): String {
-        val dir = File(context.filesDir, "xray")
+        val dir = File(context.filesDir, "vless")
         val lines = ArrayList<String>()
         for (name in listOf("core.1.log", "core.log")) {
             val file = File(dir, name)
@@ -51,7 +51,7 @@ internal object CoreLog {
     }
 
     fun clear(context: Context) {
-        val dir = File(context.filesDir, "xray")
+        val dir = File(context.filesDir, "vless")
         File(dir, "core.log").delete()
         File(dir, "core.1.log").delete()
     }

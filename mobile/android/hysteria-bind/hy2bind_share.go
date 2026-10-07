@@ -13,46 +13,46 @@ import (
 	"syscall"
 	"time"
 
+	v2core "github.com/v2fly/v2ray-core/v5"
+	vnet "github.com/v2fly/v2ray-core/v5/common/net"
+	"github.com/v2fly/v2ray-core/v5/transport/internet"
 	"github.com/xjasonlyu/tun2socks/v2/core/device/fdbased"
 	M "github.com/xjasonlyu/tun2socks/v2/metadata"
 	"github.com/xjasonlyu/tun2socks/v2/proxy"
 	"github.com/xjasonlyu/tun2socks/v2/tunnel"
-	xnet "github.com/xtls/xray-core/common/net"
-	xcore "github.com/xtls/xray-core/core"
-	"github.com/xtls/xray-core/transport/internet"
 )
 
-// shareSocks is the local Xray SOCKS inbound. Hy2 keeps :10808.
+// shareSocks is the local VLESS-core SOCKS inbound. Hy2 keeps :10808.
 const shareSocks = "127.0.0.1:10809"
 
 var (
 	shareMu   sync.Mutex
-	shareInst *xcore.Instance
+	shareInst *v2core.Instance
 )
 
-// StartShare runs upstream Xray-core (MPL-2.0) inside this gomobile runtime.
+// StartShare runs v2ray-core inside this gomobile runtime.
 // A second gomobile runtime deadlocks on Pixel, so this is not a separate AAR.
 // [configJSON] holds credentials; do not log it.
 func StartShare(configJSON string) string {
 	if configJSON == "" {
-		return "empty xray config"
+		return "empty share config"
 	}
 	prepareCoreLog(configJSON)
-	registerXrayProtector()
+	registerEngineProtector()
 	lastProtectErr.Store("")
 	cfg, err := loadShareConfig(configJSON)
 	if err != nil {
-		return fmt.Sprintf("xray: %v", err)
+		return fmt.Sprintf("engine: %v", err)
 	}
-	inst, err := xcore.New(cfg)
+	inst, err := v2core.New(cfg)
 	if err != nil {
-		return fmt.Sprintf("xray: %v", err)
+		return fmt.Sprintf("engine: %v", err)
 	}
-	// New() installs Xray's log.Instance. Bind after that so decision lines
+	// New() installs the core log handler. Bind after that so decision lines
 	// reach the file instead of stdout.
 	bindCoreLogHandler()
 	if err := inst.Start(); err != nil {
-		return fmt.Sprintf("xray: %v", err)
+		return fmt.Sprintf("engine: %v", err)
 	}
 	noteShareCore()
 	shareMu.Lock()
@@ -81,34 +81,32 @@ func shareRunning() bool {
 	return shareInst != nil
 }
 
-var xrayProtectOnce sync.Once
+var engineProtectOnce sync.Once
 var lastProtectErr atomic.Value
 
 // LastProtectError is the latest VpnService.protect failure. Empty if the
-// last dial was protected. Xray ignores a controller error and would still
-// connect the socket, so a failed protect also closes the fd.
+// last dial was protected. A failed protect returns an error so the socket
+// is not connected.
 func LastProtectError() string {
 	text, _ := lastProtectErr.Load().(string)
 	return text
 }
 
-func registerXrayProtector() {
-	xrayProtectOnce.Do(func() {
+func registerEngineProtector() {
+	engineProtectOnce.Do(func() {
 		internet.UseAlternativeSystemDialer(protectedSystemDialer{})
 	})
 }
 
 // protectedSystemDialer owns the socket: protect(fd) then connect.
 // A failed protect returns an error. The fd is not closed inside Control,
-// because Xray has not handed the socket to connect yet.
+// because the core has not handed the socket to connect yet.
 type protectedSystemDialer struct{}
-
-func (protectedSystemDialer) DestIpAddress() xnet.IP { return nil }
 
 func (protectedSystemDialer) Dial(
 	ctx context.Context,
-	_ xnet.Address,
-	dest xnet.Destination,
+	_ vnet.Address,
+	dest vnet.Destination,
 	_ *internet.SocketConfig,
 ) (net.Conn, error) {
 	dialer := &net.Dialer{
@@ -135,7 +133,7 @@ func (protectedSystemDialer) Dial(
 	return dialer.DialContext(ctx, dest.Network.SystemString(), dest.NetAddr())
 }
 
-// StartShareTun pumps VpnService TUN to the local Xray SOCKS inbound.
+// StartShareTun pumps VpnService TUN to the local share SOCKS inbound.
 func StartShareTun(fd int, mtu int) string {
 	if fd <= 0 {
 		return "invalid tun fd"
@@ -145,7 +143,7 @@ func StartShareTun(fd int, mtu int) string {
 	}
 	if !shareRunning() {
 		closeTunFd(fd)
-		return "xray not started"
+		return "share core not started"
 	}
 	mu.Lock()
 	defer mu.Unlock()
@@ -158,7 +156,7 @@ func StartShareTun(fd int, mtu int) string {
 		closeTunFd(fd)
 		return fmt.Sprintf("tun fd: %v", err)
 	}
-	tunnel.T().SetDialer(&socksDialer{addr: shareSocks})
+	tunnel.T().SetProxy(&socksDialer{addr: shareSocks})
 	st, err := createTunStack(dev)
 	if err != nil {
 		dev.Close()
@@ -173,7 +171,7 @@ type socksDialer struct {
 	addr string
 }
 
-var _ proxy.Dialer = (*socksDialer)(nil)
+var _ proxy.Proxy = (*socksDialer)(nil)
 
 func (d *socksDialer) DialContext(ctx context.Context, m *M.Metadata) (net.Conn, error) {
 	conn, err := net.DialTimeout("tcp", d.addr, 5*time.Second)

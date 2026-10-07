@@ -2,12 +2,19 @@ import 'dart:convert';
 
 import 'share_link_parser.dart';
 
-/// Local SOCKS port for an in-process Xray core (MPL-2.0). Not Hy2's :10808.
-const xraySocksPort = 10809;
+/// Local SOCKS port for the in-process VLESS engine (v2ray-core, MIT).
+/// Not Hy2's :10808.
+const shareSocksPort = 10809;
 
 /// JSON for `hy2bind.StartShare`. Returns null for Hysteria2 or a link we
 /// cannot describe. Callers must not log the result: it contains secrets.
-String? buildXraySocksConfig(ParsedShareLink link) {
+///
+/// "Cannot describe" includes Reality and XHTTP: the engine is v2ray-core,
+/// which has no Reality engine and no `xhttp` dialer, and the loader refuses
+/// both (mobile/android/hysteria-bind/hy2bind_engine_load.go). Returning null
+/// keeps the failure explicit instead of handing over a document the loader
+/// will reject.
+String? buildShareSocksConfig(ParsedShareLink link) {
   if (link.isHysteria2) return null;
   final outbound = _outbound(link);
   if (outbound == null) return null;
@@ -17,7 +24,7 @@ String? buildXraySocksConfig(ParsedShareLink link) {
     'inbounds': [
       {
         'listen': '127.0.0.1',
-        'port': xraySocksPort,
+        'port': shareSocksPort,
         'protocol': 'socks',
         'settings': {'udp': true, 'auth': 'noauth'},
         'tag': 'socks-in',
@@ -71,6 +78,8 @@ Map<String, Object?>? _vless(ParsedShareLink link) {
   final security = (q['security'] ?? 'tls').trim();
   final sni = (q['sni'] ?? q['peer'] ?? host).trim();
   final flow = (q['flow'] ?? '').trim();
+  final stream = _stream(q, network: network, security: security, sni: sni);
+  if (stream == null) return null;
   return {
     'protocol': 'vless',
     'settings': {
@@ -88,7 +97,7 @@ Map<String, Object?>? _vless(ParsedShareLink link) {
         },
       ],
     },
-    'streamSettings': _stream(q, network: network, security: security, sni: sni),
+    'streamSettings': stream,
   };
 }
 
@@ -102,6 +111,8 @@ Map<String, Object?>? _trojan(ParsedShareLink link) {
   final network = (q['type'] ?? q['net'] ?? 'tcp').trim();
   final security = (q['security'] ?? 'tls').trim();
   final sni = (q['sni'] ?? q['peer'] ?? host).trim();
+  final stream = _stream(q, network: network, security: security, sni: sni);
+  if (stream == null) return null;
   return {
     'protocol': 'trojan',
     'settings': {
@@ -113,7 +124,7 @@ Map<String, Object?>? _trojan(ParsedShareLink link) {
         },
       ],
     },
-    'streamSettings': _stream(q, network: network, security: security, sni: sni),
+    'streamSettings': stream,
   };
 }
 
@@ -131,6 +142,16 @@ Map<String, Object?>? _vmess(ParsedShareLink link) {
   final tls = '${decoded['tls'] ?? ''}'.trim();
   final security = tls.isEmpty ? 'none' : tls;
   final sni = '${decoded['sni'] ?? decoded['host'] ?? host}'.trim();
+  final stream = _stream(
+    {
+      'path': '${decoded['path'] ?? ''}',
+      'host': '${decoded['host'] ?? ''}',
+    },
+    network: network,
+    security: security,
+    sni: sni,
+  );
+  if (stream == null) return null;
   return {
     'protocol': 'vmess',
     'settings': {
@@ -144,15 +165,7 @@ Map<String, Object?>? _vmess(ParsedShareLink link) {
         },
       ],
     },
-    'streamSettings': _stream(
-      {
-        'path': '${decoded['path'] ?? ''}',
-        'host': '${decoded['host'] ?? ''}',
-      },
-      network: network,
-      security: security,
-      sni: sni,
-    ),
+    'streamSettings': stream,
   };
 }
 
@@ -189,6 +202,13 @@ Map<String, Object?>? _shadowsocks(ParsedShareLink link) {
   }
   final uri = Uri.tryParse(link.raw.split('#').first);
   final q = uri?.queryParameters ?? const <String, String>{};
+  final stream = _stream(
+    q,
+    network: (q['type'] ?? q['net'] ?? 'tcp').trim(),
+    security: 'none',
+    sni: host,
+  );
+  if (stream == null) return null;
   return {
     'protocol': 'shadowsocks',
     'settings': {
@@ -201,16 +221,11 @@ Map<String, Object?>? _shadowsocks(ParsedShareLink link) {
         },
       ],
     },
-    'streamSettings': _stream(
-      q,
-      network: (q['type'] ?? q['net'] ?? 'tcp').trim(),
-      security: 'none',
-      sni: host,
-    ),
+    'streamSettings': stream,
   };
 }
 
-Map<String, Object?> _stream(
+Map<String, Object?>? _stream(
   Map<String, String> q, {
   required String network,
   required String security,
@@ -221,23 +236,24 @@ Map<String, Object?> _stream(
     'mkcp' => 'kcp',
     _ => network,
   };
+  final scheme = security.isEmpty ? 'none' : security;
+  // v2ray-core has no Reality engine and no `xhttp` dialer; see the caller's
+  // docstring. Null here makes the whole link "not describable".
+  if (scheme == 'reality' ||
+      normalized == 'xhttp' ||
+      normalized == 'splithttp') {
+    return null;
+  }
   final stream = <String, Object?>{
     'network': normalized,
-    'security': security.isEmpty ? 'none' : security,
+    'security': scheme,
   };
-  if (security == 'tls') {
+  if (scheme == 'tls') {
     final allowInsecure = q['allowInsecure'] == '1' || q['insecure'] == '1';
     stream['tlsSettings'] = {
       'serverName': sni,
       if ((q['fp'] ?? '').isNotEmpty) 'fingerprint': q['fp'],
       if (allowInsecure) 'allowInsecure': true,
-    };
-  } else if (security == 'reality') {
-    stream['realitySettings'] = {
-      'serverName': sni,
-      'publicKey': q['pbk'] ?? '',
-      'shortId': q['sid'] ?? '',
-      'fingerprint': (q['fp'] ?? '').isEmpty ? 'chrome' : q['fp'],
     };
   }
   if (normalized == 'ws') {
