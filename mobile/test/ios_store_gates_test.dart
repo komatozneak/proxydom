@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:proxydom/core/ios_store_gates.dart';
+import 'package:proxydom/features/vpn/data/dial_set.dart';
 import 'package:proxydom/features/settings/data/qs_tile_prefs.dart';
 import 'package:proxydom/features/settings/data/vpn_notification_prefs.dart';
 

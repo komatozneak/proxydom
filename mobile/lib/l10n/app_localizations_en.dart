@@ -1492,10 +1492,10 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get freeHy2OnlyAdd =>
-      'Could not add the node: only Hysteria2 is supported.';
+      'Could not add the node: this protocol cannot start on this device.';
 
   @override
-  String get freeNoHy2Lines => 'This source has no Hysteria2 lines.';
+  String get freeNoHy2Lines => 'This source has no lines the client can start.';
 
   @override
   String get freeSchemeParked => 'This protocol cannot start.';

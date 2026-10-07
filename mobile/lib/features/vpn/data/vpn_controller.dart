@@ -249,8 +249,8 @@ class VpnController {
   }
 
   /// Start the in-process VLESS core (v2ray-core, same gomobile runtime as
-  /// Hy2). The dial gate stays closed; this is the parked path. [configJson]
-  /// has secrets; it is not logged.
+  /// Hy2). Android calls this for an imported line the dial gate admitted
+  /// (ADR 035). [configJson] has secrets; it is not logged.
   ///
   /// Android app exclusions use the same package list as Hysteria2. Site
   /// suffixes stay out of this start: VLESS does not apply them, and

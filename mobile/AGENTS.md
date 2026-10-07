@@ -14,7 +14,14 @@ Name rule: `.cursor/rules/05-product-names.mdc`.
 
 ## Dial set
 
-**Hysteria2 only** — `hy2://` and `hysteria2://`, including `obfs=salamander` and port hop — on Android, iOS, and Windows. VLESS and VLESS Reality dial is **parked** on every platform (ADR 033): the parser still reads `vless://`, the dial gate does not admit it. Trojan, Shadowsocks, and VMess are out of the product. The running engine is hy2bind. The parked VLESS path inside that same binary is `v2fly/v2ray-core` (MIT), not `xray-core`; Reality is not part of that engine. `libXray.aar` was removed because it embeds `sagernet/sing` (GPL-3.0, ADR 036); do not fetch it back. `libbox` is sing-box and must not be vendored. hev stays dormant — do not call it from the active connect path. Policy: `docs/product-policy.md`. Authority: `docs/decisions/033-client-hy2-only-dial-set.md`.
+**Two sets, do not mix them (ADR 035):**
+
+- **Catalog dial set** — nodes the catalog and the bot serve: **Hysteria2 only** (ADR 018, ADR 033), `hy2://` and `hysteria2://` including `obfs=salamander` and port hop.
+- **Imported-document dial set** — lines the user pastes or pulls from a foreign HTTPS document: **Hysteria2 on every OS, and VLESS where the engine can carry the line.** Today that is Android only. The engine is in-process `v2fly/v2ray-core` v5.54.2 (MIT) inside hy2bind; ADR 036 is why it is not `xray-core`. Reality and XHTTP are not describable, so those lines stay inactive. iOS has no VLESS engine and the Windows broker does not carry transport; both gates stay closed until their own tasks. `lib/features/vpn/data/dial_set.dart` is the single authority.
+
+Trojan, Shadowsocks, and VMess stay out of the product: the parser reads them, the dial gate does not admit them (ADR 033 §3, ADR 035 §5). A mixed document imports whole and is never deleted. A line this platform cannot start is a neutral badge, not an error.
+
+`libXray.aar` was removed because it embeds `sagernet/sing` (GPL-3.0, ADR 036); do not fetch it back. `libbox` is sing-box and must not be vendored. hev stays dormant — do not call it from the active connect path. Policy: `docs/product-policy.md`. Authority: `docs/decisions/033-client-hy2-only-dial-set.md` (catalog) and `docs/decisions/035-imported-document-dial-set.md` (import).
 
 ## Brand / palette
 

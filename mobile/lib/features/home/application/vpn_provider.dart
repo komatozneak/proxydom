@@ -8,6 +8,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/diagnostics/product_log.dart';
 import '../../../core/diagnostics/session_trace.dart';
 import '../../../core/ios_store_gates.dart';
+import '../../vpn/data/dial_set.dart';
+import '../../vpn/data/engine_share_config.dart';
 import '../../vpn/data/hy2_import_store.dart';
 import '../../vpn/data/share_session_log.dart';
 import '../../vpn/data/subscription_device.dart';
@@ -1150,19 +1152,37 @@ class VpnNotifier extends Notifier<VpnStatus> {
           'apps': blocked.length,
         });
         final profile = imported.hy2?.profile;
+        // ADR 035: an imported document may carry VLESS beside Hysteria2.
+        // The catalog never does. Android builds the in-process v2ray-core
+        // document here. iOS and Windows stay closed, so canDialScheme
+        // refuses vless there and the share_unsupported path remains.
+        // buildShareSocksConfig is the authority for what the engine can
+        // describe: Reality and XHTTP return null and do not start.
+        final vlessConfig = profile == null && canDialScheme(imported.scheme)
+            ? buildShareSocksConfig(imported)
+            : null;
         var started = false;
-        SessionTrace.mark('config', {'scheme': imported.scheme});
-        if (profile != null) {
+        SessionTrace.mark('config', {
+          'scheme': imported.scheme,
+          if (profile == null) 'core': vlessConfig == null ? 'none' : 'vless',
+        });
+        if (profile != null || vlessConfig != null) {
           final dial = _dialGen == 0 ? ++_dialGen : _dialGen;
           _handshakeHost = imported.endpoint;
           _nativeGenFloor = _lastNativeGen;
           final raw = windowsDesktop
               ? await VpnController.instance.startWindowsShare(imported.raw)
-              : await VpnController.instance.startHysteria(
-                  profile,
-                  displayLabel: shown.title,
-                  sessionId: _sid,
-                );
+              : profile != null
+                  ? await VpnController.instance.startHysteria(
+                      profile,
+                      displayLabel: shown.title,
+                      sessionId: _sid,
+                    )
+                  : await VpnController.instance.startVless(
+                      vlessConfig!,
+                      displayLabel: shown.title,
+                      sessionId: _sid,
+                    );
           started = raw && _dialGen == dial;
         } else {
           SessionTrace.mark('fail', {'code': 'share_unsupported'});

@@ -17,6 +17,14 @@ Color goldInk(BuildContext context) {
   return dark ? AppBrand.mascotGoldLit : AppBrand.mascotGoldDeep;
 }
 
+/// Short mark for a share scheme. Hysteria2 stays `HY2`; everything else is
+/// the scheme itself, so a VLESS line is not labelled as Hysteria2.
+String protocolMark(String scheme) {
+  final name = scheme.trim().toLowerCase();
+  if (name == 'hysteria2' || name == 'hy2' || name.isEmpty) return 'HY2';
+  return name.toUpperCase();
+}
+
 /// One node in the pool, drawn as a line on an instrument panel rather than as
 /// a list row: a mark, the name, where it lives, and the protocol.
 ///
@@ -31,6 +39,8 @@ class NodeLine extends StatelessWidget {
     required this.endpoint,
     required this.selected,
     required this.onTap,
+    this.protocol = 'HY2',
+    this.dialable = true,
   });
 
   final PoolServerLabel label;
@@ -38,13 +48,23 @@ class NodeLine extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
+  /// Short protocol mark. Callers pass the line's own scheme; the default
+  /// stays HY2 for the catalog-era fixtures that only ever drew Hysteria2.
+  final String protocol;
+
+  /// False paints a neutral mark and shows [endpoint] as the reason the line
+  /// cannot start, instead of a place name that looks tappable.
+  final bool dialable;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final dark = theme.brightness == Brightness.dark;
     final mute = dark ? AppBrand.inkMutedDark : AppBrand.inkMutedLight;
     final gold = goldInk(context);
-    final subtitle = label.subtitle.isEmpty ? endpoint : label.subtitle;
+    final subtitle = !dialable || label.subtitle.isEmpty
+        ? endpoint
+        : label.subtitle;
 
     return HoverBuilder(
       onTap: onTap,
@@ -111,26 +131,29 @@ class NodeLine extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 10),
-                    // The protocol is the one fact a person deploying through
-                    // this app checks first; Hy2 is the only one that can dial.
-                    // A wash of the house gold, not another outlined box.
+                    // The protocol mark. A line this device cannot start wears
+                    // plain ink, the same neutral badge as the locations card.
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 7,
                         vertical: 3,
                       ),
                       decoration: BoxDecoration(
-                        color: AppBrand.mascotGold.withValues(
-                          alpha: dark ? 0.16 : 0.13,
-                        ),
+                        color: dialable
+                            ? AppBrand.mascotGold.withValues(
+                                alpha: dark ? 0.16 : 0.13,
+                              )
+                            : theme.colorScheme.onSurface.withValues(
+                                alpha: 0.06,
+                              ),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        'HY2',
+                        protocol,
                         style: terminalText(
                           context,
                           size: 9.5,
-                          color: gold,
+                          color: dialable ? gold : mute,
                           weight: 700,
                           spacing: 1.4,
                         ),
