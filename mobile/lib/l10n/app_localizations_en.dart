@@ -234,7 +234,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get homeNodeAuthRefused =>
-      'The node refused authentication. Refresh the subscription document, then connect again.';
+      'The node refused authentication. The session is not allowed: this period’s traffic is used up, or the key was revoked.';
 
   @override
   String get homePathIncompatibleHint =>

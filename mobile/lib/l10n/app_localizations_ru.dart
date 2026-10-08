@@ -235,7 +235,7 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get homeNodeAuthRefused =>
-      'Узел отклонил аутентификацию. Обновите документ подписки и подключитесь снова.';
+      'Узел отклонил аутентификацию. Сессия не разрешена: трафик периода закончился или ключ отозван.';
 
   @override
   String get homePathIncompatibleHint =>

@@ -77,14 +77,14 @@ void main() {
       expect(err.message, isNot(contains('405')));
     });
 
-    test('the refusal copy asks to refresh the subscription document', () {
+    test('the refusal copy names a denied session, not the raw 405', () {
       expect(
         AppL10nRu().homeNodeAuthRefused,
-        'Узел отклонил аутентификацию. Обновите документ подписки и подключитесь снова.',
+        'Узел отклонил аутентификацию. Сессия не разрешена: трафик периода закончился или ключ отозван.',
       );
       expect(
         AppL10nEn().homeNodeAuthRefused,
-        contains('Refresh the subscription document'),
+        contains('traffic is used up'),
       );
     });
 
