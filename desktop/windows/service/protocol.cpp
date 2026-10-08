@@ -541,110 +541,94 @@ std::string state_event(std::int64_t generation, const std::string& state, const
 
 namespace {
 
-std::string proxy_outbound(const ShareLine& line, const std::string& server_ip) {
+std::string json_string_array(const std::vector<std::string>& values) {
+  std::ostringstream out;
+  bool first = true;
+  for (const auto& value : values) {
+    if (!domain_allowed(value)) continue;
+    if (!first) out << ',';
+    first = false;
+    out << '"' << json_escape(value) << '"';
+  }
+  return out.str();
+}
+
+// Outbound object for proxydom-engine. VLESS is described and then refused by
+// the process (`error transport`); it is not rewritten as a TCP dial.
+std::string engine_outbound(const ShareLine& line, const std::string& server_ip) {
   if (server_ip.empty() || server_ip.find(':') != std::string::npos) return {};
   std::ostringstream outbound;
   if (line.scheme == "hysteria2") {
-    outbound << "{\"type\":\"hysteria2\",\"tag\":\"proxy\",\"server\":\"" << json_escape(server_ip)
-             << "\",\"server_port\":" << line.port;
+    outbound << "{\"type\":\"hysteria2\",\"server\":\"" << json_escape(server_ip) << "\",\"server_port\":" << line.port;
     if (!line.server_ports.empty()) {
-      outbound << ",\"server_ports\":[\"" << json_escape(line.server_ports) << "\"]";
+      outbound << ",\"server_ports\":\"" << json_escape(line.server_ports) << "\"";
     }
     if (!line.hop_interval.empty()) {
       outbound << ",\"hop_interval\":\"" << json_escape(line.hop_interval) << "\"";
     }
-    outbound << ",\"password\":\"" << json_escape(line.password) << "\"";
+    outbound << ",\"password\":\"" << json_escape(line.password) << "\",\"sni\":\"" << json_escape(line.sni)
+             << "\",\"insecure\":" << (line.insecure ? "true" : "false");
     if (lower_copy(line.obfs) == "salamander") {
-      outbound << ",\"obfs\":{\"type\":\"salamander\",\"password\":\"" << json_escape(line.obfs_password)
-               << "\"}";
+      outbound << ",\"obfs\":\"salamander\",\"obfs_password\":\"" << json_escape(line.obfs_password) << "\"";
     }
-    outbound << ",\"tls\":{\"enabled\":true,\"server_name\":\"" << json_escape(line.sni) << "\",\"insecure\":"
-             << (line.insecure ? "true" : "false") << "}}";
+    outbound << "}";
   } else {
-    outbound << "{\"type\":\"vless\",\"tag\":\"proxy\",\"server\":\"" << json_escape(server_ip)
-             << "\",\"server_port\":" << line.port << ",\"uuid\":\"" << json_escape(line.uuid) << "\"";
+    outbound << "{\"type\":\"vless\",\"server\":\"" << json_escape(server_ip) << "\",\"server_port\":" << line.port
+             << ",\"uuid\":\"" << json_escape(line.uuid) << "\"";
     if (!line.flow.empty()) outbound << ",\"flow\":\"" << json_escape(line.flow) << "\"";
-    outbound << ",\"tls\":{\"enabled\":true,\"server_name\":\"" << json_escape(line.sni) << "\",\"insecure\":"
-             << (line.insecure ? "true" : "false") << ",\"utls\":{\"enabled\":true,\"fingerprint\":\""
-             << json_escape(line.fingerprint) << "\"}";
+    outbound << ",\"sni\":\"" << json_escape(line.sni) << "\",\"insecure\":" << (line.insecure ? "true" : "false")
+             << ",\"fingerprint\":\"" << json_escape(line.fingerprint) << "\"";
     if (line.security == "reality") {
-      outbound << ",\"reality\":{\"enabled\":true,\"public_key\":\"" << json_escape(line.public_key)
-               << "\",\"short_id\":\"" << json_escape(line.short_id) << "\"}";
+      outbound << ",\"security\":\"reality\",\"public_key\":\"" << json_escape(line.public_key) << "\",\"short_id\":\""
+               << json_escape(line.short_id) << "\"";
     }
-    outbound << "}}";
+    outbound << "}";
   }
   return outbound.str();
 }
 
 }  // namespace
 
-std::string build_singbox_probe_config(const ShareLine& line,
-                                       const std::string& server_ip,
-                                       unsigned short listen_port) {
+std::string build_engine_probe_config(const ShareLine& line,
+                                      const std::string& server_ip,
+                                      unsigned short listen_port) {
   if (listen_port == 0) return {};
-  const std::string outbound = proxy_outbound(line, server_ip);
+  const std::string outbound = engine_outbound(line, server_ip);
   if (outbound.empty()) return {};
   std::ostringstream config;
-  config << "{"
-         << "\"log\":{\"level\":\"warn\"},"
-         << "\"inbounds\":[{\"type\":\"mixed\",\"tag\":\"probe-in\",\"listen\":\"127.0.0.1\","
-         << "\"listen_port\":" << listen_port << "}],"
-         << "\"outbounds\":[" << outbound << "],"
-         << "\"route\":{\"final\":\"proxy\"}"
-         << "}";
+  config << "{\"log_level\":\"warn\",\"probe\":true,\"socks_listen\":\"127.0.0.1:" << listen_port
+         << "\",\"routing_applied\":false,\"dns_hijack\":false,\"outbound\":" << outbound << "}";
   return config.str();
 }
 
-std::string build_singbox_config(const ShareLine& line,
-                                 const std::string& server_ip,
-                                 const std::vector<std::string>& domains,
-                                 const std::vector<std::string>& force_proxy_domains,
-                                 bool udp_direct,
-                                 unsigned short api_port,
-                                 const std::string& api_secret) {
-  const std::string outbound = proxy_outbound(line, server_ip);
+std::string build_engine_config(const ShareLine& line,
+                                const std::string& server_ip,
+                                const std::vector<std::string>& domains,
+                                const std::vector<std::string>& force_proxy_domains,
+                                bool udp_direct,
+                                unsigned short api_port,
+                                const std::string& api_secret) {
+  const std::string outbound = engine_outbound(line, server_ip);
   if (outbound.empty()) return {};
 
-  std::ostringstream rules;
-  rules << "{\"action\":\"sniff\"},{\"protocol\":\"dns\",\"action\":\"hijack-dns\"},"
-           "{\"ip_cidr\":[\"10.0.0.0/8\",\"172.16.0.0/12\",\"192.168.0.0/16\",\"127.0.0.0/8\","
-           "\"fc00::/7\",\"fe80::/10\"],\"outbound\":\"direct\"}";
-  // sing-box takes the first matching rule, so force-proxy rows must sit above
-  // the UDP bypass — otherwise QUIC to a blocked CDN leaves the tunnel.
-  for (const auto& domain : force_proxy_domains) {
-    if (!domain_allowed(domain)) continue;
-    rules << ",{\"domain_suffix\":[\"" << json_escape(domain) << "\"],\"outbound\":\"proxy\"}";
-  }
-  for (const auto& domain : domains) {
-    if (!domain_allowed(domain)) continue;
-    rules << ",{\"domain_suffix\":[\"" << json_escape(domain) << "\"],\"outbound\":\"direct\"}";
-  }
-  // Game traffic is UDP to bare IPs with no name to match, and those addresses
-  // change. This rule is what lets a game bypass the tunnel without a list.
-  // It governs TUN traffic only; the engine's own proxy socket is not routed.
-  if (udp_direct) {
-    rules << ",{\"network\":\"udp\",\"outbound\":\"direct\"}";
-  }
-
+  // Domain lists are recorded in the order the sites screen already uses:
+  // force-proxy names, then exclusions, then the UDP flag. The process logs
+  // that it does not apply them. auto_route stays false: C++ installs the
+  // capture routes.
   std::ostringstream config;
   config << "{"
-         << "\"log\":{\"level\":\"info\"},"
-         << "\"dns\":{\"servers\":[{\"type\":\"udp\",\"tag\":\"remote\",\"server\":\"1.1.1.1\","
-         << "\"server_port\":53,\"detour\":\"proxy\"}],\"strategy\":\"ipv4_only\",\"final\":\"remote\"},"
-         << "\"inbounds\":[{\"type\":\"tun\",\"tag\":\"tun-in\",\"interface_name\":\"ProxyDomTun\","
-         << "\"address\":[\"198.18.0.1/30\"],\"stack\":\"system\","
-         << "\"auto_route\":false,\"strict_route\":false,"
-         << "\"dns_mode\":\"hijack\",\"dns_address\":[\"198.18.0.2\"]}],"
-         << "\"outbounds\":[" << outbound << ",{\"type\":\"direct\",\"tag\":\"direct\"}],"
-         << "\"route\":{\"auto_detect_interface\":true,\"final\":\"proxy\",\"rules\":[" << rules.str() << "]},"
-         << "\"experimental\":{";
-  if (api_port != 0) {
-    config << "\"clash_api\":{\"external_controller\":\"127.0.0.1:" << api_port << "\",\"secret\":\""
-           << json_escape(api_secret) << "\"}";
-  } else {
-    config << "\"cache_file\":{\"enabled\":false}";
-  }
-  config << "}"
-         << "}";
+         << "\"log_level\":\"info\","
+         << "\"probe\":false,"
+         << "\"socks_listen\":\"127.0.0.1:10808\","
+         << "\"tun\":{\"name\":\"ProxyDomTun\",\"address\":\"198.18.0.1/30\",\"dns\":\"198.18.0.2\","
+         << "\"mtu\":1280,\"auto_route\":false},"
+         << "\"force_proxy_domains\":[" << json_string_array(force_proxy_domains) << "],"
+         << "\"direct_domains\":[" << json_string_array(domains) << "],"
+         << "\"udp_direct\":" << (udp_direct ? "true" : "false") << ","
+         << "\"dns_hijack\":false,"
+         << "\"routing_applied\":false,"
+         << "\"api_port\":" << api_port << ","
+         << "\"api_secret\":\"" << json_escape(api_secret) << "\","
+         << "\"outbound\":" << outbound << "}";
   return config.str();
 }

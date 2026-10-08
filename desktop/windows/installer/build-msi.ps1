@@ -63,10 +63,12 @@ function Ensure-WixExtension([string]$Name) {
 
 function Ensure-ThirdParty {
     New-Item -ItemType Directory -Force -Path $ThirdParty | Out-Null
-    # sing-box.exe is GPL-3.0, and the broker still launches it. Deleting it
-    # belongs to task 05, in the same change as its replacement; doing it here
-    # breaks Connect. The payload check warns while the entry exists
-    # (KnownPayloadViolations in check-payload-licenses.ps1).
+    # sing-box.exe is GPL-3.0. The broker launches proxydom-engine.exe. The
+    # GPL binary stays in the payload until routing, DNS hijack, and the clash
+    # counters exist in that engine (task 05b). Deleting it earlier makes
+    # check-payload-licenses.ps1 fail on a stale KnownViolations entry, and
+    # deleting the entry while the file remains fails the other way. The check
+    # warns while both the entry and the file exist.
     $sing = Join-Path $ThirdParty "sing-box.exe"
     $wintun = Join-Path $ThirdParty "wintun.dll"
     # The prebuilt-binaries license travels with the DLL it covers.
@@ -182,13 +184,24 @@ Ensure-ThirdParty
 Copy-Item (Join-Path $ThirdParty "sing-box.exe") $Payload -Force
 Copy-Item (Join-Path $ThirdParty "wintun.dll") $Payload -Force
 Copy-Item (Join-Path $ThirdParty "wintun-LICENSE.txt") $Payload -Force
+Write-Host "Building proxydom-engine.exe"
+$engineDir = Join-Path $Repo "mobile\android\hysteria-bind"
+Push-Location $engineDir
+try {
+    $env:GOOS = "windows"
+    $env:GOARCH = "amd64"
+    $env:CGO_ENABLED = "0"
+    Invoke-Native { go build -o (Join-Path $Payload "proxydom-engine.exe") ./cmd/proxydom-engine } "go build proxydom-engine"
+} finally {
+    Pop-Location
+}
 # Also inside data\flutter_assets; a copy next to the executables is the one a
 # person finds in Program Files.
 Copy-Item (Join-Path $Mobile "assets\legal\THIRD-PARTY-NOTICES.md") $Payload -Force
 Write-Warning ("This MSI is not for release: it still ships sing-box.exe (GPL-3.0). " +
-    "Task 05 (docs/ops/engine-migration/05-windows-engine-swap.md) removes it together " +
-    "with the replacement engine. Removing it earlier breaks Connect, because the " +
-    "broker still launches sing-box.exe.")
+    "The broker launches proxydom-engine.exe. sing-box.exe stays until task 05b " +
+    "applies routing, DNS hijack, and clash counters and deletes the GPL binary " +
+    "in the same change. Domain rules in the engine config are recorded and not applied.")
 
 Write-Host "Checking payload licenses"
 $licenseCheck = Join-Path $Installer "check-payload-licenses.ps1"

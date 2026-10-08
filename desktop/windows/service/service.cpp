@@ -105,7 +105,7 @@ struct App {
   std::thread worker;
 
   App()
-      : engine(exe_dir() + L"\\sing-box.exe", proxy_dom_engine_config_path()),
+      : engine(exe_dir() + L"\\proxydom-engine.exe", proxy_dom_engine_config_path()),
         supervisor(routes, engine, resolver, probe, files, log, sleeper) {}
 
   void emit(const TunnelSnapshot& snap) {
@@ -615,7 +615,7 @@ int reconcile_standalone() {
   WSADATA wsa{};
   WSAStartup(MAKEWORD(2, 2), &wsa);
   Win32RouteTable routes;
-  Win32Engine engine(exe_dir() + L"\\sing-box.exe", proxy_dom_engine_config_path());
+  Win32Engine engine(exe_dir() + L"\\proxydom-engine.exe", proxy_dom_engine_config_path());
   Win32Resolver resolver;
   Win32ConnectivityProbe probe;
   Win32SessionFiles files;

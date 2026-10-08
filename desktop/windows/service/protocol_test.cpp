@@ -127,8 +127,8 @@ int main() {
   expect(line.server_ports == "1000:2000", "hop ports");
   expect(line.hop_interval == "30s", "hop interval");
 
-  const auto config = build_singbox_config(line, "203.0.113.10", {"lan.example"}, {}, false, 0, "");
-  expect(config.find("\"stack\":\"system\"") != std::string::npos, "windows tun uses the system adapter");
+  const auto config = build_engine_config(line, "203.0.113.10", {"lan.example"}, {}, false, 0, "");
+  expect(config.find("\"name\":\"ProxyDomTun\"") != std::string::npos, "tun name");
   expect(config.find("\"auto_route\":false") != std::string::npos, "engine does not own routes");
   expect(config.find("\"auto_route\":true") == std::string::npos, "auto_route stays off");
   expect(config.find("route_address") == std::string::npos, "engine installs no prefixes");
@@ -137,66 +137,59 @@ int main() {
   expect(config.find("198.18.0.2") != std::string::npos, "dns address");
   expect(config.find("salamander") != std::string::npos, "obfs in config");
   expect(config.find("lan.example") != std::string::npos, "direct domain");
-  expect(config.find("\"server_ports\":[\"1000:2000\"]") != std::string::npos, "hop range uses a colon");
+  expect(config.find("\"server_ports\":\"1000:2000\"") != std::string::npos, "hop range uses a colon");
+  expect(config.find("\"routing_applied\":false") != std::string::npos, "routing is recorded as not applied");
+  expect(config.find("\"dns_hijack\":false") != std::string::npos, "dns hijack is not claimed");
 
-  // Game traffic is UDP to bare IPs whose addresses change, so the tunnel is
-  // bypassed by protocol instead of by a list that would rot.
+  // The lists are still in the document, in the order the sites screen uses.
+  // This build of the engine does not apply them.
   const auto udp_config =
-      build_singbox_config(line, "203.0.113.10", {"steamserver.net"}, {"youtube.com"}, true, 0, "");
-  expect(udp_config.find("{\"network\":\"udp\",\"outbound\":\"direct\"}") != std::string::npos,
-         "udp bypass rule is emitted");
-  expect(build_singbox_config(line, "203.0.113.10", {}, {}, false, 0, "")
-             .find("\"network\":\"udp\"") == std::string::npos,
+      build_engine_config(line, "203.0.113.10", {"steamserver.net"}, {"youtube.com"}, true, 0, "");
+  expect(udp_config.find("\"udp_direct\":true") != std::string::npos, "udp bypass flag is recorded");
+  expect(build_engine_config(line, "203.0.113.10", {}, {}, false, 0, "")
+             .find("\"udp_direct\":true") == std::string::npos,
          "no udp bypass when the window did not ask");
   const auto force_at = udp_config.find("youtube.com");
-  const auto udp_at = udp_config.find("\"network\":\"udp\"");
+  const auto udp_at = udp_config.find("\"udp_direct\":true");
   const auto direct_at = udp_config.find("steamserver.net");
   expect(force_at != std::string::npos && udp_at != std::string::npos && direct_at != std::string::npos,
-         "routed config carries all three rules");
-  expect(force_at < udp_at, "force-proxy sits above the udp bypass");
-  expect(direct_at < udp_at, "site exclusions sit above the udp bypass");
-  const auto force_rule = udp_config.find("youtube.com");
-  expect(force_rule != std::string::npos &&
-             udp_config.find("\"domain_suffix\":[\"youtube.com\"],\"outbound\":\"proxy\"") != std::string::npos,
-         "force-proxy row routes to proxy, not direct");
+         "config carries force-proxy, exclusions, and the udp flag");
+  expect(force_at < udp_at, "force-proxy sits above the udp flag");
+  expect(direct_at < udp_at, "site exclusions sit above the udp flag");
+  expect(udp_config.find("\"force_proxy_domains\":[\"youtube.com\"]") != std::string::npos,
+         "force-proxy names are recorded");
 
-  // The broker reads its routing counters off a loopback clash api. Without it
-  // there is nothing in the journal that says where a game's UDP actually went.
-  expect(config.find("clash_api") == std::string::npos, "no controller without a port");
-  const auto api_config = build_singbox_config(line, "203.0.113.10", {}, {}, true, 19090, "abc123");
-  expect(api_config.find("\"external_controller\":\"127.0.0.1:19090\"") != std::string::npos,
-         "controller listens on loopback only");
-  expect(api_config.find("\"secret\":\"abc123\"") != std::string::npos, "controller carries the secret");
-  expect(api_config.find("0.0.0.0:19090") == std::string::npos,
-         "controller is not on a routable address");
-  expect(api_config.find("{\"network\":\"udp\",\"outbound\":\"direct\"}") != std::string::npos,
-         "counters do not displace the udp bypass");
-  const auto quoted = build_singbox_config(line, "203.0.113.10", {}, {}, false, 19091, "he\"llo\\there");
-  expect(quoted.find("\"secret\":\"he\\\"llo\\\\there\"") != std::string::npos,
+  expect(config.find("\"api_port\":0") != std::string::npos, "no controller without a port");
+  const auto api_config = build_engine_config(line, "203.0.113.10", {}, {}, true, 19090, "abc123");
+  expect(api_config.find("\"api_port\":19090") != std::string::npos, "api port is recorded");
+  expect(api_config.find("\"api_secret\":\"abc123\"") != std::string::npos, "api secret is recorded");
+  expect(api_config.find("0.0.0.0:19090") == std::string::npos, "controller is not on a routable address");
+  expect(api_config.find("\"udp_direct\":true") != std::string::npos, "api fields do not drop the udp flag");
+  const auto quoted = build_engine_config(line, "203.0.113.10", {}, {}, false, 19091, "he\"llo\\there");
+  expect(quoted.find("\"api_secret\":\"he\\\"llo\\\\there\"") != std::string::npos,
          "a quote or a backslash in the secret cannot break the config");
-  const auto no_api = build_singbox_config(line, "203.0.113.10", {}, {}, false, 0, "");
-  expect(no_api.find("\"experimental\":{") != std::string::npos, "experimental block is always present");
-  expect(no_api.find("\"experimental\":{}") == std::string::npos, "experimental block is never empty");
+  const auto no_api = build_engine_config(line, "203.0.113.10", {}, {}, false, 0, "");
+  expect(no_api.find("\"routing_applied\":false") != std::string::npos, "routing flag is always present");
+  expect(no_api.find("\"api_port\":0") != std::string::npos, "absent api is port 0");
 
   ShareLine slash;
   error.clear();
   expect(parse_share_line("hy2://secret@cdn.example:443/?sni=cdn.example", slash, error), "slash after port parses");
   expect(slash.port == 443 && slash.server_ports.empty(), "slash is not a port range");
-  const auto slash_config = build_singbox_config(slash, "203.0.113.10", {}, {}, false, 0, "");
+  const auto slash_config = build_engine_config(slash, "203.0.113.10", {}, {}, false, 0, "");
   expect(slash_config.find("server_ports") == std::string::npos, "plain port omits server_ports");
   expect(!parse_share_line("hy2://secret@cdn.example:443abc", slash, error), "junk port is refused");
   expect(error == "port", "junk port error");
   expect(config.find("1000-2000") == std::string::npos, "hop range is not a hyphen");
-  expect(config.find("\"action\":\"hijack-dns\"") != std::string::npos, "dns hijack rule");
-  expect(config.find("\"server\":\"1.1.1.1\"") != std::string::npos, "dns server");
+  expect(config.find("hijack-dns") == std::string::npos, "dns hijack is not pretended");
+  expect(config.find("\"dns_hijack\":false") != std::string::npos, "dns hijack flag is false");
   expect(config.find("secret+pass") != std::string::npos, "password reaches the engine config");
   expect(config.find("172.19.0.1") == std::string::npos, "tun prefix stays outside 172.16/12");
-  expect(build_singbox_config(line, "2001:db8::1", {}, {}, false, 0, "").empty(), "refuse ipv6 pin");
-  const auto probe = build_singbox_probe_config(line, "203.0.113.10", 17890);
-  expect(probe.find("\"type\":\"mixed\"") != std::string::npos, "probe has loopback proxy");
-  expect(probe.find("\"listen\":\"127.0.0.1\"") != std::string::npos, "probe is loopback only");
-  expect(probe.find("\"listen_port\":17890") != std::string::npos, "probe port");
-  expect(probe.find("\"type\":\"tun\"") == std::string::npos, "probe has no tun");
+  expect(build_engine_config(line, "2001:db8::1", {}, {}, false, 0, "").empty(), "refuse ipv6 pin");
+  const auto probe = build_engine_probe_config(line, "203.0.113.10", 17890);
+  expect(probe.find("\"probe\":true") != std::string::npos, "probe flag");
+  expect(probe.find("\"socks_listen\":\"127.0.0.1:17890\"") != std::string::npos, "probe is loopback only");
+  expect(probe.find("ProxyDomTun") == std::string::npos, "probe has no tun");
   expect(probe.find("auto_route") == std::string::npos, "probe changes no routes");
 
   ShareLine vless;
@@ -204,10 +197,11 @@ int main() {
   const std::string vless_uri =
       "vless://11111111-2222-3333-4444-555555555555@edge.example:443?security=reality&pbk=pub&sid=abcd&sni=edge.example&flow=xtls-rprx-vision&fp=chrome";
   expect(parse_share_line(vless_uri, vless, error), "parse vless");
-  const auto vless_config = build_singbox_config(vless, "203.0.113.11", {}, {}, false, 0, "");
+  const auto vless_config = build_engine_config(vless, "203.0.113.11", {}, {}, false, 0, "");
   expect(vless_config.find("\"public_key\":\"pub\"") != std::string::npos, "reality public key");
   expect(vless_config.find("private_key") == std::string::npos, "no server private key");
   expect(vless_config.find("xtls-rprx-vision") != std::string::npos, "flow");
+  expect(vless_config.find("\"type\":\"vless\"") != std::string::npos, "vless stays named so the engine can refuse it");
 
   const auto restored = state_event_v2(7, "idle", "", "", true);
   expect(restored.find("\"cleanup_verified\":true") != std::string::npos, "verified idle flag");

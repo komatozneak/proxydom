@@ -925,7 +925,7 @@ TunnelSnapshot TunnelSupervisor::run_connect(const ConnectRequest& request, Canc
     flows_ = flow_factory_(api_port, api_secret);
   }
   const std::string config =
-      build_singbox_config(line, server_ip, request.direct_domains, request.force_proxy_domains,
+      build_engine_config(line, server_ip, request.direct_domains, request.force_proxy_domains,
                            request.udp_direct, flows_ ? api_port : 0, api_secret);
   if (config.empty() || !files_.write_config(config)) {
     const unsigned long win32 = config.empty() ? 13u : files_.last_error();

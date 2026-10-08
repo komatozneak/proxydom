@@ -5,7 +5,8 @@
 #include <string>
 #include <vector>
 
-// Share-line to sing-box config for ADR 029. No Win32 types in this header.
+// Share-line to the Windows engine config (ADR 029, amended for the
+// proxydom-engine process). No Win32 types in this header.
 
 constexpr std::uint32_t kFrameMaxBody = 65536;
 
@@ -62,22 +63,21 @@ bool own_adapter_name(const std::wstring& name);
 bool domain_allowed(const std::string& host);
 
 // [server_ip] is the IPv4 pinned before the adapter comes up. Empty rejects.
-// [force_proxy_domains] are matched before the UDP rule, [udp_direct] last.
-// [api_port] and [api_secret] expose the loopback clash api the broker reads its
-// routing counters from. Port 0 leaves it off entirely.
-std::string build_singbox_config(const ShareLine& line,
-                                 const std::string& server_ip,
-                                 const std::vector<std::string>& domains,
-                                 const std::vector<std::string>& force_proxy_domains,
-                                 bool udp_direct,
-                                 unsigned short api_port,
-                                 const std::string& api_secret);
+// Domain lists, [udp_direct], and the clash api port are recorded in the
+// document. This engine build does not apply them: routing_applied and
+// dns_hijack are false, and a non-zero api port is logged as not applied.
+std::string build_engine_config(const ShareLine& line,
+                                const std::string& server_ip,
+                                const std::vector<std::string>& domains,
+                                const std::vector<std::string>& force_proxy_domains,
+                                bool udp_direct,
+                                unsigned short api_port,
+                                const std::string& api_secret);
 
-// First prove the key through a loopback SOCKS endpoint. This config has no
-// TUN inbound, auto_route, DNS hijack, or other system-network mutation.
-std::string build_singbox_probe_config(const ShareLine& line,
-                                       const std::string& server_ip,
-                                       unsigned short listen_port);
+// Loopback SOCKS only. No TUN, no routes, no DNS hijack.
+std::string build_engine_probe_config(const ShareLine& line,
+                                      const std::string& server_ip,
+                                      unsigned short listen_port);
 
 std::string state_event(std::int64_t generation,
                         const std::string& state,

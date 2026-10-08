@@ -32,6 +32,12 @@ std::wstring full_path(const std::wstring& path) {
   return full;
 }
 
+std::wstring exe_file_name(const std::wstring& path) {
+  const auto slash = path.find_last_of(L"\\/");
+  if (slash == std::wstring::npos) return path;
+  return path.substr(slash + 1);
+}
+
 }  // namespace
 
 Win32Engine::Win32Engine(std::wstring exe, std::wstring config) : impl_(new Impl) {
@@ -284,7 +290,10 @@ void Win32Engine::stop_owned_processes() {
   entry.dwSize = sizeof(entry);
   if (Process32FirstW(snap, &entry)) {
     do {
-      if (_wcsicmp(entry.szExeFile, L"sing-box.exe") != 0) continue;
+      // The image name is the file we were given, not a hardcoded sing-box.exe.
+      // A sweep that still looks for the old name would leave this process up.
+      const std::wstring image = exe_file_name(impl_->exe);
+      if (image.empty() || _wcsicmp(entry.szExeFile, image.c_str()) != 0) continue;
       HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_TERMINATE | SYNCHRONIZE,
                                    FALSE, entry.th32ProcessID);
       if (process == nullptr) continue;

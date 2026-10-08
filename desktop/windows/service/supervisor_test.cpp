@@ -1003,8 +1003,10 @@ void test_flow_counters_record_the_outbound() {
   expect(connected.phase == TunnelPhase::Connected, "flow session connects");
   expect(seen_port == 17890, "the controller port comes from the free-port pick");
   expect(seen_secret.size() == 48, "the controller carries a per-session secret");
-  expect(h.files.config_body.find("\"external_controller\":\"127.0.0.1:17890\"") != std::string::npos,
-         "the engine is told where to answer");
+  expect(h.files.config_body.find("\"api_port\":17890") != std::string::npos,
+         "the engine config records the controller port");
+  expect(h.files.config_body.find(seen_secret) != std::string::npos,
+         "the engine config records the controller secret");
 
   h.supervisor.watchdog(h.cancel);
   const bool announced_direct =
