@@ -765,6 +765,13 @@
   "freeSaveOnly": "Save only",
   "freePreview": "Found",
   "freeServerAdded": "Server added",
+  "freeImportCount": "Read {recognized}, unsupported {unsupported}",
+  "@freeImportCount": {
+    "placeholders": {
+      "recognized": {"type": "int"},
+      "unsupported": {"type": "int"}
+    }
+  },
   "freeLinkInvalid": "Could not read that link",
   "freeSubscriptionLoadFail": "The document did not load. The host did not answer.",
   "freeSubscriptionMissing": "That address has no document.",

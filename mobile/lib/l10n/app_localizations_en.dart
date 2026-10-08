@@ -1422,6 +1422,11 @@ class AppL10nEn extends AppL10n {
   String get freeServerAdded => 'Server added';
 
   @override
+  String freeImportCount(int recognized, int unsupported) {
+    return 'Read $recognized, unsupported $unsupported';
+  }
+
+  @override
   String get freeLinkInvalid => 'Could not read that link';
 
   @override

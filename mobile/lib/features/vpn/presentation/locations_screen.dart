@@ -411,6 +411,16 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     final handle = _keyHandle(catalog);
     final selectedLabel = _selectedLabel();
     final russian = Localizations.localeOf(context).languageCode == 'ru';
+    final parsed = inspectShareLines(catalog.lines);
+    final unsupportedNote = parsed.skipped.isEmpty
+        ? null
+        : formatUnsupportedImport(
+            countLine: l.freeImportCount(
+              parsed.links.length,
+              parsed.skipped.length,
+            ),
+            skipped: parsed.skipped,
+          );
 
     // The gap between cards belongs to the list, not to the card: one number
     // for the distance between two profiles on this page.
@@ -449,6 +459,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
           catalog.subscriptionKey == null ? null : () => _shareCatalog(catalog),
       onDelete: () => _deleteProfile(catalog.id),
       showTelegraph: planeUrl.isNotEmpty,
+      unsupportedNote: unsupportedNote,
     );
   }
 

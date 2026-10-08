@@ -1425,6 +1425,11 @@ class AppL10nRu extends AppL10n {
   String get freeServerAdded => 'Сервер добавлен';
 
   @override
+  String freeImportCount(int recognized, int unsupported) {
+    return 'Распознано $recognized, не поддержано $unsupported';
+  }
+
+  @override
   String get freeLinkInvalid => 'Ссылка не разобрана';
 
   @override

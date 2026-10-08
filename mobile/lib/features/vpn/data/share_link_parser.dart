@@ -41,21 +41,60 @@ bool isShareLinkLine(String raw) {
   return false;
 }
 
+/// A share line that looked like a key and did not parse. The raw URI is
+/// not kept: it may hold a secret. [reason] is the parser's message.
+class ShareLineSkip {
+  const ShareLineSkip(this.reason);
+
+  final String reason;
+}
+
+/// Parsed lines plus the ones a person would otherwise never see.
+class ShareParseReport {
+  const ShareParseReport({required this.links, required this.skipped});
+
+  final List<ParsedShareLink> links;
+  final List<ShareLineSkip> skipped;
+}
+
 /// Newline list, one URI, or a base64 blob of those lines.
-List<ParsedShareLink> parseShareSubscription(String body) {
+List<ParsedShareLink> parseShareSubscription(String body) =>
+    inspectShareSubscription(body).links;
+
+/// Same split as [parseShareSubscription], keeping each rejected key's reason.
+ShareParseReport inspectShareSubscription(String body) {
   final decoded = _decodeSubscriptionBody(body);
-  final out = <ParsedShareLink>[];
-  for (final line in decoded.split(RegExp(r'\r?\n'))) {
+  return inspectShareLines(decoded.split(RegExp(r'\r?\n')));
+}
+
+ShareParseReport inspectShareLines(Iterable<String> lines) {
+  final links = <ParsedShareLink>[];
+  final skipped = <ShareLineSkip>[];
+  for (final line in lines) {
     final text = line.trim();
     if (text.isEmpty || text.startsWith('#')) continue;
     if (!isShareLinkLine(text)) continue;
     try {
-      out.add(parseShareLink(text));
-    } on FormatException {
-      continue;
+      links.add(parseShareLink(text));
+    } on FormatException catch (error) {
+      final reason = error.message.trim();
+      skipped.add(ShareLineSkip(reason.isEmpty ? 'unsupported' : reason));
     }
   }
-  return out;
+  return ShareParseReport(links: links, skipped: skipped);
+}
+
+/// Count sentence plus one reason per rejected line. Neutral: not an error.
+String formatUnsupportedImport({
+  required String countLine,
+  required List<ShareLineSkip> skipped,
+}) {
+  final reasons = skipped
+      .map((skip) => skip.reason.trim())
+      .where((reason) => reason.isNotEmpty)
+      .join('\n');
+  if (reasons.isEmpty) return countLine;
+  return '$countLine\n$reasons';
 }
 
 ParsedShareLink parseShareLink(String raw) {

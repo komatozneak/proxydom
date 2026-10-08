@@ -4,6 +4,7 @@ import java.io.BufferedReader
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.InputStreamReader
+import java.net.Inet4Address
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.Socket
@@ -190,9 +191,47 @@ class VpnPingMonitor(
         }
 
         /**
-         * Public IPv4 as seen through the Hy2 SOCKS client.
-         * The app itself is excluded from the TUN, so a normal HTTP client
-         * would report the carrier address.
+         * Walk literal targets until one SOCKS CONNECT completes.
+         *
+         * `ipv4.icanhazip.com` is not a target: foreign exits reset that name.
+         * An IP parsed from a trace is recorded on the sample and is not
+         * required for [HttpProbeSample.tcp].
+         */
+        fun proveTunnel(
+            socksHost: String = GvisorTun2Socks.SOCKS_HOST,
+            socksPort: Int = GvisorTun2Socks.SOCKS_PORT,
+            timeoutMs: Int = PROBE_TIMEOUT_MS,
+        ): TunnelAcceptance {
+            val samples = ArrayList<HttpProbeSample>(3)
+            val trace = probeTraceLiteral(socksHost, socksPort, timeoutMs)
+            samples.add(trace)
+            if (trace.tcp) return acceptTunnel(samples)
+            val cloudflare = probeGenerate204Literal(
+                socksHost = socksHost,
+                socksPort = socksPort,
+                timeoutMs = timeoutMs,
+                name = "cp.cloudflare.com",
+                port = 443,
+                tls = true,
+            )
+            samples.add(cloudflare)
+            if (cloudflare.tcp) return acceptTunnel(samples)
+            samples.add(
+                probeGenerate204Literal(
+                    socksHost = socksHost,
+                    socksPort = socksPort,
+                    timeoutMs = timeoutMs,
+                    name = "www.gstatic.com",
+                    port = 80,
+                    tls = false,
+                ),
+            )
+            return acceptTunnel(samples)
+        }
+
+        /**
+         * Public IPv4 via the name `ipv4.icanhazip.com`. Not an acceptance
+         * gate: foreign exits reset that name. Callers may log the result.
          */
         fun socksExitIp(
             socksHost: String = GvisorTun2Socks.SOCKS_HOST,
@@ -408,7 +447,142 @@ class VpnPingMonitor(
                 }
             }.getOrNull()
 
-        private fun probeTls(plain: Socket): SSLSocket {
+        private fun probeTraceLiteral(
+            socksHost: String,
+            socksPort: Int,
+            timeoutMs: Int,
+        ): HttpProbeSample {
+            val target = "1.1.1.1:443"
+            return try {
+                Socket().use { plain ->
+                    plain.soTimeout = timeoutMs
+                    plain.connect(InetSocketAddress(socksHost, socksPort), timeoutMs)
+                    val out = DataOutputStream(plain.getOutputStream())
+                    val inp = DataInputStream(plain.getInputStream())
+                    socks5Greeting(out, inp)
+                    socks5ConnectIpv4(out, inp, "1.1.1.1", 443)
+                    try {
+                        val ssl = probeTls(plain, "1.1.1.1", 443)
+                        ssl.soTimeout = timeoutMs
+                        ssl.startHandshake()
+                        val writer = ssl.getOutputStream()
+                        writer.write(
+                            (
+                                "GET /cdn-cgi/trace HTTP/1.0\r\n" +
+                                    "Host: 1.1.1.1\r\nConnection: close\r\n\r\n"
+                                ).toByteArray(StandardCharsets.US_ASCII),
+                        )
+                        writer.flush()
+                        val text = ssl.getInputStream().readBytes()
+                            .toString(StandardCharsets.US_ASCII)
+                        runCatching { ssl.close() }
+                        val status = text.lineSequence().firstOrNull()?.let(::parseHttpStatusCode)
+                        val ip = Regex("""(?m)^ip=(\d{1,3}(?:\.\d{1,3}){3})\s*$""")
+                            .find(text)
+                            ?.groupValues
+                            ?.getOrNull(1)
+                        HttpProbeSample(
+                            target = target,
+                            tcp = true,
+                            httpStatus = status,
+                            exitIp = ip,
+                            detail = "http=${status ?: "none"}",
+                        )
+                    } catch (e: Exception) {
+                        HttpProbeSample(
+                            target = target,
+                            tcp = true,
+                            httpStatus = null,
+                            exitIp = null,
+                            detail = "${e.javaClass.simpleName}=${e.message ?: "err"}",
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                HttpProbeSample(
+                    target = target,
+                    tcp = false,
+                    httpStatus = null,
+                    exitIp = null,
+                    detail = "${e.javaClass.simpleName}=${e.message ?: "err"}",
+                )
+            }
+        }
+
+        private fun probeGenerate204Literal(
+            socksHost: String,
+            socksPort: Int,
+            timeoutMs: Int,
+            name: String,
+            port: Int,
+            tls: Boolean,
+        ): HttpProbeSample {
+            val target = "$name:$port"
+            val literal = resolveIpv4(name)
+            if (literal == null) {
+                return HttpProbeSample(
+                    target = target,
+                    tcp = false,
+                    httpStatus = null,
+                    exitIp = null,
+                    detail = "dns",
+                )
+            }
+            return try {
+                Socket().use { plain ->
+                    plain.soTimeout = timeoutMs
+                    plain.connect(InetSocketAddress(socksHost, socksPort), timeoutMs)
+                    val out = DataOutputStream(plain.getOutputStream())
+                    val inp = DataInputStream(plain.getInputStream())
+                    socks5Greeting(out, inp)
+                    socks5ConnectIpv4(out, inp, literal, port)
+                    try {
+                        val status = if (tls) {
+                            val ssl = probeTls(plain, name, port)
+                            ssl.soTimeout = timeoutMs
+                            ssl.startHandshake()
+                            val code = httpGenerate204(ssl, name)
+                            runCatching { ssl.close() }
+                            code
+                        } else {
+                            httpGenerate204(plain, name)
+                        }
+                        val http = (status as? SocksHttpsResult.Ok)?.code
+                        HttpProbeSample(
+                            target = target,
+                            tcp = true,
+                            httpStatus = http,
+                            exitIp = null,
+                            detail = status.detail,
+                        )
+                    } catch (e: Exception) {
+                        HttpProbeSample(
+                            target = target,
+                            tcp = true,
+                            httpStatus = null,
+                            exitIp = null,
+                            detail = "${e.javaClass.simpleName}=${e.message ?: "err"}",
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                HttpProbeSample(
+                    target = target,
+                    tcp = false,
+                    httpStatus = null,
+                    exitIp = null,
+                    detail = "${e.javaClass.simpleName}=${e.message ?: "err"}",
+                )
+            }
+        }
+
+        private fun resolveIpv4(name: String): String? = runCatching {
+            InetAddress.getAllByName(name)
+                .firstOrNull { it is Inet4Address }
+                ?.hostAddress
+        }.getOrNull()
+
+        private fun probeTls(plain: Socket, host: String = "1.1.1.1", port: Int = 443): SSLSocket {
             val trustAll = arrayOf<TrustManager>(object : X509TrustManager {
                 override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) = Unit
                 override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) = Unit
@@ -416,7 +590,7 @@ class VpnPingMonitor(
             })
             val context = SSLContext.getInstance("TLS")
             context.init(null, trustAll, SecureRandom())
-            val ssl = context.socketFactory.createSocket(plain, "1.1.1.1", 443, true) as SSLSocket
+            val ssl = context.socketFactory.createSocket(plain, host, port, true) as SSLSocket
             val params = ssl.sslParameters
             params.endpointIdentificationAlgorithm = null
             ssl.sslParameters = params
