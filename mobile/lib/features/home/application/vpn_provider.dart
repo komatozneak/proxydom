@@ -689,7 +689,8 @@ class VpnNotifier extends Notifier<VpnStatus> {
     } catch (_) {}
   }
 
-  /// After TUN is up: icanhazip vs catalog IPv4 (not SNI / expected_egress_host).
+  /// After TUN is up: record the exit address when native has one.
+  /// An unread address stays `egress_unknown` and leaves the session up.
   Future<void> _logEgressProbe({int? token}) async {
     final mine = token ?? _egressProbeToken;
     if (_suppressAutoReconnect ||
@@ -704,18 +705,22 @@ class VpnNotifier extends Notifier<VpnStatus> {
       final shownIp = ip?.trim() ?? '';
       final ok = shownIp.isNotEmpty;
       final error = ok ? null : await VpnController.instance.getLastError();
+      final decision = decideEgressProbe(shownIp);
       ShareSessionLog.emit(
         'vpn.egress_probe',
-        level: ok ? ProductLogLevel.info : ProductLogLevel.error,
+        level: decision.result == 'ok'
+            ? ProductLogLevel.info
+            : ProductLogLevel.warn,
         sid: _sid,
         extra: {
-          'ok': ok,
-          'external_ip': ok ? shownIp : 'fail',
+          'ok': decision.result == 'ok',
+          'result': decision.result,
+          'external_ip': decision.result == 'ok' ? shownIp : null,
           'phase': _lastSessionPhase.name,
-          'error': error ?? (ok ? null : 'no egress ip'),
+          'error': decision.result == 'ok' ? null : error,
         },
       );
-      if (!ok) {
+      if (decision.stopSession) {
         _lastSessionPhase = VpnSessionPhase.connectedDegraded;
         state = const VpnError(message: 'egress_fail', code: 'egress_fail');
         await VpnController.instance.stop(reason: 'egress_fail');

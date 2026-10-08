@@ -23,8 +23,6 @@ import android.system.Os
 import android.system.StructPollfd
 import android.system.StructTimeval
 import java.io.FileDescriptor
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import com.proxydom.app.session.AutoCandidate
@@ -1175,30 +1173,19 @@ class ProxyDomVpnService : VpnService() {
         val tcpLine = "server=$serverHost:$serverPort tcp=$reach"
         lastShareTcp = tcpLine
         DiagnosticRing.event("debug", "vpn.server_tcp", tcpLine)
-        val probe = VpnPingMonitor.socksConnectProbe(socksPort = watch.port)
-        if (probe !is VpnPingMonitor.SocksHttpsResult.Ok) {
-            val reason = (probe as? VpnPingMonitor.SocksHttpsResult.Fail)?.reason
-                ?: "unknown"
-            failStart("VLESS SOCKS probe failed: $reason")
-            return
-        }
         val protectErr = Hy2bind.lastProtectError()?.trim().orEmpty()
         if (protectErr.isNotEmpty()) {
             failStart(protectErr)
             return
         }
-        val exit = VpnPingMonitor.socksExitIpByIpv4(socksPort = watch.port)
-        val carrierIp = readCarrierIpv4()
-        val exitIp = exit.ip
-        if (exitIp.isNullOrBlank() || exitIp == carrierIp) {
-            val reach = tcpReach(serverHost, serverPort)
-            failStart(
-                "VLESS egress empty exit=$exitIp carrier=$carrierIp " +
-                    "reason=${exit.reason} server=$serverHost:$serverPort tcp=$reach",
+        if (!acceptCarryingTunnel(
+                socksPort = watch.port,
+                server = "$serverHost:$serverPort",
+                tcpReachLine = reach,
             )
+        ) {
             return
         }
-        provenEgressIp = exitIp
         isRunning = true
         establishInProgress = false
         coreRecovering = false
@@ -1233,13 +1220,10 @@ class ProxyDomVpnService : VpnService() {
             return
         }
         val socksListen = hysteriaSocksListen(params)
-        val nodeId = (params["hysteriaNodeId"] as? String)?.trim().orEmpty()
-            .ifBlank { "eu-hy2-1" }
 
         val sessionName = (params["sessionName"] as? String)
             ?.takeIf { it.isNotBlank() }
             ?: "Прокси Дом"
-        val carrierIp = readCarrierIpv4()
         // Hy2 QUIC overhead on LTE: 1500 inner packets fragment and stall
         // the first request of each page. Video then recovers via TCP MSS.
         val mtu = 1280
@@ -1341,30 +1325,20 @@ class ProxyDomVpnService : VpnService() {
         // Go owns the detached dup; Kotlin keeps the establish PFD until
         // [closeTunOnce] in teardownCores (closing establish early tears down VPN).
 
-        val probeCandidate = SocksProbeCandidate(
-            id = nodeId,
-            host = server.substringBefore(':'),
-            label = "hysteria",
-            configJson = hysteriaTun2SocksConfig(mtu),
-        )
         if (!alive()) {
             teardownCores()
             return
         }
-        if (!probeSocksHttps(probeCandidate, socksPort = watch.port)) {
-            failStart("$nodeId@$server: SOCKS HTTPS probe failed")
+        val hyHost = server.substringBefore(':')
+        val hyPort = server.substringAfter(':', "").toIntOrNull() ?: 0
+        if (!acceptCarryingTunnel(
+                socksPort = watch.port,
+                server = server,
+                tcpReachLine = tcpReach(hyHost, hyPort),
+            )
+        ) {
             return
         }
-        if (!alive()) {
-            teardownCores()
-            return
-        }
-        val exitIp = VpnPingMonitor.socksExitIp(socksPort = watch.port)
-        if (exitIp.isNullOrBlank() || exitIp == carrierIp) {
-            failStart("egress unchanged exit=$exitIp carrier=$carrierIp")
-            return
-        }
-        provenEgressIp = exitIp
 
         isRunning = true
         establishInProgress = false
@@ -1391,89 +1365,6 @@ class ProxyDomVpnService : VpnService() {
         conn.readTimeout = 4000
         conn.inputStream.bufferedReader().use { it.readLine()?.trim() }
     }.getOrNull()
-
-    private fun probeSocksHttps(selected: SocksProbeCandidate, socksPort: Int): Boolean {
-        val okFlag = AtomicBoolean(false)
-        val done = CountDownLatch(1)
-        Thread(
-            {
-                try {
-                    // Poll SOCKS accept readiness instead of a blind sleep(500).
-                    val warmupDeadline =
-                        SystemClock.elapsedRealtime() + XRAY_SOCKS_WARMUP_BUDGET_MS
-                    while (SystemClock.elapsedRealtime() < warmupDeadline) {
-                        if (VpnPingMonitor.isSocksReachable(
-                                port = socksPort,
-                                timeoutMs = XRAY_SOCKS_WARMUP_POLL_MS,
-                            )
-                        ) {
-                            break
-                        }
-                        Thread.sleep(50)
-                    }
-                    for (attempt in 1..XRAY_SOCKS_PROBE_ATTEMPTS) {
-                        if (!VpnPingMonitor.isSocksReachable(
-                                port = socksPort,
-                                timeoutMs = 800,
-                            )
-                        ) {
-                            NativeLog.w(
-                                TAG,
-                                "SOCKS not reachable yet candidate=" +
-                                    "${selected.id}@${selected.host} socks=$socksPort " +
-                                    "attempt=$attempt/$XRAY_SOCKS_PROBE_ATTEMPTS",
-                            )
-                            Thread.sleep(XRAY_SOCKS_PROBE_RETRY_SLEEP_MS)
-                            continue
-                        }
-                        val outcome = VpnPingMonitor.socksConnectProbe(
-                            socksPort = socksPort,
-                            timeoutMs = XRAY_SOCKS_PROBE_TIMEOUT_MS,
-                        )
-                        if (outcome is VpnPingMonitor.SocksHttpsResult.Ok) {
-                            NativeLog.i(
-                                TAG,
-                                "SOCKS CONNECT ${outcome.code}ms ok candidate=" +
-                                    "${selected.id}@${selected.host} attempt=$attempt",
-                            )
-                            okFlag.set(true)
-                            return@Thread
-                        }
-                        NativeLog.w(
-                            TAG,
-                            "SOCKS CONNECT probe fail candidate=" +
-                                "${selected.id}@${selected.host} " +
-                                "attempt=$attempt/$XRAY_SOCKS_PROBE_ATTEMPTS " +
-                                "err=${outcome.detail}",
-                        )
-                        Thread.sleep(XRAY_SOCKS_PROBE_RETRY_SLEEP_MS)
-                    }
-                } catch (e: InterruptedException) {
-                    Thread.currentThread().interrupt()
-                } finally {
-                    done.countDown()
-                }
-            },
-            "proxydom-socks-probe",
-        ).apply { isDaemon = true }.start()
-
-        val budgetMs =
-            XRAY_SOCKS_WARMUP_BUDGET_MS +
-                XRAY_SOCKS_PROBE_ATTEMPTS *
-                (XRAY_SOCKS_PROBE_TIMEOUT_MS + XRAY_SOCKS_PROBE_RETRY_SLEEP_MS + 800L)
-        val finished = try {
-            done.await(budgetMs, TimeUnit.MILLISECONDS)
-        } catch (_: InterruptedException) {
-            false
-        }
-        if (!finished) {
-            NativeLog.w(
-                TAG,
-                "SOCKS CONNECT probe timeout candidate=${selected.id}@${selected.host}",
-            )
-        }
-        return okFlag.get()
-    }
 
     private fun tcpReach(host: String, port: Int): String {
         if (host.isEmpty() || port <= 0) return "no_target"
@@ -1535,7 +1426,73 @@ class ProxyDomVpnService : VpnService() {
         }
     }
 
+    /**
+     * SOCKS must accept a CONNECT before the session is connected. The exit
+     * IP is recorded when a target returns one and is not a reason to stop.
+     */
+    private fun acceptCarryingTunnel(
+        socksPort: Int,
+        server: String,
+        tcpReachLine: String,
+    ): Boolean {
+        if (!awaitSocksPort(socksPort)) {
+            failStart(
+                "socks not listening server=$server port=$socksPort tcp=$tcpReachLine",
+            )
+            return false
+        }
+        val acceptance = VpnPingMonitor.proveTunnel(socksPort = socksPort)
+        if (!acceptance.carriesData) {
+            failStart(
+                "tunnel carried no tcp server=$server reason=${acceptance.detail} " +
+                    "tcp=$tcpReachLine socks=$socksPort",
+            )
+            return false
+        }
+        val carrierIp = if (acceptance.exitIp.isNullOrBlank()) {
+            null
+        } else {
+            readCarrierIpv4()
+        }
+        val warn = egressIpWarn(acceptance.exitIp, carrierIp)
+        if (warn != null) {
+            NativeLog.w(
+                TAG,
+                "$warn server=$server exit=${acceptance.exitIp} carrier=$carrierIp",
+            )
+        } else {
+            NativeLog.i(
+                TAG,
+                "egress ip read exit=${acceptance.exitIp} target=${acceptance.target} " +
+                    "server=$server",
+            )
+        }
+        val legacy = VpnPingMonitor.socksExitIp(socksPort = socksPort, timeoutMs = 1_200)
+        NativeLog.i(
+            TAG,
+            "icanhazip through tunnel exit=${legacy ?: "unread"} (not a gate) server=$server",
+        )
+        provenEgressIp = acceptance.exitIp
+        return true
+    }
+
+    private fun awaitSocksPort(socksPort: Int): Boolean {
+        val deadline = SystemClock.elapsedRealtime() + XRAY_SOCKS_WARMUP_BUDGET_MS
+        while (SystemClock.elapsedRealtime() < deadline) {
+            if (VpnPingMonitor.isSocksReachable(
+                    port = socksPort,
+                    timeoutMs = XRAY_SOCKS_WARMUP_POLL_MS,
+                )
+            ) {
+                return true
+            }
+            Thread.sleep(50)
+        }
+        return VpnPingMonitor.isSocksReachable(port = socksPort, timeoutMs = 800)
+    }
+
     private fun failStart(message: String) {
+        NativeLog.e(TAG, "failStart: $message")
         establishInProgress = false
         VpnStatusBroadcaster.setError(message)
         DiagnosticRing.event(

@@ -367,6 +367,33 @@ bool shouldRetryAutoOnWifi({
   return true;
 }
 
+/// What to do with a tunnel whose exit address could not be read.
+///
+/// An empty IP is `egress_unknown`. It is a journal fact. It does not stop
+/// a session that already carries TCP.
+class EgressProbeDecision {
+  const EgressProbeDecision({
+    required this.stopSession,
+    required this.result,
+  });
+
+  final bool stopSession;
+
+  /// `ok` when an address was read, otherwise `egress_unknown`.
+  final String result;
+}
+
+EgressProbeDecision decideEgressProbe(String? ip) {
+  final shown = ip?.trim() ?? '';
+  if (shown.isEmpty) {
+    return const EgressProbeDecision(
+      stopSession: false,
+      result: 'egress_unknown',
+    );
+  }
+  return const EgressProbeDecision(stopSession: false, result: 'ok');
+}
+
 /// One re-read of the pasted document after the node refused our secret.
 ///
 /// Reissuing a document rotates every node password, so a cached config
