@@ -1,8 +1,9 @@
 package com.proxydom.app
 
 /**
- * One SOCKS attempt. [tcp] means the proxy completed CONNECT. [exitIp] is
- * optional text from a trace body. Reading that IP is not required for [tcp].
+ * One SOCKS attempt. [tcp] means the proxy completed CONNECT. That is not
+ * proof the destination answered: Hy2 FastOpen returns the socket before the
+ * server confirms it. A parsed [httpStatus] or a read [exitIp] is the answer.
  */
 data class HttpProbeSample(
     val target: String,
@@ -13,8 +14,9 @@ data class HttpProbeSample(
 )
 
 /**
- * Connected requires [carriesData]. [exitIp] is filled only when a target
- * returned one. A missing IP is not a failed tunnel.
+ * Connected requires [carriesData]: a parsed HTTP status or a read exit
+ * address. A finished CONNECT alone is not enough. A missing IP is not a
+ * failed tunnel when some sample still answered.
  */
 data class TunnelAcceptance(
     val carriesData: Boolean,
@@ -24,18 +26,19 @@ data class TunnelAcceptance(
 )
 
 /**
- * First sample that completed SOCKS CONNECT wins. Later samples are not
- * required. No CONNECT at all is the only refusal.
+ * First sample with a response wins. A response is any parsed HTTP status
+ * or a non-blank [HttpProbeSample.exitIp]. CONNECT with neither is skipped.
+ * No response from any sample is the refusal.
  */
 fun acceptTunnel(samples: List<HttpProbeSample>): TunnelAcceptance {
-    val hit = samples.firstOrNull { it.tcp }
+    val hit = samples.firstOrNull { it.confirmsCarry() }
     if (hit != null) {
         val ip = hit.exitIp?.trim()?.takeIf { it.isNotEmpty() }
         return TunnelAcceptance(
             carriesData = true,
             exitIp = ip,
             target = hit.target,
-            detail = "tcp=ok target=${hit.target} http=${hit.httpStatus ?: "none"}",
+            detail = "response target=${hit.target} http=${hit.httpStatus ?: "none"}",
         )
     }
     val detail = if (samples.isEmpty()) {
@@ -50,6 +53,10 @@ fun acceptTunnel(samples: List<HttpProbeSample>): TunnelAcceptance {
         detail = detail,
     )
 }
+
+/** A parsed status or a read address. A finished CONNECT is not this. */
+fun HttpProbeSample.confirmsCarry(): Boolean =
+    httpStatus != null || !exitIp.isNullOrBlank()
 
 /**
  * Same address as the carrier is a suspicion. It does not refuse the session.
