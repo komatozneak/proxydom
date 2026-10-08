@@ -129,3 +129,43 @@ jobs:
       - name: go test
         working-directory: mobile/android/hysteria-bind
         run: go test ./...
+
+  # flutter test does not compile Kotlin. PathHealth and socksWatchFor live
+  # in the Android app module; this job is what actually runs them.
+  # gradlew is gitignored (mobile/android/.gitignore). config-only injects it
+  # and writes local.properties, then the unit-test task runs.
+  android-unit-test:
+    name: Android unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+          lfs: true
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        working-directory: mobile
+        run: flutter pub get
+
+      - name: Inject Gradle wrapper
+        working-directory: mobile
+        run: flutter build apk --config-only --debug
+
+      - name: Unit tests
+        working-directory: mobile/android
+        run: chmod +x ./gradlew && ./gradlew :app:testDebugUnitTest --stacktrace

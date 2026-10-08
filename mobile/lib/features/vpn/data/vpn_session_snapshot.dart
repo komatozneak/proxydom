@@ -207,6 +207,53 @@ bool connectingIdleShouldDrop({
   return lastPhase == VpnSessionPhase.idle || userStopping;
 }
 
+/// Free-session flag skips a second hydration. It does not freeze Connecting.
+///
+/// A connected snapshot while the Nest is already Connected must not open
+/// another session. The same snapshot while the Nest is Connecting (native
+/// recover published Binding, then ConnectedHealthy) has to paint Connected
+/// again. [uiConnecting] is the Nest, not the native phase.
+bool shouldSkipFreeSessionHydration({
+  required bool freeSessionOpen,
+  required bool uiConnecting,
+}) =>
+    freeSessionOpen && !uiConnecting;
+
+/// Paint used by [freeSessionNestAfterPhase]. Not a [VpnStatus].
+enum FreeSessionNest { connecting, connected, other }
+
+/// One session phase against an already-open free session.
+///
+/// Walk phases (`ownsConnectUi`) drop the Nest to Connecting. Dead is still
+/// [VpnSessionPhase.connectedDegraded], so it does not drop the Nest; the
+/// Binding that follows the recover does. The next connected phase paints
+/// Connected again.
+FreeSessionNest freeSessionNestAfterPhase({
+  required FreeSessionNest nest,
+  required VpnSessionPhase phase,
+  required bool freeSessionOpen,
+}) {
+  final ownsWalk = switch (phase) {
+    VpnSessionPhase.binding ||
+    VpnSessionPhase.tunUp ||
+    VpnSessionPhase.coreStarting ||
+    VpnSessionPhase.proving =>
+      true,
+    _ => false,
+  };
+  if (ownsWalk) return FreeSessionNest.connecting;
+  final snapshotConnected = phase == VpnSessionPhase.connectedHealthy ||
+      phase == VpnSessionPhase.connectedDegraded;
+  if (!snapshotConnected) return nest;
+  if (shouldSkipFreeSessionHydration(
+    freeSessionOpen: freeSessionOpen,
+    uiConnecting: nest == FreeSessionNest.connecting,
+  )) {
+    return nest;
+  }
+  return FreeSessionNest.connected;
+}
+
 /// Nest Connected paint: abort stale restore-connect and require a live TUN
 /// unless Auto/manual walk still owns the UI.
 bool shouldRefuseEnterConnected({

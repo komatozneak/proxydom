@@ -4,7 +4,6 @@ import com.proxydom.app.NativeLog
 
 import android.os.SystemClock
 import com.proxydom.app.DiagnosticRing
-import com.proxydom.app.GvisorTun2Socks
 import com.proxydom.app.VpnPingMonitor
 import com.proxydom.app.XRAY_SOCKS_PROBE_ATTEMPTS
 import com.proxydom.app.XRAY_SOCKS_PROBE_RETRY_SLEEP_MS
@@ -19,14 +18,15 @@ import java.util.concurrent.atomic.AtomicInteger
  *
  * One facade for triple-core: [CoreAdapter.XraySocks] / [CoreAdapter.HysteriaSocks]
  * use SOCKS CONNECT to 1.1.1.1:443; [CoreAdapter.TrustTunnel] uses the same
- * CONNECT (SOCKS if :10808 is up, else TUN-direct TCP). Handshake is not a
- * prove. PathIncompatible never swaps cores.
+ * CONNECT (SOCKS on the port of the running core, else TUN-direct TCP).
+ * Handshake is not a prove. PathIncompatible never swaps cores.
  */
 class PathHealth {
     enum class CoreAdapter {
         XraySocks,
         TrustTunnel,
         HysteriaSocks,
+        ShareSocks,
     }
 
     fun interface Listener {
@@ -53,6 +53,7 @@ class PathHealth {
      */
     fun proveEgress(
         adapter: CoreAdapter,
+        socksPort: Int,
         alive: () -> Boolean,
         underlyingIface: String?,
         candidateLabel: String,
@@ -62,26 +63,27 @@ class PathHealth {
         }
         return when (adapter) {
             CoreAdapter.TrustTunnel ->
-                proveTrustTunnelEgress(alive, underlyingIface, candidateLabel)
-            CoreAdapter.XraySocks, CoreAdapter.HysteriaSocks ->
-                proveXrayEgress(alive, underlyingIface, candidateLabel)
+                proveTrustTunnelEgress(alive, underlyingIface, candidateLabel, socksPort)
+            CoreAdapter.XraySocks, CoreAdapter.HysteriaSocks, CoreAdapter.ShareSocks ->
+                proveXrayEgress(alive, underlyingIface, candidateLabel, socksPort)
         }
     }
 
     /**
      * TT Auto/manual: TCP CONNECT through the tunnel, not handshake-skip.
-     * Prefers SOCKS when :10808 is up; otherwise TUN-direct (no protect).
+     * Prefers SOCKS on [socksPort] when that port accepts; otherwise TUN-direct.
      */
     fun proveTrustTunnelEgress(
         alive: () -> Boolean,
         underlyingIface: String?,
         candidateLabel: String,
+        socksPort: Int,
     ): HealthResult {
         if (!alive()) {
             return HealthResult.Fail(SessionReason.Cancelled, "generation cancelled", 0)
         }
-        if (VpnPingMonitor.isSocksReachable(timeoutMs = 400)) {
-            return proveXrayEgress(alive, underlyingIface, candidateLabel)
+        if (VpnPingMonitor.isSocksReachable(port = socksPort, timeoutMs = 400)) {
+            return proveXrayEgress(alive, underlyingIface, candidateLabel, socksPort)
         }
         val iface = underlyingIface ?: "(unknown)"
         for (attempt in 1..XRAY_SOCKS_PROBE_ATTEMPTS) {
@@ -122,6 +124,7 @@ class PathHealth {
         alive: () -> Boolean,
         underlyingIface: String?,
         candidateLabel: String,
+        socksPort: Int,
     ): HealthResult {
         if (!alive()) {
             return HealthResult.Fail(SessionReason.Cancelled, "generation cancelled", 0)
@@ -133,7 +136,11 @@ class PathHealth {
                 if (!alive()) {
                     return HealthResult.Fail(SessionReason.Cancelled, "cancelled warmup", 0)
                 }
-                if (VpnPingMonitor.isSocksReachable(timeoutMs = XRAY_SOCKS_WARMUP_POLL_MS)) {
+                if (VpnPingMonitor.isSocksReachable(
+                        port = socksPort,
+                        timeoutMs = XRAY_SOCKS_WARMUP_POLL_MS,
+                    )
+                ) {
                     break
                 }
                 Thread.sleep(50)
@@ -142,17 +149,19 @@ class PathHealth {
                 if (!alive()) {
                     return HealthResult.Fail(SessionReason.Cancelled, "cancelled", attempt)
                 }
-                if (!VpnPingMonitor.isSocksReachable(timeoutMs = 800)) {
+                if (!VpnPingMonitor.isSocksReachable(port = socksPort, timeoutMs = 800)) {
                     NativeLog.w(
                         TAG,
                         "prove socks not ready candidate=$candidateLabel " +
-                            "underlying=$iface attempt=$attempt/$XRAY_SOCKS_PROBE_ATTEMPTS",
+                            "underlying=$iface socks=$socksPort " +
+                            "attempt=$attempt/$XRAY_SOCKS_PROBE_ATTEMPTS",
                     )
                     Thread.sleep(XRAY_SOCKS_PROBE_RETRY_SLEEP_MS)
                     continue
                 }
                 val startedAt = SystemClock.elapsedRealtime()
                 val outcome = VpnPingMonitor.socksConnectProbe(
+                    socksPort = socksPort,
                     timeoutMs = XRAY_SOCKS_PROBE_TIMEOUT_MS,
                 )
                 val latencyMs = SystemClock.elapsedRealtime() - startedAt
@@ -200,6 +209,7 @@ class PathHealth {
      */
     fun startContinuous(
         adapter: CoreAdapter,
+        socksPort: Int,
         listener: Listener,
         alive: () -> Boolean,
     ) {
@@ -244,6 +254,7 @@ class PathHealth {
         continuousRunning.set(true)
         continuousThread = Thread(
             {
+                NativeLog.i(TAG, "continuous socks probe port=$socksPort")
                 while (continuousRunning.get() && alive()) {
                     try {
                         Thread.sleep(CONTINUOUS_INTERVAL_MS)
@@ -252,10 +263,11 @@ class PathHealth {
                     }
                     if (!continuousRunning.get() || !alive()) break
                     val ok = runCatching {
-                        if (!VpnPingMonitor.isSocksReachable(timeoutMs = 800)) {
+                        if (!VpnPingMonitor.isSocksReachable(port = socksPort, timeoutMs = 800)) {
                             false
                         } else {
                             VpnPingMonitor.socksConnectOk(
+                                socksPort = socksPort,
                                 timeoutMs = CONTINUOUS_PROBE_TIMEOUT_MS,
                             )
                         }
@@ -265,7 +277,7 @@ class PathHealth {
                         listener.onHealth(HealthResult.Ok(rttMs = 0, attempt = 0))
                     } else {
                         val n = consecutiveFails.incrementAndGet()
-                        val detail = "continuous fail n=$n socks=${GvisorTun2Socks.SOCKS_PORT}"
+                        val detail = continuousSocksFailDetail(n, socksPort)
                         if (n >= DEAD_THRESHOLD) {
                             listener.onHealth(HealthResult.Dead(n, detail))
                         } else if (n >= DEGRADED_THRESHOLD) {
@@ -292,5 +304,9 @@ class PathHealth {
         private const val CONTINUOUS_PROBE_TIMEOUT_MS = 2_500
         const val DEGRADED_THRESHOLD = 2
         const val DEAD_THRESHOLD = 4
+
+        /** Fail line names the port that was probed, not the Hy2 constant. */
+        fun continuousSocksFailDetail(consecutiveFails: Int, socksPort: Int): String =
+            "continuous fail n=$consecutiveFails socks=$socksPort"
     }
 }
