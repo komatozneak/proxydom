@@ -553,6 +553,26 @@ class VpnNotifier extends Notifier<VpnStatus> {
     )) {
       _endSessionWalk();
       _cancelConnectingWatchdog();
+      // Binding during a native recover drops the Nest to Connecting.
+      // The free-session flag must not leave it there once the tunnel is up.
+      if (!shouldSkipFreeSessionHydration(
+        freeSessionOpen: true,
+        uiConnecting: state is VpnConnecting,
+      )) {
+        final since = await _resolveConnectedSince(freshSession: false);
+        if (_suppressAutoReconnect || _switchStop) return;
+        if (state is VpnConnecting) {
+          state = VpnConnected(
+            serverName: serverName,
+            protocol: protocol,
+            connectedSince: since,
+          );
+          _vpnLog(
+            '[VPN] restore connected over connecting '
+            'phase=${_lastSessionPhase.name}',
+          );
+        }
+      }
       return;
     }
     if (state is VpnConnected && !freshSession) {
@@ -1634,9 +1654,18 @@ class VpnNotifier extends Notifier<VpnStatus> {
       _lastProveSummary = 'id=$proveId ok reason=${snap.reason.name}';
       _cancelConnectingWatchdog();
       final alreadyOn = state is VpnConnected;
-      if (_freeSessionOpen) return;
+      if (shouldSkipFreeSessionHydration(
+        freeSessionOpen: _freeSessionOpen,
+        uiConnecting: state is VpnConnecting,
+      )) {
+        return;
+      }
       unawaited(
-        _enterConnected(freshSession: !alreadyOn && state is VpnConnecting),
+        _enterConnected(
+          freshSession: !alreadyOn &&
+              state is VpnConnecting &&
+              !_freeSessionOpen,
+        ),
       );
       return;
     }

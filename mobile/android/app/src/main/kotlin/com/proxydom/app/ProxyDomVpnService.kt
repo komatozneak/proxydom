@@ -33,6 +33,8 @@ import com.proxydom.app.session.SessionPhase
 import com.proxydom.app.session.SessionSnapshot
 import com.proxydom.app.session.SessionSnapshotBroadcaster
 import com.proxydom.app.session.VpnSessionEngine
+import com.proxydom.app.session.hysteriaSocksListen
+import com.proxydom.app.session.socksWatchFor
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
@@ -446,6 +448,8 @@ class ProxyDomVpnService : VpnService() {
     private var trafficMonitor: VpnTrafficMonitor? = null
     private var notificationSessionLine: String = "Прокси Дом"
     private val pathHealth = PathHealth()
+    /** Params of the session [startVpn] is establishing. The watch reads this. */
+    private var liveSessionParams: Map<String, Any?> = emptyMap()
     private val mainHandler = Handler(Looper.getMainLooper())
     private var vpnWakeLock: PowerManager.WakeLock? = null
     private var vpnWifiLock: WifiManager.WifiLock? = null
@@ -980,9 +984,12 @@ class ProxyDomVpnService : VpnService() {
         val auth = (params["hysteriaAuth"] as? String)?.trim().orEmpty()
         if (server.isEmpty() || auth.isEmpty()) return false
         val sni = (params["hysteriaSni"] as? String)?.trim().orEmpty()
-        val socksListen = (params["hysteriaSocksListen"] as? String)?.trim()
-            .orEmpty()
-            .ifBlank { "${GvisorTun2Socks.SOCKS_HOST}:${GvisorTun2Socks.SOCKS_PORT}" }
+        val watch = socksWatchFor(params)
+        if (watch == null) {
+            NativeLog.w(TAG, "proveHysteriaSocks: socks port undefined")
+            return false
+        }
+        val socksListen = hysteriaSocksListen(params)
         DefaultNetworkMonitor.prewarm(this)
         if (!DefaultNetworkMonitor.awaitUnderlyingNetwork(this, 5000)) return false
         ProtectGuard.reset()
@@ -1002,7 +1009,8 @@ class ProxyDomVpnService : VpnService() {
             return false
         }
         val health = PathHealth().proveEgress(
-            adapter = PathHealth.CoreAdapter.HysteriaSocks,
+            adapter = watch.adapter,
+            socksPort = watch.port,
             alive = alive,
             underlyingIface = DefaultNetworkMonitor.defaultNetwork?.toString(),
             candidateLabel = (params["hysteriaNodeId"] as? String) ?: server,
@@ -1027,6 +1035,7 @@ class ProxyDomVpnService : VpnService() {
         alive: () -> Boolean = { true },
     ) {
         if (!alive()) return
+        liveSessionParams = params.toMap()
         if (isRunning || HysteriaBridge.instance.running()) {
             NativeLog.w(TAG, "startVpn: previous hysteria still up — stop before establish")
             teardownCores()
@@ -1099,6 +1108,11 @@ class ProxyDomVpnService : VpnService() {
             failStart("vless config missing")
             return
         }
+        val watch = socksWatchFor(params)
+        if (watch == null) {
+            failStart("VLESS SOCKS port undefined")
+            return
+        }
         val sessionName = (params["sessionName"] as? String)
             ?.takeIf { it.isNotBlank() }
             ?: "Прокси Дом"
@@ -1161,7 +1175,7 @@ class ProxyDomVpnService : VpnService() {
         val tcpLine = "server=$serverHost:$serverPort tcp=$reach"
         lastShareTcp = tcpLine
         DiagnosticRing.event("debug", "vpn.server_tcp", tcpLine)
-        val probe = VpnPingMonitor.socksConnectProbe(socksPort = 10809)
+        val probe = VpnPingMonitor.socksConnectProbe(socksPort = watch.port)
         if (probe !is VpnPingMonitor.SocksHttpsResult.Ok) {
             val reason = (probe as? VpnPingMonitor.SocksHttpsResult.Fail)?.reason
                 ?: "unknown"
@@ -1173,7 +1187,7 @@ class ProxyDomVpnService : VpnService() {
             failStart(protectErr)
             return
         }
-        val exit = VpnPingMonitor.socksExitIpByIpv4(socksPort = 10809)
+        val exit = VpnPingMonitor.socksExitIpByIpv4(socksPort = watch.port)
         val carrierIp = readCarrierIpv4()
         val exitIp = exit.ip
         if (exitIp.isNullOrBlank() || exitIp == carrierIp) {
@@ -1213,9 +1227,12 @@ class ProxyDomVpnService : VpnService() {
             return
         }
         val sni = (params["hysteriaSni"] as? String)?.trim().orEmpty()
-        val socksListen = (params["hysteriaSocksListen"] as? String)?.trim()
-            .orEmpty()
-            .ifBlank { "${GvisorTun2Socks.SOCKS_HOST}:${GvisorTun2Socks.SOCKS_PORT}" }
+        val watch = socksWatchFor(params)
+        if (watch == null) {
+            failStart("hysteria socks port undefined")
+            return
+        }
+        val socksListen = hysteriaSocksListen(params)
         val nodeId = (params["hysteriaNodeId"] as? String)?.trim().orEmpty()
             .ifBlank { "eu-hy2-1" }
 
@@ -1334,7 +1351,7 @@ class ProxyDomVpnService : VpnService() {
             teardownCores()
             return
         }
-        if (!probeSocksHttps(probeCandidate)) {
+        if (!probeSocksHttps(probeCandidate, socksPort = watch.port)) {
             failStart("$nodeId@$server: SOCKS HTTPS probe failed")
             return
         }
@@ -1342,7 +1359,7 @@ class ProxyDomVpnService : VpnService() {
             teardownCores()
             return
         }
-        val exitIp = VpnPingMonitor.socksExitIp()
+        val exitIp = VpnPingMonitor.socksExitIp(socksPort = watch.port)
         if (exitIp.isNullOrBlank() || exitIp == carrierIp) {
             failStart("egress unchanged exit=$exitIp carrier=$carrierIp")
             return
@@ -1375,7 +1392,7 @@ class ProxyDomVpnService : VpnService() {
         conn.inputStream.bufferedReader().use { it.readLine()?.trim() }
     }.getOrNull()
 
-    private fun probeSocksHttps(selected: SocksProbeCandidate): Boolean {
+    private fun probeSocksHttps(selected: SocksProbeCandidate, socksPort: Int): Boolean {
         val okFlag = AtomicBoolean(false)
         val done = CountDownLatch(1)
         Thread(
@@ -1386,6 +1403,7 @@ class ProxyDomVpnService : VpnService() {
                         SystemClock.elapsedRealtime() + XRAY_SOCKS_WARMUP_BUDGET_MS
                     while (SystemClock.elapsedRealtime() < warmupDeadline) {
                         if (VpnPingMonitor.isSocksReachable(
+                                port = socksPort,
                                 timeoutMs = XRAY_SOCKS_WARMUP_POLL_MS,
                             )
                         ) {
@@ -1394,17 +1412,22 @@ class ProxyDomVpnService : VpnService() {
                         Thread.sleep(50)
                     }
                     for (attempt in 1..XRAY_SOCKS_PROBE_ATTEMPTS) {
-                        if (!VpnPingMonitor.isSocksReachable(timeoutMs = 800)) {
+                        if (!VpnPingMonitor.isSocksReachable(
+                                port = socksPort,
+                                timeoutMs = 800,
+                            )
+                        ) {
                             NativeLog.w(
                                 TAG,
                                 "SOCKS not reachable yet candidate=" +
-                                    "${selected.id}@${selected.host} " +
+                                    "${selected.id}@${selected.host} socks=$socksPort " +
                                     "attempt=$attempt/$XRAY_SOCKS_PROBE_ATTEMPTS",
                             )
                             Thread.sleep(XRAY_SOCKS_PROBE_RETRY_SLEEP_MS)
                             continue
                         }
                         val outcome = VpnPingMonitor.socksConnectProbe(
+                            socksPort = socksPort,
                             timeoutMs = XRAY_SOCKS_PROBE_TIMEOUT_MS,
                         )
                         if (outcome is VpnPingMonitor.SocksHttpsResult.Ok) {
@@ -1678,8 +1701,18 @@ class ProxyDomVpnService : VpnService() {
     private fun startPathHealthWatch() {
         pathHealth.stopContinuous()
         if (!isRunning) return
+        val watch = socksWatchFor(liveSessionParams)
+        if (watch == null) {
+            NativeLog.e(
+                TAG,
+                "path health watch refused: socks port undefined " +
+                    "vpnCore=${liveSessionParams["vpnCore"]}",
+            )
+            return
+        }
         pathHealth.startContinuous(
-            adapter = PathHealth.CoreAdapter.HysteriaSocks,
+            adapter = watch.adapter,
+            socksPort = watch.port,
             listener = { result -> sessionEngine.notifyHealth(result) },
             alive = {
                 isRunning &&
@@ -1688,7 +1721,10 @@ class ProxyDomVpnService : VpnService() {
                     currentStatus != "idle"
             },
         )
-        NativeLog.i(TAG, "path health watch started")
+        NativeLog.i(
+            TAG,
+            "path health watch started adapter=${watch.adapter} socks=${watch.port}",
+        )
     }
 
     private fun stopPathHealthWatch() {
