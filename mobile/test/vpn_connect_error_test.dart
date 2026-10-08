@@ -596,4 +596,47 @@ void main() {
       );
     });
   });
+
+  group('shouldRefreshAfterAuthRefusal', () {
+    test('re-reads the document once when the node refused the secret', () {
+      expect(
+        shouldRefreshAfterAuthRefusal(
+          alreadyRefreshed: false,
+          userStopping: false,
+          hasSourceUrl: true,
+        ),
+        isTrue,
+      );
+    });
+
+    test('never loops and never fires after Nest stop', () {
+      expect(
+        shouldRefreshAfterAuthRefusal(
+          alreadyRefreshed: true,
+          userStopping: false,
+          hasSourceUrl: true,
+        ),
+        isFalse,
+      );
+      expect(
+        shouldRefreshAfterAuthRefusal(
+          alreadyRefreshed: false,
+          userStopping: true,
+          hasSourceUrl: true,
+        ),
+        isFalse,
+      );
+    });
+
+    test('a bare pasted key has nothing to re-read', () {
+      expect(
+        shouldRefreshAfterAuthRefusal(
+          alreadyRefreshed: false,
+          userStopping: false,
+          hasSourceUrl: false,
+        ),
+        isFalse,
+      );
+    });
+  });
 }

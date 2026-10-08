@@ -319,3 +319,18 @@ bool shouldRetryAutoOnWifi({
   if (alreadyRetried || userStopping || !isWifi) return false;
   return true;
 }
+
+/// One re-read of the pasted document after the node refused our secret.
+///
+/// Reissuing a document rotates every node password, so a cached config
+/// keeps presenting a stale one and the node masquerades (405). Never
+/// loops: one refresh per connect attempt, and never after Nest stop or
+/// when the line was pasted bare (no source URL to re-read).
+bool shouldRefreshAfterAuthRefusal({
+  required bool alreadyRefreshed,
+  required bool userStopping,
+  required bool hasSourceUrl,
+}) {
+  if (alreadyRefreshed || userStopping || !hasSourceUrl) return false;
+  return true;
+}

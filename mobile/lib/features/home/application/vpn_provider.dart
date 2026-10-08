@@ -225,6 +225,10 @@ class VpnNotifier extends Notifier<VpnStatus> {
   /// and syncFromNative auto-reconnect until the next user [connect].
   bool _suppressAutoReconnect = false;
 
+  /// True once this connect attempt has re-read the document after a node
+  /// auth refusal. Bounds refresh-and-redial to a single pass.
+  bool _authRefreshRetried = false;
+
   /// True while a server switch is waiting for the previous tunnel to go idle.
   bool _switchStop = false;
   int _dialGen = 0;
@@ -420,6 +424,24 @@ class VpnNotifier extends Notifier<VpnStatus> {
         code: kVpnConflictErrorCode,
       ),
     );
+  }
+
+  /// Re-read the pasted catalog document after the node refused our secret.
+  ///
+  /// Reissuing a document rotates every node password in the same
+  /// transaction, so a config cached on the phone keeps sending a stale
+  /// secret and the node answers with the masquerade 405. Returns false when
+  /// the line was pasted bare and has no source URL to re-read.
+  Future<bool> _refreshSelectedDocument() async {
+    final catalog = await Hy2ImportStore.instance.selectedCatalog();
+    if (catalog == null) return false;
+    if ((catalog.url ?? '').trim().isEmpty) return false;
+    try {
+      await Hy2ImportStore.instance.refreshCatalog(catalog.id);
+      return true;
+    } on SubscriptionDocumentException {
+      return false;
+    }
   }
 
   Future<VpnError> _vpnErrorFromNative({
@@ -954,6 +976,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
       _cancelWifiRetry();
       _wifiAutoRetryUsed = false;
       _autoConnectAttempt = 1;
+      _authRefreshRetried = false;
     }
     if (_connectInFlight != null) {
       final switching = forceRestart &&
@@ -1206,6 +1229,21 @@ class VpnNotifier extends Notifier<VpnStatus> {
             );
           }
           final startError = await _errorForStartFailure();
+          // A reissued document rotates every node password, so the cached
+          // config presents a stale secret and the node masquerades (405).
+          // Re-read the document and redial once before calling the key dead.
+          if (startError.code == kVpnNodeAuthRefusedErrorCode &&
+              shouldRefreshAfterAuthRefusal(
+                alreadyRefreshed: _authRefreshRetried,
+                userStopping: _suppressAutoReconnect,
+                hasSourceUrl: true,
+              ) &&
+              await _refreshSelectedDocument()) {
+            _authRefreshRetried = true;
+            if (await _abortStaleConnect(gen)) return;
+            await _connectBody(forceRestart: true, gen: gen);
+            return;
+          }
           SessionTrace.mark('fail', {'code': startError.code});
           ProductLog.event(
             'vpn.connect_fail',
