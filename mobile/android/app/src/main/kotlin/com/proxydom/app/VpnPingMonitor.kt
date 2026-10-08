@@ -45,6 +45,9 @@ class VpnPingMonitor(
         const val MAX_PLAUSIBLE_MS = 5000
         const val PROBE_INTERVAL_MS = 5_000L
         const val PROBE_TIMEOUT_MS = 3_500
+
+        /** Gate before Connected. One second, not a TLS trace. */
+        const val CARRY_TIMEOUT_MS = 1_000
         const val FAIL_CLEAR_THRESHOLD = 2
         const val PROBE_HOST = "1.1.1.1"
         const val PROBE_PORT = 443
@@ -191,43 +194,48 @@ class VpnPingMonitor(
         }
 
         /**
-         * Walk literal targets until one SOCKS CONNECT completes.
+         * Walk CONNECT targets until one completes. No TLS and no body: that
+         * is what blocks Connected. [traceExitIp] reads the address later.
          *
-         * `ipv4.icanhazip.com` is not a target: foreign exits reset that name.
-         * An IP parsed from a trace is recorded on the sample and is not
-         * required for [HttpProbeSample.tcp].
+         * `ipv4.icanhazip.com` is not a target.
          */
         fun proveTunnel(
             socksHost: String = GvisorTun2Socks.SOCKS_HOST,
             socksPort: Int = GvisorTun2Socks.SOCKS_PORT,
-            timeoutMs: Int = PROBE_TIMEOUT_MS,
+            timeoutMs: Int = CARRY_TIMEOUT_MS,
         ): TunnelAcceptance {
             val samples = ArrayList<HttpProbeSample>(3)
-            val trace = probeTraceLiteral(socksHost, socksPort, timeoutMs)
-            samples.add(trace)
-            if (trace.tcp) return acceptTunnel(samples)
-            val cloudflare = probeGenerate204Literal(
-                socksHost = socksHost,
-                socksPort = socksPort,
-                timeoutMs = timeoutMs,
-                name = "cp.cloudflare.com",
-                port = 443,
-                tls = true,
-            )
-            samples.add(cloudflare)
-            if (cloudflare.tcp) return acceptTunnel(samples)
             samples.add(
-                probeGenerate204Literal(
-                    socksHost = socksHost,
-                    socksPort = socksPort,
-                    timeoutMs = timeoutMs,
-                    name = "www.gstatic.com",
-                    port = 80,
-                    tls = false,
+                connectSample(
+                    socksHost, socksPort, "1.1.1.1:443", "1.1.1.1", 443, timeoutMs,
+                ),
+            )
+            if (samples.last().tcp) return acceptTunnel(samples)
+            samples.add(
+                connectNamed(
+                    socksHost, socksPort, "cp.cloudflare.com", 443, timeoutMs,
+                ),
+            )
+            if (samples.last().tcp) return acceptTunnel(samples)
+            samples.add(
+                connectNamed(
+                    socksHost, socksPort, "www.gstatic.com", 80, timeoutMs,
                 ),
             )
             return acceptTunnel(samples)
         }
+
+        /**
+         * Exit address from `1.1.1.1/cdn-cgi/trace`. Not a connect gate.
+         * Null when the trace has no `ip=` line.
+         */
+        fun traceExitIp(
+            socksHost: String = GvisorTun2Socks.SOCKS_HOST,
+            socksPort: Int = GvisorTun2Socks.SOCKS_PORT,
+            timeoutMs: Int = PROBE_TIMEOUT_MS,
+        ): String? = probeTraceLiteral(socksHost, socksPort, timeoutMs).exitIp
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
 
         /**
          * Public IPv4 via the name `ipv4.icanhazip.com`. Not an acceptance
@@ -447,6 +455,63 @@ class VpnPingMonitor(
                 }
             }.getOrNull()
 
+        private fun connectSample(
+            socksHost: String,
+            socksPort: Int,
+            target: String,
+            destHost: String,
+            destPort: Int,
+            timeoutMs: Int,
+        ): HttpProbeSample {
+            val outcome = socksConnectProbe(
+                socksHost = socksHost,
+                socksPort = socksPort,
+                destHost = destHost,
+                destPort = destPort,
+                timeoutMs = timeoutMs,
+            )
+            return if (outcome is SocksHttpsResult.Ok) {
+                HttpProbeSample(
+                    target = target,
+                    tcp = true,
+                    httpStatus = null,
+                    exitIp = null,
+                    detail = "connect=${outcome.code}ms",
+                )
+            } else {
+                HttpProbeSample(
+                    target = target,
+                    tcp = false,
+                    httpStatus = null,
+                    exitIp = null,
+                    detail = outcome.detail,
+                )
+            }
+        }
+
+        private fun connectNamed(
+            socksHost: String,
+            socksPort: Int,
+            name: String,
+            port: Int,
+            timeoutMs: Int,
+        ): HttpProbeSample {
+            val target = "$name:$port"
+            val literal = resolveIpv4(name)
+            if (literal == null) {
+                return HttpProbeSample(
+                    target = target,
+                    tcp = false,
+                    httpStatus = null,
+                    exitIp = null,
+                    detail = "dns",
+                )
+            }
+            return connectSample(
+                socksHost, socksPort, target, literal, port, timeoutMs,
+            )
+        }
+
         private fun probeTraceLiteral(
             socksHost: String,
             socksPort: Int,
@@ -487,73 +552,6 @@ class VpnPingMonitor(
                             httpStatus = status,
                             exitIp = ip,
                             detail = "http=${status ?: "none"}",
-                        )
-                    } catch (e: Exception) {
-                        HttpProbeSample(
-                            target = target,
-                            tcp = true,
-                            httpStatus = null,
-                            exitIp = null,
-                            detail = "${e.javaClass.simpleName}=${e.message ?: "err"}",
-                        )
-                    }
-                }
-            } catch (e: Exception) {
-                HttpProbeSample(
-                    target = target,
-                    tcp = false,
-                    httpStatus = null,
-                    exitIp = null,
-                    detail = "${e.javaClass.simpleName}=${e.message ?: "err"}",
-                )
-            }
-        }
-
-        private fun probeGenerate204Literal(
-            socksHost: String,
-            socksPort: Int,
-            timeoutMs: Int,
-            name: String,
-            port: Int,
-            tls: Boolean,
-        ): HttpProbeSample {
-            val target = "$name:$port"
-            val literal = resolveIpv4(name)
-            if (literal == null) {
-                return HttpProbeSample(
-                    target = target,
-                    tcp = false,
-                    httpStatus = null,
-                    exitIp = null,
-                    detail = "dns",
-                )
-            }
-            return try {
-                Socket().use { plain ->
-                    plain.soTimeout = timeoutMs
-                    plain.connect(InetSocketAddress(socksHost, socksPort), timeoutMs)
-                    val out = DataOutputStream(plain.getOutputStream())
-                    val inp = DataInputStream(plain.getInputStream())
-                    socks5Greeting(out, inp)
-                    socks5ConnectIpv4(out, inp, literal, port)
-                    try {
-                        val status = if (tls) {
-                            val ssl = probeTls(plain, name, port)
-                            ssl.soTimeout = timeoutMs
-                            ssl.startHandshake()
-                            val code = httpGenerate204(ssl, name)
-                            runCatching { ssl.close() }
-                            code
-                        } else {
-                            httpGenerate204(plain, name)
-                        }
-                        val http = (status as? SocksHttpsResult.Ok)?.code
-                        HttpProbeSample(
-                            target = target,
-                            tcp = true,
-                            httpStatus = http,
-                            exitIp = null,
-                            detail = status.detail,
                         )
                     } catch (e: Exception) {
                         HttpProbeSample(

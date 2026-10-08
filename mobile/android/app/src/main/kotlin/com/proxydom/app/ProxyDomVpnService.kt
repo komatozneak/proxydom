@@ -1181,7 +1181,6 @@ class ProxyDomVpnService : VpnService() {
         if (!acceptCarryingTunnel(
                 socksPort = watch.port,
                 server = "$serverHost:$serverPort",
-                tcpReachLine = reach,
             )
         ) {
             return
@@ -1329,12 +1328,9 @@ class ProxyDomVpnService : VpnService() {
             teardownCores()
             return
         }
-        val hyHost = server.substringBefore(':')
-        val hyPort = server.substringAfter(':', "").toIntOrNull() ?: 0
         if (!acceptCarryingTunnel(
                 socksPort = watch.port,
                 server = server,
-                tcpReachLine = tcpReach(hyHost, hyPort),
             )
         ) {
             return
@@ -1353,18 +1349,6 @@ class ProxyDomVpnService : VpnService() {
         startTrafficMonitor()
         NativeLog.event("info", "vpn.core.established", "core=hysteria server=$server")
     }
-
-    /**
-     * SOCKS CONNECT to 1.1.1.1:443 through local Xray SOCKS — must pass before
-     * `connected`. Runs off the main thread (no TLS, no generate_204).
-     */
-    private fun readCarrierIpv4(): String? = runCatching {
-        val url = java.net.URL("http://ipv4.icanhazip.com")
-        val conn = url.openConnection() as java.net.HttpURLConnection
-        conn.connectTimeout = 4000
-        conn.readTimeout = 4000
-        conn.inputStream.bufferedReader().use { it.readLine()?.trim() }
-    }.getOrNull()
 
     private fun tcpReach(host: String, port: Int): String {
         if (host.isEmpty() || port <= 0) return "no_target"
@@ -1427,17 +1411,17 @@ class ProxyDomVpnService : VpnService() {
     }
 
     /**
-     * SOCKS must accept a CONNECT before the session is connected. The exit
-     * IP is recorded when a target returns one and is not a reason to stop.
+     * SOCKS CONNECT must finish before Connected. The exit address is read
+     * afterwards and does not hold the status.
      */
     private fun acceptCarryingTunnel(
         socksPort: Int,
         server: String,
-        tcpReachLine: String,
     ): Boolean {
         if (!awaitSocksPort(socksPort)) {
             failStart(
-                "socks not listening server=$server port=$socksPort tcp=$tcpReachLine",
+                "socks not listening server=$server port=$socksPort " +
+                    "tcp=${tcpReachServer(server)}",
             )
             return false
         }
@@ -1445,35 +1429,40 @@ class ProxyDomVpnService : VpnService() {
         if (!acceptance.carriesData) {
             failStart(
                 "tunnel carried no tcp server=$server reason=${acceptance.detail} " +
-                    "tcp=$tcpReachLine socks=$socksPort",
+                    "tcp=${tcpReachServer(server)} socks=$socksPort",
             )
             return false
         }
-        val carrierIp = if (acceptance.exitIp.isNullOrBlank()) {
-            null
-        } else {
-            readCarrierIpv4()
-        }
-        val warn = egressIpWarn(acceptance.exitIp, carrierIp)
-        if (warn != null) {
-            NativeLog.w(
-                TAG,
-                "$warn server=$server exit=${acceptance.exitIp} carrier=$carrierIp",
-            )
-        } else {
-            NativeLog.i(
-                TAG,
-                "egress ip read exit=${acceptance.exitIp} target=${acceptance.target} " +
-                    "server=$server",
-            )
-        }
-        val legacy = VpnPingMonitor.socksExitIp(socksPort = socksPort, timeoutMs = 1_200)
-        NativeLog.i(
-            TAG,
-            "icanhazip through tunnel exit=${legacy ?: "unread"} (not a gate) server=$server",
-        )
-        provenEgressIp = acceptance.exitIp
+        provenEgressIp = null
+        scheduleExitIpRead(socksPort = socksPort, server = server)
         return true
+    }
+
+    private fun tcpReachServer(server: String): String {
+        val host = server.substringBefore(':')
+        val port = server.substringAfter(':', "").toIntOrNull() ?: 0
+        return tcpReach(host, port)
+    }
+
+    /** Trace `ip=` after Connected. A later generation must not inherit it. */
+    private fun scheduleExitIpRead(socksPort: Int, server: String) {
+        val gen = sessionEngine.currentGeneration()
+        Thread(
+            {
+                val ip = VpnPingMonitor.traceExitIp(socksPort = socksPort)
+                if (!sessionEngine.isAlive(gen)) return@Thread
+                provenEgressIp = ip
+                if (ip.isNullOrBlank()) {
+                    NativeLog.w(TAG, "egress ip unread server=$server")
+                } else {
+                    NativeLog.i(
+                        TAG,
+                        "egress ip read exit=$ip target=1.1.1.1:443 server=$server",
+                    )
+                }
+            },
+            "proxydom-exit-ip",
+        ).apply { isDaemon = true }.start()
     }
 
     private fun awaitSocksPort(socksPort: Int): Boolean {
