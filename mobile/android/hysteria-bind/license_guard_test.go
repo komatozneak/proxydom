@@ -36,6 +36,9 @@ var licenseGuardTargets = []struct {
 }{
 	{"android", "arm64", []string{"./...", "golang.org/x/mobile/bind/java", "golang.org/x/mobile/bind/seq"}},
 	{"ios", "arm64", []string{"./...", "golang.org/x/mobile/bind/objc", "golang.org/x/mobile/bind/seq"}},
+	// The MSI ships proxydom-engine.exe. A guard that only walks the phone
+	// builds says nothing about that binary.
+	{"windows", "amd64", []string{"./...", "./cmd/proxydom-engine"}},
 }
 
 var allowedLicenses = map[string]bool{
