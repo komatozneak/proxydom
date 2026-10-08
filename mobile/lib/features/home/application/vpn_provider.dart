@@ -432,6 +432,13 @@ class VpnNotifier extends Notifier<VpnStatus> {
   /// transaction, so a config cached on the phone keeps sending a stale
   /// secret and the node answers with the masquerade 405. Returns false when
   /// the line was pasted bare and has no source URL to re-read.
+  /// Source URL of the selected line, or null when it was pasted bare.
+  Future<String?> _selectedDocumentUrl() async {
+    final catalog = await Hy2ImportStore.instance.selectedCatalog();
+    final url = (catalog?.url ?? '').trim();
+    return url.isEmpty ? null : url;
+  }
+
   Future<bool> _refreshSelectedDocument() async {
     final catalog = await Hy2ImportStore.instance.selectedCatalog();
     if (catalog == null) return false;
@@ -1236,7 +1243,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
               shouldRefreshAfterAuthRefusal(
                 alreadyRefreshed: _authRefreshRetried,
                 userStopping: _suppressAutoReconnect,
-                hasSourceUrl: true,
+                hasSourceUrl: await _selectedDocumentUrl() != null,
               ) &&
               await _refreshSelectedDocument()) {
             _authRefreshRetried = true;
