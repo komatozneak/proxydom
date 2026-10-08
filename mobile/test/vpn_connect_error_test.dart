@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:proxydom/features/home/application/vpn_status.dart';
 import 'package:proxydom/features/vpn/data/vpn_session_snapshot.dart';
 import 'package:proxydom/features/vpn/domain/vpn_connect_error.dart';
+import 'package:proxydom/l10n/app_localizations_en.dart';
+import 'package:proxydom/l10n/app_localizations_ru.dart';
 
 void main() {
   group('parseSocksProbeFailure', () {
@@ -64,6 +66,32 @@ void main() {
       );
       expect(err.code, kVpnProbeFailedErrorCode);
       expect(err.message, 'eu-hy2-1');
+    });
+
+    test('masquerade 405 is a node refusal, not the raw status', () {
+      final err = vpnErrorFromNativeDetail(
+        'hy2 client: authentication error, HTTP status code: 405',
+      );
+      expect(err.code, kVpnNodeAuthRefusedErrorCode);
+      expect(err.message, kVpnNodeAuthRefusedErrorCode);
+      expect(err.message, isNot(contains('405')));
+    });
+
+    test('the refusal copy names a denied session, not the raw 405', () {
+      expect(
+        AppL10nRu().homeNodeAuthRefused,
+        'Узел отклонил аутентификацию. Сессия не разрешена: трафик периода закончился или ключ отозван.',
+      );
+      expect(
+        AppL10nEn().homeNodeAuthRefused,
+        contains('traffic is used up'),
+      );
+    });
+
+    test('a transport failure stays a transport failure', () {
+      final err = vpnErrorFromNativeDetail('connection reset by peer');
+      expect(err.code, isNull);
+      expect(err.message, 'vpn: connection reset by peer');
     });
 
     test('falls back when detail empty', () {
@@ -563,6 +591,49 @@ void main() {
           alreadyRetried: false,
           userStopping: false,
           isWifi: false,
+        ),
+        isFalse,
+      );
+    });
+  });
+
+  group('shouldRefreshAfterAuthRefusal', () {
+    test('re-reads the document once when the node refused the secret', () {
+      expect(
+        shouldRefreshAfterAuthRefusal(
+          alreadyRefreshed: false,
+          userStopping: false,
+          hasSourceUrl: true,
+        ),
+        isTrue,
+      );
+    });
+
+    test('never loops and never fires after Nest stop', () {
+      expect(
+        shouldRefreshAfterAuthRefusal(
+          alreadyRefreshed: true,
+          userStopping: false,
+          hasSourceUrl: true,
+        ),
+        isFalse,
+      );
+      expect(
+        shouldRefreshAfterAuthRefusal(
+          alreadyRefreshed: false,
+          userStopping: true,
+          hasSourceUrl: true,
+        ),
+        isFalse,
+      );
+    });
+
+    test('a bare pasted key has nothing to re-read', () {
+      expect(
+        shouldRefreshAfterAuthRefusal(
+          alreadyRefreshed: false,
+          userStopping: false,
+          hasSourceUrl: false,
         ),
         isFalse,
       );
