@@ -233,6 +233,10 @@ class AppL10nEn extends AppL10n {
   String get homeErrorFriendly => 'Couldn’t connect. Please try again.';
 
   @override
+  String get homeNodeAuthRefused =>
+      'The node refused authentication. Refresh the subscription document, then connect again.';
+
+  @override
   String get homePathIncompatibleHint =>
       'Couldn’t reach a server. Tap again or pick a location yourself.';
 

@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:proxydom/features/home/application/vpn_status.dart';
 import 'package:proxydom/features/vpn/data/vpn_session_snapshot.dart';
 import 'package:proxydom/features/vpn/domain/vpn_connect_error.dart';
+import 'package:proxydom/l10n/app_localizations_en.dart';
+import 'package:proxydom/l10n/app_localizations_ru.dart';
 
 void main() {
   group('parseSocksProbeFailure', () {
@@ -64,6 +66,32 @@ void main() {
       );
       expect(err.code, kVpnProbeFailedErrorCode);
       expect(err.message, 'eu-hy2-1');
+    });
+
+    test('masquerade 405 is a node refusal, not the raw status', () {
+      final err = vpnErrorFromNativeDetail(
+        'hy2 client: authentication error, HTTP status code: 405',
+      );
+      expect(err.code, kVpnNodeAuthRefusedErrorCode);
+      expect(err.message, kVpnNodeAuthRefusedErrorCode);
+      expect(err.message, isNot(contains('405')));
+    });
+
+    test('the refusal copy asks to refresh the subscription document', () {
+      expect(
+        AppL10nRu().homeNodeAuthRefused,
+        'Узел отклонил аутентификацию. Обновите документ подписки и подключитесь снова.',
+      );
+      expect(
+        AppL10nEn().homeNodeAuthRefused,
+        contains('Refresh the subscription document'),
+      );
+    });
+
+    test('a transport failure stays a transport failure', () {
+      final err = vpnErrorFromNativeDetail('connection reset by peer');
+      expect(err.code, isNull);
+      expect(err.message, 'vpn: connection reset by peer');
     });
 
     test('falls back when detail empty', () {

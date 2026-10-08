@@ -15,6 +15,9 @@ const kVpnPathIncompatibleErrorCode = 'path_incompatible';
 /// Control plane (DNS / TCP to the API) failed before any config was minted.
 const kVpnApiUnreachableErrorCode = 'api_unreachable';
 
+/// Hy2 answered with the masquerade site's HTTP 405, not our error code.
+const kVpnNodeAuthRefusedErrorCode = 'node_auth_refused';
+
 /// Why an Auto mint produced no config.
 enum AutoMintSkipKind {
   /// DNS, connect, or timeout talking to the API.
@@ -74,7 +77,20 @@ VpnError vpnErrorFromNativeDetail(
       code: kVpnPathIncompatibleErrorCode,
     );
   }
+  if (_isNodeAuthRefusal(detail)) {
+    return const VpnError(
+      message: kVpnNodeAuthRefusedErrorCode,
+      code: kVpnNodeAuthRefusedErrorCode,
+    );
+  }
   return VpnError(message: 'vpn: $detail');
+}
+
+/// Masquerade returns 405 when the node refuses the password. That status is
+/// the website's, so it must not be shown as our error text.
+bool _isNodeAuthRefusal(String detail) {
+  final lower = detail.toLowerCase();
+  return lower.contains('authentication error') && lower.contains('405');
 }
 
 /// Map ADR 014 session Error / PathIncompatible to Home [VpnError].

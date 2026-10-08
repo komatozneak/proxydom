@@ -529,6 +529,12 @@ abstract class AppL10n {
   /// **'Couldn’t connect. Please try again.'**
   String get homeErrorFriendly;
 
+  /// No description provided for @homeNodeAuthRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'The node refused authentication. Refresh the subscription document, then connect again.'**
+  String get homeNodeAuthRefused;
+
   /// No description provided for @homePathIncompatibleHint.
   ///
   /// In en, this message translates to:

@@ -111,6 +111,8 @@
   "@homeRetry": {},
   "homeErrorFriendly": "Couldn’t connect. Please try again.",
   "@homeErrorFriendly": {},
+  "homeNodeAuthRefused": "The node refused authentication. Refresh the subscription document, then connect again.",
+  "@homeNodeAuthRefused": {},
   "homePathIncompatibleHint": "Couldn’t reach a server. Tap again or pick a location yourself.",
   "@homePathIncompatibleHint": {},
   "homeTtProvisionFailedTitle": "Server unavailable",

@@ -17,6 +17,10 @@ import '../../../core/ios_store_gates.dart';
 
 const _prefsKey = 'hy2_import_v1';
 
+/// Tests swap this so a document refresh does not open a real socket.
+@visibleForTesting
+HttpClient Function() hy2HttpClientFactory = HttpClient.new;
+
 /// One subscription or one manual paste. Not mixed with another source.
 class ShareCatalog {
   const ShareCatalog({
@@ -569,7 +573,7 @@ class Hy2ImportStore {
     int? localLinks,
   }) async {
     final started = Stopwatch()..start();
-    final client = HttpClient();
+    final client = hy2HttpClientFactory();
     try {
       final request = await client
           .getUrl(Uri.parse(url))
