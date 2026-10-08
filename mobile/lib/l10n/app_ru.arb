@@ -591,6 +591,13 @@
   "freeSaveOnly": "Только сохранить",
   "freePreview": "Найдено",
   "freeServerAdded": "Сервер добавлен",
+  "freeImportCount": "Распознано {recognized}, не поддержано {unsupported}",
+  "@freeImportCount": {
+    "placeholders": {
+      "recognized": {"type": "int"},
+      "unsupported": {"type": "int"}
+    }
+  },
   "freeLinkInvalid": "Ссылка не разобрана",
   "freeSubscriptionLoadFail": "Документ не загрузился. Адрес не ответил.",
   "freeSubscriptionMissing": "По этому адресу документа нет.",

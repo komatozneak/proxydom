@@ -37,6 +37,7 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
   final _controller = TextEditingController();
   final _fieldFocus = FocusNode();
   List<ParsedShareLink> _preview = const [];
+  List<ShareLineSkip> _skipped = const [];
   String? _previewTitle;
   String? _error;
   bool _busy = false;
@@ -103,6 +104,7 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
         _loadingPreview = true;
         _error = null;
         _preview = const [];
+        _skipped = const [];
         _previewTitle = null;
       });
       Hy2ImportStore.instance.previewSubscription(text).then((result) {
@@ -110,10 +112,13 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
         setState(() {
           _loadingPreview = false;
           _preview = result.links;
+          _skipped = result.skipped;
           _previewTitle = result.title;
-          _error = result.links.isEmpty
+          _error = result.links.isEmpty && result.skipped.isEmpty
               ? 'empty'
-              : switch (shareImportDial(
+              : result.links.isEmpty
+                  ? null
+                  : switch (shareImportDial(
                   result.links,
                   fromDocument: true,
                 )) {
@@ -151,15 +156,19 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
       _previewTitle = null;
     });
     try {
-      final links = parseShareSubscription(text);
+      final report = inspectShareSubscription(text);
+      final links = report.links;
       final dial = shareImportDial(links, fromDocument: false);
       setState(() {
         _preview = links;
+        _skipped = report.skipped;
         _error = text.isEmpty
             ? null
-            : links.isEmpty
-                ? 'empty'
-                : switch (dial) {
+            : links.isEmpty && report.skipped.isNotEmpty
+                ? null
+                : links.isEmpty
+                    ? 'empty'
+                    : switch (dial) {
                     ShareImportDial.singleUnsupported => 'hy2_only',
                     ShareImportDial.noneDialable => 'no_hy2',
                     ShareImportDial.dialable => null,
@@ -169,6 +178,7 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
       UiLog.action('import', 'preview', result: 'bad');
       setState(() {
         _preview = const [];
+        _skipped = const [];
         _error = 'bad';
       });
     }
@@ -184,7 +194,7 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
       !_busy &&
       !_loadingPreview &&
       (_error == null || _error == 'no_hy2') &&
-      (_subscriptionUrl || _preview.isNotEmpty);
+      (_subscriptionUrl || _preview.isNotEmpty || _skipped.isNotEmpty);
 
   /// Saves the draft and dials it.
   ///
@@ -383,6 +393,23 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
                               if (_error != null) ...[
                                 const SizedBox(height: 12),
                                 _ErrorLine(_errorFor(l)),
+                              ],
+                              if (_skipped.isNotEmpty) ...[
+                                const SizedBox(height: 12),
+                                Text(
+                                  formatUnsupportedImport(
+                                    countLine: l.freeImportCount(
+                                      _preview.length,
+                                      _skipped.length,
+                                    ),
+                                    skipped: _skipped,
+                                  ),
+                                  style: TextStyle(
+                                    color: mute,
+                                    fontSize: 13,
+                                    height: 1.35,
+                                  ),
+                                ),
                               ],
                             ],
                           ),

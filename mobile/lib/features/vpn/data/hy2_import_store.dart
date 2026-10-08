@@ -537,17 +537,23 @@ class Hy2ImportStore {
   }
 
   /// Download a subscription and parse it without writing the store.
-  Future<({List<ParsedShareLink> links, String? title})> previewSubscription(
+  Future<
+      ({
+        List<ParsedShareLink> links,
+        String? title,
+        List<ShareLineSkip> skipped,
+      })> previewSubscription(
     String raw,
   ) async {
     final target = subscriptionDocumentTarget(raw);
     if (target == null) throw const FormatException('subscription');
     final fetched = await _fetch(target.url);
+    final report = inspectShareSubscription(fetched.body);
     final links = _linesToKeep(
-      parseShareSubscription(fetched.body),
+      report.links,
       hwidMaxDevices: fetched.hwidMaxDevices,
     );
-    if (links.isEmpty) {
+    if (links.isEmpty && report.skipped.isEmpty) {
       logDocumentFetch(
         url: target.url,
         links: 0,
@@ -564,7 +570,7 @@ class Hy2ImportStore {
     final title = fetched.profileTitle ??
         target.title ??
         titleFromSubscriptionBody(fetched.body);
-    return (links: links, title: title);
+    return (links: links, title: title, skipped: report.skipped);
   }
 
   Future<_Fetched> _fetch(
@@ -730,17 +736,9 @@ class Hy2ImportStore {
   }
 
   List<ParsedShareLink> _parseAll(_Blob blob) {
-    final out = <ParsedShareLink>[];
-    for (final catalog in blob.catalogs) {
-      for (final item in catalog.lines) {
-        try {
-          out.add(parseShareLink(item));
-        } on FormatException {
-          continue;
-        }
-      }
-    }
-    return out;
+    return inspectShareLines(
+      blob.catalogs.expand((catalog) => catalog.lines),
+    ).links;
   }
 }
 

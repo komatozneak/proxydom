@@ -2683,6 +2683,12 @@ abstract class AppL10n {
   /// **'Server added'**
   String get freeServerAdded;
 
+  /// No description provided for @freeImportCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Read {recognized}, unsupported {unsupported}'**
+  String freeImportCount(int recognized, int unsupported);
+
   /// No description provided for @freeLinkInvalid.
   ///
   /// In en, this message translates to:

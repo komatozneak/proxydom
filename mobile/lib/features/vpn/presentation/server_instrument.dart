@@ -37,6 +37,7 @@ class ProfileInstrument extends StatelessWidget {
     this.onShare,
     this.onDelete,
     this.showTelegraph = true,
+    this.unsupportedNote,
   });
 
   final String title;
@@ -66,6 +67,9 @@ class ProfileInstrument extends StatelessWidget {
   final VoidCallback? onShare;
   final VoidCallback? onDelete;
   final bool showTelegraph;
+
+  /// Lines the parser kept out of [nodes], with a reason each. Neutral.
+  final String? unsupportedNote;
 
   @override
   Widget build(BuildContext context) {
@@ -253,6 +257,20 @@ class ProfileInstrument extends StatelessWidget {
                 ],
               ],
             ),
+            if (unsupportedNote != null && unsupportedNote!.trim().isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                child: Text(
+                  unsupportedNote!,
+                  style: terminalText(
+                    context,
+                    size: 12,
+                    color: mute,
+                    weight: 500,
+                    spacing: 0.2,
+                  ),
+                ),
+              ),
           ],
         ],
       ),
