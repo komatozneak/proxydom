@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "flow_probe.h"
+#include "protocol.h"
 
 // Service-owned TUN session. Win32 is behind the interfaces below so a fake
 // network can prove that Idle is emitted only after a verified restore.
@@ -34,6 +35,13 @@ enum class TunnelCode {
   CleanupFailed,
   Busy,
   Protocol,
+  // The engine names what it cannot carry and exits before starting a core.
+  // These are not crashes: the line asked for something this platform does not
+  // have, and reporting that as a service failure sends the person to look for
+  // a bug in the client instead of at their own line.
+  TransportUnsupported,
+  SecurityUnsupported,
+  SchemeUnsupported,
 };
 
 enum class ConnectStep {
@@ -66,7 +74,45 @@ struct OwnedAdapter {
   std::uint64_t luid = 0;
   unsigned long if_index = 0;
   bool up = false;
+  std::string ipv4;  // empty until the engine has assigned the address
+  // Diagnostics. A route into an adapter Windows treats as disconnected is
+  // accepted by the route table and then refused by connect().
+  unsigned long media_state = 0;  // MediaConnectState as reported by the adapter
+  unsigned long dad_state = 0;    // DadState of the first IPv4 address
 };
+
+// Where Windows would actually send a packet. A route row that exists but
+// cannot be used is indistinguishable from no route at all at connect() time,
+// which returns the same host-unreachable either way, so ask the stack instead
+// of inferring from the table we just wrote.
+struct RouteLookup {
+  std::string next_hop;
+  std::string source;
+  std::uint64_t interface_luid = 0;
+  unsigned long interface_index = 0;
+  int prefix_length = 0;
+};
+
+// The engine opens the wintun adapter and assigns the address afterwards, and
+// Windows reports an address-less adapter as up. A canary route into such an
+// adapter fails immediately, so "up" alone is not ready: wait for the address
+// the engine was told to set.
+//
+// The address alone is not enough either. Windows reports it as
+// IpDadStateTentative while it checks for a duplicate, and a route into an
+// adapter whose only address is tentative is accepted by the route table and
+// then refused by connect(), which answers host unreachable exactly as it does
+// when no route exists at all. Measured on the owner's machine: dad=1 together
+// with GetBestRoute2 returning ERROR_NOT_FOUND for a canary whose /32 row was
+// present. Readiness therefore requires Preferred.
+constexpr unsigned long kIpDadStateTentative = 1;
+constexpr unsigned long kIpDadStatePreferred = 4;
+
+inline bool tun_adapter_ready(const OwnedAdapter& adapter) {
+  return adapter.name == kTunName && adapter.up && adapter.luid != 0 &&
+         adapter.if_index != 0 && adapter.ipv4 == kTunIpv4 &&
+         adapter.dad_state == kIpDadStatePreferred;
+}
 
 struct OwnedRoute {
   std::string destination;
@@ -176,6 +222,9 @@ class RouteTable {
   virtual bool delete_canary(const OwnedRoute& route) = 0;
   // Follows the routing table. No IP_UNICAST_IF bind.
   virtual bool fetch_canary(const std::string& ip, const std::function<bool()>& cancelled) = 0;
+  // Which interface the stack picks for this address, and its error when it
+  // picks none. Answers "is the canary route usable" without guessing.
+  virtual bool lookup_route(const std::string& ip, RouteLookup& out) = 0;
   virtual bool tun_ready(OwnedAdapter& adapter, std::vector<OwnedRoute>& halves) = 0;
   virtual bool prove_exit(unsigned long if_index,
                           const std::string& probe_ip,

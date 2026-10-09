@@ -123,3 +123,39 @@ func TestStartConfigUnmarshalsSuffixes(t *testing.T) {
 		t.Fatal("youtube must stay force-proxy")
 	}
 }
+
+func TestTunDNSAddressIsHijacked(t *testing.T) {
+	t.Cleanup(clearSplitState)
+	setHijackDNS("198.18.0.2")
+	ip := netip.MustParseAddr("198.18.0.2")
+	if !shouldHijackDNS(ip, 53) {
+		t.Fatal("adapter DNS must be hijacked")
+	}
+	if shouldHijackDNS(ip, 443) {
+		t.Fatal("only port 53")
+	}
+	if shouldHijackDNS(netip.MustParseAddr("1.1.1.1"), 53) {
+		t.Fatal("public DNS is not the adapter address")
+	}
+}
+
+func TestUDPDirectYieldsToForceProxy(t *testing.T) {
+	t.Cleanup(clearSplitState)
+	setExtraForceSuffixes([]string{"game.example"})
+	setUDPDirect(true)
+	rememberHostIP("game.example", netip.MustParseAddr("203.0.113.9"))
+	rememberHostIP("other.example", netip.MustParseAddr("203.0.113.8"))
+	forced := &M.Metadata{DstIP: netip.MustParseAddr("203.0.113.9"), DstPort: 27015}
+	other := &M.Metadata{DstIP: netip.MustParseAddr("203.0.113.8"), DstPort: 27015}
+	bare := &M.Metadata{DstIP: netip.MustParseAddr("203.0.113.7"), DstPort: 27015}
+	if shouldDirectUDP(forced) {
+		t.Fatal("force-proxy host must stay on the tunnel")
+	}
+	if !shouldDirectUDP(other) || !shouldDirectUDP(bare) {
+		t.Fatal("other UDP should leave the tunnel")
+	}
+	setUDPDirect(false)
+	if shouldDirectUDP(bare) {
+		t.Fatal("udp bypass is off")
+	}
+}

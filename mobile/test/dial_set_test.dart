@@ -22,12 +22,12 @@ void main() {
     }
   });
 
-  test('VLESS is admitted on Android and refused on iOS and Windows', () {
+  test('VLESS is admitted on Android and Windows, refused on iOS', () {
     expect(canDialSchemeOn(DialTarget.android, 'vless'), isTrue);
+    expect(canDialSchemeOn(DialTarget.windows, 'vless'), isTrue);
     expect(canDialSchemeOn(DialTarget.ios, 'vless'), isFalse);
-    expect(canDialSchemeOn(DialTarget.windows, 'vless'), isFalse);
     expect(canDialSchemeOn(DialTarget.other, 'vless'), isFalse);
-    expect(windowsDialScheme('vless'), isFalse);
+    expect(windowsDialScheme('vless'), isTrue);
     expect(windowsDialScheme('hysteria2'), isTrue);
     expect(windowsDialScheme('hy2'), isTrue);
   });
@@ -55,21 +55,37 @@ void main() {
     }
   });
 
-  test('a vless WS/TLS line passes canDialLink only on Android', () {
+  test('a vless WS/TLS line passes canDialLink only where the engine runs', () {
     const raw =
         'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
         '?security=tls&type=ws&path=%2Fws&sni=front.example#A';
     final link = parseShareLink(raw);
     expect(canDialLinkOn(DialTarget.android, link), isTrue);
+    expect(canDialLinkOn(DialTarget.windows, link), isTrue);
     expect(canDialLinkOn(DialTarget.ios, link), isFalse);
-    expect(canDialLinkOn(DialTarget.windows, link), isFalse);
     expect(canDialLinkOn(DialTarget.other, link), isFalse);
 
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     expect(canDialScheme(link.scheme), isTrue);
     expect(canDialLink(link), isTrue);
 
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    expect(canDialLink(link), isTrue);
+
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
     expect(canDialLink(link), isFalse);
+  });
+
+  // A transport the engine cannot describe stays inactive on Windows too. The
+  // broker parses gRPC and XHTTP happily; the core that carries VLESS cannot
+  // dial them, and a line that taps and times out is worse than a neutral badge.
+  test('a vless gRPC line stays inactive on Windows', () {
+    const raw =
+        'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
+        '?security=tls&type=grpc&serviceName=grpc&sni=front.example#G';
+    final link = parseShareLink(raw);
+    expect(canDialSchemeOn(DialTarget.windows, link.scheme), isTrue);
+    expect(canDialLinkOn(DialTarget.windows, link), isFalse);
+    expect(canDialLinkOn(DialTarget.android, link), isFalse);
   });
 }

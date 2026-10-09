@@ -55,6 +55,11 @@ class FakeRoutes : public RouteTable {
   bool canary_present = false;
   bool fetch_ok = true;
   int fetch_calls = 0;
+  bool lookup_ok = true;
+  int lookup_calls = 0;
+  unsigned long lookup_luid = 99;
+  unsigned long dad_state = kIpDadStatePreferred;
+  int tentative_polls = 0;
   bool cancel_during_fetch = false;
   unsigned long hardware_index = 18;
   CancelFlag* cancel = nullptr;
@@ -112,6 +117,8 @@ class FakeRoutes : public RouteTable {
     adapter.luid = 99;
     adapter.if_index = 5;
     adapter.up = true;
+    adapter.ipv4 = kTunIpv4;
+    adapter.dad_state = dad_state;
     out.push_back(adapter);
     return true;
   }
@@ -126,12 +133,25 @@ class FakeRoutes : public RouteTable {
       --tun_misses;
       return false;
     }
+    OwnedAdapter candidate;
+    candidate.name = "ProxyDomTun";
+    candidate.guid = "{tun}";
+    candidate.luid = 99;
+    candidate.if_index = 5;
+    candidate.up = true;
+    candidate.ipv4 = kTunIpv4;
+    candidate.dad_state = dad_state;
+    if (tentative_polls > 0) {
+      --tentative_polls;
+      candidate.dad_state = kIpDadStateTentative;
+    }
+    // Ask the same question the route table asks. A fake that simply said yes
+    // would let the suite pass while the readiness rule the real adapter has to
+    // satisfy went unexercised, which is exactly how the tentative address
+    // stayed invisible.
+    if (!tun_adapter_ready(candidate)) return false;
+    adapter = candidate;
     adapter_present = true;
-    adapter.name = "ProxyDomTun";
-    adapter.guid = "{tun}";
-    adapter.luid = 99;
-    adapter.if_index = 5;
-    adapter.up = true;
     return true;
   }
   bool add_canary(const OwnedAdapter& adapter, const std::string& ip, OwnedRoute& route) override {
@@ -153,6 +173,16 @@ class FakeRoutes : public RouteTable {
     if (cancel_during_fetch && cancel != nullptr) cancel->request();
     if (cancelled && cancelled()) return false;
     return fetch_ok;
+  }
+  bool lookup_route(const std::string&, RouteLookup& out) override {
+    ++lookup_calls;
+    if (!lookup_ok) return false;
+    out.interface_luid = lookup_luid;
+    out.interface_index = 5;
+    out.prefix_length = 32;
+    out.next_hop = "0.0.0.0";
+    out.source = "198.18.0.1";
+    return true;
   }
   bool install_capture(const OwnedAdapter& adapter, std::vector<OwnedRoute>& routes) override {
     ++capture_calls;
@@ -268,8 +298,14 @@ class FakeEngine : public EngineHost {
 class FakeNames : public NameResolver {
  public:
   bool fail = false;
+  // The server host resolves first and the probe host second, so failing every
+  // call can never reach the probe path. fail_on_call names the call to fail.
+  int calls = 0;
+  int fail_on_call = 0;
   bool resolve_ipv4(const std::string& host, std::string& ip) override {
+    ++calls;
     if (fail) return false;
+    if (fail_on_call != 0 && calls == fail_on_call) return false;
     ip = host == "cp.cloudflare.com" ? "1.1.1.1" : "203.0.113.10";
     return true;
   }
@@ -542,8 +578,119 @@ void test_bad_key_never_mutates_routes() {
   expect(!leaked, "engine log drops the password");
 }
 
-void test_cancel_during_key_probe_never_mutates_routes() {
+// A line this platform cannot carry is a refusal, not a crash. The engine names
+// it and leaves before a core exists; reporting that as a dead service sends the
+// person looking for a bug in the client instead of at their own line.
+void test_a_refused_transport_is_not_a_crash() {
   Harness harness;
+  harness.engine.die_after_resume = true;
+  harness.engine.tail = "error transport_unsupported";
+  const auto snap = harness.connect();
+  expect(snap.code == TunnelCode::TransportUnsupported, "the engine's name reaches the code");
+  expect(snap.message == "Этот транспорт не поддержан на этой платформе",
+         "the caption is the refusal, not a service fault");
+  expect(snap.phase == TunnelPhase::Idle && snap.cleanup_verified, "a refusal restores");
+  expect(harness.routes.add_calls == 0, "a refusal adds no pin");
+  expect(harness.routes.capture_calls == 0, "a refusal installs no capture");
+  bool named_refusal = false;
+  bool kept_words = false;
+  for (const auto& line : harness.log.lines) {
+    if (line.event == "line_refused" && line.code == "transport_unsupported") named_refusal = true;
+    if (line.event == "core_exited" && line.code.find("transport_unsupported") != std::string::npos) {
+      kept_words = true;
+    }
+  }
+  expect(named_refusal, "the journal names the refusal, so it is not invisible");
+  expect(kept_words, "the engine's own words are still kept");
+}
+
+// Reality is refused for its security, not its transport. One name for both
+// would tell the person to change the wrong half of their line.
+void test_a_refused_security_keeps_its_own_name() {
+  Harness harness;
+  harness.engine.die_after_resume = true;
+  harness.engine.tail = "error security_unsupported";
+  const auto snap = harness.connect();
+  expect(snap.code == TunnelCode::SecurityUnsupported, "security is named apart from transport");
+  expect(snap.message == "Этот способ защиты не поддержан на этой платформе", "security caption");
+}
+
+// The list of names the broker understands is closed. A word it has not agreed
+// on stays a plain core exit: inventing a name for it would be worse than the
+// honest generic one.
+void test_an_unknown_word_is_still_a_core_exit() {
+  Harness harness;
+  harness.engine.die_after_resume = true;
+  harness.engine.tail = "error something_new_the_engine_grew";
+  const auto snap = harness.connect();
+  expect(snap.code == TunnelCode::CoreExited, "an unagreed word stays a core exit");
+  expect(snap.message == "Сбой локальной службы туннеля", "unknown exit keeps the service caption");
+}
+
+// A line the broker cannot carry is refused by the broker, before any core
+// exists. It used to report resolve_failed, which told the person their server
+// name did not resolve — a thing that was never true, and it sent them to look
+// at DNS instead of at their line. The engine names these same conditions when
+// it catches them after starting, so the reason reads the same either way.
+void test_a_parked_protocol_is_refused_by_name_before_the_core() {
+  Harness harness;
+  ConnectRequest parked;
+  parked.uri = "trojan://secret@edge.example:443?sni=edge.example";
+  expect(harness.supervisor.begin_connect().accepted, "parked begin");
+  const auto snap = harness.supervisor.run_connect(parked, harness.cancel);
+  expect(snap.code == TunnelCode::SchemeUnsupported, "a parked protocol is named as a scheme");
+  expect(snap.message == "Этот протокол не поддержан на этой платформе", "the scheme caption");
+  expect(snap.phase == TunnelPhase::Idle, "the refusal ends idle");
+  expect(harness.engine.launch_calls == 0, "no core is started for a parked protocol");
+  expect(harness.routes.add_calls == 0, "no pin is added");
+  expect(harness.routes.capture_calls == 0, "no capture is installed");
+  expect(harness.log.index_of("line_refused", "scheme_unsupported") >= 0,
+         "the refusal is named in the journal, not silent");
+}
+
+// TCP obfuscation cannot be expressed to the engine at all, so a line needing
+// it must be refused rather than dialled as plain TCP and failed generically.
+void test_tcp_obfuscation_is_refused_as_a_transport() {
+  Harness harness;
+  ConnectRequest obfuscated;
+  obfuscated.uri =
+      "vless://11111111-2222-3333-4444-555555555555@edge.example:443?security=tls&headerType=http";
+  expect(harness.supervisor.begin_connect().accepted, "obfuscated begin");
+  const auto snap = harness.supervisor.run_connect(obfuscated, harness.cancel);
+  expect(snap.code == TunnelCode::TransportUnsupported, "tcp obfuscation is a transport we lack");
+  expect(snap.message == "Этот транспорт не поддержан на этой платформе", "the transport caption");
+  expect(harness.engine.launch_calls == 0, "no core is started for a transport we cannot carry");
+  expect(harness.routes.capture_calls == 0, "no capture is installed");
+}
+
+// Reality without a public key is refused for its security. One name for both
+// halves would tell the person to change the wrong part of their line.
+void test_reality_without_a_key_is_refused_for_its_security() {
+  Harness harness;
+  ConnectRequest reality;
+  reality.uri = "vless://11111111-2222-3333-4444-555555555555@edge.example:443?security=reality";
+  expect(harness.supervisor.begin_connect().accepted, "reality begin");
+  const auto snap = harness.supervisor.run_connect(reality, harness.cancel);
+  expect(snap.code == TunnelCode::SecurityUnsupported, "reality is a security complaint");
+  expect(snap.message == "Этот способ защиты не поддержан на этой платформе", "the security caption");
+  expect(harness.engine.launch_calls == 0, "no core is started for a security we cannot negotiate");
+}
+
+// A line with no protocol in it is malformed, which is a different complaint
+// from a protocol we do not carry. Blaming the protocol would send the person
+// looking for the wrong thing.
+void test_a_malformed_line_is_not_blamed_on_the_protocol() {
+  Harness harness;
+  ConnectRequest malformed;
+  malformed.uri = "just-some-text";
+  expect(harness.supervisor.begin_connect().accepted, "malformed begin");
+  const auto snap = harness.supervisor.run_connect(malformed, harness.cancel);
+  expect(snap.code == TunnelCode::InvalidProfile, "a line with no protocol is an invalid profile");
+  expect(snap.code != TunnelCode::SchemeUnsupported, "the protocol is not blamed");
+  expect(harness.engine.launch_calls == 0, "no core is started");
+}
+
+void test_cancel_during_key_probe_never_mutates_routes() {  Harness harness;
   harness.routes.cancel_during_fetch = true;
   const auto snap = harness.connect();
   expect(snap.code == TunnelCode::None, "canary cancel is not an egress failure");
@@ -794,7 +941,20 @@ OwnedAdapter tun_row(bool up, std::uint64_t luid, unsigned long index) {
   adapter.luid = luid;
   adapter.if_index = index;
   adapter.up = up;
+  // A row Windows has finished checking. The tentative case is set explicitly
+  // by the tests that care about it.
+  adapter.dad_state = kIpDadStatePreferred;
   return adapter;
+}
+
+// A journal line matched by part. The diagnostic lines carry several fields, so
+// an exact match would never find them.
+int log_first_with(const FakeLog& log, const std::string& event, const std::string& part) {
+  for (int i = 0; i < static_cast<int>(log.lines.size()); ++i) {
+    const auto& line = log.lines[static_cast<std::size_t>(i)];
+    if (line.event == event && line.code.find(part) != std::string::npos) return i;
+  }
+  return -1;
 }
 
 void test_classify_tun_wait() {
@@ -849,8 +1009,18 @@ void test_classify_tun_wait() {
   up.process_alive = true;
   up.list_ok = true;
   up.adapters = {tun_row(true, 99, 5)};
-  const auto ready = classify_tun_wait(up);
-  expect(std::string(ready.code) == "adapter_up", "an up adapter is not adapter_not_found");
+  const auto bare = classify_tun_wait(up);
+  expect(std::string(bare.code) == "adapter_state_not_up",
+         "an up adapter with no address is not usable yet");
+
+  TunWaitView configured;
+  configured.process_alive = true;
+  configured.list_ok = true;
+  OwnedAdapter addressed = tun_row(true, 99, 5);
+  addressed.ipv4 = kTunIpv4;
+  configured.adapters = {addressed};
+  const auto ready = classify_tun_wait(configured);
+  expect(std::string(ready.code) == "adapter_up", "a configured adapter is not adapter_not_found");
 }
 
 void test_tun_timeout_log_names_the_adapter() {
@@ -864,7 +1034,10 @@ void test_tun_timeout_log_names_the_adapter() {
   expect(snap.phase == TunnelPhase::Idle && snap.cleanup_verified, "down adapter still restores");
   expect(down.routes.add_calls == 0 && down.routes.capture_calls == 0, "diagnosis adds no routes");
   expect(down.log.index_of("tun_init_timeout", "adapter_state_not_up") >= 0, "down adapter is named");
-  expect(down.log.index_of("tun_adapter", "ProxyDomTun,up=0,luid=77,if=3") >= 0, "snapshot has luid");
+  expect(log_first_with(down.log, "tun_adapter", "ProxyDomTun,up=0,luid=77,if=3") >= 0,
+         "snapshot has luid");
+  expect(log_first_with(down.log, "tun_adapter", "dad=4") >= 0,
+         "snapshot carries the address state that decides readiness");
 
   Harness engine_text;
   engine_text.routes.tun_misses = 100;
@@ -962,6 +1135,103 @@ void test_sanitizer_covers_every_credential_shape() {
          "ordinary fields are left alone");
 }
 
+// The leading cut kept the engine's opening banner and dropped the lines after
+// it, which are the ones that name the fault. This pins the direction of the
+// cut so a failure reason cannot hide behind a status line again.
+void test_sanitizer_recent_keeps_the_failure_reason() {
+  std::string banner = "event=core code=ok tun=ProxyDomTun";
+  while (banner.size() < 300) banner += " routing_applied=true";
+  const std::string text = banner + " tun rx=0 tx=0 hy2bind dial tcp 1.2.3.4:80";
+
+  const std::string leading = sanitize_engine_output(text);
+  const std::string recent = sanitize_engine_output_recent(text, 256);
+  expect(leading.find("tun rx=0") == std::string::npos,
+         "the leading cut still hides the reason");
+  expect(recent.find("tun rx=0") != std::string::npos,
+         "the recent cut keeps the line that names the fault");
+  expect(recent.size() == 256, "the recent cut honours its bound");
+  expect(recent == text.substr(text.size() - 256),
+         "the recent cut is the tail of the text");
+
+  const std::string brief = "event=egress code=probe_failed win32=10065";
+  expect(sanitize_engine_output_recent(brief, 256) == brief,
+         "text shorter than the bound is returned whole");
+  expect(sanitize_engine_output_recent(brief, 0).size() == brief.size(),
+         "a zero bound falls back to 256");
+
+  const std::string secret = banner + " \"password\":\"tailSecret\"";
+  expect(sanitize_engine_output_recent(secret, 256).find("tailSecret") == std::string::npos,
+         "redaction runs before the recent cut too");
+}
+
+// The route lookup is a diagnostic. It runs before the probe and must never
+// become a gate: a stack that cannot answer still gets the canary, because the
+// probe's own error is what decides the session.
+void test_route_lookup_is_diagnostic_only() {
+  Harness answered;
+  const auto connected = answered.connect();
+  expect(connected.phase == TunnelPhase::Connected, "the lookup does not break a healthy connect");
+  expect(answered.routes.lookup_calls == 1, "the route lookup runs once per attempt");
+  const int lookup = log_first_with(answered.log, "route_lookup", "dest=");
+  const int gate = log_first_with(answered.log, "gate", "egress");
+  expect(lookup >= 0 && gate > lookup, "the lookup is recorded before the egress gate");
+  expect(log_first_with(answered.log, "route_lookup", "idx=5") >= 0,
+         "the journal names the interface the stack picked");
+
+  Harness blind;
+  blind.routes.lookup_ok = false;
+  const auto still = blind.connect();
+  expect(still.phase == TunnelPhase::Connected, "a failed lookup does not stop the tunnel");
+  expect(blind.routes.fetch_calls == 1, "the canary still runs when the lookup cannot answer");
+  expect(log_first_with(blind.log, "route_lookup", "none") >= 0, "a failed lookup is recorded as none");
+
+  // Windows accepts a route row and can then lose it when the adapter's network
+  // is re-identified. The stack stops picking our adapter, which is the only
+  // visible sign, so the row goes back once and the probe runs afterwards.
+  Harness moved;
+  moved.routes.lookup_luid = 7;  // some other adapter, not ours
+  const auto healed = moved.connect();
+  expect(healed.phase == TunnelPhase::Connected, "a lost route is put back and the session connects");
+  expect(moved.routes.canary_calls == 2, "the canary is re-asserted once");
+  expect(log_first_with(moved.log, "routes", "canary_reasserted") >= 0,
+         "the re-assert is recorded, so a silent drop stops being invisible");
+  expect(log_first_with(moved.log, "gate", "egress") >= 0, "the probe still runs after the repair");
+}
+
+// The probe resolve used to end the session without a word from the engine, so
+// a lookup that never entered the tun and one that entered and went nowhere
+// looked identical. The counters name which, and dst= names where they went.
+void test_probe_resolve_failure_shows_the_engine_counters() {
+  Harness h;
+  h.names.fail_on_call = 2;
+  h.engine.tail = "tun rx=4 tx=0 dst=198.18.0.2";
+  const auto snap = h.connect();
+  expect(snap.code == TunnelCode::ResolveFailed, "the probe resolve is the one that failed");
+  expect(log_first_with(h.log, "core_output", "tun rx=4") >= 0,
+         "a failed lookup still shows what the engine counted");
+  expect(log_first_with(h.log, "core_output", "dst=198.18.0.2") >= 0,
+         "the counters name where the packets were addressed");
+}
+
+// The fix itself. Windows publishes the address before it can carry traffic, so
+// a session that probes the moment the address appears fails on every node with
+// egress_timeout. Here the address stays tentative for 1.5 s and the session has
+// to wait it out and then connect.
+void test_connect_waits_for_a_preferred_address() {
+  Harness slow;
+  slow.routes.tentative_polls = 15;
+  const auto connected = slow.connect();
+  expect(connected.phase == TunnelPhase::Connected, "a slow address still connects");
+  expect(slow.routes.fetch_calls == 1, "the probe runs once, after the wait");
+
+  const int waited = log_first_with(slow.log, "tun_wait_ms", "1500");
+  expect(waited >= 0, "the wait is recorded, so it stops being invisible");
+  expect(log_first_with(slow.log, "adapter", kTunIpv4) > waited,
+         "the adapter is only accepted after the wait");
+  expect(log_first_with(slow.log, "tun_init_timeout", "adapter_") < 0,
+         "a slow address is not a timeout");
+}
+
 void test_resolve_and_route_table_failures() {
   Harness names;
   names.names.fail = true;
@@ -1003,8 +1273,10 @@ void test_flow_counters_record_the_outbound() {
   expect(connected.phase == TunnelPhase::Connected, "flow session connects");
   expect(seen_port == 17890, "the controller port comes from the free-port pick");
   expect(seen_secret.size() == 48, "the controller carries a per-session secret");
-  expect(h.files.config_body.find("\"external_controller\":\"127.0.0.1:17890\"") != std::string::npos,
-         "the engine is told where to answer");
+  expect(h.files.config_body.find("\"api_port\":17890") != std::string::npos,
+         "the engine config records the controller port");
+  expect(h.files.config_body.find(seen_secret) != std::string::npos,
+         "the engine config records the controller secret");
 
   h.supervisor.watchdog(h.cancel);
   const bool announced_direct =
@@ -1347,12 +1619,92 @@ void test_only_a_lost_client_keeps_the_tunnel() {
          "every reason has a name");
 }
 
+// The engine opens the wintun adapter first and assigns the address with a
+// separate netsh process afterwards, and Windows reports an address-less
+// adapter as up. Readiness that accepted "up" alone let the egress probe run
+// against an adapter with no address: the connect failed in about a
+// millisecond and the journal blamed the node.
+void test_tun_readiness_needs_the_address() {
+  OwnedAdapter bare = tun_row(true, 99, 5);
+  expect(!tun_adapter_ready(bare), "an adapter with no address is not ready");
+
+  OwnedAdapter ready = tun_row(true, 99, 5);
+  ready.ipv4 = kTunIpv4;
+  expect(tun_adapter_ready(ready), "the configured adapter is ready");
+
+  OwnedAdapter other = tun_row(true, 99, 5);
+  other.ipv4 = "169.254.1.1";
+  expect(!tun_adapter_ready(other), "another address is not our adapter");
+
+  OwnedAdapter down = tun_row(false, 99, 5);
+  down.ipv4 = kTunIpv4;
+  expect(!tun_adapter_ready(down), "a down adapter is not ready");
+
+  OwnedAdapter legacy = tun_row(true, 99, 5);
+  legacy.name = "teremokhy2";
+  legacy.ipv4 = kTunIpv4;
+  expect(!tun_adapter_ready(legacy), "the legacy name is cleaned up, never routed");
+
+  OwnedAdapter no_luid = tun_row(true, 0, 5);
+  no_luid.ipv4 = kTunIpv4;
+  expect(!tun_adapter_ready(no_luid), "a zero luid cannot carry a route");
+
+  OwnedAdapter no_index = tun_row(true, 99, 0);
+  no_index.ipv4 = kTunIpv4;
+  expect(!tun_adapter_ready(no_index), "a zero index cannot carry a route");
+}
+
+// The owner's machine settled this one: adapter_state reported media=1 dad=1
+// and route_lookup came back ERROR_NOT_FOUND for a canary whose /32 row was in
+// the table. The address was present and Windows was still checking it for a
+// duplicate, so the stack had no usable source and refused the route. An
+// address is not ready until it is Preferred.
+void test_tun_readiness_needs_a_preferred_address() {
+  OwnedAdapter tentative = tun_row(true, 99, 5);
+  tentative.ipv4 = kTunIpv4;
+  tentative.dad_state = kIpDadStateTentative;
+  expect(!tun_adapter_ready(tentative), "a tentative address is not ready");
+
+  OwnedAdapter duplicate = tun_row(true, 99, 5);
+  duplicate.ipv4 = kTunIpv4;
+  duplicate.dad_state = 2;
+  expect(!tun_adapter_ready(duplicate), "a duplicate address is not ready");
+
+  OwnedAdapter deprecated = tun_row(true, 99, 5);
+  deprecated.ipv4 = kTunIpv4;
+  deprecated.dad_state = 3;
+  expect(!tun_adapter_ready(deprecated), "a deprecated address is not ready");
+
+  OwnedAdapter preferred = tun_row(true, 99, 5);
+  preferred.ipv4 = kTunIpv4;
+  preferred.dad_state = kIpDadStatePreferred;
+  expect(tun_adapter_ready(preferred), "a preferred address is ready");
+
+  // The timeout diagnosis has to name this state rather than call it "down",
+  // because "wait longer" and "the adapter never came up" need different fixes.
+  TunWaitView view;
+  view.process_alive = true;
+  view.list_ok = true;
+  view.adapters = {tentative};
+  expect(classify_tun_wait(view).code == std::string("adapter_address_tentative"),
+         "a tentative address is named on its own");
+  expect(classify_tun_wait(view).win32 == kIpDadStateTentative,
+         "the diagnosis carries the dad state it saw");
+}
+
 int main() {
   test_route_policy();
   test_slash_port_connects_and_junk_does_not_launch();
   test_foreign_blocks_before_pin();
   test_radmin_allows_connect();
   test_bad_key_never_mutates_routes();
+  test_a_refused_transport_is_not_a_crash();
+  test_a_refused_security_keeps_its_own_name();
+  test_an_unknown_word_is_still_a_core_exit();
+  test_a_parked_protocol_is_refused_by_name_before_the_core();
+  test_tcp_obfuscation_is_refused_as_a_transport();
+  test_reality_without_a_key_is_refused_for_its_security();
+  test_a_malformed_line_is_not_blamed_on_the_protocol();
   test_cancel_during_key_probe_never_mutates_routes();
   test_cancel_before_and_after_pin();
   test_launch_failure_keeps_win32();
@@ -1367,9 +1719,15 @@ int main() {
   test_ledger_roundtrip();
   test_user_proof_refusal_restores_capture();
   test_classify_tun_wait();
+  test_tun_readiness_needs_the_address();
+  test_tun_readiness_needs_a_preferred_address();
   test_tun_timeout_log_names_the_adapter();
   test_stderr_after_info_is_not_cut();
   test_sanitizer_covers_every_credential_shape();
+  test_sanitizer_recent_keeps_the_failure_reason();
+  test_route_lookup_is_diagnostic_only();
+  test_probe_resolve_failure_shows_the_engine_counters();
+  test_connect_waits_for_a_preferred_address();
   test_resolve_and_route_table_failures();
   test_flow_counters_record_the_outbound();
   test_connections_body_parses();

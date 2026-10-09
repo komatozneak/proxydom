@@ -36,6 +36,7 @@ $Allowed = @{
     # DLL is allowed beside software that only calls wintun.h. Not copyleft, and
     # it does not require publishing source. See ADR 036.
     "wintun.dll"                                = "Wintun Prebuilt Binaries License (WireGuard LLC)"
+    "proxydom-engine.exe"                       = "Proxy Dom tunnel engine, own code; notices in THIRD-PARTY-NOTICES.md"
 }
 
 # Copyleft binaries that still ship. Each entry names the task that removes it.
@@ -46,9 +47,7 @@ $Allowed = @{
 #   binary present, entry deleted  -> failure (the binary came back);
 #   entry present, binary absent   -> failure (the entry is stale).
 if (-not $PSBoundParameters.ContainsKey('KnownViolations')) {
-    $KnownViolations = @{
-        "sing-box.exe" = "removed by docs/ops/engine-migration/05-windows-engine-swap.md"
-    }
+    $KnownViolations = @{}
 }
 
 # Go module paths that mark a GPL engine inside a binary, whatever it is named.

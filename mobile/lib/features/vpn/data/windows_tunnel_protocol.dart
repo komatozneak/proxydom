@@ -24,6 +24,12 @@ bool windowsBrokerOwnsCaption(String? code) {
     case 'route_failed':
     case 'core_start_failed':
     case 'core_exited':
+    // The engine refuses a line it cannot carry by name, before a core exists.
+    // These are the line's problem, not the service's, and the caption has to
+    // say so or the person goes looking for a bug in the client.
+    case 'transport_unsupported':
+    case 'security_unsupported':
+    case 'scheme_unsupported':
     case 'tun_not_ready':
     case 'tun_init_timeout':
     case 'egress_failed':
@@ -46,6 +52,15 @@ String windowsGateCaption(String? code, String? message, String fallback) {
   if (code == 'connecting_timeout') return kWindowsConnectingTimeoutCaption;
   if (code == 'core_exited' || code == 'core_start_failed') {
     return 'Сбой локальной службы туннеля';
+  }
+  if (code == 'transport_unsupported') {
+    return 'Этот транспорт не поддержан на этой платформе';
+  }
+  if (code == 'security_unsupported') {
+    return 'Этот способ защиты не поддержан на этой платформе';
+  }
+  if (code == 'scheme_unsupported') {
+    return 'Этот протокол не поддержан на этой платформе';
   }
   if (code == 'tun_init_timeout') return 'Сбой сетевого адаптера туннеля';
   if (code == 'auth_rejected') return 'Ключ не принят сервером';

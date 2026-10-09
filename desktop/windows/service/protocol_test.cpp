@@ -127,8 +127,8 @@ int main() {
   expect(line.server_ports == "1000:2000", "hop ports");
   expect(line.hop_interval == "30s", "hop interval");
 
-  const auto config = build_singbox_config(line, "203.0.113.10", {"lan.example"}, {}, false, 0, "");
-  expect(config.find("\"stack\":\"system\"") != std::string::npos, "windows tun uses the system adapter");
+  const auto config = build_engine_config(line, "203.0.113.10", {"lan.example"}, {}, false, 0, "");
+  expect(config.find("\"name\":\"ProxyDomTun\"") != std::string::npos, "tun name");
   expect(config.find("\"auto_route\":false") != std::string::npos, "engine does not own routes");
   expect(config.find("\"auto_route\":true") == std::string::npos, "auto_route stays off");
   expect(config.find("route_address") == std::string::npos, "engine installs no prefixes");
@@ -137,66 +137,59 @@ int main() {
   expect(config.find("198.18.0.2") != std::string::npos, "dns address");
   expect(config.find("salamander") != std::string::npos, "obfs in config");
   expect(config.find("lan.example") != std::string::npos, "direct domain");
-  expect(config.find("\"server_ports\":[\"1000:2000\"]") != std::string::npos, "hop range uses a colon");
+  expect(config.find("\"server_ports\":\"1000:2000\"") != std::string::npos, "hop range uses a colon");
+  expect(config.find("\"routing_applied\":true") != std::string::npos, "routing is applied");
+  expect(config.find("\"dns_hijack\":true") != std::string::npos, "dns hijack is applied");
 
-  // Game traffic is UDP to bare IPs whose addresses change, so the tunnel is
-  // bypassed by protocol instead of by a list that would rot.
+  // The lists are still in the document, in the order the sites screen uses.
+  // This build of the engine does not apply them.
   const auto udp_config =
-      build_singbox_config(line, "203.0.113.10", {"steamserver.net"}, {"youtube.com"}, true, 0, "");
-  expect(udp_config.find("{\"network\":\"udp\",\"outbound\":\"direct\"}") != std::string::npos,
-         "udp bypass rule is emitted");
-  expect(build_singbox_config(line, "203.0.113.10", {}, {}, false, 0, "")
-             .find("\"network\":\"udp\"") == std::string::npos,
+      build_engine_config(line, "203.0.113.10", {"steamserver.net"}, {"youtube.com"}, true, 0, "");
+  expect(udp_config.find("\"udp_direct\":true") != std::string::npos, "udp bypass flag is recorded");
+  expect(build_engine_config(line, "203.0.113.10", {}, {}, false, 0, "")
+             .find("\"udp_direct\":true") == std::string::npos,
          "no udp bypass when the window did not ask");
   const auto force_at = udp_config.find("youtube.com");
-  const auto udp_at = udp_config.find("\"network\":\"udp\"");
+  const auto udp_at = udp_config.find("\"udp_direct\":true");
   const auto direct_at = udp_config.find("steamserver.net");
   expect(force_at != std::string::npos && udp_at != std::string::npos && direct_at != std::string::npos,
-         "routed config carries all three rules");
-  expect(force_at < udp_at, "force-proxy sits above the udp bypass");
-  expect(direct_at < udp_at, "site exclusions sit above the udp bypass");
-  const auto force_rule = udp_config.find("youtube.com");
-  expect(force_rule != std::string::npos &&
-             udp_config.find("\"domain_suffix\":[\"youtube.com\"],\"outbound\":\"proxy\"") != std::string::npos,
-         "force-proxy row routes to proxy, not direct");
+         "config carries force-proxy, exclusions, and the udp flag");
+  expect(force_at < udp_at, "force-proxy sits above the udp flag");
+  expect(direct_at < udp_at, "site exclusions sit above the udp flag");
+  expect(udp_config.find("\"force_proxy_domains\":[\"youtube.com\"]") != std::string::npos,
+         "force-proxy names are recorded");
 
-  // The broker reads its routing counters off a loopback clash api. Without it
-  // there is nothing in the journal that says where a game's UDP actually went.
-  expect(config.find("clash_api") == std::string::npos, "no controller without a port");
-  const auto api_config = build_singbox_config(line, "203.0.113.10", {}, {}, true, 19090, "abc123");
-  expect(api_config.find("\"external_controller\":\"127.0.0.1:19090\"") != std::string::npos,
-         "controller listens on loopback only");
-  expect(api_config.find("\"secret\":\"abc123\"") != std::string::npos, "controller carries the secret");
-  expect(api_config.find("0.0.0.0:19090") == std::string::npos,
-         "controller is not on a routable address");
-  expect(api_config.find("{\"network\":\"udp\",\"outbound\":\"direct\"}") != std::string::npos,
-         "counters do not displace the udp bypass");
-  const auto quoted = build_singbox_config(line, "203.0.113.10", {}, {}, false, 19091, "he\"llo\\there");
-  expect(quoted.find("\"secret\":\"he\\\"llo\\\\there\"") != std::string::npos,
+  expect(config.find("\"api_port\":0") != std::string::npos, "no controller without a port");
+  const auto api_config = build_engine_config(line, "203.0.113.10", {}, {}, true, 19090, "abc123");
+  expect(api_config.find("\"api_port\":19090") != std::string::npos, "api port is recorded");
+  expect(api_config.find("\"api_secret\":\"abc123\"") != std::string::npos, "api secret is recorded");
+  expect(api_config.find("0.0.0.0:19090") == std::string::npos, "controller is not on a routable address");
+  expect(api_config.find("\"udp_direct\":true") != std::string::npos, "api fields do not drop the udp flag");
+  const auto quoted = build_engine_config(line, "203.0.113.10", {}, {}, false, 19091, "he\"llo\\there");
+  expect(quoted.find("\"api_secret\":\"he\\\"llo\\\\there\"") != std::string::npos,
          "a quote or a backslash in the secret cannot break the config");
-  const auto no_api = build_singbox_config(line, "203.0.113.10", {}, {}, false, 0, "");
-  expect(no_api.find("\"experimental\":{") != std::string::npos, "experimental block is always present");
-  expect(no_api.find("\"experimental\":{}") == std::string::npos, "experimental block is never empty");
+  const auto no_api = build_engine_config(line, "203.0.113.10", {}, {}, false, 0, "");
+  expect(no_api.find("\"routing_applied\":true") != std::string::npos, "routing flag is always present");
+  expect(no_api.find("\"api_port\":0") != std::string::npos, "absent api is port 0");
 
   ShareLine slash;
   error.clear();
   expect(parse_share_line("hy2://secret@cdn.example:443/?sni=cdn.example", slash, error), "slash after port parses");
   expect(slash.port == 443 && slash.server_ports.empty(), "slash is not a port range");
-  const auto slash_config = build_singbox_config(slash, "203.0.113.10", {}, {}, false, 0, "");
+  const auto slash_config = build_engine_config(slash, "203.0.113.10", {}, {}, false, 0, "");
   expect(slash_config.find("server_ports") == std::string::npos, "plain port omits server_ports");
   expect(!parse_share_line("hy2://secret@cdn.example:443abc", slash, error), "junk port is refused");
   expect(error == "port", "junk port error");
   expect(config.find("1000-2000") == std::string::npos, "hop range is not a hyphen");
-  expect(config.find("\"action\":\"hijack-dns\"") != std::string::npos, "dns hijack rule");
-  expect(config.find("\"server\":\"1.1.1.1\"") != std::string::npos, "dns server");
+  expect(config.find("hijack-dns") == std::string::npos, "dns hijack is not a sing-box rule");
+  expect(config.find("\"dns_hijack\":true") != std::string::npos, "dns hijack flag is true");
   expect(config.find("secret+pass") != std::string::npos, "password reaches the engine config");
   expect(config.find("172.19.0.1") == std::string::npos, "tun prefix stays outside 172.16/12");
-  expect(build_singbox_config(line, "2001:db8::1", {}, {}, false, 0, "").empty(), "refuse ipv6 pin");
-  const auto probe = build_singbox_probe_config(line, "203.0.113.10", 17890);
-  expect(probe.find("\"type\":\"mixed\"") != std::string::npos, "probe has loopback proxy");
-  expect(probe.find("\"listen\":\"127.0.0.1\"") != std::string::npos, "probe is loopback only");
-  expect(probe.find("\"listen_port\":17890") != std::string::npos, "probe port");
-  expect(probe.find("\"type\":\"tun\"") == std::string::npos, "probe has no tun");
+  expect(build_engine_config(line, "2001:db8::1", {}, {}, false, 0, "").empty(), "refuse ipv6 pin");
+  const auto probe = build_engine_probe_config(line, "203.0.113.10", 17890);
+  expect(probe.find("\"probe\":true") != std::string::npos, "probe flag");
+  expect(probe.find("\"socks_listen\":\"127.0.0.1:17890\"") != std::string::npos, "probe is loopback only");
+  expect(probe.find("ProxyDomTun") == std::string::npos, "probe has no tun");
   expect(probe.find("auto_route") == std::string::npos, "probe changes no routes");
 
   ShareLine vless;
@@ -204,10 +197,121 @@ int main() {
   const std::string vless_uri =
       "vless://11111111-2222-3333-4444-555555555555@edge.example:443?security=reality&pbk=pub&sid=abcd&sni=edge.example&flow=xtls-rprx-vision&fp=chrome";
   expect(parse_share_line(vless_uri, vless, error), "parse vless");
-  const auto vless_config = build_singbox_config(vless, "203.0.113.11", {}, {}, false, 0, "");
+  const auto vless_config = build_engine_config(vless, "203.0.113.11", {}, {}, false, 0, "");
   expect(vless_config.find("\"public_key\":\"pub\"") != std::string::npos, "reality public key");
   expect(vless_config.find("private_key") == std::string::npos, "no server private key");
   expect(vless_config.find("xtls-rprx-vision") != std::string::npos, "flow");
+  // The parser carries the share-link word, not a core preset: `fp=chrome` is
+  // what the link says, and translating it to the uTLS preset the core accepts
+  // is the loader's job. Doing it here would be a second table to drift.
+  expect(vless_config.find("\"fingerprint\":\"chrome\"") != std::string::npos,
+         "the link's own fingerprint word is carried through");
+  expect(vless_config.find("\"type\":\"vless\"") != std::string::npos, "vless is named so the engine knows which core to start");
+  expect(vless_config.find("\"security\":\"reality\"") != std::string::npos, "reality is described, then refused by the core that lacks it");
+
+  // A WebSocket VLESS line is the shape subscriptions hand out. Dropping
+  // path/host/alpn left the engine with a line it could not describe, and it
+  // refused the whole line as if the transport itself were unsupported.
+  ShareLine ws;
+  error.clear();
+  const std::string ws_uri =
+      "vless://11111111-2222-3333-4444-555555555555@edge.example:443"
+      "?security=tls&type=ws&path=%2Fray&host=cdn.example&alpn=h2,http%2F1.1&sni=cdn.example";
+  expect(parse_share_line(ws_uri, ws, error), "parse a websocket vless line");
+  expect(ws.network == "ws", "network is read");
+  expect(ws.path == "/ray", "path is decoded");
+  expect(ws.ws_host == "cdn.example", "host header is read");
+  expect(ws.alpn == "h2,http/1.1", "the alpn list survives");
+  const auto ws_config = build_engine_config(ws, "203.0.113.11", {}, {}, false, 0, "");
+  expect(ws_config.find("\"network\":\"ws\"") != std::string::npos, "transport reaches the engine");
+  expect(ws_config.find("\"path\":\"/ray\"") != std::string::npos, "path reaches the engine");
+  expect(ws_config.find("\"host\":\"cdn.example\"") != std::string::npos, "host reaches the engine");
+  expect(ws_config.find("\"alpn\":\"h2,http/1.1\"") != std::string::npos, "alpn reaches the engine");
+
+  // A line that says nothing means tcp over tls, and the two sides of the
+  // process boundary have to agree on that or they describe one link two ways.
+  ShareLine bare;
+  error.clear();
+  expect(parse_share_line("vless://11111111-2222-3333-4444-555555555555@edge.example:443", bare, error),
+         "parse a bare vless line");
+  expect(bare.network == "tcp", "a bare vless line is tcp");
+  expect(bare.security == "tls", "a bare vless line is tls");
+  const auto bare_config = build_engine_config(bare, "203.0.113.11", {}, {}, false, 0, "");
+  expect(bare_config.find("\"network\":\"tcp\"") != std::string::npos, "the default transport is written out");
+  expect(bare_config.find("\"security\":\"tls\"") != std::string::npos, "the default security is written out");
+  // A link that does not ask for a fingerprint gets the core's own TLS, exactly
+  // as the Dart builder leaves it. Inventing "chrome" here made the same link
+  // describe a different ClientHello on Windows than on Android.
+  expect(bare_config.find("fingerprint") == std::string::npos,
+         "no fingerprint is invented for a link that asked for none");
+  expect(ws_config.find("fingerprint") == std::string::npos,
+         "a websocket link without fp invents none either");
+
+  // `peer` is the older spelling of the same field and is still what plenty of
+  // providers emit. The Dart builder reads it; reading only `sni` here meant one
+  // link dialled with a different server name on Windows than on Android, and
+  // the side that guessed wrong failed the certificate check as a generic core
+  // exit with nothing naming the cause.
+  ShareLine peer;
+  error.clear();
+  expect(parse_share_line(
+             "vless://11111111-2222-3333-4444-555555555555@1.2.3.4:443?security=tls&peer=front.example",
+             peer, error),
+         "parse a line that names its sni with peer");
+  expect(peer.sni == "front.example", "peer is read as the server name");
+  expect(peer.host == "1.2.3.4", "peer does not replace the address we dial");
+  const auto peer_config = build_engine_config(peer, "203.0.113.11", {}, {}, false, 0, "");
+  expect(peer_config.find("\"sni\":\"front.example\"") != std::string::npos, "peer reaches the engine as sni");
+  // An explicit sni still wins over peer, and the address is still the last
+  // resort, so the three do not fight.
+  ShareLine both;
+  error.clear();
+  expect(parse_share_line(
+             "vless://11111111-2222-3333-4444-555555555555@1.2.3.4:443?sni=real.example&peer=stale.example",
+             both, error),
+         "parse a line with both sni and peer");
+  expect(both.sni == "real.example", "sni outranks peer");
+
+  // TCP obfuscation has no representation in the engine: the loader builds no
+  // tcpSettings at all. A headerType we ignored would dial plain TCP at a server
+  // expecting obfuscation and surface a generic failure.
+  ShareLine obfuscated;
+  error.clear();
+  expect(!parse_share_line(
+             "vless://11111111-2222-3333-4444-555555555555@edge.example:443?security=tls&headerType=http",
+             obfuscated, error),
+         "a line needing tcp obfuscation is refused");
+  expect(error == "transport", "tcp obfuscation is a transport we do not carry");
+  ShareLine plain;
+  error.clear();
+  expect(parse_share_line(
+             "vless://11111111-2222-3333-4444-555555555555@edge.example:443?security=tls&headerType=none",
+             plain, error),
+         "headerType=none means no obfuscation and passes");
+
+  // kcp obfuscation is a seed the loader already carries. Dropping it here left
+  // the engine dialling a server that was expecting obfuscation.
+  ShareLine kcp;
+  error.clear();
+  expect(parse_share_line(
+             "vless://11111111-2222-3333-4444-555555555555@edge.example:443?security=tls&type=kcp&seed=obfuscate-me",
+             kcp, error),
+         "parse a kcp vless line");
+  expect(kcp.kcp_seed == "obfuscate-me", "the kcp seed is read");
+  const auto kcp_config = build_engine_config(kcp, "203.0.113.11", {}, {}, false, 0, "");
+  expect(kcp_config.find("\"kcp_seed\":\"obfuscate-me\"") != std::string::npos, "the kcp seed reaches the engine");
+
+  // A line with no protocol in it is malformed, which is not the same complaint
+  // as a protocol we do not carry. Blaming the protocol would send the person
+  // looking for the wrong thing.
+  ShareLine malformed;
+  error.clear();
+  expect(!parse_share_line("just-some-text", malformed, error), "a line with no scheme is refused");
+  expect(error == "profile", "a malformed line is not a scheme complaint");
+  ShareLine parked;
+  error.clear();
+  expect(!parse_share_line("trojan://pass@host:443", parked, error), "trojan is refused");
+  expect(error == "scheme", "a parked protocol is named as a scheme complaint");
 
   const auto restored = state_event_v2(7, "idle", "", "", true);
   expect(restored.find("\"cleanup_verified\":true") != std::string::npos, "verified idle flag");

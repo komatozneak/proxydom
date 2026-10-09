@@ -17,7 +17,7 @@ Name rule: `.cursor/rules/05-product-names.mdc`.
 **Two sets, do not mix them (ADR 035):**
 
 - **Catalog dial set** — nodes the catalog and the bot serve: **Hysteria2 only** (ADR 018, ADR 033), `hy2://` and `hysteria2://` including `obfs=salamander` and port hop.
-- **Imported-document dial set** — lines the user pastes or pulls from a foreign HTTPS document: **Hysteria2 on every OS, and VLESS where the engine can carry the line.** Today that is Android only. The engine is in-process `v2fly/v2ray-core` v5.54.2 (MIT) inside hy2bind; ADR 036 is why it is not `xray-core`. Reality and XHTTP are not describable, so those lines stay inactive. iOS has no VLESS engine and the Windows broker does not carry transport; both gates stay closed until their own tasks. `lib/features/vpn/data/dial_set.dart` is the single authority.
+- **Imported-document dial set** — lines the user pastes or pulls from a foreign HTTPS document: **Hysteria2 on every OS, and VLESS where the engine can carry the line.** That is Android and Windows, and it is one engine: in-process `v2fly/v2ray-core` v5.54.2 (MIT) inside hy2bind on Android, the same core inside `proxydom-engine.exe` on Windows; ADR 036 is why it is not `xray-core`. Reality and XHTTP are not describable, so those lines stay inactive. iOS has no VLESS engine and its gate stays closed until its own task. `lib/features/vpn/data/dial_set.dart` is the single authority.
 
 Trojan, Shadowsocks, and VMess stay out of the product: the parser reads them, the dial gate does not admit them (ADR 033 §3, ADR 035 §5). A mixed document imports whole and is never deleted. A line this platform cannot start is a neutral badge, not an error.
 

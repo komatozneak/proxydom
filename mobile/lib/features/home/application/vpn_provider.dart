@@ -1209,7 +1209,8 @@ class VpnNotifier extends Notifier<VpnStatus> {
         final profile = imported.hy2?.profile;
         // ADR 035: an imported document may carry VLESS beside Hysteria2.
         // The catalog never does. Android builds the in-process v2ray-core
-        // document here. iOS and Windows stay closed, so canDialScheme
+        // document here; Windows hands the raw URI to the broker, which
+        // starts the same MIT core. iOS stays closed, so canDialScheme
         // refuses vless there and the share_unsupported path remains.
         // buildShareSocksConfig is the authority for what the engine can
         // describe: Reality and XHTTP return null and do not start.

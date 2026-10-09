@@ -89,11 +89,29 @@ bool text_says_name_taken(const std::string& text) {
   return lower_copy(text).find("already exists") != std::string::npos;
 }
 
-bool tun_name(const std::string& name) { return name == "ProxyDomTun"; }
-
-bool tun_usable(const OwnedAdapter& adapter) {
-  return tun_name(adapter.name) && adapter.up && adapter.luid != 0 && adapter.if_index != 0;
+// The engine refuses a line by printing "error <name>" and exiting before it
+// starts a core. The name is the whole message, so it has to survive the trip
+// to the user: without this the refusal is indistinguishable from a crash, and
+// the caption blames the tunnel service for the line's transport.
+//
+// The list is closed on purpose. A word the engine grows that is not here
+// stays a plain core exit, which is honest, rather than being shown to the
+// person as a name nothing has agreed on.
+TunnelCode named_refusal_in_text(const std::string& text) {
+  const std::string lower = lower_copy(text);
+  if (lower.find("error transport_unsupported") != std::string::npos) {
+    return TunnelCode::TransportUnsupported;
+  }
+  if (lower.find("error security_unsupported") != std::string::npos) {
+    return TunnelCode::SecurityUnsupported;
+  }
+  if (lower.find("error scheme_unsupported") != std::string::npos) {
+    return TunnelCode::SchemeUnsupported;
+  }
+  return TunnelCode::None;
 }
+
+bool tun_name(const std::string& name) { return name == kTunName; }
 
 }  // namespace
 
@@ -102,14 +120,29 @@ TunWaitClass classify_tun_wait(const TunWaitView& view) {
   int named = 0;
   int usable = 0;
   int not_up = 0;
+  int tentative = 0;
   for (const auto& adapter : view.adapters) {
     if (!tun_name(adapter.name)) continue;
     ++named;
-    if (tun_usable(adapter)) ++usable;
-    else ++not_up;
+    // One readiness rule, the same one the route table applies. A second copy
+    // here that accepted a bare "up" would report adapter_up for an adapter the
+    // route table had just refused, which is how the egress race stayed hidden.
+    if (tun_adapter_ready(adapter)) {
+      ++usable;
+      continue;
+    }
+    // An address Windows is still checking for a duplicate is the one state
+    // that readiness used to mistake for ready, so it is named apart from a
+    // plain "down": the two need different answers.
+    if (adapter.up && adapter.ipv4 == kTunIpv4 && adapter.dad_state == kIpDadStateTentative) {
+      ++tentative;
+      continue;
+    }
+    ++not_up;
   }
   // A second ProxyDomTun, or sing-box saying the name is taken, is not "still down".
   if (named > 1 || text_says_name_taken(view.engine_text)) return {"adapter_name_conflict", 0};
+  if (tentative > 0) return {"adapter_address_tentative", kIpDadStateTentative};
   if (not_up > 0) return {"adapter_state_not_up", 0};
   const unsigned long parsed = win32_in_text(view.engine_text);
   if (parsed != 0 && usable == 0) return {"wintun_create_failed", parsed};
@@ -150,6 +183,12 @@ const char* code_name(TunnelCode code) {
       return "egress_failed";
     case TunnelCode::CoreExited:
       return "core_exited";
+    case TunnelCode::TransportUnsupported:
+      return "transport_unsupported";
+    case TunnelCode::SecurityUnsupported:
+      return "security_unsupported";
+    case TunnelCode::SchemeUnsupported:
+      return "scheme_unsupported";
     case TunnelCode::TunInitTimeout:
       return "tun_init_timeout";
     case TunnelCode::EgressTimeout:
@@ -182,6 +221,12 @@ std::string user_message(TunnelCode code, const std::string& extra) {
       return "Сбой локальной службы туннеля";
     case TunnelCode::CoreExited:
       return "Сбой локальной службы туннеля";
+    case TunnelCode::TransportUnsupported:
+      return "Этот транспорт не поддержан на этой платформе";
+    case TunnelCode::SecurityUnsupported:
+      return "Этот способ защиты не поддержан на этой платформе";
+    case TunnelCode::SchemeUnsupported:
+      return "Этот протокол не поддержан на этой платформе";
     case TunnelCode::TunInitTimeout:
       return "Сбой сетевого адаптера туннеля";
     case TunnelCode::EgressTimeout:
@@ -843,7 +888,8 @@ void TunnelSupervisor::note_tun_timeout() {
       }
       std::ostringstream code;
       code << name << ",up=" << (adapter.up ? 1 : 0) << ",luid=" << adapter.luid
-           << ",if=" << adapter.if_index;
+           << ",if=" << adapter.if_index << ",dad=" << adapter.dad_state
+           << ",media=" << adapter.media_state;
       log_.write(ledger_.generation, "tun_adapter", code.str(), adapter.up ? 1ul : 0ul);
     }
   }
@@ -889,6 +935,25 @@ TunnelSnapshot TunnelSupervisor::run_connect(const ConnectRequest& request, Canc
         log_.write(ledger_.generation, "profile_parse_failed", value, 0);
         return finish(TunnelCode::InvalidProfile, {}, false);
       }
+      // A line we cannot carry is not a line we failed to resolve. Reporting
+      // resolve_failed for a trojan:// link told the person their server name
+      // did not resolve, which was never the problem and sent them to look at
+      // DNS. These are the same names the engine uses when it refuses a line
+      // after starting, so the reason reads the same wherever it is caught.
+      TunnelCode refusal = TunnelCode::None;
+      if (error == "scheme") {
+        refusal = TunnelCode::SchemeUnsupported;
+      } else if (error == "transport") {
+        refusal = TunnelCode::TransportUnsupported;
+      } else if (error == "security" || error == "reality") {
+        refusal = TunnelCode::SecurityUnsupported;
+      } else if (error == "profile") {
+        refusal = TunnelCode::InvalidProfile;
+      }
+      if (refusal != TunnelCode::None) {
+        log_.write(ledger_.generation, "line_refused", code_name(refusal), 0);
+        return finish(refusal, {}, false);
+      }
       return finish(TunnelCode::ResolveFailed, {}, false);
     }
     if (!names_.resolve_ipv4(line.host, server_ip)) {
@@ -925,7 +990,7 @@ TunnelSnapshot TunnelSupervisor::run_connect(const ConnectRequest& request, Canc
     flows_ = flow_factory_(api_port, api_secret);
   }
   const std::string config =
-      build_singbox_config(line, server_ip, request.direct_domains, request.force_proxy_domains,
+      build_engine_config(line, server_ip, request.direct_domains, request.force_proxy_domains,
                            request.udp_direct, flows_ ? api_port : 0, api_secret);
   if (config.empty() || !files_.write_config(config)) {
     const unsigned long win32 = config.empty() ? 13u : files_.last_error();
@@ -967,11 +1032,25 @@ TunnelSnapshot TunnelSupervisor::run_connect(const ConnectRequest& request, Canc
 
   OwnedAdapter adapter;
   bool found = false;
-  for (int i = 0; i < 50; ++i) {
+  int waited_ms = 0;
+  // Ten seconds, not five. Readiness now waits for Windows to finish checking
+  // the new address for a duplicate, and that check is not instant. The earlier
+  // budget was never really spent: the rule it waited on accepted the address
+  // while it was still tentative.
+  for (int i = 0; i < 100; ++i) {
+    waited_ms = i * 100;
     if (cancel.requested()) return finish(TunnelCode::None, {}, true);
     if (!engine_.alive()) {
-      const std::string stderr_text = sanitize_engine_output(engine_.output_tail());
+      const std::string raw_tail = engine_.output_tail();
+      const std::string stderr_text = sanitize_engine_output(raw_tail);
       log_.write(ledger_.generation, "core_exited", stderr_text, engine_.exit_code());
+      // A refusal is not an exit. The engine names it and leaves before a core
+      // exists, so the honest answer is the name it gave, not a service fault.
+      const TunnelCode refusal = named_refusal_in_text(raw_tail);
+      if (refusal != TunnelCode::None) {
+        log_.write(ledger_.generation, "line_refused", code_name(refusal), 0);
+        return finish(refusal, {}, false);
+      }
       return finish(TunnelCode::CoreExited, {}, false);
     }
     if (routes_.find_own_adapter(adapter)) {
@@ -980,11 +1059,26 @@ TunnelSnapshot TunnelSupervisor::run_connect(const ConnectRequest& request, Canc
     }
     sleeper_.sleep_ms(100);
   }
+  // How long the address took to become usable. Without this the wait is
+  // invisible, which is how a readiness rule that never waited went unnoticed.
+  log_.write(ledger_.generation, "tun_wait_ms", std::to_string(waited_ms), 0);
   if (!found) {
     note_tun_timeout();
     return finish(TunnelCode::TunInitTimeout, {}, false);
   }
   gate("core", "ok");
+  // Readiness now requires this address, so record it. It is the whole
+  // difference between "the adapter exists" and "the adapter can carry a
+  // route", and the journal had no way to tell the two apart.
+  log_.write(ledger_.generation, "adapter", adapter.ipv4, 0);
+  // Windows accepts a route into an adapter it then refuses to send through,
+  // and reports that as host unreachable, so record what it thinks of the
+  // adapter: MediaConnectState 1 is connected, DadState 4 is preferred.
+  log_.write(ledger_.generation, "adapter_state",
+             "media=" + std::to_string(adapter.media_state) + " dad=" +
+                 std::to_string(adapter.dad_state) + " luid=" + std::to_string(adapter.luid) +
+                 " idx=" + std::to_string(adapter.if_index),
+             0);
   remember([&] {
     ledger_.adapter_known = true;
     ledger_.adapter = adapter;
@@ -1020,7 +1114,15 @@ TunnelSnapshot TunnelSupervisor::run_connect(const ConnectRequest& request, Canc
   if (stop_requested(ConnectStep::Pinned, cancel)) return finish(TunnelCode::None, {}, true);
 
   gate("resolve", nullptr);
-  if (!names_.resolve_ipv4("cp.cloudflare.com", probe_ip)) return finish(TunnelCode::ResolveFailed, {}, false);
+  if (!names_.resolve_ipv4("cp.cloudflare.com", probe_ip)) {
+    // The engine's own counters are the only way to tell "the query never
+    // entered the tun" from "it entered and went nowhere", and this path used
+    // to end without them. dst= names where the packets were addressed.
+    const std::string raw_tail = engine_.output_tail();
+    const std::string shown = sanitize_engine_output_recent(raw_tail, 256);
+    if (!shown.empty()) log_.write(ledger_.generation, "core_output", shown, 0);
+    return finish(TunnelCode::ResolveFailed, {}, false);
+  }
   gate("resolve", "ok");
   OwnedRoute canary;
   if (!routes_.add_canary(adapter, probe_ip, canary)) {
@@ -1029,16 +1131,64 @@ TunnelSnapshot TunnelSupervisor::run_connect(const ConnectRequest& request, Canc
   }
   remember([&] { ledger_.routes = {canary}; });
 
+  // Ask the stack where it would send the canary before sending it. A route
+  // row that sits in the table and cannot be used answers connect() with the
+  // same host-unreachable as no route at all, and the journal had no way to
+  // tell the two apart.
+  //
+  // Windows also accepts a row and can then lose it when the adapter's network
+  // is re-identified, which happens right after the address is assigned. So
+  // when the stack does not pick our adapter, put the row back once and look
+  // again instead of spending the probe on a route that is already gone.
+  RouteLookup lookup;
+  bool routed = routes_.lookup_route(probe_ip, lookup);
+  if (!routed || lookup.interface_luid != adapter.luid) {
+    routes_.delete_canary(canary);
+    if (!routes_.add_canary(adapter, probe_ip, canary)) {
+      log_.write(ledger_.generation, "routes", "canary_failed", routes_.last_error());
+      return finish(TunnelCode::RouteFailed, {}, false);
+    }
+    log_.write(ledger_.generation, "routes", "canary_reasserted", 0);
+    routed = routes_.lookup_route(probe_ip, lookup);
+  }
+  if (routed) {
+    log_.write(ledger_.generation, "route_lookup",
+               "dest=" + probe_ip + " luid=" + std::to_string(lookup.interface_luid) +
+                   " idx=" + std::to_string(lookup.interface_index) + " prefix=" +
+                   std::to_string(lookup.prefix_length) + " nexthop=" + lookup.next_hop +
+                   " source=" + lookup.source,
+               0);
+  } else {
+    log_.write(ledger_.generation, "route_lookup", "none", routes_.last_error());
+  }
   gate("egress", nullptr);
   const bool canary_ok = routes_.fetch_canary(probe_ip, [&] { return cancel.requested(); });
   if (cancel.requested()) return finish(TunnelCode::None, {}, true);
   if (!canary_ok) {
-    const std::string stderr_text = engine_.output_tail();
-    if (engine_reported_auth_failure(stderr_text)) {
+    const std::string raw_tail = engine_.output_tail();
+    if (engine_reported_auth_failure(raw_tail)) {
       log_.write(ledger_.generation, "egress", "auth_rejected", 0);
       return finish(TunnelCode::AuthRejected, {}, false);
     }
-    log_.write(ledger_.generation, "egress", "timeout", 3500);
+    // The code names the outcome and win32 carries the socket error that
+    // closed the probe. A literal 3500 used to sit in this field, which read
+    // like a measured timeout and hid an immediate refusal. The engine's own
+    // output was read for the auth check and then dropped, so a probe that
+    // failed while the tunnel was still coming up left no trace at all.
+    log_.write(ledger_.generation, "egress", "probe_failed", routes_.last_error());
+    // The recent cut, not the leading one: the engine prints its status banner
+    // first and everything that explains a failure after it, so keeping the
+    // first 256 characters kept the banner and dropped the reason.
+    const std::string shown = sanitize_engine_output_recent(raw_tail, 256);
+    if (!shown.empty()) {
+      log_.write(ledger_.generation, "core_output", shown, 0);
+    }
+    const std::string full = sanitize_engine_output_full(raw_tail);
+    if (full.size() > 256) {
+      const std::size_t end = full.size() - 256;
+      const std::size_t begin = end > 256 ? end - 256 : 0;
+      log_.write(ledger_.generation, "core_output_prev", full.substr(begin, end - begin), 0);
+    }
     return finish(TunnelCode::EgressTimeout, {}, false);
   }
   gate("egress", "ok");

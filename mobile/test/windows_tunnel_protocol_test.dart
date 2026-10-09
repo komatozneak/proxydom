@@ -112,6 +112,24 @@ void main() {
     expect(tunnelEventIsConnectTerminal(current, 3), isTrue);
   });
 
+  // A line the engine cannot carry is the line's problem. The caption must not
+  // borrow the service-failure wording, or the person reports a client bug.
+  test('a refused line is named, not blamed on the service', () {
+    const generic = 'Ошибка подключения';
+    const serviceFault = 'Сбой локальной службы туннеля';
+    for (final entry in const {
+      'transport_unsupported': 'Этот транспорт не поддержан на этой платформе',
+      'security_unsupported': 'Этот способ защиты не поддержан на этой платформе',
+      'scheme_unsupported': 'Этот протокол не поддержан на этой платформе',
+    }.entries) {
+      expect(windowsBrokerOwnsCaption(entry.key), isTrue, reason: entry.key);
+      final caption = windowsGateCaption(entry.key, '', generic);
+      expect(caption, entry.value, reason: entry.key);
+      expect(caption, isNot(serviceFault), reason: entry.key);
+      expect(caption, isNot(generic), reason: entry.key);
+    }
+  });
+
   test('broker captions are not the generic connection error', () {
     const generic = 'Ошибка подключения';
     expect(

@@ -43,8 +43,64 @@ const dnsCacheCap = 4096
 var (
 	splitMu      sync.RWMutex
 	directSuffix []string
+	extraForce   []string
 	dnsIPToHost  = map[netip.Addr]string{}
+	udpDirect    bool
+	hijackDNS    netip.Addr
 )
+
+func setExtraForceSuffixes(raw []string) {
+	out := make([]string, 0, len(raw))
+	seen := map[string]struct{}{}
+	for _, s := range raw {
+		s = strings.ToLower(strings.TrimSpace(strings.TrimSuffix(s, ".")))
+		if s == "" {
+			continue
+		}
+		if _, ok := seen[s]; ok {
+			continue
+		}
+		seen[s] = struct{}{}
+		out = append(out, s)
+	}
+	splitMu.Lock()
+	extraForce = out
+	splitMu.Unlock()
+}
+
+func setUDPDirect(on bool) {
+	splitMu.Lock()
+	udpDirect = on
+	splitMu.Unlock()
+}
+
+func udpDirectOn() bool {
+	splitMu.RLock()
+	defer splitMu.RUnlock()
+	return udpDirect
+}
+
+func setHijackDNS(raw string) {
+	ip, err := netip.ParseAddr(strings.TrimSpace(raw))
+	splitMu.Lock()
+	defer splitMu.Unlock()
+	if err != nil {
+		hijackDNS = netip.Addr{}
+		return
+	}
+	hijackDNS = ip.Unmap()
+}
+
+func hijackDNSAddr(ip netip.Addr) bool {
+	if !ip.IsValid() {
+		return false
+	}
+	ip = ip.Unmap()
+	splitMu.RLock()
+	want := hijackDNS
+	splitMu.RUnlock()
+	return want.IsValid() && want == ip
+}
 
 func setDirectSuffixes(raw []string) {
 	out := make([]string, 0, len(raw))
@@ -68,6 +124,9 @@ func setDirectSuffixes(raw []string) {
 func clearSplitState() {
 	splitMu.Lock()
 	directSuffix = nil
+	extraForce = nil
+	udpDirect = false
+	hijackDNS = netip.Addr{}
 	dnsIPToHost = map[netip.Addr]string{}
 	splitMu.Unlock()
 }
@@ -107,6 +166,14 @@ func suffixMatches(host, suffix string) bool {
 
 func isForceProxyHost(host string) bool {
 	for _, s := range forceProxySuffixes {
+		if suffixMatches(host, s) {
+			return true
+		}
+	}
+	splitMu.RLock()
+	extra := extraForce
+	splitMu.RUnlock()
+	for _, s := range extra {
 		if suffixMatches(host, s) {
 			return true
 		}
@@ -162,5 +229,5 @@ func (d *hyDialer) dialDirect(network, addr string) (net.Conn, error) {
 		return d.directDial(network, addr)
 	}
 	log.Printf("hy2bind direct %s %s", network, addr)
-	return protectAndDial(network, addr)
+	return dialOutsideTun(network, addr)
 }

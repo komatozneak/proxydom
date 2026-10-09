@@ -385,7 +385,10 @@ bool parse_share_line(const std::string& raw, ShareLine& out, std::string& error
   const std::string text = trim_copy(raw);
   const auto scheme_end = text.find("://");
   if (scheme_end == std::string::npos || scheme_end == 0) {
-    error = "scheme";
+    // Not a share link at all, which is a different thing from a link whose
+    // protocol we do not carry. Saying "scheme unsupported" here would blame
+    // the protocol for a line that has no protocol in it.
+    error = "profile";
     return false;
   }
   std::string scheme = lower_copy(text.substr(0, scheme_end));
@@ -447,6 +450,12 @@ bool parse_share_line(const std::string& raw, ShareLine& out, std::string& error
   out.scheme = scheme;
   out.host = host;
   out.sni = query_value(query, "sni");
+  // `peer` is the older name for the same field and is still what plenty of
+  // providers emit. The Dart builder reads it, so a line that carries only
+  // `peer` would have dialled with the server name taken from the address on
+  // Windows and from `peer` on Android: one of the two fails the certificate
+  // check, and it fails as a generic core exit with nothing naming the cause.
+  if (out.sni.empty()) out.sni = query_value(query, "peer");
   if (out.sni.empty()) out.sni = host;
   out.insecure = query_value(query, "insecure") == "1" || query_value(query, "allowInsecure") == "1";
   std::string port_spec = port_token;
@@ -483,7 +492,35 @@ bool parse_share_line(const std::string& raw, ShareLine& out, std::string& error
     out.public_key = query_value(query, "pbk");
     out.short_id = query_value(query, "sid");
     out.fingerprint = query_value(query, "fp");
-    if (out.fingerprint.empty()) out.fingerprint = "chrome";
+    // No default. A line that does not ask for a fingerprint gets the core's
+    // own TLS, which is what the Dart builder does; inventing one here made the
+    // same link describe a different ClientHello on Windows than on Android.
+    // The name is also share-link vocabulary (`fp=chrome`), not a core preset
+    // (`chrome_auto`), so translating it is the loader's job, not this parser's.
+    // The same defaults the Dart builder uses, so one link cannot be described
+    // two ways depending on which side of the process boundary reads it.
+    out.network = lower_copy(query_value(query, "type"));
+    if (out.network.empty()) out.network = lower_copy(query_value(query, "net"));
+    if (out.network.empty()) out.network = "tcp";
+    out.path = query_value(query, "path");
+    out.ws_host = query_value(query, "host");
+    out.alpn = query_value(query, "alpn");
+    // TCP obfuscation has no representation in the engine: the loader builds no
+    // `tcpSettings` at all, so a `headerType` we ignored would dial plain TCP at
+    // a server expecting obfuscation and surface a generic failure. Refuse by
+    // name instead. `headerType=none` means no obfuscation and passes, which is
+    // the same rule the Dart builder applies.
+    const std::string header_type = lower_copy(query_value(query, "headerType"));
+    if (!header_type.empty() && header_type != "none") {
+      error = "transport";
+      return false;
+    }
+    if (out.network == "kcp" || out.network == "mkcp") {
+      out.kcp_seed = query_value(query, "seed");
+      if (out.kcp_seed.empty()) out.kcp_seed = query_value(query, "path");
+      if (out.kcp_seed == "/") out.kcp_seed.clear();
+    }
+    if (out.security.empty()) out.security = "tls";
     if (out.security == "reality" && out.public_key.empty()) {
       error = "reality";
       return false;
@@ -541,110 +578,109 @@ std::string state_event(std::int64_t generation, const std::string& state, const
 
 namespace {
 
-std::string proxy_outbound(const ShareLine& line, const std::string& server_ip) {
+std::string json_string_array(const std::vector<std::string>& values) {
+  std::ostringstream out;
+  bool first = true;
+  for (const auto& value : values) {
+    if (!domain_allowed(value)) continue;
+    if (!first) out << ',';
+    first = false;
+    out << '"' << json_escape(value) << '"';
+  }
+  return out.str();
+}
+
+// Outbound object for proxydom-engine. VLESS is carried by the in-process
+// v2ray-core; a transport or security that core does not have is described
+// here and refused by the process (`error transport_unsupported` /
+// `error security_unsupported`), not rewritten as a TCP dial.
+std::string engine_outbound(const ShareLine& line, const std::string& server_ip) {
   if (server_ip.empty() || server_ip.find(':') != std::string::npos) return {};
   std::ostringstream outbound;
   if (line.scheme == "hysteria2") {
-    outbound << "{\"type\":\"hysteria2\",\"tag\":\"proxy\",\"server\":\"" << json_escape(server_ip)
-             << "\",\"server_port\":" << line.port;
+    outbound << "{\"type\":\"hysteria2\",\"server\":\"" << json_escape(server_ip) << "\",\"server_port\":" << line.port;
     if (!line.server_ports.empty()) {
-      outbound << ",\"server_ports\":[\"" << json_escape(line.server_ports) << "\"]";
+      outbound << ",\"server_ports\":\"" << json_escape(line.server_ports) << "\"";
     }
     if (!line.hop_interval.empty()) {
       outbound << ",\"hop_interval\":\"" << json_escape(line.hop_interval) << "\"";
     }
-    outbound << ",\"password\":\"" << json_escape(line.password) << "\"";
+    outbound << ",\"password\":\"" << json_escape(line.password) << "\",\"sni\":\"" << json_escape(line.sni)
+             << "\",\"insecure\":" << (line.insecure ? "true" : "false");
     if (lower_copy(line.obfs) == "salamander") {
-      outbound << ",\"obfs\":{\"type\":\"salamander\",\"password\":\"" << json_escape(line.obfs_password)
-               << "\"}";
+      outbound << ",\"obfs\":\"salamander\",\"obfs_password\":\"" << json_escape(line.obfs_password) << "\"";
     }
-    outbound << ",\"tls\":{\"enabled\":true,\"server_name\":\"" << json_escape(line.sni) << "\",\"insecure\":"
-             << (line.insecure ? "true" : "false") << "}}";
+    outbound << "}";
   } else {
-    outbound << "{\"type\":\"vless\",\"tag\":\"proxy\",\"server\":\"" << json_escape(server_ip)
-             << "\",\"server_port\":" << line.port << ",\"uuid\":\"" << json_escape(line.uuid) << "\"";
+    outbound << "{\"type\":\"vless\",\"server\":\"" << json_escape(server_ip) << "\",\"server_port\":" << line.port
+             << ",\"uuid\":\"" << json_escape(line.uuid) << "\"";
     if (!line.flow.empty()) outbound << ",\"flow\":\"" << json_escape(line.flow) << "\"";
-    outbound << ",\"tls\":{\"enabled\":true,\"server_name\":\"" << json_escape(line.sni) << "\",\"insecure\":"
-             << (line.insecure ? "true" : "false") << ",\"utls\":{\"enabled\":true,\"fingerprint\":\""
-             << json_escape(line.fingerprint) << "\"}";
-    if (line.security == "reality") {
-      outbound << ",\"reality\":{\"enabled\":true,\"public_key\":\"" << json_escape(line.public_key)
-               << "\",\"short_id\":\"" << json_escape(line.short_id) << "\"}";
+    outbound << ",\"sni\":\"" << json_escape(line.sni) << "\",\"insecure\":" << (line.insecure ? "true" : "false")
+             << ",\"security\":\"" << json_escape(line.security) << "\""
+             << ",\"network\":\"" << json_escape(line.network) << "\"";
+    if (!line.fingerprint.empty()) {
+      outbound << ",\"fingerprint\":\"" << json_escape(line.fingerprint) << "\"";
     }
-    outbound << "}}";
+    if (!line.kcp_seed.empty()) {
+      outbound << ",\"kcp_seed\":\"" << json_escape(line.kcp_seed) << "\"";
+    }
+    // Without these a vless:// over WebSocket cannot be described at all, and
+    // the row that needs them is exactly the one subscriptions hand out.
+    if (!line.path.empty()) outbound << ",\"path\":\"" << json_escape(line.path) << "\"";
+    if (!line.ws_host.empty()) outbound << ",\"host\":\"" << json_escape(line.ws_host) << "\"";
+    if (!line.alpn.empty()) outbound << ",\"alpn\":\"" << json_escape(line.alpn) << "\"";
+    if (line.security == "reality") {
+      outbound << ",\"public_key\":\"" << json_escape(line.public_key) << "\",\"short_id\":\""
+               << json_escape(line.short_id) << "\"";
+    }
+    outbound << "}";
   }
   return outbound.str();
 }
 
 }  // namespace
 
-std::string build_singbox_probe_config(const ShareLine& line,
-                                       const std::string& server_ip,
-                                       unsigned short listen_port) {
+std::string build_engine_probe_config(const ShareLine& line,
+                                      const std::string& server_ip,
+                                      unsigned short listen_port) {
   if (listen_port == 0) return {};
-  const std::string outbound = proxy_outbound(line, server_ip);
+  const std::string outbound = engine_outbound(line, server_ip);
   if (outbound.empty()) return {};
   std::ostringstream config;
-  config << "{"
-         << "\"log\":{\"level\":\"warn\"},"
-         << "\"inbounds\":[{\"type\":\"mixed\",\"tag\":\"probe-in\",\"listen\":\"127.0.0.1\","
-         << "\"listen_port\":" << listen_port << "}],"
-         << "\"outbounds\":[" << outbound << "],"
-         << "\"route\":{\"final\":\"proxy\"}"
-         << "}";
+  config << "{\"log_level\":\"warn\",\"probe\":true,\"socks_listen\":\"127.0.0.1:" << listen_port
+         << "\",\"routing_applied\":false,\"dns_hijack\":false,\"outbound\":" << outbound << "}";
   return config.str();
 }
 
-std::string build_singbox_config(const ShareLine& line,
-                                 const std::string& server_ip,
-                                 const std::vector<std::string>& domains,
-                                 const std::vector<std::string>& force_proxy_domains,
-                                 bool udp_direct,
-                                 unsigned short api_port,
-                                 const std::string& api_secret) {
-  const std::string outbound = proxy_outbound(line, server_ip);
+std::string build_engine_config(const ShareLine& line,
+                                const std::string& server_ip,
+                                const std::vector<std::string>& domains,
+                                const std::vector<std::string>& force_proxy_domains,
+                                bool udp_direct,
+                                unsigned short api_port,
+                                const std::string& api_secret) {
+  const std::string outbound = engine_outbound(line, server_ip);
   if (outbound.empty()) return {};
 
-  std::ostringstream rules;
-  rules << "{\"action\":\"sniff\"},{\"protocol\":\"dns\",\"action\":\"hijack-dns\"},"
-           "{\"ip_cidr\":[\"10.0.0.0/8\",\"172.16.0.0/12\",\"192.168.0.0/16\",\"127.0.0.0/8\","
-           "\"fc00::/7\",\"fe80::/10\"],\"outbound\":\"direct\"}";
-  // sing-box takes the first matching rule, so force-proxy rows must sit above
-  // the UDP bypass — otherwise QUIC to a blocked CDN leaves the tunnel.
-  for (const auto& domain : force_proxy_domains) {
-    if (!domain_allowed(domain)) continue;
-    rules << ",{\"domain_suffix\":[\"" << json_escape(domain) << "\"],\"outbound\":\"proxy\"}";
-  }
-  for (const auto& domain : domains) {
-    if (!domain_allowed(domain)) continue;
-    rules << ",{\"domain_suffix\":[\"" << json_escape(domain) << "\"],\"outbound\":\"direct\"}";
-  }
-  // Game traffic is UDP to bare IPs with no name to match, and those addresses
-  // change. This rule is what lets a game bypass the tunnel without a list.
-  // It governs TUN traffic only; the engine's own proxy socket is not routed.
-  if (udp_direct) {
-    rules << ",{\"network\":\"udp\",\"outbound\":\"direct\"}";
-  }
-
+  // Domain lists are recorded in the order the sites screen already uses:
+  // force-proxy names, then exclusions, then the UDP flag. The engine applies
+  // them: force-proxy wins over a direct suffix and over UDP bypass.
+  // auto_route stays false: C++ installs the capture routes.
   std::ostringstream config;
   config << "{"
-         << "\"log\":{\"level\":\"info\"},"
-         << "\"dns\":{\"servers\":[{\"type\":\"udp\",\"tag\":\"remote\",\"server\":\"1.1.1.1\","
-         << "\"server_port\":53,\"detour\":\"proxy\"}],\"strategy\":\"ipv4_only\",\"final\":\"remote\"},"
-         << "\"inbounds\":[{\"type\":\"tun\",\"tag\":\"tun-in\",\"interface_name\":\"ProxyDomTun\","
-         << "\"address\":[\"198.18.0.1/30\"],\"stack\":\"system\","
-         << "\"auto_route\":false,\"strict_route\":false,"
-         << "\"dns_mode\":\"hijack\",\"dns_address\":[\"198.18.0.2\"]}],"
-         << "\"outbounds\":[" << outbound << ",{\"type\":\"direct\",\"tag\":\"direct\"}],"
-         << "\"route\":{\"auto_detect_interface\":true,\"final\":\"proxy\",\"rules\":[" << rules.str() << "]},"
-         << "\"experimental\":{";
-  if (api_port != 0) {
-    config << "\"clash_api\":{\"external_controller\":\"127.0.0.1:" << api_port << "\",\"secret\":\""
-           << json_escape(api_secret) << "\"}";
-  } else {
-    config << "\"cache_file\":{\"enabled\":false}";
-  }
-  config << "}"
-         << "}";
+         << "\"log_level\":\"info\","
+         << "\"probe\":false,"
+         << "\"socks_listen\":\"127.0.0.1:10808\","
+         << "\"tun\":{\"name\":\"" << kTunName << "\",\"address\":\"" << kTunIpv4
+         << "/30\",\"dns\":\"198.18.0.2\","
+         << "\"mtu\":1280,\"auto_route\":false},"
+         << "\"force_proxy_domains\":[" << json_string_array(force_proxy_domains) << "],"
+         << "\"direct_domains\":[" << json_string_array(domains) << "],"
+         << "\"udp_direct\":" << (udp_direct ? "true" : "false") << ","
+         << "\"dns_hijack\":true,"
+         << "\"routing_applied\":true,"
+         << "\"api_port\":" << api_port << ","
+         << "\"api_secret\":\"" << json_escape(api_secret) << "\","
+         << "\"outbound\":" << outbound << "}";
   return config.str();
 }

@@ -291,6 +291,26 @@ bool Win32RouteTable::list_own_adapters(std::vector<OwnedAdapter>& out) {
     owned.luid = adapter->Luid.Value;
     owned.if_index = adapter->IfIndex;
     owned.up = adapter->OperStatus == IfOperStatusUp;
+    // MediaConnectState on IP_ADAPTER_ADDRESSES is hidden behind an NTDDI
+    // guard in this SDK; MIB_IF_ROW2 carries the same value unconditionally.
+    // Asked only for our own adapter, so the poll loop stays cheap.
+    if (owned.name == kTunName) {
+      MIB_IF_ROW2 ifrow{};
+      ifrow.InterfaceLuid.Value = adapter->Luid.Value;
+      if (GetIfEntry2(&ifrow) == NO_ERROR) {
+        owned.media_state = static_cast<unsigned long>(ifrow.MediaConnectState);
+      }
+    }
+    for (auto* ua = adapter->FirstUnicastAddress; ua != nullptr; ua = ua->Next) {
+      if (ua->Address.lpSockaddr == nullptr) continue;
+      if (ua->Address.lpSockaddr->sa_family != AF_INET) continue;
+      const auto* sin = reinterpret_cast<const sockaddr_in*>(ua->Address.lpSockaddr);
+      char text[INET_ADDRSTRLEN] = {};
+      if (inet_ntop(AF_INET, &sin->sin_addr, text, sizeof(text)) == nullptr) continue;
+      owned.ipv4 = text;
+      owned.dad_state = ua->DadState;
+      break;
+    }
     out.push_back(owned);
   }
   last_error_ = 0;
@@ -301,7 +321,7 @@ bool Win32RouteTable::find_own_adapter(OwnedAdapter& adapter) {
   std::vector<OwnedAdapter> owned;
   if (!list_own_adapters(owned)) return false;
   for (const auto& item : owned) {
-    if (item.name == "ProxyDomTun" && item.up && item.luid != 0 && item.if_index != 0) {
+    if (tun_adapter_ready(item)) {
       adapter = item;
       return true;
     }
@@ -319,6 +339,11 @@ bool Win32RouteTable::add_on_link(int family, const OwnedAdapter& adapter, const
   row.DestinationPrefix.PrefixLength = static_cast<UINT8>(prefix);
   row.Metric = 1;
   row.Protocol = MIB_IPPROTO_NETMGMT;
+  // Spell the lifetimes out. A route row with a zero lifetime is accepted by
+  // CreateIpForwardEntry2 and is not usable afterwards, which connect() reports
+  // as host unreachable rather than as a missing route.
+  row.ValidLifetime = 0xffffffff;
+  row.PreferredLifetime = 0xffffffff;
   if (family == AF_INET) {
     row.DestinationPrefix.Prefix.si_family = AF_INET;
     row.DestinationPrefix.Prefix.Ipv4.sin_family = AF_INET;
@@ -357,6 +382,40 @@ bool Win32RouteTable::add_canary(const OwnedAdapter& adapter, const std::string&
     return false;
   }
   return add_on_link(AF_INET, adapter, ip.c_str(), 32, route);
+}
+
+bool Win32RouteTable::lookup_route(const std::string& ip, RouteLookup& out) {
+  IN_ADDR destination{};
+  if (inet_pton(AF_INET, ip.c_str(), &destination) != 1) {
+    last_error_ = ERROR_INVALID_PARAMETER;
+    return false;
+  }
+  SOCKADDR_INET target{};
+  target.si_family = AF_INET;
+  target.Ipv4.sin_family = AF_INET;
+  target.Ipv4.sin_addr = destination;
+
+  MIB_IPFORWARD_ROW2 row{};
+  SOCKADDR_INET source{};
+  const auto rc = GetBestRoute2(nullptr, 0, nullptr, &target, 0, &row, &source);
+  if (rc != NO_ERROR) {
+    last_error_ = rc;
+    return false;
+  }
+  out.interface_luid = row.InterfaceLuid.Value;
+  out.interface_index = row.InterfaceIndex;
+  out.prefix_length = row.DestinationPrefix.PrefixLength;
+  char text[INET_ADDRSTRLEN] = {};
+  if (row.NextHop.si_family == AF_INET &&
+      inet_ntop(AF_INET, &row.NextHop.Ipv4.sin_addr, text, sizeof(text)) != nullptr) {
+    out.next_hop = text;
+  }
+  if (source.si_family == AF_INET &&
+      inet_ntop(AF_INET, &source.Ipv4.sin_addr, text, sizeof(text)) != nullptr) {
+    out.source = text;
+  }
+  last_error_ = 0;
+  return true;
 }
 
 bool Win32RouteTable::delete_canary(const OwnedRoute& route) {
