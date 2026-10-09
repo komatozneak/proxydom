@@ -74,7 +74,32 @@ void main() {
     expect(find.text('Ошибка подключения'), findsNothing);
   });
 
-  testWidgets('a lone vless key is refused off Android', (tester) async {
+  testWidgets('a lone vless key over an unsupported transport is refused on Windows', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    try {
+      await _pumpImport(tester);
+      // gRPC is a transport the core that carries VLESS cannot dial. The line
+      // is refused as a line, not as a scheme — VLESS itself now runs here.
+      await tester.enterText(
+        find.byType(TextField),
+        'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
+        '?security=tls&type=grpc&serviceName=grpc#A',
+      );
+      await tester.pump();
+
+      expect(
+        find.text(
+          'Не удалось добавить узел: этот протокол не запускается на этом устройстве.',
+        ),
+        findsOneWidget,
+      );
+      expect(_saveEnabled(tester), isFalse);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('a lone vless key over WebSocket is accepted on Windows', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.windows;
     try {
       await _pumpImport(tester);
@@ -89,9 +114,9 @@ void main() {
         find.text(
           'Не удалось добавить узел: этот протокол не запускается на этом устройстве.',
         ),
-        findsOneWidget,
+        findsNothing,
       );
-      expect(_saveEnabled(tester), isFalse);
+      expect(_saveEnabled(tester), isTrue);
     } finally {
       debugDefaultTargetPlatformOverride = null;
     }

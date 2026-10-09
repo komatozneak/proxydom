@@ -122,13 +122,28 @@ void main() {
     );
 
     debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    // Windows carries VLESS on the same core as Android now.
+    expect(
+      shareImportDial([vless], fromDocument: false),
+      ShareImportDial.dialable,
+    );
     expect(
       shareImportDial([vless], fromDocument: true),
-      ShareImportDial.noneDialable,
+      ShareImportDial.dialable,
     );
     expect(
       shareImportDial([hy2, vless], fromDocument: true),
       ShareImportDial.dialable,
+    );
+    // The gate is still per link, not per scheme: a transport the core cannot
+    // dial stays out on Windows exactly as it does on Android.
+    expect(
+      shareImportDial([reality], fromDocument: false),
+      ShareImportDial.singleUnsupported,
+    );
+    expect(
+      shareImportDial([reality], fromDocument: true),
+      ShareImportDial.noneDialable,
     );
   });
 

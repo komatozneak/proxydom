@@ -53,18 +53,18 @@ const kParkedSchemes = <String>{'vmess', 'trojan', 'ss'};
 
 /// Whether [scheme] may start a system tunnel on [target].
 ///
-/// Hysteria2 on every OS. VLESS only on Android: that is the only platform
-/// whose engine (v2ray-core inside hy2bind) can dial it today.
+/// Hysteria2 on every OS. VLESS on Android and Windows: Android runs
+/// v2ray-core in-process inside hy2bind, and the Windows broker starts the same
+/// MIT core as its tunnel engine. Both are the engine from ADR 035/036.
 ///
-/// iOS has no VLESS engine, and the Windows broker accepts the scheme but does
-/// not carry transport or ALPN. Both stay false here. That is temporary and
-/// comes off together with those engines, in their own tasks — not in this
-/// file ahead of the engine.
+/// iOS has no VLESS engine and stays false. That is the only platform left, and
+/// it comes off with its own engine, in its own task — not in this file ahead
+/// of it.
 bool canDialSchemeOn(DialTarget target, String scheme) {
   final name = scheme.trim().toLowerCase();
   if (_hysteriaSchemes.contains(name)) return true;
   if (_vlessSchemes.contains(name)) {
-    return target == DialTarget.android;
+    return target == DialTarget.android || target == DialTarget.windows;
   }
   return false;
 }
@@ -74,7 +74,8 @@ bool canDialScheme(String scheme) => canDialSchemeOn(dialTarget, scheme);
 
 /// The Windows broker's answer. Moved here from `ios_store_gates.dart` so the
 /// gate has one home. The broker parses the raw URI itself; this mirrors the
-/// Flutter gate so the two cannot drift. Today that answer is Hysteria2 only.
+/// Flutter gate so the two cannot drift. Today that answer is Hysteria2 and
+/// VLESS over TCP or WebSocket.
 bool windowsDialScheme(String scheme) =>
     canDialSchemeOn(DialTarget.windows, scheme);
 
