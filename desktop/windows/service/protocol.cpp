@@ -564,8 +564,8 @@ std::string json_string_array(const std::vector<std::string>& values) {
 
 // Outbound object for proxydom-engine. VLESS is carried by the in-process
 // v2ray-core; a transport or security that core does not have is described
-// here and refused by the process (`error transport` / `error security`), not
-// rewritten as a TCP dial.
+// here and refused by the process (`error transport_unsupported` /
+// `error security_unsupported`), not rewritten as a TCP dial.
 std::string engine_outbound(const ShareLine& line, const std::string& server_ip) {
   if (server_ip.empty() || server_ip.find(':') != std::string::npos) return {};
   std::ostringstream outbound;

@@ -127,15 +127,16 @@ func (c engineConfig) rejectTransport() bool {
 // shareRefusal names what the in-process core cannot carry, before a core is
 // started at all. Empty means the document is dialable.
 //
-// The words are bare, so the broker's digit scan leaves them alone and they
-// reach the journal as the refusal itself — the same mechanism as
-// `error transport`.
+// The name is the user-facing one, not an internal category, so nothing has to
+// translate it later and no table can drift between the two. The broker
+// recognises these exact words and reports them as the refusal they are; a
+// name it does not recognise stays a plain core exit, which is honest.
 func (c engineConfig) shareRefusal() string {
 	if !hy2bind.TransportDialable(c.Outbound.networkName()) {
-		return "transport"
+		return "transport_unsupported"
 	}
 	if !hy2bind.SecurityDialable(c.Outbound.securityName()) {
-		return "security"
+		return "security_unsupported"
 	}
 	return ""
 }
@@ -163,7 +164,7 @@ func parseEngineConfig(raw []byte) (engineConfig, error) {
 // stays in the JSON the core reads and is not returned as a log line.
 func (c engineConfig) hy2StartJSON() ([]byte, error) {
 	if kind, ok := c.kind(); !ok || kind != engineHy2 {
-		return nil, fmt.Errorf("error transport")
+		return nil, fmt.Errorf("error scheme_unsupported")
 	}
 	if c.Outbound.Server == "" || c.Outbound.ServerPort <= 0 || c.Outbound.Password == "" {
 		return nil, fmt.Errorf("hy2 start failed")

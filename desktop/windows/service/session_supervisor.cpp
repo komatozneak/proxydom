@@ -89,6 +89,28 @@ bool text_says_name_taken(const std::string& text) {
   return lower_copy(text).find("already exists") != std::string::npos;
 }
 
+// The engine refuses a line by printing "error <name>" and exiting before it
+// starts a core. The name is the whole message, so it has to survive the trip
+// to the user: without this the refusal is indistinguishable from a crash, and
+// the caption blames the tunnel service for the line's transport.
+//
+// The list is closed on purpose. A word the engine grows that is not here
+// stays a plain core exit, which is honest, rather than being shown to the
+// person as a name nothing has agreed on.
+TunnelCode named_refusal_in_text(const std::string& text) {
+  const std::string lower = lower_copy(text);
+  if (lower.find("error transport_unsupported") != std::string::npos) {
+    return TunnelCode::TransportUnsupported;
+  }
+  if (lower.find("error security_unsupported") != std::string::npos) {
+    return TunnelCode::SecurityUnsupported;
+  }
+  if (lower.find("error scheme_unsupported") != std::string::npos) {
+    return TunnelCode::SchemeUnsupported;
+  }
+  return TunnelCode::None;
+}
+
 bool tun_name(const std::string& name) { return name == kTunName; }
 
 }  // namespace
@@ -161,6 +183,12 @@ const char* code_name(TunnelCode code) {
       return "egress_failed";
     case TunnelCode::CoreExited:
       return "core_exited";
+    case TunnelCode::TransportUnsupported:
+      return "transport_unsupported";
+    case TunnelCode::SecurityUnsupported:
+      return "security_unsupported";
+    case TunnelCode::SchemeUnsupported:
+      return "scheme_unsupported";
     case TunnelCode::TunInitTimeout:
       return "tun_init_timeout";
     case TunnelCode::EgressTimeout:
@@ -193,6 +221,12 @@ std::string user_message(TunnelCode code, const std::string& extra) {
       return "Сбой локальной службы туннеля";
     case TunnelCode::CoreExited:
       return "Сбой локальной службы туннеля";
+    case TunnelCode::TransportUnsupported:
+      return "Этот транспорт не поддержан на этой платформе";
+    case TunnelCode::SecurityUnsupported:
+      return "Этот способ защиты не поддержан на этой платформе";
+    case TunnelCode::SchemeUnsupported:
+      return "Этот протокол не поддержан на этой платформе";
     case TunnelCode::TunInitTimeout:
       return "Сбой сетевого адаптера туннеля";
     case TunnelCode::EgressTimeout:
@@ -988,8 +1022,16 @@ TunnelSnapshot TunnelSupervisor::run_connect(const ConnectRequest& request, Canc
     waited_ms = i * 100;
     if (cancel.requested()) return finish(TunnelCode::None, {}, true);
     if (!engine_.alive()) {
-      const std::string stderr_text = sanitize_engine_output(engine_.output_tail());
+      const std::string raw_tail = engine_.output_tail();
+      const std::string stderr_text = sanitize_engine_output(raw_tail);
       log_.write(ledger_.generation, "core_exited", stderr_text, engine_.exit_code());
+      // A refusal is not an exit. The engine names it and leaves before a core
+      // exists, so the honest answer is the name it gave, not a service fault.
+      const TunnelCode refusal = named_refusal_in_text(raw_tail);
+      if (refusal != TunnelCode::None) {
+        log_.write(ledger_.generation, "line_refused", code_name(refusal), 0);
+        return finish(refusal, {}, false);
+      }
       return finish(TunnelCode::CoreExited, {}, false);
     }
     if (routes_.find_own_adapter(adapter)) {

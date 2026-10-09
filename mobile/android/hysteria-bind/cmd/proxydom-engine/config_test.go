@@ -102,15 +102,16 @@ func TestVLESSBuildsAShareDocument(t *testing.T) {
 
 // A transport the core cannot dial is refused before a core is started, so the
 // person is told which part of the line is unsupported instead of watching a
-// timeout and blaming their network.
+// timeout and blaming their network. The name is the user-facing one: the
+// broker matches it literally, so a rename here has to reach the broker too.
 func TestVLESSTransportIsRefusedBeforeTheCoreStarts(t *testing.T) {
 	for _, network := range []string{"grpc", "xhttp", "quic", "httpupgrade"} {
 		cfg, err := parseEngineConfig([]byte(`{"outbound":{"type":"vless","server":"203.0.113.11","server_port":443,"uuid":"u","network":"` + network + `"}}`))
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got := cfg.shareRefusal(); got != "transport" {
-			t.Fatalf("%s: refusal = %q, want transport", network, got)
+		if got := cfg.shareRefusal(); got != "transport_unsupported" {
+			t.Fatalf("%s: refusal = %q, want transport_unsupported", network, got)
 		}
 	}
 }
@@ -121,8 +122,8 @@ func TestVLESSRealityIsRefused(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := cfg.shareRefusal(); got != "security" {
-		t.Fatalf("refusal = %q, want security", got)
+	if got := cfg.shareRefusal(); got != "security_unsupported" {
+		t.Fatalf("refusal = %q, want security_unsupported", got)
 	}
 }
 

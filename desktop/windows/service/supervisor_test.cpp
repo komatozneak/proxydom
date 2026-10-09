@@ -578,8 +578,56 @@ void test_bad_key_never_mutates_routes() {
   expect(!leaked, "engine log drops the password");
 }
 
-void test_cancel_during_key_probe_never_mutates_routes() {
+// A line this platform cannot carry is a refusal, not a crash. The engine names
+// it and leaves before a core exists; reporting that as a dead service sends the
+// person looking for a bug in the client instead of at their own line.
+void test_a_refused_transport_is_not_a_crash() {
   Harness harness;
+  harness.engine.die_after_resume = true;
+  harness.engine.tail = "error transport_unsupported";
+  const auto snap = harness.connect();
+  expect(snap.code == TunnelCode::TransportUnsupported, "the engine's name reaches the code");
+  expect(snap.message == "Этот транспорт не поддержан на этой платформе",
+         "the caption is the refusal, not a service fault");
+  expect(snap.phase == TunnelPhase::Idle && snap.cleanup_verified, "a refusal restores");
+  expect(harness.routes.add_calls == 0, "a refusal adds no pin");
+  expect(harness.routes.capture_calls == 0, "a refusal installs no capture");
+  bool named_refusal = false;
+  bool kept_words = false;
+  for (const auto& line : harness.log.lines) {
+    if (line.event == "line_refused" && line.code == "transport_unsupported") named_refusal = true;
+    if (line.event == "core_exited" && line.code.find("transport_unsupported") != std::string::npos) {
+      kept_words = true;
+    }
+  }
+  expect(named_refusal, "the journal names the refusal, so it is not invisible");
+  expect(kept_words, "the engine's own words are still kept");
+}
+
+// Reality is refused for its security, not its transport. One name for both
+// would tell the person to change the wrong half of their line.
+void test_a_refused_security_keeps_its_own_name() {
+  Harness harness;
+  harness.engine.die_after_resume = true;
+  harness.engine.tail = "error security_unsupported";
+  const auto snap = harness.connect();
+  expect(snap.code == TunnelCode::SecurityUnsupported, "security is named apart from transport");
+  expect(snap.message == "Этот способ защиты не поддержан на этой платформе", "security caption");
+}
+
+// The list of names the broker understands is closed. A word it has not agreed
+// on stays a plain core exit: inventing a name for it would be worse than the
+// honest generic one.
+void test_an_unknown_word_is_still_a_core_exit() {
+  Harness harness;
+  harness.engine.die_after_resume = true;
+  harness.engine.tail = "error something_new_the_engine_grew";
+  const auto snap = harness.connect();
+  expect(snap.code == TunnelCode::CoreExited, "an unagreed word stays a core exit");
+  expect(snap.message == "Сбой локальной службы туннеля", "unknown exit keeps the service caption");
+}
+
+void test_cancel_during_key_probe_never_mutates_routes() {  Harness harness;
   harness.routes.cancel_during_fetch = true;
   const auto snap = harness.connect();
   expect(snap.code == TunnelCode::None, "canary cancel is not an egress failure");
@@ -1587,6 +1635,9 @@ int main() {
   test_foreign_blocks_before_pin();
   test_radmin_allows_connect();
   test_bad_key_never_mutates_routes();
+  test_a_refused_transport_is_not_a_crash();
+  test_a_refused_security_keeps_its_own_name();
+  test_an_unknown_word_is_still_a_core_exit();
   test_cancel_during_key_probe_never_mutates_routes();
   test_cancel_before_and_after_pin();
   test_launch_failure_keeps_win32();

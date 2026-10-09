@@ -35,6 +35,13 @@ enum class TunnelCode {
   CleanupFailed,
   Busy,
   Protocol,
+  // The engine names what it cannot carry and exits before starting a core.
+  // These are not crashes: the line asked for something this platform does not
+  // have, and reporting that as a service failure sends the person to look for
+  // a bug in the client instead of at their own line.
+  TransportUnsupported,
+  SecurityUnsupported,
+  SchemeUnsupported,
 };
 
 enum class ConnectStep {

@@ -36,8 +36,10 @@ func main() {
 	}
 	if cfg.rejectTransport() {
 		// Not a Win32 code. "error " followed by a non-number is ignored by
-		// the broker's digit scan, and the word is the refusal itself.
-		log.Printf("error transport")
+		// the broker's digit scan, and the word is the refusal itself. It is
+		// the user-facing name, so the broker needs no second table to say
+		// which part of the line this platform does not carry.
+		log.Printf("error scheme_unsupported")
 		os.Exit(1)
 	}
 	kind, _ := cfg.kind()
