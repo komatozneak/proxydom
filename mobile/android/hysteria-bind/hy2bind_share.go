@@ -22,10 +22,6 @@ import (
 	"github.com/xjasonlyu/tun2socks/v2/tunnel"
 )
 
-// shareSocks is the default local VLESS-core SOCKS inbound. Hy2 keeps :10808.
-// The document carries the real port; this is only the fallback.
-const shareSocks = "127.0.0.1:10809"
-
 var (
 	shareMu   sync.Mutex
 	shareInst *v2core.Instance
@@ -35,6 +31,14 @@ var (
 // shareListenAddr reads the local SOCKS address out of the document, so the
 // tunnel is pointed at the port the core was actually told to listen on rather
 // than at a constant that can drift away from it.
+//
+// An empty answer means the document does not say, and the caller must refuse
+// rather than guess. There used to be a `127.0.0.1:10809` fallback here, which
+// was worse than useless: a port the core was never told to bind looks exactly
+// like a working one until something dials it. This runs only after the core has
+// started, and a core that started had a real inbound, so an empty answer means
+// our reading of the document disagrees with the core's — and then the honest
+// move is to stop, not to pick a number.
 func shareListenAddr(configJSON string) string {
 	var doc struct {
 		Inbounds []struct {
@@ -43,11 +47,11 @@ func shareListenAddr(configJSON string) string {
 		} `json:"inbounds"`
 	}
 	if err := json.Unmarshal([]byte(configJSON), &doc); err != nil || len(doc.Inbounds) == 0 {
-		return shareSocks
+		return ""
 	}
 	in := doc.Inbounds[0]
 	if in.Port <= 0 {
-		return shareSocks
+		return ""
 	}
 	host := in.Listen
 	if host == "" {
@@ -76,7 +80,6 @@ func StartShare(configJSON string) string {
 	prepareCoreLog(configJSON)
 	registerEngineProtector()
 	lastProtectErr.Store("")
-	shareAddr.Store(shareListenAddr(configJSON))
 	cfg, err := loadShareConfig(configJSON)
 	if err != nil {
 		return fmt.Sprintf("engine: %v", err)
@@ -91,11 +94,21 @@ func StartShare(configJSON string) string {
 	if err := inst.Start(); err != nil {
 		return fmt.Sprintf("engine: %v", err)
 	}
-	noteShareCore()
+	// Only now, and only once the core is up. The address used to be stored
+	// before the config was even parsed, so a start that failed still left it
+	// behind: ShareSocksAddr would then answer with a port nothing listens on
+	// for as long as some other core was running, and the tunnel would be
+	// pointed at it.
+	shareAddr.Store(shareListenAddr(configJSON))
 	shareMu.Lock()
 	prev := shareInst
 	shareInst = inst
 	shareMu.Unlock()
+	// After the swap, not before. ShareSocksAddr reports the running core's
+	// address and answers empty until shareInst is set, so logging it first
+	// recorded "socks=" on every session — the one line meant to say which port
+	// the core listens on said nothing at all.
+	noteShareCore()
 	if prev != nil {
 		_ = prev.Close()
 	}
@@ -110,6 +123,10 @@ func stopShare() {
 	if inst != nil {
 		_ = inst.Close()
 	}
+	// Cleared with the core, so the recorded address never outlives the port it
+	// names. ShareSocksAddr already guards on shareRunning, but leaving a dead
+	// port in the variable means the next reader that forgets the guard dials it.
+	shareAddr.Store("")
 }
 
 func shareRunning() bool {

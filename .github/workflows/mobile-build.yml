@@ -129,6 +129,25 @@ jobs:
       - name: go test
         working-directory: mobile/android/hysteria-bind
         run: go test ./...
+      # This job runs on ubuntu, so the Windows half of the engine is excluded
+      # by build constraints and never compiled: cmd/proxydom-engine (all files
+      # are `//go:build windows`), hy2bind_tun_windows.go and
+      # hy2bind_protect_windows.go. That is the half the owner's machine
+      # actually runs, and it is the half the MSI carries.
+      #
+      # Measured: changing StartShareTunStack to take an argument leaves
+      # `GOOS=linux go build ./...` and `go vet ./...` both exiting 0 while
+      # main.go no longer compiles. Green CI, broken installer. Cross-compile
+      # instead. The tests cannot be run for another OS, but a compile error is
+      # the failure that reaches the owner.
+      - name: Cross-compile the Windows engine
+        working-directory: mobile/android/hysteria-bind
+        env:
+          GOOS: windows
+          GOARCH: amd64
+        run: |
+          go build ./...
+          go vet ./...
 
   # flutter test does not compile Kotlin. PathHealth and socksWatchFor live
   # in the Android app module; this job is what actually runs them.
