@@ -86,14 +86,25 @@ struct RouteLookup {
   int prefix_length = 0;
 };
 
-// The engine opens the wintun adapter first and assigns the address afterwards,
-// and Windows reports an address-less adapter as up. A canary route into such
-// an adapter fails immediately, so "up" alone is not ready: wait for the
-// address the engine was told to set. Readiness that ignored this raced the
-// engine and failed the egress probe in about a millisecond.
+// The engine opens the wintun adapter and assigns the address afterwards, and
+// Windows reports an address-less adapter as up. A canary route into such an
+// adapter fails immediately, so "up" alone is not ready: wait for the address
+// the engine was told to set.
+//
+// The address alone is not enough either. Windows reports it as
+// IpDadStateTentative while it checks for a duplicate, and a route into an
+// adapter whose only address is tentative is accepted by the route table and
+// then refused by connect(), which answers host unreachable exactly as it does
+// when no route exists at all. Measured on the owner's machine: dad=1 together
+// with GetBestRoute2 returning ERROR_NOT_FOUND for a canary whose /32 row was
+// present. Readiness therefore requires Preferred.
+constexpr unsigned long kIpDadStateTentative = 1;
+constexpr unsigned long kIpDadStatePreferred = 4;
+
 inline bool tun_adapter_ready(const OwnedAdapter& adapter) {
   return adapter.name == kTunName && adapter.up && adapter.luid != 0 &&
-         adapter.if_index != 0 && adapter.ipv4 == kTunIpv4;
+         adapter.if_index != 0 && adapter.ipv4 == kTunIpv4 &&
+         adapter.dad_state == kIpDadStatePreferred;
 }
 
 struct OwnedRoute {

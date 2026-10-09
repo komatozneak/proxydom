@@ -58,6 +58,8 @@ class FakeRoutes : public RouteTable {
   bool lookup_ok = true;
   int lookup_calls = 0;
   unsigned long lookup_luid = 99;
+  unsigned long dad_state = kIpDadStatePreferred;
+  int tentative_polls = 0;
   bool cancel_during_fetch = false;
   unsigned long hardware_index = 18;
   CancelFlag* cancel = nullptr;
@@ -115,6 +117,8 @@ class FakeRoutes : public RouteTable {
     adapter.luid = 99;
     adapter.if_index = 5;
     adapter.up = true;
+    adapter.ipv4 = kTunIpv4;
+    adapter.dad_state = dad_state;
     out.push_back(adapter);
     return true;
   }
@@ -129,12 +133,25 @@ class FakeRoutes : public RouteTable {
       --tun_misses;
       return false;
     }
+    OwnedAdapter candidate;
+    candidate.name = "ProxyDomTun";
+    candidate.guid = "{tun}";
+    candidate.luid = 99;
+    candidate.if_index = 5;
+    candidate.up = true;
+    candidate.ipv4 = kTunIpv4;
+    candidate.dad_state = dad_state;
+    if (tentative_polls > 0) {
+      --tentative_polls;
+      candidate.dad_state = kIpDadStateTentative;
+    }
+    // Ask the same question the route table asks. A fake that simply said yes
+    // would let the suite pass while the readiness rule the real adapter has to
+    // satisfy went unexercised, which is exactly how the tentative address
+    // stayed invisible.
+    if (!tun_adapter_ready(candidate)) return false;
+    adapter = candidate;
     adapter_present = true;
-    adapter.name = "ProxyDomTun";
-    adapter.guid = "{tun}";
-    adapter.luid = 99;
-    adapter.if_index = 5;
-    adapter.up = true;
     return true;
   }
   bool add_canary(const OwnedAdapter& adapter, const std::string& ip, OwnedRoute& route) override {
@@ -807,7 +824,20 @@ OwnedAdapter tun_row(bool up, std::uint64_t luid, unsigned long index) {
   adapter.luid = luid;
   adapter.if_index = index;
   adapter.up = up;
+  // A row Windows has finished checking. The tentative case is set explicitly
+  // by the tests that care about it.
+  adapter.dad_state = kIpDadStatePreferred;
   return adapter;
+}
+
+// A journal line matched by part. The diagnostic lines carry several fields, so
+// an exact match would never find them.
+int log_first_with(const FakeLog& log, const std::string& event, const std::string& part) {
+  for (int i = 0; i < static_cast<int>(log.lines.size()); ++i) {
+    const auto& line = log.lines[static_cast<std::size_t>(i)];
+    if (line.event == event && line.code.find(part) != std::string::npos) return i;
+  }
+  return -1;
 }
 
 void test_classify_tun_wait() {
@@ -887,7 +917,10 @@ void test_tun_timeout_log_names_the_adapter() {
   expect(snap.phase == TunnelPhase::Idle && snap.cleanup_verified, "down adapter still restores");
   expect(down.routes.add_calls == 0 && down.routes.capture_calls == 0, "diagnosis adds no routes");
   expect(down.log.index_of("tun_init_timeout", "adapter_state_not_up") >= 0, "down adapter is named");
-  expect(down.log.index_of("tun_adapter", "ProxyDomTun,up=0,luid=77,if=3") >= 0, "snapshot has luid");
+  expect(log_first_with(down.log, "tun_adapter", "ProxyDomTun,up=0,luid=77,if=3") >= 0,
+         "snapshot has luid");
+  expect(log_first_with(down.log, "tun_adapter", "dad=4") >= 0,
+         "snapshot carries the address state that decides readiness");
 
   Harness engine_text;
   engine_text.routes.tun_misses = 100;
@@ -1018,23 +1051,14 @@ void test_sanitizer_recent_keeps_the_failure_reason() {
 // become a gate: a stack that cannot answer still gets the canary, because the
 // probe's own error is what decides the session.
 void test_route_lookup_is_diagnostic_only() {
-  // The lookup line carries several fields, so it is matched by part, not whole.
-  const auto first_with = [](const FakeLog& log, const std::string& event, const std::string& part) {
-    for (int i = 0; i < static_cast<int>(log.lines.size()); ++i) {
-      const auto& line = log.lines[static_cast<std::size_t>(i)];
-      if (line.event == event && line.code.find(part) != std::string::npos) return i;
-    }
-    return -1;
-  };
-
   Harness answered;
   const auto connected = answered.connect();
   expect(connected.phase == TunnelPhase::Connected, "the lookup does not break a healthy connect");
   expect(answered.routes.lookup_calls == 1, "the route lookup runs once per attempt");
-  const int lookup = first_with(answered.log, "route_lookup", "dest=");
-  const int gate = first_with(answered.log, "gate", "egress");
+  const int lookup = log_first_with(answered.log, "route_lookup", "dest=");
+  const int gate = log_first_with(answered.log, "gate", "egress");
   expect(lookup >= 0 && gate > lookup, "the lookup is recorded before the egress gate");
-  expect(first_with(answered.log, "route_lookup", "idx=5") >= 0,
+  expect(log_first_with(answered.log, "route_lookup", "idx=5") >= 0,
          "the journal names the interface the stack picked");
 
   Harness blind;
@@ -1042,7 +1066,7 @@ void test_route_lookup_is_diagnostic_only() {
   const auto still = blind.connect();
   expect(still.phase == TunnelPhase::Connected, "a failed lookup does not stop the tunnel");
   expect(blind.routes.fetch_calls == 1, "the canary still runs when the lookup cannot answer");
-  expect(first_with(blind.log, "route_lookup", "none") >= 0, "a failed lookup is recorded as none");
+  expect(log_first_with(blind.log, "route_lookup", "none") >= 0, "a failed lookup is recorded as none");
 
   // Windows accepts a route row and can then lose it when the adapter's network
   // is re-identified. The stack stops picking our adapter, which is the only
@@ -1052,9 +1076,28 @@ void test_route_lookup_is_diagnostic_only() {
   const auto healed = moved.connect();
   expect(healed.phase == TunnelPhase::Connected, "a lost route is put back and the session connects");
   expect(moved.routes.canary_calls == 2, "the canary is re-asserted once");
-  expect(first_with(moved.log, "routes", "canary_reasserted") >= 0,
+  expect(log_first_with(moved.log, "routes", "canary_reasserted") >= 0,
          "the re-assert is recorded, so a silent drop stops being invisible");
-  expect(first_with(moved.log, "gate", "egress") >= 0, "the probe still runs after the repair");
+  expect(log_first_with(moved.log, "gate", "egress") >= 0, "the probe still runs after the repair");
+}
+
+// The fix itself. Windows publishes the address before it can carry traffic, so
+// a session that probes the moment the address appears fails on every node with
+// egress_timeout. Here the address stays tentative for 1.5 s and the session has
+// to wait it out and then connect.
+void test_connect_waits_for_a_preferred_address() {
+  Harness slow;
+  slow.routes.tentative_polls = 15;
+  const auto connected = slow.connect();
+  expect(connected.phase == TunnelPhase::Connected, "a slow address still connects");
+  expect(slow.routes.fetch_calls == 1, "the probe runs once, after the wait");
+
+  const int waited = log_first_with(slow.log, "tun_wait_ms", "1500");
+  expect(waited >= 0, "the wait is recorded, so it stops being invisible");
+  expect(log_first_with(slow.log, "adapter", kTunIpv4) > waited,
+         "the adapter is only accepted after the wait");
+  expect(log_first_with(slow.log, "tun_init_timeout", "adapter_") < 0,
+         "a slow address is not a timeout");
 }
 
 void test_resolve_and_route_table_failures() {
@@ -1479,6 +1522,44 @@ void test_tun_readiness_needs_the_address() {
   expect(!tun_adapter_ready(no_index), "a zero index cannot carry a route");
 }
 
+// The owner's machine settled this one: adapter_state reported media=1 dad=1
+// and route_lookup came back ERROR_NOT_FOUND for a canary whose /32 row was in
+// the table. The address was present and Windows was still checking it for a
+// duplicate, so the stack had no usable source and refused the route. An
+// address is not ready until it is Preferred.
+void test_tun_readiness_needs_a_preferred_address() {
+  OwnedAdapter tentative = tun_row(true, 99, 5);
+  tentative.ipv4 = kTunIpv4;
+  tentative.dad_state = kIpDadStateTentative;
+  expect(!tun_adapter_ready(tentative), "a tentative address is not ready");
+
+  OwnedAdapter duplicate = tun_row(true, 99, 5);
+  duplicate.ipv4 = kTunIpv4;
+  duplicate.dad_state = 2;
+  expect(!tun_adapter_ready(duplicate), "a duplicate address is not ready");
+
+  OwnedAdapter deprecated = tun_row(true, 99, 5);
+  deprecated.ipv4 = kTunIpv4;
+  deprecated.dad_state = 3;
+  expect(!tun_adapter_ready(deprecated), "a deprecated address is not ready");
+
+  OwnedAdapter preferred = tun_row(true, 99, 5);
+  preferred.ipv4 = kTunIpv4;
+  preferred.dad_state = kIpDadStatePreferred;
+  expect(tun_adapter_ready(preferred), "a preferred address is ready");
+
+  // The timeout diagnosis has to name this state rather than call it "down",
+  // because "wait longer" and "the adapter never came up" need different fixes.
+  TunWaitView view;
+  view.process_alive = true;
+  view.list_ok = true;
+  view.adapters = {tentative};
+  expect(classify_tun_wait(view).code == std::string("adapter_address_tentative"),
+         "a tentative address is named on its own");
+  expect(classify_tun_wait(view).win32 == kIpDadStateTentative,
+         "the diagnosis carries the dad state it saw");
+}
+
 int main() {
   test_route_policy();
   test_slash_port_connects_and_junk_does_not_launch();
@@ -1500,11 +1581,13 @@ int main() {
   test_user_proof_refusal_restores_capture();
   test_classify_tun_wait();
   test_tun_readiness_needs_the_address();
+  test_tun_readiness_needs_a_preferred_address();
   test_tun_timeout_log_names_the_adapter();
   test_stderr_after_info_is_not_cut();
   test_sanitizer_covers_every_credential_shape();
   test_sanitizer_recent_keeps_the_failure_reason();
   test_route_lookup_is_diagnostic_only();
+  test_connect_waits_for_a_preferred_address();
   test_resolve_and_route_table_failures();
   test_flow_counters_record_the_outbound();
   test_connections_body_parses();

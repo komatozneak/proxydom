@@ -98,17 +98,29 @@ TunWaitClass classify_tun_wait(const TunWaitView& view) {
   int named = 0;
   int usable = 0;
   int not_up = 0;
+  int tentative = 0;
   for (const auto& adapter : view.adapters) {
     if (!tun_name(adapter.name)) continue;
     ++named;
     // One readiness rule, the same one the route table applies. A second copy
     // here that accepted a bare "up" would report adapter_up for an adapter the
     // route table had just refused, which is how the egress race stayed hidden.
-    if (tun_adapter_ready(adapter)) ++usable;
-    else ++not_up;
+    if (tun_adapter_ready(adapter)) {
+      ++usable;
+      continue;
+    }
+    // An address Windows is still checking for a duplicate is the one state
+    // that readiness used to mistake for ready, so it is named apart from a
+    // plain "down": the two need different answers.
+    if (adapter.up && adapter.ipv4 == kTunIpv4 && adapter.dad_state == kIpDadStateTentative) {
+      ++tentative;
+      continue;
+    }
+    ++not_up;
   }
   // A second ProxyDomTun, or sing-box saying the name is taken, is not "still down".
   if (named > 1 || text_says_name_taken(view.engine_text)) return {"adapter_name_conflict", 0};
+  if (tentative > 0) return {"adapter_address_tentative", kIpDadStateTentative};
   if (not_up > 0) return {"adapter_state_not_up", 0};
   const unsigned long parsed = win32_in_text(view.engine_text);
   if (parsed != 0 && usable == 0) return {"wintun_create_failed", parsed};
@@ -842,7 +854,8 @@ void TunnelSupervisor::note_tun_timeout() {
       }
       std::ostringstream code;
       code << name << ",up=" << (adapter.up ? 1 : 0) << ",luid=" << adapter.luid
-           << ",if=" << adapter.if_index;
+           << ",if=" << adapter.if_index << ",dad=" << adapter.dad_state
+           << ",media=" << adapter.media_state;
       log_.write(ledger_.generation, "tun_adapter", code.str(), adapter.up ? 1ul : 0ul);
     }
   }
@@ -966,7 +979,13 @@ TunnelSnapshot TunnelSupervisor::run_connect(const ConnectRequest& request, Canc
 
   OwnedAdapter adapter;
   bool found = false;
-  for (int i = 0; i < 50; ++i) {
+  int waited_ms = 0;
+  // Ten seconds, not five. Readiness now waits for Windows to finish checking
+  // the new address for a duplicate, and that check is not instant. The earlier
+  // budget was never really spent: the rule it waited on accepted the address
+  // while it was still tentative.
+  for (int i = 0; i < 100; ++i) {
+    waited_ms = i * 100;
     if (cancel.requested()) return finish(TunnelCode::None, {}, true);
     if (!engine_.alive()) {
       const std::string stderr_text = sanitize_engine_output(engine_.output_tail());
@@ -979,6 +998,9 @@ TunnelSnapshot TunnelSupervisor::run_connect(const ConnectRequest& request, Canc
     }
     sleeper_.sleep_ms(100);
   }
+  // How long the address took to become usable. Without this the wait is
+  // invisible, which is how a readiness rule that never waited went unnoticed.
+  log_.write(ledger_.generation, "tun_wait_ms", std::to_string(waited_ms), 0);
   if (!found) {
     note_tun_timeout();
     return finish(TunnelCode::TunInitTimeout, {}, false);
