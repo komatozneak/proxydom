@@ -972,6 +972,35 @@ void test_sanitizer_covers_every_credential_shape() {
          "ordinary fields are left alone");
 }
 
+// The leading cut kept the engine's opening banner and dropped the lines after
+// it, which are the ones that name the fault. This pins the direction of the
+// cut so a failure reason cannot hide behind a status line again.
+void test_sanitizer_recent_keeps_the_failure_reason() {
+  std::string banner = "event=core code=ok tun=ProxyDomTun";
+  while (banner.size() < 300) banner += " routing_applied=true";
+  const std::string text = banner + " tun rx=0 tx=0 hy2bind dial tcp 1.2.3.4:80";
+
+  const std::string leading = sanitize_engine_output(text);
+  const std::string recent = sanitize_engine_output_recent(text, 256);
+  expect(leading.find("tun rx=0") == std::string::npos,
+         "the leading cut still hides the reason");
+  expect(recent.find("tun rx=0") != std::string::npos,
+         "the recent cut keeps the line that names the fault");
+  expect(recent.size() == 256, "the recent cut honours its bound");
+  expect(recent == text.substr(text.size() - 256),
+         "the recent cut is the tail of the text");
+
+  const std::string brief = "event=egress code=probe_failed win32=10065";
+  expect(sanitize_engine_output_recent(brief, 256) == brief,
+         "text shorter than the bound is returned whole");
+  expect(sanitize_engine_output_recent(brief, 0).size() == brief.size(),
+         "a zero bound falls back to 256");
+
+  const std::string secret = banner + " \"password\":\"tailSecret\"";
+  expect(sanitize_engine_output_recent(secret, 256).find("tailSecret") == std::string::npos,
+         "redaction runs before the recent cut too");
+}
+
 void test_resolve_and_route_table_failures() {
   Harness names;
   names.names.fail = true;
@@ -1418,6 +1447,7 @@ int main() {
   test_tun_timeout_log_names_the_adapter();
   test_stderr_after_info_is_not_cut();
   test_sanitizer_covers_every_credential_shape();
+  test_sanitizer_recent_keeps_the_failure_reason();
   test_resolve_and_route_table_failures();
   test_flow_counters_record_the_outbound();
   test_connections_body_parses();

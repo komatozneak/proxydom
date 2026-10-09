@@ -73,12 +73,16 @@ func startTUN(cfg engineConfig) error {
 	if cfg.Tun == nil || cfg.Tun.AutoRoute {
 		return fmt.Errorf("win32=%d", 87)
 	}
-	if msg := hy2bind.StartNamedTun(cfg.Tun.Name, cfg.Tun.MTU); msg != "" {
+	if msg := hy2bind.OpenNamedTun(cfg.Tun.Name, cfg.Tun.MTU); msg != "" {
 		return fmt.Errorf("%s", msg)
 	}
 	if err := assignTunIPv4(cfg.Tun.Name, cfg.Tun.Address, cfg.Tun.DNS); err != nil {
 		hy2bind.StopTun()
 		return err
+	}
+	if msg := hy2bind.StartTunStack(); msg != "" {
+		hy2bind.StopTun()
+		return fmt.Errorf("%s", msg)
 	}
 	return nil
 }

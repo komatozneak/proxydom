@@ -3,6 +3,7 @@ package hy2bind
 import (
 	"context"
 	"errors"
+	"log"
 	"net"
 	"net/netip"
 	"sync"
@@ -57,6 +58,10 @@ func (d *hyDialer) DialContext(_ context.Context, m *M.Metadata) (net.Conn, erro
 		return nil, errSkipCDN
 	}
 	addr := egressAddr(m)
+	// One line per connection. The broker reads this to tell a tunnel that
+	// never received the packet apart from one that received it and could not
+	// dial, which is the difference between a routing fault and a proxy fault.
+	log.Printf("hy2bind dial tcp %s", addr)
 	chain := "proxy"
 	var conn net.Conn
 	var err error

@@ -1047,9 +1047,18 @@ TunnelSnapshot TunnelSupervisor::run_connect(const ConnectRequest& request, Canc
     // output was read for the auth check and then dropped, so a probe that
     // failed while the tunnel was still coming up left no trace at all.
     log_.write(ledger_.generation, "egress", "probe_failed", routes_.last_error());
-    const std::string shown = sanitize_engine_output(raw_tail);
+    // The recent cut, not the leading one: the engine prints its status banner
+    // first and everything that explains a failure after it, so keeping the
+    // first 256 characters kept the banner and dropped the reason.
+    const std::string shown = sanitize_engine_output_recent(raw_tail, 256);
     if (!shown.empty()) {
       log_.write(ledger_.generation, "core_output", shown, 0);
+    }
+    const std::string full = sanitize_engine_output_full(raw_tail);
+    if (full.size() > 256) {
+      const std::size_t end = full.size() - 256;
+      const std::size_t begin = end > 256 ? end - 256 : 0;
+      log_.write(ledger_.generation, "core_output_prev", full.substr(begin, end - begin), 0);
     }
     return finish(TunnelCode::EgressTimeout, {}, false);
   }

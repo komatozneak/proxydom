@@ -131,6 +131,13 @@ std::string sanitize_engine_output(const std::string& text) {
   return out;
 }
 
+std::string sanitize_engine_output_recent(const std::string& text, std::size_t keep) {
+  std::string out = sanitize_engine_output_full(text);
+  if (keep == 0) keep = 256;
+  if (out.size() > keep) out = out.substr(out.size() - keep);
+  return out;
+}
+
 bool engine_reported_auth_failure(const std::string& text) {
   const std::string lower = lower_copy(text);
   return lower.find("authentication failed") != std::string::npos ||
