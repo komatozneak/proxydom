@@ -849,8 +849,18 @@ void test_classify_tun_wait() {
   up.process_alive = true;
   up.list_ok = true;
   up.adapters = {tun_row(true, 99, 5)};
-  const auto ready = classify_tun_wait(up);
-  expect(std::string(ready.code) == "adapter_up", "an up adapter is not adapter_not_found");
+  const auto bare = classify_tun_wait(up);
+  expect(std::string(bare.code) == "adapter_state_not_up",
+         "an up adapter with no address is not usable yet");
+
+  TunWaitView configured;
+  configured.process_alive = true;
+  configured.list_ok = true;
+  OwnedAdapter addressed = tun_row(true, 99, 5);
+  addressed.ipv4 = kTunIpv4;
+  configured.adapters = {addressed};
+  const auto ready = classify_tun_wait(configured);
+  expect(std::string(ready.code) == "adapter_up", "a configured adapter is not adapter_not_found");
 }
 
 void test_tun_timeout_log_names_the_adapter() {
@@ -1349,6 +1359,41 @@ void test_only_a_lost_client_keeps_the_tunnel() {
          "every reason has a name");
 }
 
+// The engine opens the wintun adapter first and assigns the address with a
+// separate netsh process afterwards, and Windows reports an address-less
+// adapter as up. Readiness that accepted "up" alone let the egress probe run
+// against an adapter with no address: the connect failed in about a
+// millisecond and the journal blamed the node.
+void test_tun_readiness_needs_the_address() {
+  OwnedAdapter bare = tun_row(true, 99, 5);
+  expect(!tun_adapter_ready(bare), "an adapter with no address is not ready");
+
+  OwnedAdapter ready = tun_row(true, 99, 5);
+  ready.ipv4 = kTunIpv4;
+  expect(tun_adapter_ready(ready), "the configured adapter is ready");
+
+  OwnedAdapter other = tun_row(true, 99, 5);
+  other.ipv4 = "169.254.1.1";
+  expect(!tun_adapter_ready(other), "another address is not our adapter");
+
+  OwnedAdapter down = tun_row(false, 99, 5);
+  down.ipv4 = kTunIpv4;
+  expect(!tun_adapter_ready(down), "a down adapter is not ready");
+
+  OwnedAdapter legacy = tun_row(true, 99, 5);
+  legacy.name = "teremokhy2";
+  legacy.ipv4 = kTunIpv4;
+  expect(!tun_adapter_ready(legacy), "the legacy name is cleaned up, never routed");
+
+  OwnedAdapter no_luid = tun_row(true, 0, 5);
+  no_luid.ipv4 = kTunIpv4;
+  expect(!tun_adapter_ready(no_luid), "a zero luid cannot carry a route");
+
+  OwnedAdapter no_index = tun_row(true, 99, 0);
+  no_index.ipv4 = kTunIpv4;
+  expect(!tun_adapter_ready(no_index), "a zero index cannot carry a route");
+}
+
 int main() {
   test_route_policy();
   test_slash_port_connects_and_junk_does_not_launch();
@@ -1369,6 +1414,7 @@ int main() {
   test_ledger_roundtrip();
   test_user_proof_refusal_restores_capture();
   test_classify_tun_wait();
+  test_tun_readiness_needs_the_address();
   test_tun_timeout_log_names_the_adapter();
   test_stderr_after_info_is_not_cut();
   test_sanitizer_covers_every_credential_shape();

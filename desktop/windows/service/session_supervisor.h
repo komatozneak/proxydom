@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "flow_probe.h"
+#include "protocol.h"
 
 // Service-owned TUN session. Win32 is behind the interfaces below so a fake
 // network can prove that Idle is emitted only after a verified restore.
@@ -66,7 +67,18 @@ struct OwnedAdapter {
   std::uint64_t luid = 0;
   unsigned long if_index = 0;
   bool up = false;
+  std::string ipv4;  // empty until the engine has assigned the address
 };
+
+// The engine opens the wintun adapter first and assigns the address afterwards,
+// and Windows reports an address-less adapter as up. A canary route into such
+// an adapter fails immediately, so "up" alone is not ready: wait for the
+// address the engine was told to set. Readiness that ignored this raced the
+// engine and failed the egress probe in about a millisecond.
+inline bool tun_adapter_ready(const OwnedAdapter& adapter) {
+  return adapter.name == kTunName && adapter.up && adapter.luid != 0 &&
+         adapter.if_index != 0 && adapter.ipv4 == kTunIpv4;
+}
 
 struct OwnedRoute {
   std::string destination;

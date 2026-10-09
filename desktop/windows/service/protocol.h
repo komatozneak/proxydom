@@ -16,6 +16,14 @@ constexpr std::uint32_t kFrameMaxBody = 65536;
 // 512 names stay far below kFrameMaxBody and keep every preset plus headroom.
 constexpr std::size_t kMaxDirectDomains = 512;
 
+// The TUN the broker routes into. The engine opens the wintun adapter by this
+// name and assigns the address with a separate netsh process only afterwards,
+// so an adapter that merely exists is not usable yet: Windows reports it up
+// with no unicast address and a route into it fails at once. The config and the
+// readiness check both read these, so the name and the address cannot drift.
+constexpr const char* kTunName = "ProxyDomTun";
+constexpr const char* kTunIpv4 = "198.18.0.1";
+
 struct ShareLine {
   std::string scheme;
   std::string host;

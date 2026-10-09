@@ -291,6 +291,15 @@ bool Win32RouteTable::list_own_adapters(std::vector<OwnedAdapter>& out) {
     owned.luid = adapter->Luid.Value;
     owned.if_index = adapter->IfIndex;
     owned.up = adapter->OperStatus == IfOperStatusUp;
+    for (auto* ua = adapter->FirstUnicastAddress; ua != nullptr; ua = ua->Next) {
+      if (ua->Address.lpSockaddr == nullptr) continue;
+      if (ua->Address.lpSockaddr->sa_family != AF_INET) continue;
+      const auto* sin = reinterpret_cast<const sockaddr_in*>(ua->Address.lpSockaddr);
+      char text[INET_ADDRSTRLEN] = {};
+      if (inet_ntop(AF_INET, &sin->sin_addr, text, sizeof(text)) == nullptr) continue;
+      owned.ipv4 = text;
+      break;
+    }
     out.push_back(owned);
   }
   last_error_ = 0;
@@ -301,7 +310,7 @@ bool Win32RouteTable::find_own_adapter(OwnedAdapter& adapter) {
   std::vector<OwnedAdapter> owned;
   if (!list_own_adapters(owned)) return false;
   for (const auto& item : owned) {
-    if (item.name == "ProxyDomTun" && item.up && item.luid != 0 && item.if_index != 0) {
+    if (tun_adapter_ready(item)) {
       adapter = item;
       return true;
     }

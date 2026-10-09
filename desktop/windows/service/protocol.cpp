@@ -620,7 +620,8 @@ std::string build_engine_config(const ShareLine& line,
          << "\"log_level\":\"info\","
          << "\"probe\":false,"
          << "\"socks_listen\":\"127.0.0.1:10808\","
-         << "\"tun\":{\"name\":\"ProxyDomTun\",\"address\":\"198.18.0.1/30\",\"dns\":\"198.18.0.2\","
+         << "\"tun\":{\"name\":\"" << kTunName << "\",\"address\":\"" << kTunIpv4
+         << "/30\",\"dns\":\"198.18.0.2\","
          << "\"mtu\":1280,\"auto_route\":false},"
          << "\"force_proxy_domains\":[" << json_string_array(force_proxy_domains) << "],"
          << "\"direct_domains\":[" << json_string_array(domains) << "],"

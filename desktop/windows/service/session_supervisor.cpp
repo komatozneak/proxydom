@@ -89,11 +89,7 @@ bool text_says_name_taken(const std::string& text) {
   return lower_copy(text).find("already exists") != std::string::npos;
 }
 
-bool tun_name(const std::string& name) { return name == "ProxyDomTun"; }
-
-bool tun_usable(const OwnedAdapter& adapter) {
-  return tun_name(adapter.name) && adapter.up && adapter.luid != 0 && adapter.if_index != 0;
-}
+bool tun_name(const std::string& name) { return name == kTunName; }
 
 }  // namespace
 
@@ -105,7 +101,10 @@ TunWaitClass classify_tun_wait(const TunWaitView& view) {
   for (const auto& adapter : view.adapters) {
     if (!tun_name(adapter.name)) continue;
     ++named;
-    if (tun_usable(adapter)) ++usable;
+    // One readiness rule, the same one the route table applies. A second copy
+    // here that accepted a bare "up" would report adapter_up for an adapter the
+    // route table had just refused, which is how the egress race stayed hidden.
+    if (tun_adapter_ready(adapter)) ++usable;
     else ++not_up;
   }
   // A second ProxyDomTun, or sing-box saying the name is taken, is not "still down".
@@ -985,6 +984,10 @@ TunnelSnapshot TunnelSupervisor::run_connect(const ConnectRequest& request, Canc
     return finish(TunnelCode::TunInitTimeout, {}, false);
   }
   gate("core", "ok");
+  // Readiness now requires this address, so record it. It is the whole
+  // difference between "the adapter exists" and "the adapter can carry a
+  // route", and the journal had no way to tell the two apart.
+  log_.write(ledger_.generation, "adapter", adapter.ipv4, 0);
   remember([&] {
     ledger_.adapter_known = true;
     ledger_.adapter = adapter;
@@ -1033,12 +1036,21 @@ TunnelSnapshot TunnelSupervisor::run_connect(const ConnectRequest& request, Canc
   const bool canary_ok = routes_.fetch_canary(probe_ip, [&] { return cancel.requested(); });
   if (cancel.requested()) return finish(TunnelCode::None, {}, true);
   if (!canary_ok) {
-    const std::string stderr_text = engine_.output_tail();
-    if (engine_reported_auth_failure(stderr_text)) {
+    const std::string raw_tail = engine_.output_tail();
+    if (engine_reported_auth_failure(raw_tail)) {
       log_.write(ledger_.generation, "egress", "auth_rejected", 0);
       return finish(TunnelCode::AuthRejected, {}, false);
     }
-    log_.write(ledger_.generation, "egress", "timeout", 3500);
+    // The code names the outcome and win32 carries the socket error that
+    // closed the probe. A literal 3500 used to sit in this field, which read
+    // like a measured timeout and hid an immediate refusal. The engine's own
+    // output was read for the auth check and then dropped, so a probe that
+    // failed while the tunnel was still coming up left no trace at all.
+    log_.write(ledger_.generation, "egress", "probe_failed", routes_.last_error());
+    const std::string shown = sanitize_engine_output(raw_tail);
+    if (!shown.empty()) {
+      log_.write(ledger_.generation, "core_output", shown, 0);
+    }
     return finish(TunnelCode::EgressTimeout, {}, false);
   }
   gate("egress", "ok");
