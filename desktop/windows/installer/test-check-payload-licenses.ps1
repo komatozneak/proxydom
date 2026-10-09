@@ -20,7 +20,6 @@ function New-CleanPayload([string]$Name) {
                        "flutter_windows.dll", "rive_native.dll", "wintun.dll")) {
         New-Binary (Join-Path $dir $exe)
     }
-    New-Binary (Join-Path $dir "sing-box.exe") $script:SingBox
     $aot = Join-Path $dir "data/app.so"
     New-Item -ItemType Directory -Force -Path (Split-Path $aot -Parent) | Out-Null
     [System.IO.File]::WriteAllBytes($aot, [byte[]](0x7F, 0x45, 0x4C, 0x46, 0x02))
@@ -32,15 +31,16 @@ function New-CleanPayload([string]$Name) {
 
 $script:SingBox = "Go buildinf: path github.com/sagernet/sing-box/cmd/sing-box"
 $cases = @(
-    @{ Name = "ratchet: entry present and sing-box.exe present"; Want = 0
-       MustContain = "WARNING known payload violation sing-box.exe"
+    @{ Name = "clean payload has no sing-box"; Want = 0
+       MustContain = "Payload license check passed"
        Setup = { param($d) } },
     @{ Name = "ratchet: entry deleted and sing-box.exe present"; Want = 1
        Known = @{}; MustContain = "FAIL sing-box.exe embeds github.com/sagernet/"
-       Setup = { param($d) } },
+       Setup = { param($d) New-Binary (Join-Path $d "sing-box.exe") $script:SingBox } },
     @{ Name = "ratchet: entry present and sing-box.exe absent"; Want = 1
+       Known = @{ "sing-box.exe" = "removed by task 05" }
        MustContain = "sing-box.exe is listed but the binary is not in the payload"
-       Setup = { param($d) Remove-Item (Join-Path $d "sing-box.exe") } },
+       Setup = { param($d) } },
     @{ Name = "sing-box bytes under an allowed name"; Want = 1
        MustContain = "FAIL wintun.dll embeds github.com/sagernet/"
        Setup = { param($d) New-Binary (Join-Path $d "wintun.dll") $script:SingBox } },

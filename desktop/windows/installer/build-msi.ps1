@@ -63,27 +63,9 @@ function Ensure-WixExtension([string]$Name) {
 
 function Ensure-ThirdParty {
     New-Item -ItemType Directory -Force -Path $ThirdParty | Out-Null
-    # sing-box.exe is GPL-3.0. The broker launches proxydom-engine.exe. The
-    # GPL binary stays in the payload until routing, DNS hijack, and the clash
-    # counters exist in that engine (task 05b). Deleting it earlier makes
-    # check-payload-licenses.ps1 fail on a stale KnownViolations entry, and
-    # deleting the entry while the file remains fails the other way. The check
-    # warns while both the entry and the file exist.
-    $sing = Join-Path $ThirdParty "sing-box.exe"
     $wintun = Join-Path $ThirdParty "wintun.dll"
     # The prebuilt-binaries license travels with the DLL it covers.
     $wintunLicense = Join-Path $ThirdParty "wintun-LICENSE.txt"
-    if (-not (Test-Path $sing)) {
-        $zip = Join-Path $ThirdParty "sing-box.zip"
-        $url = "https://github.com/SagerNet/sing-box/releases/download/v1.14.2/sing-box-1.14.2-windows-amd64.zip"
-        Invoke-WebRequest -Uri $url -OutFile $zip
-        $unpack = Join-Path $ThirdParty "sing-box-unpack"
-        if (Test-Path $unpack) { Remove-Item $unpack -Recurse -Force }
-        Expand-Archive -Path $zip -DestinationPath $unpack -Force
-        $found = Get-ChildItem $unpack -Recurse -Filter "sing-box.exe" | Select-Object -First 1
-        if (-not $found) { throw "sing-box.exe was not in the release zip." }
-        Copy-Item $found.FullName $sing -Force
-    }
     if (-not (Test-Path $wintun) -or -not (Test-Path $wintunLicense)) {
         $zip = Join-Path $ThirdParty "wintun.zip"
         Invoke-WebRequest -Uri "https://www.wintun.net/builds/wintun-0.14.1.zip" -OutFile $zip
@@ -181,11 +163,13 @@ Write-Host "Staging payload"
 Get-ChildItem $Payload -Exclude "ProxyDomBroker.exe","ProxyDomCtl.exe" | Remove-Item -Recurse -Force
 Copy-Item (Join-Path $FlutterRelease "*") $Payload -Recurse -Force
 Ensure-ThirdParty
-Copy-Item (Join-Path $ThirdParty "sing-box.exe") $Payload -Force
 Copy-Item (Join-Path $ThirdParty "wintun.dll") $Payload -Force
 Copy-Item (Join-Path $ThirdParty "wintun-LICENSE.txt") $Payload -Force
 Write-Host "Building proxydom-engine.exe"
 $engineDir = Join-Path $Repo "mobile\android\hysteria-bind"
+$prevGOOS = $env:GOOS
+$prevGOARCH = $env:GOARCH
+$prevCGO = $env:CGO_ENABLED
 Push-Location $engineDir
 try {
     $env:GOOS = "windows"
@@ -194,14 +178,13 @@ try {
     Invoke-Native { go build -o (Join-Path $Payload "proxydom-engine.exe") ./cmd/proxydom-engine } "go build proxydom-engine"
 } finally {
     Pop-Location
+    if ($null -eq $prevGOOS) { Remove-Item Env:GOOS -ErrorAction SilentlyContinue } else { $env:GOOS = $prevGOOS }
+    if ($null -eq $prevGOARCH) { Remove-Item Env:GOARCH -ErrorAction SilentlyContinue } else { $env:GOARCH = $prevGOARCH }
+    if ($null -eq $prevCGO) { Remove-Item Env:CGO_ENABLED -ErrorAction SilentlyContinue } else { $env:CGO_ENABLED = $prevCGO }
 }
 # Also inside data\flutter_assets; a copy next to the executables is the one a
 # person finds in Program Files.
 Copy-Item (Join-Path $Mobile "assets\legal\THIRD-PARTY-NOTICES.md") $Payload -Force
-Write-Warning ("This MSI is not for release: it still ships sing-box.exe (GPL-3.0). " +
-    "The broker launches proxydom-engine.exe. sing-box.exe stays until task 05b " +
-    "applies routing, DNS hijack, and clash counters and deletes the GPL binary " +
-    "in the same change. Domain rules in the engine config are recorded and not applied.")
 
 Write-Host "Checking payload licenses"
 $licenseCheck = Join-Path $Installer "check-payload-licenses.ps1"
