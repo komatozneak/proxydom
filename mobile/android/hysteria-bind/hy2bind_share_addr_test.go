@@ -22,15 +22,39 @@ func shareDocWithSocks(port int) string {
 	return string(raw)
 }
 
+// freePort returns a port number nothing is using on both TCP and UDP.
+//
+// Both, because a v2ray-core SOCKS inbound with `udp: true` binds the TCP and
+// the UDP side of the same number, and on Windows those two are not equally
+// available: the OS keeps excluded port ranges (Hyper-V and WinNAT reserve
+// blocks of the ephemeral range), where a bind fails with WSAEACCES rather than
+// "in use". A port that came from a TCP-only probe can therefore be free for TCP
+// and forbidden for UDP, and the core fails to start for a reason that has
+// nothing to do with the test.
+//
+// That is not hypothetical: it is what the first run of the socks dialer tests
+// hit, on a machine with Hyper-V, as
+// `listen udp 127.0.0.1:49632: bind: An attempt was made to access a socket in a
+// way forbidden by its access permissions`.
 func freePort(t *testing.T) int {
 	t.Helper()
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
+	for attempt := 0; attempt < 20; attempt++ {
+		listener, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		port := listener.Addr().(*net.TCPAddr).Port
+		_ = listener.Close()
+
+		udp, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: port})
+		if err != nil {
+			continue
+		}
+		_ = udp.Close()
+		return port
 	}
-	port := listener.Addr().(*net.TCPAddr).Port
-	_ = listener.Close()
-	return port
+	t.Fatal("no port was free on both tcp and udp after 20 attempts")
+	return 0
 }
 
 // ShareSocksAddr is what StartShareTunStack dials, so a core that is running
