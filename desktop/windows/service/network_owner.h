@@ -20,6 +20,7 @@ class Win32RouteTable : public RouteTable {
   bool add_canary(const OwnedAdapter& adapter, const std::string& ip, OwnedRoute& route) override;
   bool delete_canary(const OwnedRoute& route) override;
   bool fetch_canary(const std::string& ip, const std::function<bool()>& cancelled) override;
+  bool lookup_route(const std::string& ip, RouteLookup& out) override;
   bool tun_ready(OwnedAdapter& adapter, std::vector<OwnedRoute>& halves) override;
   bool prove_exit(unsigned long if_index,
                   const std::string& probe_ip,

@@ -142,13 +142,16 @@ func StartTunStack() string {
 }
 
 // reportTunStats keeps saying what the adapter delivers until something
-// arrives, then stops. A silent tunnel is the case worth a journal line.
+// arrives, then stops. It speaks at once and often: the broker gives the
+// canary about a second, and a first line after a one second sleep landed in
+// the journal too late to be read.
 func reportTunStats(stats *tunStats) {
-	for i := 0; i < 30; i++ {
-		time.Sleep(time.Second)
-		log.Printf("%s", stats.summary())
+	log.Printf("%s", stats.summary())
+	for i := 0; i < 120; i++ {
+		time.Sleep(250 * time.Millisecond)
 		if stats.rx.Load() > 0 {
 			return
 		}
+		log.Printf("%s", stats.summary())
 	}
 }

@@ -68,6 +68,22 @@ struct OwnedAdapter {
   unsigned long if_index = 0;
   bool up = false;
   std::string ipv4;  // empty until the engine has assigned the address
+  // Diagnostics. A route into an adapter Windows treats as disconnected is
+  // accepted by the route table and then refused by connect().
+  unsigned long media_state = 0;  // MediaConnectState as reported by the adapter
+  unsigned long dad_state = 0;    // DadState of the first IPv4 address
+};
+
+// Where Windows would actually send a packet. A route row that exists but
+// cannot be used is indistinguishable from no route at all at connect() time,
+// which returns the same host-unreachable either way, so ask the stack instead
+// of inferring from the table we just wrote.
+struct RouteLookup {
+  std::string next_hop;
+  std::string source;
+  std::uint64_t interface_luid = 0;
+  unsigned long interface_index = 0;
+  int prefix_length = 0;
 };
 
 // The engine opens the wintun adapter first and assigns the address afterwards,
@@ -188,6 +204,9 @@ class RouteTable {
   virtual bool delete_canary(const OwnedRoute& route) = 0;
   // Follows the routing table. No IP_UNICAST_IF bind.
   virtual bool fetch_canary(const std::string& ip, const std::function<bool()>& cancelled) = 0;
+  // Which interface the stack picks for this address, and its error when it
+  // picks none. Answers "is the canary route usable" without guessing.
+  virtual bool lookup_route(const std::string& ip, RouteLookup& out) = 0;
   virtual bool tun_ready(OwnedAdapter& adapter, std::vector<OwnedRoute>& halves) = 0;
   virtual bool prove_exit(unsigned long if_index,
                           const std::string& probe_ip,

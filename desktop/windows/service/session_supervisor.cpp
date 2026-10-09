@@ -988,6 +988,14 @@ TunnelSnapshot TunnelSupervisor::run_connect(const ConnectRequest& request, Canc
   // difference between "the adapter exists" and "the adapter can carry a
   // route", and the journal had no way to tell the two apart.
   log_.write(ledger_.generation, "adapter", adapter.ipv4, 0);
+  // Windows accepts a route into an adapter it then refuses to send through,
+  // and reports that as host unreachable, so record what it thinks of the
+  // adapter: MediaConnectState 1 is connected, DadState 4 is preferred.
+  log_.write(ledger_.generation, "adapter_state",
+             "media=" + std::to_string(adapter.media_state) + " dad=" +
+                 std::to_string(adapter.dad_state) + " luid=" + std::to_string(adapter.luid) +
+                 " idx=" + std::to_string(adapter.if_index),
+             0);
   remember([&] {
     ledger_.adapter_known = true;
     ledger_.adapter = adapter;
@@ -1032,6 +1040,21 @@ TunnelSnapshot TunnelSupervisor::run_connect(const ConnectRequest& request, Canc
   }
   remember([&] { ledger_.routes = {canary}; });
 
+  // Ask the stack where it would send the canary before sending it. A route
+  // that sits in the table and cannot be used answers connect() with the same
+  // host-unreachable as no route at all, and the journal could not tell them
+  // apart: this line names the interface Windows picked, or its error.
+  RouteLookup lookup;
+  if (routes_.lookup_route(probe_ip, lookup)) {
+    log_.write(ledger_.generation, "route_lookup",
+               "dest=" + probe_ip + " luid=" + std::to_string(lookup.interface_luid) +
+                   " idx=" + std::to_string(lookup.interface_index) + " prefix=" +
+                   std::to_string(lookup.prefix_length) + " nexthop=" + lookup.next_hop +
+                   " source=" + lookup.source,
+               0);
+  } else {
+    log_.write(ledger_.generation, "route_lookup", "none", routes_.last_error());
+  }
   gate("egress", nullptr);
   const bool canary_ok = routes_.fetch_canary(probe_ip, [&] { return cancel.requested(); });
   if (cancel.requested()) return finish(TunnelCode::None, {}, true);

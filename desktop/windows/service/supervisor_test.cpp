@@ -55,6 +55,8 @@ class FakeRoutes : public RouteTable {
   bool canary_present = false;
   bool fetch_ok = true;
   int fetch_calls = 0;
+  bool lookup_ok = true;
+  int lookup_calls = 0;
   bool cancel_during_fetch = false;
   unsigned long hardware_index = 18;
   CancelFlag* cancel = nullptr;
@@ -153,6 +155,16 @@ class FakeRoutes : public RouteTable {
     if (cancel_during_fetch && cancel != nullptr) cancel->request();
     if (cancelled && cancelled()) return false;
     return fetch_ok;
+  }
+  bool lookup_route(const std::string&, RouteLookup& out) override {
+    ++lookup_calls;
+    if (!lookup_ok) return false;
+    out.interface_luid = 99;
+    out.interface_index = 5;
+    out.prefix_length = 32;
+    out.next_hop = "0.0.0.0";
+    out.source = "198.18.0.1";
+    return true;
   }
   bool install_capture(const OwnedAdapter& adapter, std::vector<OwnedRoute>& routes) override {
     ++capture_calls;
@@ -1001,6 +1013,37 @@ void test_sanitizer_recent_keeps_the_failure_reason() {
          "redaction runs before the recent cut too");
 }
 
+// The route lookup is a diagnostic. It runs before the probe and must never
+// become a gate: a stack that cannot answer still gets the canary, because the
+// probe's own error is what decides the session.
+void test_route_lookup_is_diagnostic_only() {
+  // The lookup line carries several fields, so it is matched by part, not whole.
+  const auto first_with = [](const FakeLog& log, const std::string& event, const std::string& part) {
+    for (int i = 0; i < static_cast<int>(log.lines.size()); ++i) {
+      const auto& line = log.lines[static_cast<std::size_t>(i)];
+      if (line.event == event && line.code.find(part) != std::string::npos) return i;
+    }
+    return -1;
+  };
+
+  Harness answered;
+  const auto connected = answered.connect();
+  expect(connected.phase == TunnelPhase::Connected, "the lookup does not break a healthy connect");
+  expect(answered.routes.lookup_calls == 1, "the route lookup runs once per attempt");
+  const int lookup = first_with(answered.log, "route_lookup", "dest=");
+  const int gate = first_with(answered.log, "gate", "egress");
+  expect(lookup >= 0 && gate > lookup, "the lookup is recorded before the egress gate");
+  expect(first_with(answered.log, "route_lookup", "idx=5") >= 0,
+         "the journal names the interface the stack picked");
+
+  Harness blind;
+  blind.routes.lookup_ok = false;
+  const auto still = blind.connect();
+  expect(still.phase == TunnelPhase::Connected, "a failed lookup does not stop the tunnel");
+  expect(blind.routes.fetch_calls == 1, "the canary still runs when the lookup cannot answer");
+  expect(first_with(blind.log, "route_lookup", "none") >= 0, "a failed lookup is recorded as none");
+}
+
 void test_resolve_and_route_table_failures() {
   Harness names;
   names.names.fail = true;
@@ -1448,6 +1491,7 @@ int main() {
   test_stderr_after_info_is_not_cut();
   test_sanitizer_covers_every_credential_shape();
   test_sanitizer_recent_keeps_the_failure_reason();
+  test_route_lookup_is_diagnostic_only();
   test_resolve_and_route_table_failures();
   test_flow_counters_record_the_outbound();
   test_connections_body_parses();
