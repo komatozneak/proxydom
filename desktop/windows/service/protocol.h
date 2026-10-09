@@ -85,8 +85,11 @@ bool domain_allowed(const std::string& host);
 
 // [server_ip] is the IPv4 pinned before the adapter comes up. Empty rejects.
 // Domain lists, [udp_direct], and the clash api port are recorded in the
-// document. This engine build does not apply them: routing_applied and
-// dns_hijack are false, and a non-zero api port is logged as not applied.
+// document, and routing_applied/dns_hijack are written as what the engine will
+// do. Only the hysteria2 body carries the split lists and only the hy2 dialer
+// hijacks DNS, so a vless line is written with both flags false and without the
+// lists: the share document cannot honour them, and a true flag there made the
+// engine's status line claim routing that never happened.
 std::string build_engine_config(const ShareLine& line,
                                 const std::string& server_ip,
                                 const std::vector<std::string>& domains,

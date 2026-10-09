@@ -662,9 +662,14 @@ std::string build_engine_config(const ShareLine& line,
   const std::string outbound = engine_outbound(line, server_ip);
   if (outbound.empty()) return {};
 
-  // Domain lists are recorded in the order the sites screen already uses:
-  // force-proxy names, then exclusions, then the UDP flag. The engine applies
-  // them: force-proxy wins over a direct suffix and over UDP bypass.
+  // routing_applied and dns_hijack describe what the engine will do, so they
+  // are written only for the scheme that does it. Only the hysteria2 body
+  // carries the split lists, and only the hy2 dialer hijacks DNS: the share
+  // document holds neither, and its dialer sends every destination verbatim.
+  // Writing them for a vless line made the engine's status line report
+  // routing_applied=true dns_hijack=true for a session where neither happened.
+  const bool applies_split = line.scheme == "hysteria2";
+
   // auto_route stays false: C++ installs the capture routes.
   std::ostringstream config;
   config << "{"
@@ -673,13 +678,18 @@ std::string build_engine_config(const ShareLine& line,
          << "\"socks_listen\":\"127.0.0.1:10808\","
          << "\"tun\":{\"name\":\"" << kTunName << "\",\"address\":\"" << kTunIpv4
          << "/30\",\"dns\":\"198.18.0.2\","
-         << "\"mtu\":1280,\"auto_route\":false},"
-         << "\"force_proxy_domains\":[" << json_string_array(force_proxy_domains) << "],"
-         << "\"direct_domains\":[" << json_string_array(domains) << "],"
-         << "\"udp_direct\":" << (udp_direct ? "true" : "false") << ","
-         << "\"dns_hijack\":true,"
-         << "\"routing_applied\":true,"
-         << "\"api_port\":" << api_port << ","
+         << "\"mtu\":1280,\"auto_route\":false}";
+  if (applies_split) {
+    // Recorded in the order the sites screen already uses: force-proxy names,
+    // then exclusions, then the UDP flag. The engine applies them: force-proxy
+    // wins over a direct suffix and over UDP bypass.
+    config << ",\"force_proxy_domains\":[" << json_string_array(force_proxy_domains) << "]"
+           << ",\"direct_domains\":[" << json_string_array(domains) << "]"
+           << ",\"udp_direct\":" << (udp_direct ? "true" : "false");
+  }
+  config << ",\"dns_hijack\":" << (applies_split ? "true" : "false")
+         << ",\"routing_applied\":" << (applies_split ? "true" : "false")
+         << ",\"api_port\":" << api_port << ","
          << "\"api_secret\":\"" << json_escape(api_secret) << "\","
          << "\"outbound\":" << outbound << "}";
   return config.str();

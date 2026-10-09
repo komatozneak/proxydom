@@ -141,8 +141,8 @@ int main() {
   expect(config.find("\"routing_applied\":true") != std::string::npos, "routing is applied");
   expect(config.find("\"dns_hijack\":true") != std::string::npos, "dns hijack is applied");
 
-  // The lists are still in the document, in the order the sites screen uses.
-  // This build of the engine does not apply them.
+  // The lists reach the document in the order the sites screen uses, and the
+  // engine applies them: force-proxy wins over a direct suffix and over UDP.
   const auto udp_config =
       build_engine_config(line, "203.0.113.10", {"steamserver.net"}, {"youtube.com"}, true, 0, "");
   expect(udp_config.find("\"udp_direct\":true") != std::string::npos, "udp bypass flag is recorded");
@@ -208,6 +208,28 @@ int main() {
          "the link's own fingerprint word is carried through");
   expect(vless_config.find("\"type\":\"vless\"") != std::string::npos, "vless is named so the engine knows which core to start");
   expect(vless_config.find("\"security\":\"reality\"") != std::string::npos, "reality is described, then refused by the core that lacks it");
+
+  // The flags say what the engine will do. The share document carries neither
+  // the split lists nor a DNS hijack, so a vless line must not be written as if
+  // it did: the engine echoes these into its status line, and a true flag there
+  // claimed routing on a session that dialled every destination verbatim.
+  const auto vless_split =
+      build_engine_config(vless, "203.0.113.11", {"lan.example"}, {"youtube.com"}, true, 0, "");
+  expect(vless_split.find("\"routing_applied\":false") != std::string::npos,
+         "vless does not claim routing was applied");
+  expect(vless_split.find("\"dns_hijack\":false") != std::string::npos,
+         "vless does not claim a dns hijack");
+  expect(vless_split.find("\"routing_applied\":true") == std::string::npos,
+         "vless never claims routing was applied");
+  expect(vless_split.find("youtube.com") == std::string::npos,
+         "the force-proxy list does not reach a document that ignores it");
+  expect(vless_split.find("lan.example") == std::string::npos,
+         "the exclusion list does not reach a document that ignores it");
+  expect(vless_split.find("\"udp_direct\":true") == std::string::npos,
+         "vless does not carry the udp bypass flag");
+  // The same call for hysteria2 still claims what that engine applies.
+  expect(config.find("\"routing_applied\":true") != std::string::npos,
+         "hysteria2 still claims the routing it applies");
 
   // A WebSocket VLESS line is the shape subscriptions hand out. Dropping
   // path/host/alpn left the engine with a line it could not describe, and it

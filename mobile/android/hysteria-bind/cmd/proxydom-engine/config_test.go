@@ -138,6 +138,55 @@ func TestVLESSBuildsKCPSeed(t *testing.T) {
 	}
 }
 
+// The status line is the journal's record of what the engine did. The broker
+// used to write routing_applied and dns_hijack as true for every scheme, and
+// the tun always carries a dns address, so a vless session was journalled as
+// routed and dns-hijacked while its document held neither the split lists nor a
+// hijack. This document is deliberately the old broker's shape: the engine is
+// the last place that can refuse to repeat a claim the line cannot honour.
+func TestVLESSStatusDoesNotClaimRouting(t *testing.T) {
+	cfg, err := parseEngineConfig([]byte(`{
+		"socks_listen":"127.0.0.1:18099",
+		"tun":{"name":"ProxyDomTun","address":"198.18.0.1/30","dns":"198.18.0.2","mtu":1280,"auto_route":false},
+		"force_proxy_domains":["youtube.com"],
+		"direct_domains":["lan.example"],
+		"udp_direct":true,
+		"dns_hijack":true,
+		"routing_applied":true,
+		"outbound":{"type":"vless","server":"203.0.113.11","server_port":443,"uuid":"11111111-2222-3333-4444-555555555555","sni":"cdn.example","network":"ws","path":"/ray","security":"tls"}
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	line := cfg.statusLine()
+	if !strings.Contains(line, "scheme=vless") {
+		t.Fatalf("status line does not name the scheme: %s", line)
+	}
+	if strings.Contains(line, "routing_applied=true") {
+		t.Fatalf("vless was journalled as routed: %s", line)
+	}
+	if strings.Contains(line, "dns_hijack=true") {
+		t.Fatalf("vless was journalled as dns-hijacked: %s", line)
+	}
+	// The same document for hysteria2 does apply them, and must keep saying so.
+	hy2, err := parseEngineConfig([]byte(`{
+		"socks_listen":"127.0.0.1:18099",
+		"tun":{"name":"ProxyDomTun","address":"198.18.0.1/30","dns":"198.18.0.2","mtu":1280,"auto_route":false},
+		"force_proxy_domains":["youtube.com"],
+		"direct_domains":["lan.example"],
+		"dns_hijack":true,
+		"routing_applied":true,
+		"outbound":{"type":"hysteria2","server":"203.0.113.10","server_port":443,"password":"p","sni":"cdn.example"}
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	hy2Line := hy2.statusLine()
+	if !strings.Contains(hy2Line, "routing_applied=true") || !strings.Contains(hy2Line, "dns_hijack=true") {
+		t.Fatalf("hysteria2 stopped reporting the routing it applies: %s", hy2Line)
+	}
+}
+
 func TestVLESSTransportIsRefusedBeforeTheCoreStarts(t *testing.T) {
 	for _, network := range []string{"grpc", "xhttp", "quic", "httpupgrade"} {
 		cfg, err := parseEngineConfig([]byte(`{"outbound":{"type":"vless","server":"203.0.113.11","server_port":443,"uuid":"u","network":"` + network + `"}}`))

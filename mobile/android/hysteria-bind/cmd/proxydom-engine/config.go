@@ -324,12 +324,21 @@ func (c engineConfig) statusLine() string {
 	if c.APIPort != 0 {
 		clash = "applied"
 	}
+	// routing_applied and dns_hijack name what the engine did, not what the
+	// document asked for. Only the hysteria2 path applies the split lists and
+	// hijacks DNS; the share document carries neither, and its dialer sends
+	// every destination verbatim. The tun's dns address is not evidence on its
+	// own: the broker sends it for both schemes.
+	appliesSplit := false
+	if kind, ok := c.kind(); ok && kind == engineHy2 {
+		appliesSplit = true
+	}
 	dns := "false"
-	if c.DNSHijack || (c.Tun != nil && c.Tun.DNS != "" && !c.Probe) {
+	if appliesSplit && (c.DNSHijack || (c.Tun != nil && c.Tun.DNS != "" && !c.Probe)) {
 		dns = "true"
 	}
 	routing := "false"
-	if c.RoutingApplied || len(c.DirectDomains) > 0 || len(c.ForceProxyDomains) > 0 || c.UDPDirect {
+	if appliesSplit && (c.RoutingApplied || len(c.DirectDomains) > 0 || len(c.ForceProxyDomains) > 0 || c.UDPDirect) {
 		routing = "true"
 	}
 	return fmt.Sprintf(
