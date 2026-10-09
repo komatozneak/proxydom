@@ -298,8 +298,14 @@ class FakeEngine : public EngineHost {
 class FakeNames : public NameResolver {
  public:
   bool fail = false;
+  // The server host resolves first and the probe host second, so failing every
+  // call can never reach the probe path. fail_on_call names the call to fail.
+  int calls = 0;
+  int fail_on_call = 0;
   bool resolve_ipv4(const std::string& host, std::string& ip) override {
+    ++calls;
     if (fail) return false;
+    if (fail_on_call != 0 && calls == fail_on_call) return false;
     ip = host == "cp.cloudflare.com" ? "1.1.1.1" : "203.0.113.10";
     return true;
   }
@@ -1081,6 +1087,21 @@ void test_route_lookup_is_diagnostic_only() {
   expect(log_first_with(moved.log, "gate", "egress") >= 0, "the probe still runs after the repair");
 }
 
+// The probe resolve used to end the session without a word from the engine, so
+// a lookup that never entered the tun and one that entered and went nowhere
+// looked identical. The counters name which, and dst= names where they went.
+void test_probe_resolve_failure_shows_the_engine_counters() {
+  Harness h;
+  h.names.fail_on_call = 2;
+  h.engine.tail = "tun rx=4 tx=0 dst=198.18.0.2";
+  const auto snap = h.connect();
+  expect(snap.code == TunnelCode::ResolveFailed, "the probe resolve is the one that failed");
+  expect(log_first_with(h.log, "core_output", "tun rx=4") >= 0,
+         "a failed lookup still shows what the engine counted");
+  expect(log_first_with(h.log, "core_output", "dst=198.18.0.2") >= 0,
+         "the counters name where the packets were addressed");
+}
+
 // The fix itself. Windows publishes the address before it can carry traffic, so
 // a session that probes the moment the address appears fails on every node with
 // egress_timeout. Here the address stays tentative for 1.5 s and the session has
@@ -1587,6 +1608,7 @@ int main() {
   test_sanitizer_covers_every_credential_shape();
   test_sanitizer_recent_keeps_the_failure_reason();
   test_route_lookup_is_diagnostic_only();
+  test_probe_resolve_failure_shows_the_engine_counters();
   test_connect_waits_for_a_preferred_address();
   test_resolve_and_route_table_failures();
   test_flow_counters_record_the_outbound();

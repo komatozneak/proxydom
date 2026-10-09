@@ -1053,7 +1053,15 @@ TunnelSnapshot TunnelSupervisor::run_connect(const ConnectRequest& request, Canc
   if (stop_requested(ConnectStep::Pinned, cancel)) return finish(TunnelCode::None, {}, true);
 
   gate("resolve", nullptr);
-  if (!names_.resolve_ipv4("cp.cloudflare.com", probe_ip)) return finish(TunnelCode::ResolveFailed, {}, false);
+  if (!names_.resolve_ipv4("cp.cloudflare.com", probe_ip)) {
+    // The engine's own counters are the only way to tell "the query never
+    // entered the tun" from "it entered and went nowhere", and this path used
+    // to end without them. dst= names where the packets were addressed.
+    const std::string raw_tail = engine_.output_tail();
+    const std::string shown = sanitize_engine_output_recent(raw_tail, 256);
+    if (!shown.empty()) log_.write(ledger_.generation, "core_output", shown, 0);
+    return finish(TunnelCode::ResolveFailed, {}, false);
+  }
   gate("resolve", "ok");
   OwnedRoute canary;
   if (!routes_.add_canary(adapter, probe_ip, canary)) {

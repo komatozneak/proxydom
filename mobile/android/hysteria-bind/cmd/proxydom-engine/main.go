@@ -76,7 +76,7 @@ func startTUN(cfg engineConfig) error {
 	if msg := hy2bind.OpenNamedTun(cfg.Tun.Name, cfg.Tun.MTU); msg != "" {
 		return fmt.Errorf("%s", msg)
 	}
-	if err := assignTunIPv4(cfg.Tun.Name, cfg.Tun.Address, cfg.Tun.DNS); err != nil {
+	if err := assignTunIPv4(cfg.Tun.Name, cfg.Tun.Address); err != nil {
 		hy2bind.StopTun()
 		return err
 	}
@@ -88,20 +88,25 @@ func startTUN(cfg engineConfig) error {
 }
 
 // assignTunIPv4 sets the address the broker already expects. It does not add
-// routes: C++ owns install_capture. DNS is recorded on the adapter and is not
-// hijacked.
-func assignTunIPv4(name, cidr, dns string) error {
+// routes: C++ owns install_capture.
+//
+// It deliberately does not advertise the config's dns address as a resolver on
+// the adapter. This process hijacks DNS that arrives through the tun and
+// forwards it, but it is not a DNS server, and pointing Windows at an address
+// nothing answers on makes every lookup wait out a timeout. Measured on the
+// owner's machine: the broker's resolve gate failed after eight seconds once
+// the address became Preferred, while the same gate had passed instantly
+// moments before, when the adapter still had no usable address and Windows was
+// still using the physical resolver. Leaving the adapter alone keeps that
+// resolver: before capture its queries go out directly, and afterwards they
+// enter the tun and the hijack forwards them, so nothing is lost.
+func assignTunIPv4(name, cidr string) error {
 	ip, mask, err := splitCIDR(cidr)
 	if err != nil {
 		return fmt.Errorf("win32=%d", 87)
 	}
 	if msg, err := netsh("interface", "ipv4", "set", "address", "name="+name, "source=static", "addr="+ip, "mask="+mask); err != nil {
 		return fmt.Errorf("netsh address: %s", msg)
-	}
-	if dns != "" {
-		if msg, err := netsh("interface", "ipv4", "set", "dnsservers", "name="+name, "source=static", "addr="+dns, "register=none"); err != nil {
-			return fmt.Errorf("netsh dns: %s", msg)
-		}
 	}
 	return nil
 }
