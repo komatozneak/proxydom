@@ -288,12 +288,13 @@ void Win32Engine::stop_owned_processes() {
   }
   PROCESSENTRY32W entry{};
   entry.dwSize = sizeof(entry);
+  // The image name is the file we were given, not a hardcoded sing-box.exe.
+  // A sweep that still looks for the old name would leave this process up.
+  // Hoisted out of the loop: it does not change per entry.
+  const std::wstring image_name = exe_file_name(impl_->exe);
   if (Process32FirstW(snap, &entry)) {
     do {
-      // The image name is the file we were given, not a hardcoded sing-box.exe.
-      // A sweep that still looks for the old name would leave this process up.
-      const std::wstring image = exe_file_name(impl_->exe);
-      if (image.empty() || _wcsicmp(entry.szExeFile, image.c_str()) != 0) continue;
+      if (image_name.empty() || _wcsicmp(entry.szExeFile, image_name.c_str()) != 0) continue;
       HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_TERMINATE | SYNCHRONIZE,
                                    FALSE, entry.th32ProcessID);
       if (process == nullptr) continue;
