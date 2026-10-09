@@ -17,8 +17,11 @@
 //   share_config probe <server_ip> <listen_port> <uri>
 //   share_config full  <server_ip> <api_port>    <uri>
 //
-// `probe` is what the broker uses to prove the node answers before it touches
-// the route table: loopback SOCKS only, no TUN. `full` is the session config.
+// `probe` is not what the broker runs. It starts the engine with probe:true, so
+// there is no TUN and no adapter, and that is exactly what makes the C++ -> engine
+// seam testable without elevation. The broker proves the node answers with the
+// egress canary instead, on the full session document (`full` below); see
+// docs/ops/engine-migration/08-windows-vless-dial.md.
 int main(int argc, char** argv) {
   if (argc != 5) {
     std::cerr << "usage: share_config <probe|full> <server_ip> <port> <uri>\n";

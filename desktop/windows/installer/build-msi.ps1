@@ -1,7 +1,13 @@
 # Visible per-machine MSI for Прокси Дом (ADR 023 / ADR 029).
 # Humans get the Russian WiX wizard. Pass -Quiet only for CI.
+#
+# -Version is mandatory on purpose. It used to carry a literal default, the
+# literal went stale, and a build went out with the wrong version stamped into
+# the MSI and its file name. A required parameter cannot go stale; the caller
+# states the version every time, and there is no second place holding one.
 param(
-    [string]$Version = "1.0.7.0",
+    [Parameter(Mandatory = $true)]
+    [string]$Version,
     [switch]$Quiet
 )
 

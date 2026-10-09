@@ -2,5 +2,9 @@
 *.exe
 *.pdb
 *.ilk
-build/
-build-release/
+# CMake build trees. They are called build, build-release, build-engine-05a and so
+# on, one per experiment, and each holds hundreds of files and megabytes of
+# objects. None of it is source, so the pattern is deliberately wide: a new
+# directory name must not become untracked noise that `git status` reports as
+# project content.
+build*/
