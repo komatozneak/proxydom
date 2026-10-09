@@ -224,4 +224,75 @@ void main() {
         ((decoded['outbounds'] as List).first as Map)['streamSettings'] as Map;
     expect((stream['wsSettings'] as Map)['headers'], {'Host': 'cdn.example'});
   });
+
+  // Share links are hand-written and generator-written, so `type=WS` and
+  // `security=TLS` reach the parser as often as the lowercase forms. The C++
+  // broker and the Go loader both fold case before their own checks, and the
+  // `headerType` rule here always did; comparing the raw word made this the one
+  // side that refused, and it refused on every platform at once — a node the
+  // engine can dial shown as unsupported.
+  test('transport and security names are matched case-insensitively', () {
+    Map<String, Object?> streamOf(String raw) {
+      final json = buildShareSocksConfig(parseShareLink(raw));
+      expect(json, isNotNull, reason: '$raw must build');
+      final decoded = jsonDecode(json!) as Map<String, dynamic>;
+      final outbound = (decoded['outbounds'] as List).first as Map;
+      return outbound['streamSettings'] as Map<String, Object?>;
+    }
+
+    String link({String? type, String? security}) =>
+        'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
+        '?sni=a.example'
+        '${type == null ? '' : '&type=$type'}'
+        '${security == null ? '' : '&security=$security'}#C';
+
+    // Folded, and the document carries the folded word: the core's own names
+    // are lowercase, so passing `WS` through would be a second bug.
+    for (final written in const ['ws', 'WS', 'Ws', 'wS']) {
+      expect(
+        streamOf(link(type: written, security: 'tls'))['network'],
+        'ws',
+        reason: 'type=$written must fold to ws',
+      );
+    }
+    for (final written in const ['tls', 'TLS', 'Tls']) {
+      final stream = streamOf(link(security: written));
+      expect(stream['security'], 'tls', reason: 'security=$written must fold');
+      expect(stream.containsKey('tlsSettings'), isTrue);
+    }
+    for (final written in const ['none', 'NONE', 'None']) {
+      final stream = streamOf(link(security: written));
+      expect(stream['security'], 'none', reason: 'security=$written must fold');
+      expect(
+        stream.containsKey('tlsSettings'),
+        isFalse,
+        reason: 'security=$written must not ask for TLS',
+      );
+    }
+    // `mkcp` is folded before the alias table is consulted, so the alias still
+    // applies; `MKCP` is the same word written loudly.
+    for (final written in const ['mkcp', 'MKCP', 'kcp', 'KCP']) {
+      expect(
+        streamOf(link(type: written, security: 'tls'))['network'],
+        'kcp',
+        reason: 'type=$written must fold to kcp',
+      );
+    }
+    // Refusals stay refusals however they are capitalised: folding must not
+    // widen the allowlist.
+    for (final written in const ['GRPC', 'Grpc', 'XHTTP', 'QUIC']) {
+      expect(
+        buildShareSocksConfig(parseShareLink(link(type: written, security: 'tls'))),
+        isNull,
+        reason: 'type=$written must stay refused',
+      );
+    }
+    for (final written in const ['REALITY', 'Reality', 'XTLS', 'Xtls']) {
+      expect(
+        buildShareSocksConfig(parseShareLink(link(security: written))),
+        isNull,
+        reason: 'security=$written must stay refused',
+      );
+    }
+  });
 }

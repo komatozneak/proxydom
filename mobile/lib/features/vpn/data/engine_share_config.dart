@@ -243,12 +243,21 @@ Map<String, Object?>? _stream(
   required String security,
   required String sni,
 }) {
-  final normalized = switch (network) {
+  // Share links are written by hand and by many generators, so `type=WS` and
+  // `security=TLS` arrive here as often as the lowercase forms. Every other
+  // reader folds case before comparing: the C++ broker through `lower_copy`,
+  // the Go loader through `strings.ToLower`, and the `headerType` check a few
+  // lines below. Comparing the raw word here made this the only side that
+  // refused, and it refused on every platform at once — a node the engine can
+  // dial shown as unsupported, which is the least useful answer available.
+  final folded = network.trim().toLowerCase();
+  final normalized = switch (folded) {
     '' => 'tcp',
     'mkcp' => 'kcp',
-    _ => network,
+    _ => folded,
   };
-  final scheme = security.isEmpty ? 'none' : security;
+  final foldedSecurity = security.trim().toLowerCase();
+  final scheme = foldedSecurity.isEmpty ? 'none' : foldedSecurity;
   // Allowlists, not a blacklist: the loader's own sets are the authority, so a
   // transport or security it would reject must stay "not describable" here.
   if (!_engineTransports.contains(normalized)) return null;
