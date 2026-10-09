@@ -7,6 +7,10 @@ add_executable(protocol_test protocol_test.cpp protocol.cpp)
 add_executable(supervisor_test supervisor_test.cpp session_supervisor.cpp protocol.cpp log_sanitizer.cpp
                flow_probe.cpp)
 
+# Portable, read-only. Prints the config the broker would give the engine for one
+# share line, so the C++ parser and the Go process can be run against each other.
+add_executable(share_config share_config.cpp protocol.cpp)
+
 if (WIN32)
   add_executable(ProxyDomBroker
     service.cpp
@@ -49,4 +53,5 @@ endif()
 if (MSVC)
   target_compile_options(protocol_test PRIVATE /utf-8)
   target_compile_options(supervisor_test PRIVATE /utf-8)
+  target_compile_options(share_config PRIVATE /utf-8)
 endif()
