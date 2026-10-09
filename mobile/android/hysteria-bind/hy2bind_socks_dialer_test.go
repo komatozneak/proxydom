@@ -79,6 +79,40 @@ func startUDPEcho(t *testing.T) string {
 	return conn.LocalAddr().String()
 }
 
+// testProtector stands in for the Kotlin side, which calls SetProtector with
+// VpnService.protect.
+type testProtector struct{}
+
+func (testProtector) Protect(int) bool { return true }
+
+// withTestProtector installs a protector for the length of one test.
+//
+// It is not a convenience. StartShare replaces the core's system dialer with
+// the platform one (`registerEngineProtector` -> `UseAlternativeSystemDialer`),
+// and on everything except Windows that dialer refuses every connection while
+// no protector is installed:
+//
+//	func engineOutboundDial(...) { ... if p == nil || !p.Protect(int(fd)) {
+//	    protectErr = errors.New("protect failed") ... } }
+//
+// The core's SOCKS inbound is a listener, so it accepts without one -- and the
+// failure then appears one step later as an EOF on read or a UDP timeout, with
+// nothing naming the cause. That is exactly what this test hit in CI, on Linux,
+// where the whole package had passed before: the TCP case died with EOF and the
+// UDP case with an i/o timeout.
+//
+// Note that this covers UDP as well as TCP. `internet.DialSystem` is the only
+// dial entry point the core has, and it goes through the same alternative
+// dialer for both networks, so a missing protector takes both down.
+func withTestProtector(t *testing.T) {
+	t.Helper()
+	mu.Lock()
+	previous := protector
+	mu.Unlock()
+	SetProtector(testProtector{})
+	t.Cleanup(func() { SetProtector(previous) })
+}
+
 // startCapturingSocks answers the SOCKS5 greeting and then hands the raw
 // CONNECT request to the channel, so a test can assert the bytes rather than
 // infer them from what happened afterwards.
@@ -163,6 +197,7 @@ func TestTheSocksDialerCarriesTcpThroughTheRealCore(t *testing.T) {
 	echo := startTCPEcho(t, "echo")
 	port := freePort(t)
 	t.Cleanup(func() { Stop() })
+	withTestProtector(t)
 
 	if msg := StartShare(shareDocWithSocks(port)); msg != "" {
 		t.Fatalf("the core did not start: %s", msg)
@@ -191,6 +226,13 @@ func TestTheSocksDialerCarriesTcpThroughTheRealCore(t *testing.T) {
 	// answering -- not a local buffer, and not the SOCKS handshake itself.
 	if want := "echo:hello-through-socks"; string(got[:n]) != want {
 		t.Fatalf("read %q, want %q", got[:n], want)
+	}
+	// And the dial that carried it went through the platform dialer with a
+	// protector, which is the precondition this whole test rests on. On Windows
+	// the protector is not consulted and this stays empty either way; on Android
+	// and on the Linux runner it is the line that says why a failure happened.
+	if got := LastProtectError(); got != "" {
+		t.Fatalf("the core's outbound dial was not protected: %s", got)
 	}
 }
 
@@ -278,6 +320,7 @@ func TestTheSocksDialerCarriesUdpAndStripsTheHeader(t *testing.T) {
 	echo := startUDPEcho(t)
 	port := freePort(t)
 	t.Cleanup(func() { Stop() })
+	withTestProtector(t)
 
 	if msg := StartShare(shareDocWithSocks(port)); msg != "" {
 		t.Fatalf("the core did not start: %s", msg)
@@ -314,6 +357,7 @@ func TestClosingTheUdpAssociateReleasesBothSockets(t *testing.T) {
 	echo := startUDPEcho(t)
 	port := freePort(t)
 	t.Cleanup(func() { Stop() })
+	withTestProtector(t)
 
 	if msg := StartShare(shareDocWithSocks(port)); msg != "" {
 		t.Fatalf("the core did not start: %s", msg)
