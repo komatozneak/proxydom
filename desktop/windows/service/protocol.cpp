@@ -484,6 +484,15 @@ bool parse_share_line(const std::string& raw, ShareLine& out, std::string& error
     out.short_id = query_value(query, "sid");
     out.fingerprint = query_value(query, "fp");
     if (out.fingerprint.empty()) out.fingerprint = "chrome";
+    // The same defaults the Dart builder uses, so one link cannot be described
+    // two ways depending on which side of the process boundary reads it.
+    out.network = lower_copy(query_value(query, "type"));
+    if (out.network.empty()) out.network = lower_copy(query_value(query, "net"));
+    if (out.network.empty()) out.network = "tcp";
+    out.path = query_value(query, "path");
+    out.ws_host = query_value(query, "host");
+    out.alpn = query_value(query, "alpn");
+    if (out.security.empty()) out.security = "tls";
     if (out.security == "reality" && out.public_key.empty()) {
       error = "reality";
       return false;
@@ -553,8 +562,10 @@ std::string json_string_array(const std::vector<std::string>& values) {
   return out.str();
 }
 
-// Outbound object for proxydom-engine. VLESS is described and then refused by
-// the process (`error transport`); it is not rewritten as a TCP dial.
+// Outbound object for proxydom-engine. VLESS is carried by the in-process
+// v2ray-core; a transport or security that core does not have is described
+// here and refused by the process (`error transport` / `error security`), not
+// rewritten as a TCP dial.
 std::string engine_outbound(const ShareLine& line, const std::string& server_ip) {
   if (server_ip.empty() || server_ip.find(':') != std::string::npos) return {};
   std::ostringstream outbound;
@@ -577,9 +588,16 @@ std::string engine_outbound(const ShareLine& line, const std::string& server_ip)
              << ",\"uuid\":\"" << json_escape(line.uuid) << "\"";
     if (!line.flow.empty()) outbound << ",\"flow\":\"" << json_escape(line.flow) << "\"";
     outbound << ",\"sni\":\"" << json_escape(line.sni) << "\",\"insecure\":" << (line.insecure ? "true" : "false")
-             << ",\"fingerprint\":\"" << json_escape(line.fingerprint) << "\"";
+             << ",\"fingerprint\":\"" << json_escape(line.fingerprint) << "\""
+             << ",\"security\":\"" << json_escape(line.security) << "\""
+             << ",\"network\":\"" << json_escape(line.network) << "\"";
+    // Without these a vless:// over WebSocket cannot be described at all, and
+    // the row that needs them is exactly the one subscriptions hand out.
+    if (!line.path.empty()) outbound << ",\"path\":\"" << json_escape(line.path) << "\"";
+    if (!line.ws_host.empty()) outbound << ",\"host\":\"" << json_escape(line.ws_host) << "\"";
+    if (!line.alpn.empty()) outbound << ",\"alpn\":\"" << json_escape(line.alpn) << "\"";
     if (line.security == "reality") {
-      outbound << ",\"security\":\"reality\",\"public_key\":\"" << json_escape(line.public_key) << "\",\"short_id\":\""
+      outbound << ",\"public_key\":\"" << json_escape(line.public_key) << "\",\"short_id\":\""
                << json_escape(line.short_id) << "\"";
     }
     outbound << "}";

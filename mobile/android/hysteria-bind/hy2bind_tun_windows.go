@@ -104,8 +104,8 @@ func OpenNamedTun(name string, mtu int) string {
 	if tunDev != nil {
 		return "tun already open"
 	}
-	if hyClient == nil {
-		return "hy2 not started"
+	if hyClient == nil && !shareRunning() {
+		return "engine not started"
 	}
 	dev, err := tun.Open(name, uint32(mtu))
 	if err != nil {
@@ -132,6 +132,37 @@ func StartTunStack() string {
 	}
 	stats := &tunStats{}
 	tunnel.T().SetProxy(&hyDialer{c: hyClient})
+	st, err := createTunStack(&countedEndpoint{LinkEndpoint: tunDev, stats: stats})
+	if err != nil {
+		return fmt.Sprintf("tun stack: %v", err)
+	}
+	tunStk = st
+	go reportTunStats(stats)
+	return ""
+}
+
+// StartShareTunStack is StartTunStack for the VLESS core: the same gVisor
+// stack on the same adapter, with the core's local SOCKS inbound as the proxy
+// instead of the Hy2 client.
+//
+// Everything that made the order matter for Hy2 applies unchanged. The read
+// loop cannot survive a proxy swap and Attach is sync.Once, so SetProxy has to
+// be in place before createTunStack.
+func StartShareTunStack() string {
+	mu.Lock()
+	defer mu.Unlock()
+	if tunStk != nil {
+		return "tun already running"
+	}
+	if tunDev == nil {
+		return "tun not open"
+	}
+	addr := ShareSocksAddr()
+	if addr == "" {
+		return "share core not started"
+	}
+	stats := &tunStats{}
+	tunnel.T().SetProxy(&socksDialer{addr: addr})
 	st, err := createTunStack(&countedEndpoint{LinkEndpoint: tunDev, stats: stats})
 	if err != nil {
 		return fmt.Sprintf("tun stack: %v", err)

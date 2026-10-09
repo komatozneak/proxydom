@@ -39,6 +39,16 @@ struct ShareLine {
   std::string public_key;
   std::string short_id;
   std::string fingerprint;
+  // Transport of a VLESS line. Reality, gRPC and XHTTP have nowhere to go in
+  // the engine that carries VLESS, so a line that needs them is refused by
+  // name rather than rewritten as plain TCP.
+  //
+  // ws_host is the Host header, not the server address above: a WebSocket line
+  // routinely carries a different name there than it dials.
+  std::string network;
+  std::string path;
+  std::string ws_host;
+  std::string alpn;
   int port = 443;
   bool insecure = false;
 };

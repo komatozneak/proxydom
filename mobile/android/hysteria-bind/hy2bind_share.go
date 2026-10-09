@@ -3,6 +3,7 @@ package hy2bind
 import (
 	"context"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -10,7 +11,6 @@ import (
 	"strconv"
 	"sync"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	v2core "github.com/v2fly/v2ray-core/v5"
@@ -22,13 +22,49 @@ import (
 	"github.com/xjasonlyu/tun2socks/v2/tunnel"
 )
 
-// shareSocks is the local VLESS-core SOCKS inbound. Hy2 keeps :10808.
+// shareSocks is the default local VLESS-core SOCKS inbound. Hy2 keeps :10808.
+// The document carries the real port; this is only the fallback.
 const shareSocks = "127.0.0.1:10809"
 
 var (
 	shareMu   sync.Mutex
 	shareInst *v2core.Instance
+	shareAddr atomic.Value // string
 )
+
+// shareListenAddr reads the local SOCKS address out of the document, so the
+// tunnel is pointed at the port the core was actually told to listen on rather
+// than at a constant that can drift away from it.
+func shareListenAddr(configJSON string) string {
+	var doc struct {
+		Inbounds []struct {
+			Listen string `json:"listen"`
+			Port   int    `json:"port"`
+		} `json:"inbounds"`
+	}
+	if err := json.Unmarshal([]byte(configJSON), &doc); err != nil || len(doc.Inbounds) == 0 {
+		return shareSocks
+	}
+	in := doc.Inbounds[0]
+	if in.Port <= 0 {
+		return shareSocks
+	}
+	host := in.Listen
+	if host == "" {
+		host = "127.0.0.1"
+	}
+	return net.JoinHostPort(host, strconv.Itoa(in.Port))
+}
+
+// ShareSocksAddr is where the running VLESS core accepts SOCKS. Empty when the
+// core is not running.
+func ShareSocksAddr() string {
+	if !shareRunning() {
+		return ""
+	}
+	addr, _ := shareAddr.Load().(string)
+	return addr
+}
 
 // StartShare runs v2ray-core inside this gomobile runtime.
 // A second gomobile runtime deadlocks on Pixel, so this is not a separate AAR.
@@ -40,6 +76,7 @@ func StartShare(configJSON string) string {
 	prepareCoreLog(configJSON)
 	registerEngineProtector()
 	lastProtectErr.Store("")
+	shareAddr.Store(shareListenAddr(configJSON))
 	cfg, err := loadShareConfig(configJSON)
 	if err != nil {
 		return fmt.Sprintf("engine: %v", err)
@@ -98,9 +135,9 @@ func registerEngineProtector() {
 	})
 }
 
-// protectedSystemDialer owns the socket: protect(fd) then connect.
-// A failed protect returns an error. The fd is not closed inside Control,
-// because the core has not handed the socket to connect yet.
+// protectedSystemDialer owns the socket the core dials its node on. What
+// "owning" means is per platform, so the body lives in hy2bind_protect_*.go:
+// Android protects the fd, Windows binds it to the physical NIC.
 type protectedSystemDialer struct{}
 
 func (protectedSystemDialer) Dial(
@@ -109,28 +146,7 @@ func (protectedSystemDialer) Dial(
 	dest vnet.Destination,
 	_ *internet.SocketConfig,
 ) (net.Conn, error) {
-	dialer := &net.Dialer{
-		Timeout: 8 * time.Second,
-		Control: func(network, address string, c syscall.RawConn) error {
-			var protectErr error
-			ctrlErr := c.Control(func(fd uintptr) {
-				mu.Lock()
-				p := protector
-				mu.Unlock()
-				if p == nil || !p.Protect(int(fd)) {
-					protectErr = errors.New("protect failed")
-					lastProtectErr.Store("protect failed")
-					return
-				}
-				lastProtectErr.Store("")
-			})
-			if ctrlErr != nil {
-				return ctrlErr
-			}
-			return protectErr
-		},
-	}
-	return dialer.DialContext(ctx, dest.Network.SystemString(), dest.NetAddr())
+	return engineOutboundDial(ctx, dest.Network.SystemString(), dest.NetAddr())
 }
 
 // StartShareTun pumps VpnService TUN to the local share SOCKS inbound.
@@ -156,7 +172,7 @@ func StartShareTun(fd int, mtu int) string {
 		closeTunFd(fd)
 		return fmt.Sprintf("tun fd: %v", err)
 	}
-	tunnel.T().SetProxy(&socksDialer{addr: shareSocks})
+	tunnel.T().SetProxy(&socksDialer{addr: ShareSocksAddr()})
 	st, err := createTunStack(dev)
 	if err != nil {
 		dev.Close()

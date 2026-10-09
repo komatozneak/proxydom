@@ -52,16 +52,128 @@ func TestHy2StartOmitsThePasswordFromTheStatusLine(t *testing.T) {
 	}
 }
 
-func TestVLESSIsTransportNotTCP(t *testing.T) {
-	cfg, err := parseEngineConfig([]byte(`{"outbound":{"type":"vless","server":"203.0.113.11","server_port":443,"uuid":"11111111-2222-3333-4444-555555555555"}}`))
+// VLESS used to be refused by name. The Windows broker carries it now, so the
+// contract is the opposite: a dialable line is accepted and the document is
+// built, and only what this core cannot carry is refused.
+func TestVLESSBuildsAShareDocument(t *testing.T) {
+	cfg, err := parseEngineConfig([]byte(`{"socks_listen":"127.0.0.1:18099","outbound":{"type":"vless","server":"203.0.113.11","server_port":443,"uuid":"11111111-2222-3333-4444-555555555555","sni":"cdn.example","network":"ws","path":"/ray","host":"cdn.example","alpn":"h2,http/1.1","security":"tls","fingerprint":"chrome"}}`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !cfg.rejectTransport() {
-		t.Fatal("vless was accepted")
+	if cfg.rejectTransport() {
+		t.Fatal("vless was refused")
 	}
-	if _, err := cfg.hy2StartJSON(); err == nil || !strings.Contains(err.Error(), "error transport") {
-		t.Fatalf("err = %v", err)
+	if refusal := cfg.shareRefusal(); refusal != "" {
+		t.Fatalf("a dialable line was refused as %q", refusal)
+	}
+	doc, err := cfg.vlessStartJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(doc)
+	for _, want := range []string{
+		`"protocol":"vless"`,
+		`"network":"ws"`,
+		`"security":"tls"`,
+		`"path":"/ray"`,
+		`"Host":"cdn.example"`,
+		`"h2"`,
+		`"http/1.1"`,
+		`"serverName":"cdn.example"`,
+		`"fingerprint":"chrome"`,
+		`"11111111-2222-3333-4444-555555555555"`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("document missing %s: %s", want, text)
+		}
+	}
+	// The core listens where the broker told it to, not on a constant.
+	if !strings.Contains(text, `"port":18099`) {
+		t.Fatalf("document ignored socks_listen: %s", text)
+	}
+	line := cfg.statusLine()
+	if !strings.Contains(line, "scheme=vless") || !strings.Contains(line, "transport=ws") {
+		t.Fatalf("status line: %s", line)
+	}
+	if strings.Contains(line, "11111111-2222-3333-4444-555555555555") {
+		t.Fatalf("status line leaked the uuid: %s", line)
+	}
+}
+
+// A transport the core cannot dial is refused before a core is started, so the
+// person is told which part of the line is unsupported instead of watching a
+// timeout and blaming their network.
+func TestVLESSTransportIsRefusedBeforeTheCoreStarts(t *testing.T) {
+	for _, network := range []string{"grpc", "xhttp", "quic", "httpupgrade"} {
+		cfg, err := parseEngineConfig([]byte(`{"outbound":{"type":"vless","server":"203.0.113.11","server_port":443,"uuid":"u","network":"` + network + `"}}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := cfg.shareRefusal(); got != "transport" {
+			t.Fatalf("%s: refusal = %q, want transport", network, got)
+		}
+	}
+}
+
+// Reality arrived with xray-core, which is GPL and is not linked (ADR 036).
+func TestVLESSRealityIsRefused(t *testing.T) {
+	cfg, err := parseEngineConfig([]byte(`{"outbound":{"type":"vless","server":"203.0.113.11","server_port":443,"uuid":"u","security":"reality","public_key":"k"}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := cfg.shareRefusal(); got != "security" {
+		t.Fatalf("refusal = %q, want security", got)
+	}
+}
+
+func TestVLESSSaysNothingMeansTCPOverTLS(t *testing.T) {
+	cfg, err := parseEngineConfig([]byte(`{"outbound":{"type":"vless","server":"203.0.113.11","server_port":443,"uuid":"u"}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Outbound.networkName() != "tcp" || cfg.Outbound.securityName() != "tls" {
+		t.Fatalf("defaults = %s/%s", cfg.Outbound.networkName(), cfg.Outbound.securityName())
+	}
+	doc, err := cfg.vlessStartJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(doc), `"tlsSettings"`) {
+		t.Fatalf("a line that says nothing must still get TLS: %s", doc)
+	}
+}
+
+func TestVLESSNeedsAUUID(t *testing.T) {
+	cfg, err := parseEngineConfig([]byte(`{"outbound":{"type":"vless","server":"203.0.113.11","server_port":443}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := cfg.vlessStartJSON(); err == nil {
+		t.Fatal("a vless line without a uuid was accepted")
+	}
+}
+
+// The two cores have separate starters. Handing one the other's document would
+// start nothing and report success.
+func TestHy2StartRefusesAVLESSDocument(t *testing.T) {
+	cfg, err := parseEngineConfig([]byte(`{"outbound":{"type":"vless","server":"203.0.113.11","server_port":443,"uuid":"u"}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := cfg.hy2StartJSON(); err == nil {
+		t.Fatal("a vless outbound was handed to the hy2 starter")
+	}
+}
+
+func TestOtherSchemesAreStillRefused(t *testing.T) {
+	for _, kind := range []string{"vmess", "trojan", "ss", "shadowsocks", ""} {
+		cfg, err := parseEngineConfig([]byte(`{"outbound":{"type":"` + kind + `","server":"203.0.113.11","server_port":443}}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !cfg.rejectTransport() {
+			t.Fatalf("%q was accepted", kind)
+		}
 	}
 }
 

@@ -300,6 +300,29 @@ func engineTransport(network string) (string, error) {
 	}
 }
 
+// TransportDialable reports whether the in-process core can dial [network].
+//
+// It is the same table shareStreamConfig uses, exported so the Windows engine
+// can refuse a transport before it starts a core that cannot carry it. Two
+// copies of that list would drift, and the one that drifted would be the one
+// telling the user why their line does not work.
+func TransportDialable(network string) bool {
+	_, err := engineTransport(network)
+	return err == nil
+}
+
+// SecurityDialable reports whether the in-process core can negotiate
+// [security]. Reality is not in this core: it arrived with xray-core, which is
+// GPL and is not linked (ADR 036).
+func SecurityDialable(security string) bool {
+	switch strings.ToLower(strings.TrimSpace(security)) {
+	case "", "none", "tls":
+		return true
+	default:
+		return false
+	}
+}
+
 func shareStreamConfig(stream *shareStream) (*internet.StreamConfig, error) {
 	network, err := engineTransport(stream.Network)
 	if err != nil {

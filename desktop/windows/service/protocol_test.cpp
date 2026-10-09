@@ -201,7 +201,39 @@ int main() {
   expect(vless_config.find("\"public_key\":\"pub\"") != std::string::npos, "reality public key");
   expect(vless_config.find("private_key") == std::string::npos, "no server private key");
   expect(vless_config.find("xtls-rprx-vision") != std::string::npos, "flow");
-  expect(vless_config.find("\"type\":\"vless\"") != std::string::npos, "vless stays named so the engine can refuse it");
+  expect(vless_config.find("\"type\":\"vless\"") != std::string::npos, "vless is named so the engine knows which core to start");
+  expect(vless_config.find("\"security\":\"reality\"") != std::string::npos, "reality is described, then refused by the core that lacks it");
+
+  // A WebSocket VLESS line is the shape subscriptions hand out. Dropping
+  // path/host/alpn left the engine with a line it could not describe, and it
+  // refused the whole line as if the transport itself were unsupported.
+  ShareLine ws;
+  error.clear();
+  const std::string ws_uri =
+      "vless://11111111-2222-3333-4444-555555555555@edge.example:443"
+      "?security=tls&type=ws&path=%2Fray&host=cdn.example&alpn=h2,http%2F1.1&sni=cdn.example";
+  expect(parse_share_line(ws_uri, ws, error), "parse a websocket vless line");
+  expect(ws.network == "ws", "network is read");
+  expect(ws.path == "/ray", "path is decoded");
+  expect(ws.ws_host == "cdn.example", "host header is read");
+  expect(ws.alpn == "h2,http/1.1", "the alpn list survives");
+  const auto ws_config = build_engine_config(ws, "203.0.113.11", {}, {}, false, 0, "");
+  expect(ws_config.find("\"network\":\"ws\"") != std::string::npos, "transport reaches the engine");
+  expect(ws_config.find("\"path\":\"/ray\"") != std::string::npos, "path reaches the engine");
+  expect(ws_config.find("\"host\":\"cdn.example\"") != std::string::npos, "host reaches the engine");
+  expect(ws_config.find("\"alpn\":\"h2,http/1.1\"") != std::string::npos, "alpn reaches the engine");
+
+  // A line that says nothing means tcp over tls, and the two sides of the
+  // process boundary have to agree on that or they describe one link two ways.
+  ShareLine bare;
+  error.clear();
+  expect(parse_share_line("vless://11111111-2222-3333-4444-555555555555@edge.example:443", bare, error),
+         "parse a bare vless line");
+  expect(bare.network == "tcp", "a bare vless line is tcp");
+  expect(bare.security == "tls", "a bare vless line is tls");
+  const auto bare_config = build_engine_config(bare, "203.0.113.11", {}, {}, false, 0, "");
+  expect(bare_config.find("\"network\":\"tcp\"") != std::string::npos, "the default transport is written out");
+  expect(bare_config.find("\"security\":\"tls\"") != std::string::npos, "the default security is written out");
 
   const auto restored = state_event_v2(7, "idle", "", "", true);
   expect(restored.find("\"cleanup_verified\":true") != std::string::npos, "verified idle flag");

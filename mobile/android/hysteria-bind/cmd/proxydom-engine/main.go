@@ -40,19 +40,44 @@ func main() {
 		log.Printf("error transport")
 		os.Exit(1)
 	}
-	start, err := cfg.hy2StartJSON()
-	if err != nil {
-		log.Printf("hy2 start failed")
-		os.Exit(1)
-	}
-	if msg := hy2bind.Start(string(start)); msg != "" {
-		// The core's error can echo the auth string. The broker log must not.
-		if strings.Contains(msg, cfg.Outbound.Password) || cfg.Outbound.Password == "" {
-			log.Printf("hy2 start failed")
-		} else {
-			log.Printf("hy2 start failed: %s", msg)
+	kind, _ := cfg.kind()
+	if kind == engineVless {
+		if refusal := cfg.shareRefusal(); refusal != "" {
+			// Same mechanism, and deliberately before a core is started: the
+			// person is told which part of their line is unsupported instead of
+			// watching it time out.
+			log.Printf("error %s", refusal)
+			os.Exit(1)
 		}
-		os.Exit(1)
+		start, err := cfg.vlessStartJSON()
+		if err != nil {
+			log.Printf("vless start failed")
+			os.Exit(1)
+		}
+		if msg := hy2bind.StartShare(string(start)); msg != "" {
+			// The core's error can echo the uuid. The broker log must not.
+			if strings.Contains(msg, cfg.Outbound.UUID) || cfg.Outbound.UUID == "" {
+				log.Printf("vless start failed")
+			} else {
+				log.Printf("vless start failed: %s", msg)
+			}
+			os.Exit(1)
+		}
+	} else {
+		start, err := cfg.hy2StartJSON()
+		if err != nil {
+			log.Printf("hy2 start failed")
+			os.Exit(1)
+		}
+		if msg := hy2bind.Start(string(start)); msg != "" {
+			// The core's error can echo the auth string. The broker log must not.
+			if strings.Contains(msg, cfg.Outbound.Password) || cfg.Outbound.Password == "" {
+				log.Printf("hy2 start failed")
+			} else {
+				log.Printf("hy2 start failed: %s", msg)
+			}
+			os.Exit(1)
+		}
 	}
 	log.Printf("%s", cfg.statusLine())
 	if !cfg.Probe {
@@ -80,7 +105,17 @@ func startTUN(cfg engineConfig) error {
 		hy2bind.StopTun()
 		return err
 	}
-	if msg := hy2bind.StartTunStack(); msg != "" {
+	// The stack is bound to whichever core is running. The order is the same
+	// for both and for the same reason: SetProxy has to be in place before the
+	// read loop starts, because neither survives a proxy swap.
+	kind, _ := cfg.kind()
+	msg := ""
+	if kind == engineVless {
+		msg = hy2bind.StartShareTunStack()
+	} else {
+		msg = hy2bind.StartTunStack()
+	}
+	if msg != "" {
 		hy2bind.StopTun()
 		return fmt.Errorf("%s", msg)
 	}

@@ -67,7 +67,7 @@ func bindCoreLogHandler() {
 }
 
 func noteShareCore() {
-	appendCoreLine("info", "core.vless dns=system socks="+shareSocks)
+	appendCoreLine("info", "core.vless dns=system socks="+ShareSocksAddr())
 	appendCoreLine("info", "core.vless started version="+v2core.Version())
 }
 
