@@ -1002,6 +1002,11 @@ class ProxyDomVpnService : VpnService() {
                 insecure = params["hysteriaInsecure"] == true,
                 obfs = (params["hysteriaObfs"] as? String).orEmpty(),
                 obfsPassword = (params["hysteriaObfsPassword"] as? String).orEmpty(),
+                congestion = (params["hysteriaCongestion"] as? String).orEmpty(),
+                bbrProfile = (params["hysteriaBbrProfile"] as? String).orEmpty(),
+                maxIdleTimeout = (params["hysteriaMaxIdleTimeout"] as? String).orEmpty(),
+                keepAlivePeriod = (params["hysteriaKeepAlivePeriod"] as? String).orEmpty(),
+                declared = (params["hysteriaFmDeclared"] as? String).orEmpty(),
             )) {
             NativeLog.w(TAG, "proveHysteriaSocks: start failed ${hy.lastErrorMessage}")
             return false
@@ -1299,6 +1304,11 @@ class ProxyDomVpnService : VpnService() {
                 insecure = params["hysteriaInsecure"] == true,
                 obfs = (params["hysteriaObfs"] as? String).orEmpty(),
                 obfsPassword = (params["hysteriaObfsPassword"] as? String).orEmpty(),
+                congestion = (params["hysteriaCongestion"] as? String).orEmpty(),
+                bbrProfile = (params["hysteriaBbrProfile"] as? String).orEmpty(),
+                maxIdleTimeout = (params["hysteriaMaxIdleTimeout"] as? String).orEmpty(),
+                keepAlivePeriod = (params["hysteriaKeepAlivePeriod"] as? String).orEmpty(),
+                declared = (params["hysteriaFmDeclared"] as? String).orEmpty(),
             )) {
             failStart(hy.lastErrorMessage ?: "Hysteria start failed")
             return

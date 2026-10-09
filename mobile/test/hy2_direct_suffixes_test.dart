@@ -76,6 +76,51 @@ void main() {
     expect(suffixes, isNot(contains('tiktok.com')));
   });
 
+  test('fm timer keys ride in start params and an empty profile omits them',
+      () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    SharedPreferences.setMockInitialValues({});
+    final plain = jsonDecode(
+      await VpnController.instance.buildStartParamsJson(_hy2Config()),
+    ) as Map<String, dynamic>;
+    expect(plain, isNot(contains('hysteriaCongestion')));
+    expect(plain, isNot(contains('hysteriaMaxIdleTimeout')));
+    expect(plain, isNot(contains('hysteriaKeepAlivePeriod')));
+    expect(plain, isNot(contains('hysteriaFmDeclared')));
+    expect(plain, isNot(contains('hysteriaBandwidthUp')));
+
+    final declared = jsonDecode(
+      await VpnController.instance.buildStartParamsJson(
+        _hy2Config(
+          congestion: 'brutal',
+          bbrProfile: 'aggressive',
+          maxIdleTimeout: '20',
+          keepAlivePeriod: '10',
+          fmDeclared: 'quicParams.maxIdleTimeout,quicParams.brutalUp',
+        ),
+      ),
+    ) as Map<String, dynamic>;
+    expect(declared['hysteriaCongestion'], 'brutal');
+    expect(declared['hysteriaBbrProfile'], 'aggressive');
+    expect(declared['hysteriaMaxIdleTimeout'], '20');
+    expect(declared['hysteriaKeepAlivePeriod'], '10');
+    expect(
+      declared['hysteriaFmDeclared'],
+      'quicParams.maxIdleTimeout,quicParams.brutalUp',
+    );
+    expect(declared['hysteriaFmDeclared'], isNot(contains('2000')));
+    expect(declared, isNot(contains('hysteriaBandwidthUp')));
+
+    final started = await _captureStartParams(
+      () => VpnController.instance.startHysteria(
+        _hy2Config(maxIdleTimeout: '1', congestion: 'brutal').hysteriaProfile!,
+      ),
+    );
+    expect(started['hysteriaMaxIdleTimeout'], '1');
+    expect(started['hysteriaCongestion'], 'brutal');
+    expect(started, isNot(contains('hysteriaBandwidthUp')));
+  });
+
   test('Android params keep hyDialer suffixes and Apps bypass', () async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     SharedPreferences.setMockInitialValues({});
@@ -201,7 +246,13 @@ Future<Map<String, dynamic>> _captureStartParams(
   return jsonDecode(captured!) as Map<String, dynamic>;
 }
 
-VpnConfig _hy2Config() {
+VpnConfig _hy2Config({
+  String congestion = '',
+  String bbrProfile = '',
+  String maxIdleTimeout = '',
+  String keepAlivePeriod = '',
+  String fmDeclared = '',
+}) {
   return VpnConfig.fromJson({
     'username': 'test_user',
     'links': const <String>[],
@@ -215,6 +266,11 @@ VpnConfig _hy2Config() {
       'username': 'user',
       'sni': 'hy2.example',
       'socks_listen': '127.0.0.1:10808',
+      if (congestion.isNotEmpty) 'congestion': congestion,
+      if (bbrProfile.isNotEmpty) 'bbr_profile': bbrProfile,
+      if (maxIdleTimeout.isNotEmpty) 'max_idle_timeout': maxIdleTimeout,
+      if (keepAlivePeriod.isNotEmpty) 'keep_alive_period': keepAlivePeriod,
+      if (fmDeclared.isNotEmpty) 'fm_declared': fmDeclared,
     },
   });
 }

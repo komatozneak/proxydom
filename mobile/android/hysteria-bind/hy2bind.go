@@ -43,6 +43,14 @@ type startConfig struct {
 	DNSAddress           string   `json:"dns_address"`
 	APIPort              int      `json:"api_port"`
 	APISecret            string   `json:"api_secret"`
+	Congestion           string   `json:"congestion"`
+	BBRProfile           string   `json:"bbr_profile"`
+	MaxIdleTimeout       string   `json:"max_idle_timeout"`
+	KeepAlivePeriod      string   `json:"keep_alive_period"`
+	// Declared lists fm field names that were present. Values stay out: a
+	// quicParams blob can carry a secret-shaped string, and the log only
+	// needs to show which knobs the link asked for.
+	Declared string `json:"declared"`
 }
 
 type protectedFactory struct{}

@@ -80,7 +80,8 @@ class VpnConfig {
       return host == null ? const [] : [host];
     }
     return [
-      for (final candidate in engineProfile?.candidates ?? const <EngineCandidate>[])
+      for (final candidate
+          in engineProfile?.candidates ?? const <EngineCandidate>[])
         if (candidate.host.isNotEmpty && candidate.host != 'unknown')
           candidate.host,
     ];
@@ -169,9 +170,8 @@ class VpnConfig {
         engineProfile: null,
         trusttunnelProfile: tt,
         hysteriaProfile: null,
-        nodeHost: (nodeHost != null && nodeHost.isNotEmpty)
-            ? nodeHost
-            : tt.hostname,
+        nodeHost:
+            (nodeHost != null && nodeHost.isNotEmpty) ? nodeHost : tt.hostname,
       );
     }
 
@@ -230,7 +230,8 @@ class VpnConfig {
         if (engineProfile != null) 'xray_profile': engineProfile!.toJson(),
         if (trusttunnelProfile != null)
           'trusttunnel_profile': trusttunnelProfile!.toJson(),
-        if (hysteriaProfile != null) 'hysteria_profile': hysteriaProfile!.toJson(),
+        if (hysteriaProfile != null)
+          'hysteria_profile': hysteriaProfile!.toJson(),
         if (nodeHost != null) 'node_host': nodeHost,
       };
 
@@ -543,6 +544,11 @@ class HysteriaProfile {
     required this.socksListen,
     this.bandwidthUp,
     this.bandwidthDown,
+    this.congestion = '',
+    this.bbrProfile = '',
+    this.maxIdleTimeout = '',
+    this.keepAlivePeriod = '',
+    this.fmDeclared = '',
     this.insecure = false,
     this.obfs = '',
     this.obfsPassword = '',
@@ -557,6 +563,20 @@ class HysteriaProfile {
   final String socksListen;
   final String? bandwidthUp;
   final String? bandwidthDown;
+
+  /// Controller name as written (`brutal`, `bbr`, `reno`). hy2bind decides
+  /// what the engine is allowed to receive.
+  final String congestion;
+
+  /// BBR profile as written. Empty when the link did not name one.
+  final String bbrProfile;
+
+  /// QUIC timers in seconds, as declared. hy2bind clamps them.
+  final String maxIdleTimeout;
+  final String keepAlivePeriod;
+
+  /// Names of `fm` fields that were present. Not their values.
+  final String fmDeclared;
 
   /// Skip TLS verification. Share links set this with `insecure=1`.
   final bool insecure;
@@ -587,6 +607,11 @@ class HysteriaProfile {
       socksListen: json['socks_listen'] as String? ?? '127.0.0.1:10808',
       bandwidthUp: json['bandwidth_up'] as String?,
       bandwidthDown: json['bandwidth_down'] as String?,
+      congestion: json['congestion'] as String? ?? '',
+      bbrProfile: json['bbr_profile'] as String? ?? '',
+      maxIdleTimeout: json['max_idle_timeout'] as String? ?? '',
+      keepAlivePeriod: json['keep_alive_period'] as String? ?? '',
+      fmDeclared: json['fm_declared'] as String? ?? '',
       insecure: json['insecure'] == true,
       obfs: json['obfs'] as String? ?? '',
       obfsPassword: json['obfs_password'] as String? ?? '',
@@ -603,6 +628,11 @@ class HysteriaProfile {
         'socks_listen': socksListen,
         if (bandwidthUp != null) 'bandwidth_up': bandwidthUp,
         if (bandwidthDown != null) 'bandwidth_down': bandwidthDown,
+        if (congestion.isNotEmpty) 'congestion': congestion,
+        if (bbrProfile.isNotEmpty) 'bbr_profile': bbrProfile,
+        if (maxIdleTimeout.isNotEmpty) 'max_idle_timeout': maxIdleTimeout,
+        if (keepAlivePeriod.isNotEmpty) 'keep_alive_period': keepAlivePeriod,
+        if (fmDeclared.isNotEmpty) 'fm_declared': fmDeclared,
         if (insecure) 'insecure': true,
         if (obfs.isNotEmpty) 'obfs': obfs,
         if (obfsPassword.isNotEmpty) 'obfs_password': obfsPassword,

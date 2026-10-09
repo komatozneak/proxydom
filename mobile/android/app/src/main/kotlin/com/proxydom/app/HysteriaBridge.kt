@@ -66,6 +66,11 @@ class HysteriaBridge private constructor() {
         insecure: Boolean = false,
         obfs: String = "",
         obfsPassword: String = "",
+        congestion: String = "",
+        bbrProfile: String = "",
+        maxIdleTimeout: String = "",
+        keepAlivePeriod: String = "",
+        declared: String = "",
     ): Boolean {
         val svc = vpnService
         if (svc == null) {
@@ -80,6 +85,17 @@ class HysteriaBridge private constructor() {
         if (insecure) obj.put("insecure", true)
         if (obfs.isNotBlank()) obj.put("obfs", obfs)
         if (obfsPassword.isNotEmpty()) obj.put("obfs_password", obfsPassword)
+        // As written. hy2bind clamps timers and refuses to forward a congestion
+        // mode the engine would reject (hy2bind_quic_timers.go, hy2bind_congestion.go).
+        if (congestion.isNotBlank()) obj.put("congestion", congestion.trim())
+        if (bbrProfile.isNotBlank()) obj.put("bbr_profile", bbrProfile.trim())
+        if (maxIdleTimeout.isNotBlank()) {
+            obj.put("max_idle_timeout", maxIdleTimeout.trim())
+        }
+        if (keepAlivePeriod.isNotBlank()) {
+            obj.put("keep_alive_period", keepAlivePeriod.trim())
+        }
+        if (declared.isNotBlank()) obj.put("declared", declared.trim())
         val suffixes = org.json.JSONArray()
         for (raw in directDomainSuffixes) {
             val s = raw.trim().lowercase()

@@ -177,7 +177,21 @@ func buildClientConfig(cfg startConfig) (*client.Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &client.Config{
+	congestionType, bbrProfile, congestionWarnings := congestionConfigFor(cfg)
+	maxIdleTimeout, keepAlivePeriod, timerWarnings := quicConfigFor(cfg)
+	for _, w := range append(congestionWarnings, timerWarnings...) {
+		log.Printf("hy2bind %s", w)
+	}
+	// Always report what reached the engine.
+	//
+	// Without this, a node that declares nothing and a node whose fm parsed
+	// look identical: a warning is printed only when a declared value was
+	// rewritten. declared= names the fields that were present, not their
+	// values, so the line cannot carry a password or a bandwidth figure.
+	log.Printf("%s", formatHy2ConfigLog(
+		congestionType, bbrProfile, maxIdleTimeout, keepAlivePeriod, cfg.Declared,
+	))
+	out := &client.Config{
 		ConnFactory: factory,
 		ServerAddr:  udpAddr,
 		Auth:        cfg.Auth,
@@ -185,10 +199,38 @@ func buildClientConfig(cfg startConfig) (*client.Config, error) {
 			ServerName:         cfg.SNI,
 			InsecureSkipVerify: cfg.Insecure,
 		},
+		// Zero keeps the engine default (30s / 10s). Anything out of range was
+		// clamped by quicConfigFor, since an out-of-range value is fatal.
+		QUICConfig: client.QUICConfig{
+			MaxIdleTimeout:  maxIdleTimeout,
+			KeepAlivePeriod: keepAlivePeriod,
+		},
 		// Official TUN clients set this: TCP() returns before the server
 		// confirms the dest, saving one RTT on every YouTube/page socket.
 		FastOpen: true,
-	}, nil
+	}
+	// An empty declaration leaves CongestionConfig at zero. NormalizeType("")
+	// is already bbr, and a catalog link has no fm to apply.
+	if congestionType != "" || bbrProfile != "" {
+		out.CongestionConfig = client.CongestionConfig{
+			Type:       congestionType,
+			BBRProfile: bbrProfile,
+		}
+	}
+	return out, nil
+}
+
+// formatHy2ConfigLog is the one line that answers what the engine received.
+// declared is field names only.
+func formatHy2ConfigLog(
+	congestionType, bbrProfile string,
+	idle, keepAlive time.Duration,
+	declared string,
+) string {
+	return fmt.Sprintf(
+		"hy2bind config congestion=%s bbr_profile=%q idle=%s keepalive=%s declared=%s",
+		congestionType, bbrProfile, idle, keepAlive, declared,
+	)
 }
 
 func newReconnectableFromConfig(cfg startConfig) (client.Client, error) {

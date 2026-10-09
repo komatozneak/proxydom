@@ -41,13 +41,15 @@ ParsedHy2Link parseHy2Link(String raw) {
       colon < 0 ? '' : Uri.decodeComponent(userInfo.substring(colon + 1));
   final auth = password.isEmpty ? username : '$username:$password';
   final port = uri.hasPort ? uri.port : 443;
+  final query = uri.queryParameters;
   // Official URI scheme: omitted sni means the TLS name is the host.
-  final queriedSni = (uri.queryParameters['sni'] ?? '').trim();
+  final queriedSni = (_queryValue(query, 'sni') ?? '').trim();
   final sni = queriedSni.isEmpty ? host : queriedSni;
-  final insecure = uri.queryParameters['insecure'] == '1' ||
-      uri.queryParameters['allowInsecure'] == '1';
-  final obfs = (uri.queryParameters['obfs'] ?? '').trim();
-  final obfsPassword = uri.queryParameters['obfs-password'] ?? '';
+  final insecure = _queryValue(query, 'insecure') == '1' ||
+      _queryValue(query, 'allowInsecure') == '1';
+  final obfs = (_queryValue(query, 'obfs') ?? '').trim();
+  final obfsPassword = _queryValue(query, 'obfs-password') ?? '';
+  final quic = hy2QuicFromQuery(query);
   final title = shareServerTitle(decodedShareFragment(text), host);
   return ParsedHy2Link(
     name: title,
@@ -62,9 +64,190 @@ ParsedHy2Link parseHy2Link(String raw) {
       insecure: insecure,
       obfs: obfs,
       obfsPassword: obfsPassword,
+      congestion: quic.congestion,
+      bbrProfile: quic.bbrProfile,
+      maxIdleTimeout: quic.maxIdleTimeout,
+      keepAlivePeriod: quic.keepAlivePeriod,
+      fmDeclared: quic.declared,
     ),
   );
 }
+
+/// Congestion name and QUIC timers a link declares, as written.
+///
+/// Values are forwarded verbatim. `hy2bind` clamps the timers and narrows the
+/// controller (`hy2bind_quic_timers.go`, `hy2bind_congestion.go`), because an
+/// out-of-range timer or an unknown controller is a fatal ConfigError in
+/// core/v2. Bandwidth figures inside `fm` are named in [Hy2QuicDecl.declared]
+/// and are not copied onto the profile.
+///
+/// Nested `quicParams` wins over a flat query key. `keepAlivePeriode22` is the
+/// provider's typo, and it is the key their fleet ships.
+Hy2QuicDecl hy2QuicFromQuery(Map<String, String> q) {
+  final fm = _fmQuicParams(_queryValue(q, 'fm'));
+  final values = fm?.values ?? const <String, String>{};
+  return Hy2QuicDecl(
+    congestion: _firstDeclared([
+          values['congestion'],
+          _queryValue(q, 'congestion'),
+        ]) ??
+        '',
+    bbrProfile: _firstDeclared([
+          values['bbrprofile'],
+          _queryValue(q, 'bbrprofile'),
+        ]) ??
+        '',
+    maxIdleTimeout: _firstDeclared([
+          values['maxidletimeout'],
+          _queryValue(q, 'maxidletimeout'),
+        ]) ??
+        '',
+    keepAlivePeriod: _firstDeclared([
+          values['keepaliveperiode22'],
+          values['keepaliveperiod'],
+          _queryValue(q, 'keepaliveperiode22'),
+          _queryValue(q, 'keepaliveperiod'),
+        ]) ??
+        '',
+    declared: _joinDeclared(fm?.declared ?? '', _flatDeclared(q)),
+  );
+}
+
+/// What a link declared. Empty strings mean the link did not say.
+class Hy2QuicDecl {
+  const Hy2QuicDecl({
+    required this.congestion,
+    required this.bbrProfile,
+    required this.maxIdleTimeout,
+    required this.keepAlivePeriod,
+    required this.declared,
+  });
+
+  final String congestion;
+  final String bbrProfile;
+  final String maxIdleTimeout;
+  final String keepAlivePeriod;
+
+  /// Field names only, comma-separated. Never the values.
+  final String declared;
+}
+
+class _FmQuic {
+  const _FmQuic({required this.values, required this.declared});
+
+  /// Normalized key → scalar text. Numbers are rendered without interpolation.
+  final Map<String, String> values;
+
+  /// `quicParams.originalKey` names, in document order.
+  final String declared;
+}
+
+/// `quicParams` from the link's `fm` blob. Null when absent or unreadable.
+///
+/// A broken `fm` is ignored. The rest of the link still parses: a timer hint
+/// must not turn a working node into a parse error.
+_FmQuic? _fmQuicParams(String? raw) {
+  final text = (raw ?? '').trim();
+  if (text.isEmpty) return null;
+  Object? decoded;
+  try {
+    decoded = jsonDecode(text);
+  } on FormatException {
+    return null;
+  }
+  if (decoded is! Map) return null;
+  String? wrapper;
+  Object? quic;
+  for (final entry in decoded.entries) {
+    if (_queryKey('${entry.key}') != 'quicparams') continue;
+    wrapper = '${entry.key}';
+    quic = entry.value;
+    break;
+  }
+  if (wrapper == null || quic is! Map) return null;
+  final values = <String, String>{};
+  final names = <String>[];
+  for (final entry in quic.entries) {
+    final scalar = _fmScalar(entry.value);
+    if (scalar == null) continue;
+    final key = '${entry.key}';
+    names.add('$wrapper.$key');
+    values[_queryKey(key)] = scalar;
+  }
+  return _FmQuic(values: values, declared: names.join(','));
+}
+
+/// JSON number or string. Maps and lists are not timer values.
+String? _fmScalar(Object? value) {
+  if (value is int) return value.toString();
+  if (value is double) {
+    if (value.isNaN || value.isInfinite) return null;
+    if (value == value.roundToDouble()) return value.toInt().toString();
+    return value.toString();
+  }
+  if (value is String) {
+    final text = value.trim();
+    return text.isEmpty ? null : text;
+  }
+  return null;
+}
+
+/// The first non-blank value, trimmed.
+String? _firstDeclared(List<String?> values) {
+  for (final value in values) {
+    final text = (value ?? '').trim();
+    if (text.isNotEmpty) return text;
+  }
+  return null;
+}
+
+String _joinDeclared(String nested, String flat) {
+  if (nested.isEmpty) return flat;
+  if (flat.isEmpty) return nested;
+  return '$nested,$flat';
+}
+
+/// Flat query keys this reader understands, under their original spelling.
+///
+/// `fm` itself is the container and is not listed. Bandwidth names are listed
+/// so the log shows they were present; their values are not copied.
+String _flatDeclared(Map<String, String> q) {
+  const recognized = <String>{
+    'congestion',
+    'bbrprofile',
+    'maxidletimeout',
+    'keepaliveperiod',
+    'keepaliveperiode22',
+    'brutalup',
+    'brutaldown',
+  };
+  final names = <String>[];
+  for (final entry in q.entries) {
+    final key = _queryKey(entry.key);
+    if (key == 'fm' || !recognized.contains(key)) continue;
+    if (entry.value.trim().isEmpty) continue;
+    names.add(entry.key);
+  }
+  return names.join(',');
+}
+
+/// Query value for [key], matched without case, `_`, or `-`.
+///
+/// `maxIdleTimeout`, `max_idle_timeout` and `max-idle-timeout` are one key.
+/// Looking up only the spelling we happened to write would drop the value for
+/// every other provider.
+String? _queryValue(Map<String, String> q, String key) {
+  final direct = q[key];
+  if (direct != null) return direct;
+  final wanted = _queryKey(key);
+  for (final entry in q.entries) {
+    if (_queryKey(entry.key) == wanted) return entry.value;
+  }
+  return null;
+}
+
+String _queryKey(String key) =>
+    key.toLowerCase().replaceAll('_', '').replaceAll('-', '');
 
 /// Percent-decoded remark. `Uri.fragment` leaves `%D0…` in the string.
 String decodeUserFacingToken(String raw) {
@@ -216,7 +399,8 @@ String? _utf8Base64(String payload) {
   final normalized = payload.replaceAll('-', '+').replaceAll('_', '/');
   final pad = normalized.length % 4 == 0
       ? normalized
-      : normalized.padRight(normalized.length + (4 - normalized.length % 4), '=');
+      : normalized.padRight(
+          normalized.length + (4 - normalized.length % 4), '=');
   try {
     return utf8.decode(base64Decode(pad));
   } on FormatException {

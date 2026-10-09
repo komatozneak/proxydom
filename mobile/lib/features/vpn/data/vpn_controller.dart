@@ -134,6 +134,16 @@ class VpnController {
         'hysteriaBandwidthUp': profile.bandwidthUp,
       if (profile.bandwidthDown != null)
         'hysteriaBandwidthDown': profile.bandwidthDown,
+      if (profile.congestion.isNotEmpty)
+        'hysteriaCongestion': profile.congestion,
+      if (profile.bbrProfile.isNotEmpty)
+        'hysteriaBbrProfile': profile.bbrProfile,
+      if (profile.maxIdleTimeout.isNotEmpty)
+        'hysteriaMaxIdleTimeout': profile.maxIdleTimeout,
+      if (profile.keepAlivePeriod.isNotEmpty)
+        'hysteriaKeepAlivePeriod': profile.keepAlivePeriod,
+      if (profile.fmDeclared.isNotEmpty)
+        'hysteriaFmDeclared': profile.fmDeclared,
       'controlPlaneHosts': VpnServiceConfig.controlPlaneHostsOf(),
       if (disallowedApps.isNotEmpty) 'disallowedApplications': disallowedApps,
       // Android: Go hyDialer suffixes. iOS: prioritized OS routes only.
@@ -220,6 +230,16 @@ class VpnController {
           'hysteriaBandwidthUp': profile.bandwidthUp,
         if (profile.bandwidthDown != null)
           'hysteriaBandwidthDown': profile.bandwidthDown,
+        if (profile.congestion.isNotEmpty)
+          'hysteriaCongestion': profile.congestion,
+        if (profile.bbrProfile.isNotEmpty)
+          'hysteriaBbrProfile': profile.bbrProfile,
+        if (profile.maxIdleTimeout.isNotEmpty)
+          'hysteriaMaxIdleTimeout': profile.maxIdleTimeout,
+        if (profile.keepAlivePeriod.isNotEmpty)
+          'hysteriaKeepAlivePeriod': profile.keepAlivePeriod,
+        if (profile.fmDeclared.isNotEmpty)
+          'hysteriaFmDeclared': profile.fmDeclared,
         if (profile.insecure) 'hysteriaInsecure': true,
         if (profile.obfs.isNotEmpty) 'hysteriaObfs': profile.obfs,
         if (profile.obfsPassword.isNotEmpty)
