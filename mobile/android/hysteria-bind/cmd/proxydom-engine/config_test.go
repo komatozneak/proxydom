@@ -44,7 +44,7 @@ func TestHy2StartOmitsThePasswordFromTheStatusLine(t *testing.T) {
 	if strings.Contains(line, "secret+pass") || strings.Contains(line, "abc123") || strings.Contains(line, "hide") {
 		t.Fatalf("status line leaked a secret: %s", line)
 	}
-	if !strings.Contains(line, "routing_applied=false") || !strings.Contains(line, "hop=not_applied") {
+	if !strings.Contains(line, "routing_applied=true") || !strings.Contains(line, "hop=applied") || !strings.Contains(line, "clash_api=applied") {
 		t.Fatalf("status line: %s", line)
 	}
 	if !strings.Contains(line, "direct_domains=1") || !strings.Contains(line, "force_proxy_domains=1") {

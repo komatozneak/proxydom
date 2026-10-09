@@ -100,6 +100,28 @@ func (c engineConfig) hy2StartJSON() ([]byte, error) {
 		body["obfs"] = c.Outbound.Obfs
 		body["obfs_password"] = c.Outbound.ObfsPassword
 	}
+	if c.Outbound.ServerPorts != "" {
+		body["server_ports"] = c.Outbound.ServerPorts
+	}
+	if c.Outbound.HopInterval != "" {
+		body["hop_interval"] = c.Outbound.HopInterval
+	}
+	if len(c.DirectDomains) > 0 {
+		body["direct_domain_suffixes"] = c.DirectDomains
+	}
+	if len(c.ForceProxyDomains) > 0 {
+		body["force_proxy_domains"] = c.ForceProxyDomains
+	}
+	if c.UDPDirect {
+		body["udp_direct"] = true
+	}
+	if c.Tun != nil && c.Tun.DNS != "" && !c.Probe {
+		body["dns_address"] = c.Tun.DNS
+	}
+	if c.APIPort > 0 && c.APISecret != "" {
+		body["api_port"] = c.APIPort
+		body["api_secret"] = c.APISecret
+	}
 	return json.Marshal(body)
 }
 
@@ -111,15 +133,23 @@ func (c engineConfig) statusLine() string {
 		tun = c.Tun.Name
 	}
 	hop := "false"
-	if c.Outbound.ServerPorts != "" || c.Outbound.HopInterval != "" {
-		hop = "not_applied"
+	if c.Outbound.ServerPorts != "" {
+		hop = "applied"
 	}
 	clash := "false"
 	if c.APIPort != 0 {
-		clash = "not_applied"
+		clash = "applied"
+	}
+	dns := "false"
+	if c.DNSHijack || (c.Tun != nil && c.Tun.DNS != "" && !c.Probe) {
+		dns = "true"
+	}
+	routing := "false"
+	if c.RoutingApplied || len(c.DirectDomains) > 0 || len(c.ForceProxyDomains) > 0 || c.UDPDirect {
+		routing = "true"
 	}
 	return fmt.Sprintf(
-		"proxydom-engine tun=%s socks=%s routing_applied=false dns_hijack=false udp_direct=%t clash_api=%s direct_domains=%d force_proxy_domains=%d hop=%s",
-		tun, c.SocksListen, c.UDPDirect, clash, len(c.DirectDomains), len(c.ForceProxyDomains), hop,
+		"proxydom-engine tun=%s socks=%s routing_applied=%s dns_hijack=%s udp_direct=%t clash_api=%s direct_domains=%d force_proxy_domains=%d hop=%s",
+		tun, c.SocksListen, routing, dns, c.UDPDirect, clash, len(c.DirectDomains), len(c.ForceProxyDomains), hop,
 	)
 }

@@ -138,8 +138,8 @@ int main() {
   expect(config.find("salamander") != std::string::npos, "obfs in config");
   expect(config.find("lan.example") != std::string::npos, "direct domain");
   expect(config.find("\"server_ports\":\"1000:2000\"") != std::string::npos, "hop range uses a colon");
-  expect(config.find("\"routing_applied\":false") != std::string::npos, "routing is recorded as not applied");
-  expect(config.find("\"dns_hijack\":false") != std::string::npos, "dns hijack is not claimed");
+  expect(config.find("\"routing_applied\":true") != std::string::npos, "routing is applied");
+  expect(config.find("\"dns_hijack\":true") != std::string::npos, "dns hijack is applied");
 
   // The lists are still in the document, in the order the sites screen uses.
   // This build of the engine does not apply them.
@@ -169,7 +169,7 @@ int main() {
   expect(quoted.find("\"api_secret\":\"he\\\"llo\\\\there\"") != std::string::npos,
          "a quote or a backslash in the secret cannot break the config");
   const auto no_api = build_engine_config(line, "203.0.113.10", {}, {}, false, 0, "");
-  expect(no_api.find("\"routing_applied\":false") != std::string::npos, "routing flag is always present");
+  expect(no_api.find("\"routing_applied\":true") != std::string::npos, "routing flag is always present");
   expect(no_api.find("\"api_port\":0") != std::string::npos, "absent api is port 0");
 
   ShareLine slash;
@@ -181,8 +181,8 @@ int main() {
   expect(!parse_share_line("hy2://secret@cdn.example:443abc", slash, error), "junk port is refused");
   expect(error == "port", "junk port error");
   expect(config.find("1000-2000") == std::string::npos, "hop range is not a hyphen");
-  expect(config.find("hijack-dns") == std::string::npos, "dns hijack is not pretended");
-  expect(config.find("\"dns_hijack\":false") != std::string::npos, "dns hijack flag is false");
+  expect(config.find("hijack-dns") == std::string::npos, "dns hijack is not a sing-box rule");
+  expect(config.find("\"dns_hijack\":true") != std::string::npos, "dns hijack flag is true");
   expect(config.find("secret+pass") != std::string::npos, "password reaches the engine config");
   expect(config.find("172.19.0.1") == std::string::npos, "tun prefix stays outside 172.16/12");
   expect(build_engine_config(line, "2001:db8::1", {}, {}, false, 0, "").empty(), "refuse ipv6 pin");

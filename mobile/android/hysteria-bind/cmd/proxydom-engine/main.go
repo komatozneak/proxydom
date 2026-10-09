@@ -15,8 +15,6 @@ import (
 	"os/signal"
 	"strings"
 
-	"github.com/xjasonlyu/tun2socks/v2/engine"
-
 	"github.com/komatozneak/proxydom/hy2bind"
 )
 
@@ -68,9 +66,6 @@ func main() {
 		}
 	}
 	waitForBreak()
-	if !cfg.Probe {
-		engine.Stop()
-	}
 	hy2bind.Stop()
 }
 
@@ -78,19 +73,11 @@ func startTUN(cfg engineConfig) error {
 	if cfg.Tun == nil || cfg.Tun.AutoRoute {
 		return fmt.Errorf("win32=%d", 87)
 	}
-	host, port, err := net.SplitHostPort(cfg.SocksListen)
-	if err != nil || host != "127.0.0.1" || port == "" {
-		return fmt.Errorf("win32=%d", 87)
+	if msg := hy2bind.StartNamedTun(cfg.Tun.Name, cfg.Tun.MTU); msg != "" {
+		return fmt.Errorf("%s", msg)
 	}
-	engine.Insert(&engine.Key{
-		MTU:      cfg.Tun.MTU,
-		Proxy:    "socks5://" + cfg.SocksListen,
-		Device:   "tun://" + cfg.Tun.Name,
-		LogLevel: "info",
-	})
-	engine.Start()
 	if err := assignTunIPv4(cfg.Tun.Name, cfg.Tun.Address, cfg.Tun.DNS); err != nil {
-		engine.Stop()
+		hy2bind.StopTun()
 		return err
 	}
 	return nil

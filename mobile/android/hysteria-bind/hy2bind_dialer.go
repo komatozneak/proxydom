@@ -57,10 +57,19 @@ func (d *hyDialer) DialContext(_ context.Context, m *M.Metadata) (net.Conn, erro
 		return nil, errSkipCDN
 	}
 	addr := egressAddr(m)
+	chain := "proxy"
+	var conn net.Conn
+	var err error
 	if shouldDirectTCP(m) {
-		return d.dialDirect("tcp", addr)
+		chain = "direct"
+		conn, err = d.dialDirect("tcp", addr)
+	} else {
+		conn, err = d.c.TCP(addr)
 	}
-	return d.c.TCP(addr)
+	if err != nil {
+		return nil, err
+	}
+	return trackStream(conn, "tcp", addr, chain), nil
 }
 
 func (d *hyDialer) DialUDP(m *M.Metadata) (net.PacketConn, error) {
@@ -74,12 +83,32 @@ func (d *hyDialer) DialUDP(m *M.Metadata) (net.PacketConn, error) {
 	send := m.DestinationAddress()
 	if shouldHijackDNS(m.DstIP, m.DstPort) {
 		send = "1.1.1.1:53"
+	} else if shouldDirectUDP(m) {
+		pc, err := dialOutsideUDP(m.DestinationAddress())
+		if err != nil {
+			return nil, err
+		}
+		return trackPacket(pc, "udp", m.DestinationAddress(), "direct"), nil
 	}
 	// Open the Hy2 UDP session on the first real send. Identical DNS questions
 	// share one lookup and never open a second session.
-	return newLazyHyPacketConn(func() (client.HyUDPConn, error) {
+	pc := newLazyHyPacketConn(func() (client.HyUDPConn, error) {
 		return d.c.UDP()
-	}, orig, send, isDNSPacketDest(orig, send)), nil
+	}, orig, send, isDNSPacketDest(orig, send))
+	return trackPacket(pc, "udp", send, "proxy"), nil
+}
+
+func shouldDirectUDP(m *M.Metadata) bool {
+	if m == nil || !udpDirectOn() {
+		return false
+	}
+	if shouldHijackDNS(m.DstIP, m.DstPort) {
+		return false
+	}
+	if host := hostForIP(m.DstIP); host != "" && isForceProxyHost(host) {
+		return false
+	}
+	return true
 }
 
 func isDNSPacketDest(orig net.Addr, send string) bool {
@@ -100,6 +129,9 @@ func egressAddr(m *M.Metadata) string {
 func shouldHijackDNS(ip netip.Addr, port uint16) bool {
 	if port != 53 {
 		return false
+	}
+	if hijackDNSAddr(ip) {
+		return true
 	}
 	if !ip.IsValid() {
 		return true

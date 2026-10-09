@@ -612,9 +612,9 @@ std::string build_engine_config(const ShareLine& line,
   if (outbound.empty()) return {};
 
   // Domain lists are recorded in the order the sites screen already uses:
-  // force-proxy names, then exclusions, then the UDP flag. The process logs
-  // that it does not apply them. auto_route stays false: C++ installs the
-  // capture routes.
+  // force-proxy names, then exclusions, then the UDP flag. The engine applies
+  // them: force-proxy wins over a direct suffix and over UDP bypass.
+  // auto_route stays false: C++ installs the capture routes.
   std::ostringstream config;
   config << "{"
          << "\"log_level\":\"info\","
@@ -625,8 +625,8 @@ std::string build_engine_config(const ShareLine& line,
          << "\"force_proxy_domains\":[" << json_string_array(force_proxy_domains) << "],"
          << "\"direct_domains\":[" << json_string_array(domains) << "],"
          << "\"udp_direct\":" << (udp_direct ? "true" : "false") << ","
-         << "\"dns_hijack\":false,"
-         << "\"routing_applied\":false,"
+         << "\"dns_hijack\":true,"
+         << "\"routing_applied\":true,"
          << "\"api_port\":" << api_port << ","
          << "\"api_secret\":\"" << json_escape(api_secret) << "\","
          << "\"outbound\":" << outbound << "}";

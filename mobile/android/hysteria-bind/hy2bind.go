@@ -36,6 +36,13 @@ type startConfig struct {
 	Insecure             bool     `json:"insecure"`
 	Obfs                 string   `json:"obfs"`
 	ObfsPassword         string   `json:"obfs_password"`
+	ServerPorts          string   `json:"server_ports"`
+	HopInterval          string   `json:"hop_interval"`
+	ForceProxy           []string `json:"force_proxy_domains"`
+	UDPDirect            bool     `json:"udp_direct"`
+	DNSAddress           string   `json:"dns_address"`
+	APIPort              int      `json:"api_port"`
+	APISecret            string   `json:"api_secret"`
 }
 
 type protectedFactory struct{}
@@ -66,21 +73,23 @@ func (f *protectedFactory) New(addr net.Addr) (net.PacketConn, error) {
 		_ = pc.Close()
 		return nil, protErr
 	}
+	bindOutsidePacket(pc)
 	return pc, nil
 }
 
 func connFactoryFor(cfg startConfig) (client.ConnFactory, error) {
 	kind := strings.TrimSpace(strings.ToLower(cfg.Obfs))
+	var inner client.ConnFactory
 	if kind == "" {
-		return &protectedFactory{}, nil
-	}
-	if kind != "salamander" {
+		inner = &protectedFactory{}
+	} else if kind != "salamander" {
 		return nil, fmt.Errorf("unsupported obfs %q", cfg.Obfs)
-	}
-	if len(cfg.ObfsPassword) < 4 {
+	} else if len(cfg.ObfsPassword) < 4 {
 		return nil, errors.New("obfs password must be at least 4 bytes")
+	} else {
+		inner = &obfsFactory{password: cfg.ObfsPassword}
 	}
-	return &obfsFactory{password: cfg.ObfsPassword}, nil
+	return maybeHop(inner, cfg), nil
 }
 
 type obfsFactory struct {
@@ -126,7 +135,12 @@ func Start(configJSON string) string {
 	if err := json.Unmarshal([]byte(configJSON), &cfg); err != nil {
 		return err.Error()
 	}
+	setExtraForceSuffixes(cfg.ForceProxy)
 	setDirectSuffixes(cfg.DirectDomainSuffixes)
+	setUDPDirect(cfg.UDPDirect)
+	setHijackDNS(cfg.DNSAddress)
+	prepareOutsideDial()
+	startFlowAPI(cfg.APIPort, cfg.APISecret)
 	mu.Lock()
 	alreadyRunning := hyClient != nil
 	mu.Unlock()
@@ -234,6 +248,7 @@ func StopTun() {
 func Stop() {
 	StopTun()
 	stopShare()
+	stopFlowAPI()
 	dnsCacheClear()
 	mu.Lock()
 	ln := socksLn
