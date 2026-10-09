@@ -22,9 +22,28 @@ var (
 	coreMu    sync.Mutex
 	coreDir   string
 	coreLevel = "info"
+	coreToErr bool
 )
 
+// coreSecret matches the credential-shaped fields the core may echo back.
 var coreSecret = regexp.MustCompile(`(?i)\b(auth|token|password|secret|authorization)\s*[=:]\s*\S+`)
+
+// coreUUID matches a user id in any position. It is a credential: on Android
+// the core log goes to a file the app owns, but on Windows these lines reach
+// the broker's service log, which is a file the owner sends around.
+var coreUUID = regexp.MustCompile(`(?i)\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b`)
+
+// CoreLogToStderr routes core decisions to stderr when no log directory is
+// configured. Android always injects one (CoreLog.kt) and reads the file back;
+// Windows has neither a logcat nor an injected directory, so without this the
+// core's own explanation of a failed dial is written nowhere at all. The broker
+// already reads this process's stderr into the service journal, so that is the
+// one channel that reaches the person debugging it.
+func CoreLogToStderr(on bool) {
+	coreMu.Lock()
+	coreToErr = on
+	coreMu.Unlock()
+}
 
 // prepareCoreLog reads the directory and level Kotlin injects beside the
 // share document. Empty dir means the handler stays quiet.
@@ -116,7 +135,8 @@ func coreTag(text string) string {
 }
 
 func redactCoreSecrets(text string) string {
-	return coreSecret.ReplaceAllString(text, "$1=***")
+	text = coreSecret.ReplaceAllString(text, "$1=***")
+	return coreUUID.ReplaceAllString(text, "***")
 }
 
 func keepCoreRecord(level string, severity clog.Severity, text string) bool {
@@ -213,7 +233,17 @@ func coreRank(level string) int {
 func appendCoreLine(level, message string) {
 	coreMu.Lock()
 	defer coreMu.Unlock()
-	if coreDir == "" || !severityAllows(coreLevel, level) {
+	if !severityAllows(coreLevel, level) {
+		return
+	}
+	if coreDir == "" {
+		// No directory means the platform has not asked for a file. On Windows
+		// the process's stderr is the journal, so speak there instead of
+		// dropping the line: a silent core is what makes a live failure
+		// undiagnosable.
+		if coreToErr {
+			fmt.Fprintln(os.Stderr, "core."+level+" "+message)
+		}
 		return
 	}
 	if err := os.MkdirAll(coreDir, 0o700); err != nil {

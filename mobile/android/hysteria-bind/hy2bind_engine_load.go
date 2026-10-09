@@ -77,15 +77,19 @@ type shareOutbound struct {
 	Stream *shareStream `json:"streamSettings"`
 }
 
+// shareTLS is the tlsSettings block of a share document. Named rather than
+// anonymous because the fingerprint translation needs to look inside it.
+type shareTLS struct {
+	ServerName  string   `json:"serverName"`
+	Fingerprint string   `json:"fingerprint"`
+	Allow       bool     `json:"allowInsecure"`
+	ALPN        []string `json:"alpn"`
+}
+
 type shareStream struct {
 	Network  string `json:"network"`
 	Security string `json:"security"`
-	TLS      *struct {
-		ServerName  string   `json:"serverName"`
-		Fingerprint string   `json:"fingerprint"`
-		Allow       bool     `json:"allowInsecure"`
-		ALPN        []string `json:"alpn"`
-	} `json:"tlsSettings"`
+	TLS      *shareTLS `json:"tlsSettings"`
 	Reality *struct {
 		ServerName  string `json:"serverName"`
 		PublicKey   string `json:"publicKey"`
@@ -362,10 +366,10 @@ func shareStreamConfig(stream *shareStream) (*internet.StreamConfig, error) {
 			}
 		}
 		var msg *anypb.Any
-		if stream.TLS != nil && stream.TLS.Fingerprint != "" {
+		if imitate := coreFingerprint(stream.TLS); imitate != "" {
 			msg = serial.ToTypedMessage(&utls.Config{
 				TlsConfig: tlsCfg,
-				Imitate:   stream.TLS.Fingerprint,
+				Imitate:   imitate,
 			})
 		} else {
 			msg = serial.ToTypedMessage(tlsCfg)
@@ -380,6 +384,96 @@ func shareStreamConfig(stream *shareStream) (*internet.StreamConfig, error) {
 		return nil, fmt.Errorf("unsupported security %q", stream.Security)
 	}
 	return cfg, nil
+}
+
+// fingerprintAliases translates the fingerprint vocabulary of share links into
+// the uTLS preset names v2ray-core knows.
+//
+// This is not cosmetic. A share link says `fp=chrome`; v2ray-core's uTLS map
+// has `chrome_auto` and no `chrome`, and an unknown name fails the dial before
+// TLS starts:
+//
+//	transport/internet/tls/utls: unable to get utls preset from name >
+//	transport/internet/tls/utls: unknown preset name
+//
+// So a perfectly good line died on a spelling. The translation lives here, at
+// the one boundary where a document becomes a core config, because this loader
+// serves both platforms: the Android client builds the document in Dart and the
+// Windows engine builds it in Go, and neither should have to know the core's
+// private names.
+//
+// Names already in the core map pass through unchanged.
+var fingerprintAliases = map[string]string{
+	"chrome":           "chrome_auto",
+	"firefox":          "firefox_auto",
+	"ios":              "ios_auto",
+	"android":          "android_11_okhttp",
+	"edge":             "edge_auto",
+	"safari":           "safari_auto",
+	"360":              "360_auto",
+	"qq":               "qq_auto",
+	"random":           "randomized",
+	"randomized":       "randomized",
+	"randomizedalpn":   "randomizedalpn",
+	"randomizednoalpn": "randomizednoalpn",
+	"firefox_auto":     "firefox_auto",
+	"firefox_55":       "firefox_55",
+	"firefox_56":       "firefox_56",
+	"firefox_63":       "firefox_63",
+	"firefox_65":       "firefox_65",
+	"firefox_99":       "firefox_99",
+	"firefox_102":      "firefox_102",
+	"firefox_105":      "firefox_105",
+	"chrome_auto":      "chrome_auto",
+	"chrome_58":        "chrome_58",
+	"chrome_62":        "chrome_62",
+	"chrome_70":        "chrome_70",
+	"chrome_72":        "chrome_72",
+	"chrome_83":        "chrome_83",
+	"chrome_87":        "chrome_87",
+	"chrome_96":        "chrome_96",
+	"chrome_100":       "chrome_100",
+	"chrome_102":       "chrome_102",
+	"ios_auto":         "ios_auto",
+	"ios_11_1":         "ios_11_1",
+	"ios_12_1":         "ios_12_1",
+	"ios_13":           "ios_13",
+	"ios_14":           "ios_14",
+	"android_11_okhttp": "android_11_okhttp",
+	"edge_auto":         "edge_auto",
+	"edge_85":           "edge_85",
+	"edge_106":          "edge_106",
+	"safari_auto":       "safari_auto",
+	"safari_16_0":       "safari_16_0",
+	"360_auto":          "360_auto",
+	"360_7_5":           "360_7_5",
+	"360_11_0":          "360_11_0",
+	"qq_auto":           "qq_auto",
+	"qq_11_1":           "qq_11_1",
+}
+
+// coreFingerprint returns the preset to imitate, or "" to leave the core's own
+// TLS in place.
+//
+// An unrecognised name is dropped rather than failing the dial. The fingerprint
+// is a hardening detail, not the identity of the line: refusing to connect
+// because a provider spelled a browser name differently would make a working
+// line inert, which is exactly the failure this whole task exists to remove.
+// The drop is said out loud so it is not invisible.
+func coreFingerprint(tls *shareTLS) string {
+	if tls == nil {
+		return ""
+	}
+	name := strings.ToLower(strings.TrimSpace(tls.Fingerprint))
+	if name == "" {
+		return ""
+	}
+	preset, ok := fingerprintAliases[name]
+	if !ok {
+		appendCoreLine("warn", "core.vless fingerprint "+name+" is not a uTLS preset; using the core default")
+		return ""
+	}
+	return preset
 }
 
 func shareRules(rules []struct {

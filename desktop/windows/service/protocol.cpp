@@ -483,7 +483,11 @@ bool parse_share_line(const std::string& raw, ShareLine& out, std::string& error
     out.public_key = query_value(query, "pbk");
     out.short_id = query_value(query, "sid");
     out.fingerprint = query_value(query, "fp");
-    if (out.fingerprint.empty()) out.fingerprint = "chrome";
+    // No default. A line that does not ask for a fingerprint gets the core's
+    // own TLS, which is what the Dart builder does; inventing one here made the
+    // same link describe a different ClientHello on Windows than on Android.
+    // The name is also share-link vocabulary (`fp=chrome`), not a core preset
+    // (`chrome_auto`), so translating it is the loader's job, not this parser's.
     // The same defaults the Dart builder uses, so one link cannot be described
     // two ways depending on which side of the process boundary reads it.
     out.network = lower_copy(query_value(query, "type"));
@@ -588,9 +592,11 @@ std::string engine_outbound(const ShareLine& line, const std::string& server_ip)
              << ",\"uuid\":\"" << json_escape(line.uuid) << "\"";
     if (!line.flow.empty()) outbound << ",\"flow\":\"" << json_escape(line.flow) << "\"";
     outbound << ",\"sni\":\"" << json_escape(line.sni) << "\",\"insecure\":" << (line.insecure ? "true" : "false")
-             << ",\"fingerprint\":\"" << json_escape(line.fingerprint) << "\""
              << ",\"security\":\"" << json_escape(line.security) << "\""
              << ",\"network\":\"" << json_escape(line.network) << "\"";
+    if (!line.fingerprint.empty()) {
+      outbound << ",\"fingerprint\":\"" << json_escape(line.fingerprint) << "\"";
+    }
     // Without these a vless:// over WebSocket cannot be described at all, and
     // the row that needs them is exactly the one subscriptions hand out.
     if (!line.path.empty()) outbound << ",\"path\":\"" << json_escape(line.path) << "\"";

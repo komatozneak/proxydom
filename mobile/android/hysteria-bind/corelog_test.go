@@ -67,6 +67,93 @@ func TestRedactCoreSecrets(t *testing.T) {
 	}
 }
 
+// The uuid is a credential and these lines reach the broker's service log on
+// Windows, which is a file the owner sends around. Android keeps them in a file
+// the app owns, so this matters more here, not less.
+func TestRedactCoreSecretsHidesTheUUID(t *testing.T) {
+	const id = "11111111-2222-3333-4444-555555555555"
+	got := redactCoreSecrets("vless: user id " + id + " accepted")
+	if strings.Contains(strings.ToLower(got), id) {
+		t.Fatal(got)
+	}
+	if !strings.Contains(got, "***") {
+		t.Fatal(got)
+	}
+	// A line with no credential is left alone.
+	plain := "transport/internet/tcp: listening TCP on 127.0.0.1:10809"
+	if redactCoreSecrets(plain) != plain {
+		t.Fatal(redactCoreSecrets(plain))
+	}
+}
+
+// Windows injects no log directory. Without a fallback the core's own account
+// of a failed dial is written nowhere, and the live failure is undiagnosable.
+func TestCoreLogFallsBackToStderrWithoutADirectory(t *testing.T) {
+	coreMu.Lock()
+	oldDir, oldToErr := coreDir, coreToErr
+	coreDir = ""
+	coreToErr = true
+	coreMu.Unlock()
+	t.Cleanup(func() {
+		coreMu.Lock()
+		coreDir, coreToErr = oldDir, oldToErr
+		coreMu.Unlock()
+	})
+
+	read, write, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldStderr := os.Stderr
+	os.Stderr = write
+	appendCoreLine("info", "core.vless failed to dial the node")
+	_ = write.Close()
+	os.Stderr = oldStderr
+	t.Cleanup(func() { _ = read.Close() })
+
+	buf := make([]byte, 4096)
+	n, _ := read.Read(buf)
+	got := string(buf[:n])
+	if !strings.Contains(got, "failed to dial the node") {
+		t.Fatalf("stderr did not receive the core line: %q", got)
+	}
+	if !strings.Contains(got, "core.info") {
+		t.Fatalf("the level is not named: %q", got)
+	}
+}
+
+// The fallback is opt-in: Android reads a file and must not gain a second copy
+// of every line on a stream nothing reads.
+func TestCoreLogStaysQuietWhenTheFallbackIsOff(t *testing.T) {
+	coreMu.Lock()
+	oldDir, oldToErr := coreDir, coreToErr
+	coreDir = ""
+	coreToErr = false
+	coreMu.Unlock()
+	t.Cleanup(func() {
+		coreMu.Lock()
+		coreDir, coreToErr = oldDir, oldToErr
+		coreMu.Unlock()
+	})
+
+	read, write, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldStderr := os.Stderr
+	os.Stderr = write
+	appendCoreLine("info", "core.vless must not appear")
+	_ = write.Close()
+	os.Stderr = oldStderr
+	t.Cleanup(func() { _ = read.Close() })
+
+	buf := make([]byte, 4096)
+	n, _ := read.Read(buf)
+	if n != 0 {
+		t.Fatalf("wrote to stderr with the fallback off: %q", string(buf[:n]))
+	}
+}
+
 func TestCoreLogRotatesWindow(t *testing.T) {
 	dir := t.TempDir()
 	oldWindow := coreWindowBytes

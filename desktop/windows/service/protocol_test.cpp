@@ -201,6 +201,11 @@ int main() {
   expect(vless_config.find("\"public_key\":\"pub\"") != std::string::npos, "reality public key");
   expect(vless_config.find("private_key") == std::string::npos, "no server private key");
   expect(vless_config.find("xtls-rprx-vision") != std::string::npos, "flow");
+  // The parser carries the share-link word, not a core preset: `fp=chrome` is
+  // what the link says, and translating it to the uTLS preset the core accepts
+  // is the loader's job. Doing it here would be a second table to drift.
+  expect(vless_config.find("\"fingerprint\":\"chrome\"") != std::string::npos,
+         "the link's own fingerprint word is carried through");
   expect(vless_config.find("\"type\":\"vless\"") != std::string::npos, "vless is named so the engine knows which core to start");
   expect(vless_config.find("\"security\":\"reality\"") != std::string::npos, "reality is described, then refused by the core that lacks it");
 
@@ -234,6 +239,13 @@ int main() {
   const auto bare_config = build_engine_config(bare, "203.0.113.11", {}, {}, false, 0, "");
   expect(bare_config.find("\"network\":\"tcp\"") != std::string::npos, "the default transport is written out");
   expect(bare_config.find("\"security\":\"tls\"") != std::string::npos, "the default security is written out");
+  // A link that does not ask for a fingerprint gets the core's own TLS, exactly
+  // as the Dart builder leaves it. Inventing "chrome" here made the same link
+  // describe a different ClientHello on Windows than on Android.
+  expect(bare_config.find("fingerprint") == std::string::npos,
+         "no fingerprint is invented for a link that asked for none");
+  expect(ws_config.find("fingerprint") == std::string::npos,
+         "a websocket link without fp invents none either");
 
   const auto restored = state_event_v2(7, "idle", "", "", true);
   expect(restored.find("\"cleanup_verified\":true") != std::string::npos, "verified idle flag");

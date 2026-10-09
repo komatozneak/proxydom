@@ -20,6 +20,10 @@ import (
 
 func main() {
 	log.SetFlags(0)
+	// Windows has no injected log directory, so the core's own account of a
+	// failed dial would be written nowhere. The broker reads this process's
+	// stderr into the service journal; that is where it has to go.
+	hy2bind.CoreLogToStderr(true)
 	if len(os.Args) != 4 || os.Args[1] != "run" || os.Args[2] != "-c" {
 		log.Printf("win32=%d", 87) // ERROR_INVALID_PARAMETER
 		os.Exit(2)
