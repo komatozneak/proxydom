@@ -385,7 +385,10 @@ bool parse_share_line(const std::string& raw, ShareLine& out, std::string& error
   const std::string text = trim_copy(raw);
   const auto scheme_end = text.find("://");
   if (scheme_end == std::string::npos || scheme_end == 0) {
-    error = "scheme";
+    // Not a share link at all, which is a different thing from a link whose
+    // protocol we do not carry. Saying "scheme unsupported" here would blame
+    // the protocol for a line that has no protocol in it.
+    error = "profile";
     return false;
   }
   std::string scheme = lower_copy(text.substr(0, scheme_end));
@@ -447,6 +450,12 @@ bool parse_share_line(const std::string& raw, ShareLine& out, std::string& error
   out.scheme = scheme;
   out.host = host;
   out.sni = query_value(query, "sni");
+  // `peer` is the older name for the same field and is still what plenty of
+  // providers emit. The Dart builder reads it, so a line that carries only
+  // `peer` would have dialled with the server name taken from the address on
+  // Windows and from `peer` on Android: one of the two fails the certificate
+  // check, and it fails as a generic core exit with nothing naming the cause.
+  if (out.sni.empty()) out.sni = query_value(query, "peer");
   if (out.sni.empty()) out.sni = host;
   out.insecure = query_value(query, "insecure") == "1" || query_value(query, "allowInsecure") == "1";
   std::string port_spec = port_token;
@@ -496,6 +505,21 @@ bool parse_share_line(const std::string& raw, ShareLine& out, std::string& error
     out.path = query_value(query, "path");
     out.ws_host = query_value(query, "host");
     out.alpn = query_value(query, "alpn");
+    // TCP obfuscation has no representation in the engine: the loader builds no
+    // `tcpSettings` at all, so a `headerType` we ignored would dial plain TCP at
+    // a server expecting obfuscation and surface a generic failure. Refuse by
+    // name instead. `headerType=none` means no obfuscation and passes, which is
+    // the same rule the Dart builder applies.
+    const std::string header_type = lower_copy(query_value(query, "headerType"));
+    if (!header_type.empty() && header_type != "none") {
+      error = "transport";
+      return false;
+    }
+    if (out.network == "kcp" || out.network == "mkcp") {
+      out.kcp_seed = query_value(query, "seed");
+      if (out.kcp_seed.empty()) out.kcp_seed = query_value(query, "path");
+      if (out.kcp_seed == "/") out.kcp_seed.clear();
+    }
     if (out.security.empty()) out.security = "tls";
     if (out.security == "reality" && out.public_key.empty()) {
       error = "reality";
@@ -596,6 +620,9 @@ std::string engine_outbound(const ShareLine& line, const std::string& server_ip)
              << ",\"network\":\"" << json_escape(line.network) << "\"";
     if (!line.fingerprint.empty()) {
       outbound << ",\"fingerprint\":\"" << json_escape(line.fingerprint) << "\"";
+    }
+    if (!line.kcp_seed.empty()) {
+      outbound << ",\"kcp_seed\":\"" << json_escape(line.kcp_seed) << "\"";
     }
     // Without these a vless:// over WebSocket cannot be described at all, and
     // the row that needs them is exactly the one subscriptions hand out.

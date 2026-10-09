@@ -64,6 +64,10 @@ type outboundConfig struct {
 	// Comma separated: the broker writes one JSON string, and ALPN is a list
 	// on the wire.
 	ALPN string `json:"alpn"`
+	// KCPSeed is the kcp obfuscation seed. The loader already carries it into
+	// the core; without it here a kcp line dialled a server that was expecting
+	// obfuscation, and failed as a generic core exit.
+	KCPSeed string `json:"kcp_seed"`
 }
 
 // networkName is the transport the core will be asked for. Empty means the
@@ -259,6 +263,11 @@ func (c engineConfig) vlessStartJSON() ([]byte, error) {
 			ws["headers"] = map[string]string{"Host": c.Outbound.Host}
 		}
 		stream["wsSettings"] = ws
+	}
+	if network := c.Outbound.networkName(); network == "kcp" || network == "mkcp" {
+		if seed := strings.TrimSpace(c.Outbound.KCPSeed); seed != "" && seed != "/" {
+			stream["kcpSettings"] = map[string]any{"seed": seed}
+		}
 	}
 
 	doc := map[string]any{

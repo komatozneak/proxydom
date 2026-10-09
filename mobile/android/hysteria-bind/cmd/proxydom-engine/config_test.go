@@ -104,6 +104,40 @@ func TestVLESSBuildsAShareDocument(t *testing.T) {
 // person is told which part of the line is unsupported instead of watching a
 // timeout and blaming their network. The name is the user-facing one: the
 // broker matches it literally, so a rename here has to reach the broker too.
+func TestVLESSBuildsKCPSeed(t *testing.T) {
+	cfg, err := parseEngineConfig([]byte(`{"socks_listen":"127.0.0.1:18099","outbound":{"type":"vless","server":"203.0.113.11","server_port":443,"uuid":"11111111-2222-3333-4444-555555555555","sni":"cdn.example","network":"kcp","kcp_seed":"obfuscate-me","security":"tls"}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if refusal := cfg.shareRefusal(); refusal != "" {
+		t.Fatalf("a dialable kcp line was refused as %q", refusal)
+	}
+	doc, err := cfg.vlessStartJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(doc)
+	// The loader reads kcpSettings.seed and hands it to the core. Without this
+	// the engine dialled a server that was expecting obfuscation and failed as
+	// a generic core exit, with nothing naming the seed as the cause.
+	if !strings.Contains(text, `"kcpSettings"`) || !strings.Contains(text, `"seed":"obfuscate-me"`) {
+		t.Fatalf("kcp seed did not reach the document: %s", text)
+	}
+	// A kcp line with no seed must not grow an empty settings block: the core
+	// then uses its own default, which is what the line asked for.
+	bare, err := parseEngineConfig([]byte(`{"socks_listen":"127.0.0.1:18099","outbound":{"type":"vless","server":"203.0.113.11","server_port":443,"uuid":"11111111-2222-3333-4444-555555555555","sni":"cdn.example","network":"kcp","security":"tls"}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	bareDoc, err := bare.vlessStartJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(bareDoc), "kcpSettings") {
+		t.Fatalf("a kcp line with no seed invented settings: %s", bareDoc)
+	}
+}
+
 func TestVLESSTransportIsRefusedBeforeTheCoreStarts(t *testing.T) {
 	for _, network := range []string{"grpc", "xhttp", "quic", "httpupgrade"} {
 		cfg, err := parseEngineConfig([]byte(`{"outbound":{"type":"vless","server":"203.0.113.11","server_port":443,"uuid":"u","network":"` + network + `"}}`))

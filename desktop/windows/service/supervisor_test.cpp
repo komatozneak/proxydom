@@ -627,6 +627,69 @@ void test_an_unknown_word_is_still_a_core_exit() {
   expect(snap.message == "Сбой локальной службы туннеля", "unknown exit keeps the service caption");
 }
 
+// A line the broker cannot carry is refused by the broker, before any core
+// exists. It used to report resolve_failed, which told the person their server
+// name did not resolve — a thing that was never true, and it sent them to look
+// at DNS instead of at their line. The engine names these same conditions when
+// it catches them after starting, so the reason reads the same either way.
+void test_a_parked_protocol_is_refused_by_name_before_the_core() {
+  Harness harness;
+  ConnectRequest parked;
+  parked.uri = "trojan://secret@edge.example:443?sni=edge.example";
+  expect(harness.supervisor.begin_connect().accepted, "parked begin");
+  const auto snap = harness.supervisor.run_connect(parked, harness.cancel);
+  expect(snap.code == TunnelCode::SchemeUnsupported, "a parked protocol is named as a scheme");
+  expect(snap.message == "Этот протокол не поддержан на этой платформе", "the scheme caption");
+  expect(snap.phase == TunnelPhase::Idle, "the refusal ends idle");
+  expect(harness.engine.launch_calls == 0, "no core is started for a parked protocol");
+  expect(harness.routes.add_calls == 0, "no pin is added");
+  expect(harness.routes.capture_calls == 0, "no capture is installed");
+  expect(harness.log.index_of("line_refused", "scheme_unsupported") >= 0,
+         "the refusal is named in the journal, not silent");
+}
+
+// TCP obfuscation cannot be expressed to the engine at all, so a line needing
+// it must be refused rather than dialled as plain TCP and failed generically.
+void test_tcp_obfuscation_is_refused_as_a_transport() {
+  Harness harness;
+  ConnectRequest obfuscated;
+  obfuscated.uri =
+      "vless://11111111-2222-3333-4444-555555555555@edge.example:443?security=tls&headerType=http";
+  expect(harness.supervisor.begin_connect().accepted, "obfuscated begin");
+  const auto snap = harness.supervisor.run_connect(obfuscated, harness.cancel);
+  expect(snap.code == TunnelCode::TransportUnsupported, "tcp obfuscation is a transport we lack");
+  expect(snap.message == "Этот транспорт не поддержан на этой платформе", "the transport caption");
+  expect(harness.engine.launch_calls == 0, "no core is started for a transport we cannot carry");
+  expect(harness.routes.capture_calls == 0, "no capture is installed");
+}
+
+// Reality without a public key is refused for its security. One name for both
+// halves would tell the person to change the wrong part of their line.
+void test_reality_without_a_key_is_refused_for_its_security() {
+  Harness harness;
+  ConnectRequest reality;
+  reality.uri = "vless://11111111-2222-3333-4444-555555555555@edge.example:443?security=reality";
+  expect(harness.supervisor.begin_connect().accepted, "reality begin");
+  const auto snap = harness.supervisor.run_connect(reality, harness.cancel);
+  expect(snap.code == TunnelCode::SecurityUnsupported, "reality is a security complaint");
+  expect(snap.message == "Этот способ защиты не поддержан на этой платформе", "the security caption");
+  expect(harness.engine.launch_calls == 0, "no core is started for a security we cannot negotiate");
+}
+
+// A line with no protocol in it is malformed, which is a different complaint
+// from a protocol we do not carry. Blaming the protocol would send the person
+// looking for the wrong thing.
+void test_a_malformed_line_is_not_blamed_on_the_protocol() {
+  Harness harness;
+  ConnectRequest malformed;
+  malformed.uri = "just-some-text";
+  expect(harness.supervisor.begin_connect().accepted, "malformed begin");
+  const auto snap = harness.supervisor.run_connect(malformed, harness.cancel);
+  expect(snap.code == TunnelCode::InvalidProfile, "a line with no protocol is an invalid profile");
+  expect(snap.code != TunnelCode::SchemeUnsupported, "the protocol is not blamed");
+  expect(harness.engine.launch_calls == 0, "no core is started");
+}
+
 void test_cancel_during_key_probe_never_mutates_routes() {  Harness harness;
   harness.routes.cancel_during_fetch = true;
   const auto snap = harness.connect();
@@ -1638,6 +1701,10 @@ int main() {
   test_a_refused_transport_is_not_a_crash();
   test_a_refused_security_keeps_its_own_name();
   test_an_unknown_word_is_still_a_core_exit();
+  test_a_parked_protocol_is_refused_by_name_before_the_core();
+  test_tcp_obfuscation_is_refused_as_a_transport();
+  test_reality_without_a_key_is_refused_for_its_security();
+  test_a_malformed_line_is_not_blamed_on_the_protocol();
   test_cancel_during_key_probe_never_mutates_routes();
   test_cancel_before_and_after_pin();
   test_launch_failure_keeps_win32();

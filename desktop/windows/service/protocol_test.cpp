@@ -247,6 +247,72 @@ int main() {
   expect(ws_config.find("fingerprint") == std::string::npos,
          "a websocket link without fp invents none either");
 
+  // `peer` is the older spelling of the same field and is still what plenty of
+  // providers emit. The Dart builder reads it; reading only `sni` here meant one
+  // link dialled with a different server name on Windows than on Android, and
+  // the side that guessed wrong failed the certificate check as a generic core
+  // exit with nothing naming the cause.
+  ShareLine peer;
+  error.clear();
+  expect(parse_share_line(
+             "vless://11111111-2222-3333-4444-555555555555@1.2.3.4:443?security=tls&peer=front.example",
+             peer, error),
+         "parse a line that names its sni with peer");
+  expect(peer.sni == "front.example", "peer is read as the server name");
+  expect(peer.host == "1.2.3.4", "peer does not replace the address we dial");
+  const auto peer_config = build_engine_config(peer, "203.0.113.11", {}, {}, false, 0, "");
+  expect(peer_config.find("\"sni\":\"front.example\"") != std::string::npos, "peer reaches the engine as sni");
+  // An explicit sni still wins over peer, and the address is still the last
+  // resort, so the three do not fight.
+  ShareLine both;
+  error.clear();
+  expect(parse_share_line(
+             "vless://11111111-2222-3333-4444-555555555555@1.2.3.4:443?sni=real.example&peer=stale.example",
+             both, error),
+         "parse a line with both sni and peer");
+  expect(both.sni == "real.example", "sni outranks peer");
+
+  // TCP obfuscation has no representation in the engine: the loader builds no
+  // tcpSettings at all. A headerType we ignored would dial plain TCP at a server
+  // expecting obfuscation and surface a generic failure.
+  ShareLine obfuscated;
+  error.clear();
+  expect(!parse_share_line(
+             "vless://11111111-2222-3333-4444-555555555555@edge.example:443?security=tls&headerType=http",
+             obfuscated, error),
+         "a line needing tcp obfuscation is refused");
+  expect(error == "transport", "tcp obfuscation is a transport we do not carry");
+  ShareLine plain;
+  error.clear();
+  expect(parse_share_line(
+             "vless://11111111-2222-3333-4444-555555555555@edge.example:443?security=tls&headerType=none",
+             plain, error),
+         "headerType=none means no obfuscation and passes");
+
+  // kcp obfuscation is a seed the loader already carries. Dropping it here left
+  // the engine dialling a server that was expecting obfuscation.
+  ShareLine kcp;
+  error.clear();
+  expect(parse_share_line(
+             "vless://11111111-2222-3333-4444-555555555555@edge.example:443?security=tls&type=kcp&seed=obfuscate-me",
+             kcp, error),
+         "parse a kcp vless line");
+  expect(kcp.kcp_seed == "obfuscate-me", "the kcp seed is read");
+  const auto kcp_config = build_engine_config(kcp, "203.0.113.11", {}, {}, false, 0, "");
+  expect(kcp_config.find("\"kcp_seed\":\"obfuscate-me\"") != std::string::npos, "the kcp seed reaches the engine");
+
+  // A line with no protocol in it is malformed, which is not the same complaint
+  // as a protocol we do not carry. Blaming the protocol would send the person
+  // looking for the wrong thing.
+  ShareLine malformed;
+  error.clear();
+  expect(!parse_share_line("just-some-text", malformed, error), "a line with no scheme is refused");
+  expect(error == "profile", "a malformed line is not a scheme complaint");
+  ShareLine parked;
+  error.clear();
+  expect(!parse_share_line("trojan://pass@host:443", parked, error), "trojan is refused");
+  expect(error == "scheme", "a parked protocol is named as a scheme complaint");
+
   const auto restored = state_event_v2(7, "idle", "", "", true);
   expect(restored.find("\"cleanup_verified\":true") != std::string::npos, "verified idle flag");
   expect(restored.find("\"code\":null") != std::string::npos, "empty code is null");

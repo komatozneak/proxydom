@@ -935,6 +935,25 @@ TunnelSnapshot TunnelSupervisor::run_connect(const ConnectRequest& request, Canc
         log_.write(ledger_.generation, "profile_parse_failed", value, 0);
         return finish(TunnelCode::InvalidProfile, {}, false);
       }
+      // A line we cannot carry is not a line we failed to resolve. Reporting
+      // resolve_failed for a trojan:// link told the person their server name
+      // did not resolve, which was never the problem and sent them to look at
+      // DNS. These are the same names the engine uses when it refuses a line
+      // after starting, so the reason reads the same wherever it is caught.
+      TunnelCode refusal = TunnelCode::None;
+      if (error == "scheme") {
+        refusal = TunnelCode::SchemeUnsupported;
+      } else if (error == "transport") {
+        refusal = TunnelCode::TransportUnsupported;
+      } else if (error == "security" || error == "reality") {
+        refusal = TunnelCode::SecurityUnsupported;
+      } else if (error == "profile") {
+        refusal = TunnelCode::InvalidProfile;
+      }
+      if (refusal != TunnelCode::None) {
+        log_.write(ledger_.generation, "line_refused", code_name(refusal), 0);
+        return finish(refusal, {}, false);
+      }
       return finish(TunnelCode::ResolveFailed, {}, false);
     }
     if (!names_.resolve_ipv4(line.host, server_ip)) {

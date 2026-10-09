@@ -49,6 +49,9 @@ struct ShareLine {
   std::string path;
   std::string ws_host;
   std::string alpn;
+  // kcp obfuscation seed. A kcp line without it dials a server that is
+  // expecting obfuscation, which fails as a generic core exit.
+  std::string kcp_seed;
   int port = 443;
   bool insecure = false;
 };
