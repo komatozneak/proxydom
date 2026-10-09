@@ -1411,8 +1411,9 @@ class ProxyDomVpnService : VpnService() {
     }
 
     /**
-     * SOCKS CONNECT must finish before Connected. The exit address is read
-     * afterwards and does not hold the status.
+     * A parsed response must arrive before Connected. A finished CONNECT is
+     * not that. An exit address already on the winning sample is kept; when
+     * it is missing, the trace is read afterwards and does not hold the status.
      */
     private fun acceptCarryingTunnel(
         socksPort: Int,
@@ -1428,13 +1429,18 @@ class ProxyDomVpnService : VpnService() {
         val acceptance = VpnPingMonitor.proveTunnel(socksPort = socksPort)
         if (!acceptance.carriesData) {
             failStart(
-                "tunnel carried no tcp server=$server reason=${acceptance.detail} " +
+                "tunnel carried no response server=$server reason=${acceptance.detail} " +
                     "tcp=${tcpReachServer(server)} socks=$socksPort",
             )
             return false
         }
-        provenEgressIp = null
-        scheduleExitIpRead(socksPort = socksPort, server = server)
+        val knownExit = acceptance.exitIp?.trim()?.takeIf { it.isNotEmpty() }
+        if (knownExit != null) {
+            provenEgressIp = knownExit
+        } else {
+            provenEgressIp = null
+            scheduleExitIpRead(socksPort = socksPort, server = server)
+        }
         return true
     }
 

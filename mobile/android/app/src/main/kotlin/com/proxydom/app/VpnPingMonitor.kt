@@ -194,8 +194,11 @@ class VpnPingMonitor(
         }
 
         /**
-         * Walk CONNECT targets until one completes. No TLS and no body: that
-         * is what blocks Connected. [traceExitIp] reads the address later.
+         * Walk the three targets until one returns a parsed HTTP status or an
+         * exit address. A finished CONNECT is not that: FastOpen can complete
+         * it before the destination exists. No answer on one target tries the
+         * next. The timeout is the existing [CARRY_TIMEOUT_MS]; nothing new
+         * is added.
          *
          * `ipv4.icanhazip.com` is not a target.
          */
@@ -205,21 +208,19 @@ class VpnPingMonitor(
             timeoutMs: Int = CARRY_TIMEOUT_MS,
         ): TunnelAcceptance {
             val samples = ArrayList<HttpProbeSample>(3)
+            samples.add(probeTraceLiteral(socksHost, socksPort, timeoutMs))
+            if (samples.last().confirmsCarry()) return acceptTunnel(samples)
             samples.add(
-                connectSample(
-                    socksHost, socksPort, "1.1.1.1:443", "1.1.1.1", 443, timeoutMs,
+                probeNamedHttp(
+                    socksHost, socksPort, "cp.cloudflare.com", 443,
+                    "/generate_204", tls = true, timeoutMs = timeoutMs,
                 ),
             )
-            if (samples.last().tcp) return acceptTunnel(samples)
+            if (samples.last().confirmsCarry()) return acceptTunnel(samples)
             samples.add(
-                connectNamed(
-                    socksHost, socksPort, "cp.cloudflare.com", 443, timeoutMs,
-                ),
-            )
-            if (samples.last().tcp) return acceptTunnel(samples)
-            samples.add(
-                connectNamed(
-                    socksHost, socksPort, "www.gstatic.com", 80, timeoutMs,
+                probeNamedHttp(
+                    socksHost, socksPort, "www.gstatic.com", 80,
+                    "/generate_204", tls = false, timeoutMs = timeoutMs,
                 ),
             )
             return acceptTunnel(samples)
@@ -455,45 +456,18 @@ class VpnPingMonitor(
                 }
             }.getOrNull()
 
-        private fun connectSample(
-            socksHost: String,
-            socksPort: Int,
-            target: String,
-            destHost: String,
-            destPort: Int,
-            timeoutMs: Int,
-        ): HttpProbeSample {
-            val outcome = socksConnectProbe(
-                socksHost = socksHost,
-                socksPort = socksPort,
-                destHost = destHost,
-                destPort = destPort,
-                timeoutMs = timeoutMs,
-            )
-            return if (outcome is SocksHttpsResult.Ok) {
-                HttpProbeSample(
-                    target = target,
-                    tcp = true,
-                    httpStatus = null,
-                    exitIp = null,
-                    detail = "connect=${outcome.code}ms",
-                )
-            } else {
-                HttpProbeSample(
-                    target = target,
-                    tcp = false,
-                    httpStatus = null,
-                    exitIp = null,
-                    detail = outcome.detail,
-                )
-            }
-        }
-
-        private fun connectNamed(
+        /**
+         * CONNECT to the name's IPv4, then read one status line. Any parsed
+         * code is kept, including 3xx and 4xx. CONNECT without a status is
+         * [HttpProbeSample.tcp] only and does not accept the tunnel.
+         */
+        private fun probeNamedHttp(
             socksHost: String,
             socksPort: Int,
             name: String,
             port: Int,
+            path: String,
+            tls: Boolean,
             timeoutMs: Int,
         ): HttpProbeSample {
             val target = "$name:$port"
@@ -507,10 +481,77 @@ class VpnPingMonitor(
                     detail = "dns",
                 )
             }
-            return connectSample(
-                socksHost, socksPort, target, literal, port, timeoutMs,
-            )
+            return try {
+                Socket().use { plain ->
+                    plain.soTimeout = timeoutMs
+                    plain.connect(InetSocketAddress(socksHost, socksPort), timeoutMs)
+                    val out = DataOutputStream(plain.getOutputStream())
+                    val inp = DataInputStream(plain.getInputStream())
+                    socks5Greeting(out, inp)
+                    socks5ConnectIpv4(out, inp, literal, port)
+                    try {
+                        val status = if (tls) {
+                            val ssl = probeTls(plain, name, port)
+                            try {
+                                ssl.soTimeout = timeoutMs
+                                ssl.startHandshake()
+                                ssl.getOutputStream().apply {
+                                    write(httpGet(path, name))
+                                    flush()
+                                }
+                                BufferedReader(
+                                    InputStreamReader(
+                                        ssl.getInputStream(),
+                                        StandardCharsets.US_ASCII,
+                                    ),
+                                ).readLine()?.let(::parseHttpStatusCode)
+                            } finally {
+                                runCatching { ssl.close() }
+                            }
+                        } else {
+                            plain.getOutputStream().apply {
+                                write(httpGet(path, name))
+                                flush()
+                            }
+                            BufferedReader(
+                                InputStreamReader(
+                                    plain.getInputStream(),
+                                    StandardCharsets.US_ASCII,
+                                ),
+                            ).readLine()?.let(::parseHttpStatusCode)
+                        }
+                        HttpProbeSample(
+                            target = target,
+                            tcp = true,
+                            httpStatus = status,
+                            exitIp = null,
+                            detail = if (status != null) "http=$status" else "http=none",
+                        )
+                    } catch (e: Exception) {
+                        HttpProbeSample(
+                            target = target,
+                            tcp = true,
+                            httpStatus = null,
+                            exitIp = null,
+                            detail = "${e.javaClass.simpleName}=${e.message ?: "err"}",
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                HttpProbeSample(
+                    target = target,
+                    tcp = false,
+                    httpStatus = null,
+                    exitIp = null,
+                    detail = "${e.javaClass.simpleName}=${e.message ?: "err"}",
+                )
+            }
         }
+
+        private fun httpGet(path: String, host: String): ByteArray =
+            (
+                "GET $path HTTP/1.0\r\nHost: $host\r\nConnection: close\r\n\r\n"
+                ).toByteArray(StandardCharsets.US_ASCII)
 
         private fun probeTraceLiteral(
             socksHost: String,
