@@ -1041,11 +1041,26 @@ TunnelSnapshot TunnelSupervisor::run_connect(const ConnectRequest& request, Canc
   remember([&] { ledger_.routes = {canary}; });
 
   // Ask the stack where it would send the canary before sending it. A route
-  // that sits in the table and cannot be used answers connect() with the same
-  // host-unreachable as no route at all, and the journal could not tell them
-  // apart: this line names the interface Windows picked, or its error.
+  // row that sits in the table and cannot be used answers connect() with the
+  // same host-unreachable as no route at all, and the journal had no way to
+  // tell the two apart.
+  //
+  // Windows also accepts a row and can then lose it when the adapter's network
+  // is re-identified, which happens right after the address is assigned. So
+  // when the stack does not pick our adapter, put the row back once and look
+  // again instead of spending the probe on a route that is already gone.
   RouteLookup lookup;
-  if (routes_.lookup_route(probe_ip, lookup)) {
+  bool routed = routes_.lookup_route(probe_ip, lookup);
+  if (!routed || lookup.interface_luid != adapter.luid) {
+    routes_.delete_canary(canary);
+    if (!routes_.add_canary(adapter, probe_ip, canary)) {
+      log_.write(ledger_.generation, "routes", "canary_failed", routes_.last_error());
+      return finish(TunnelCode::RouteFailed, {}, false);
+    }
+    log_.write(ledger_.generation, "routes", "canary_reasserted", 0);
+    routed = routes_.lookup_route(probe_ip, lookup);
+  }
+  if (routed) {
     log_.write(ledger_.generation, "route_lookup",
                "dest=" + probe_ip + " luid=" + std::to_string(lookup.interface_luid) +
                    " idx=" + std::to_string(lookup.interface_index) + " prefix=" +

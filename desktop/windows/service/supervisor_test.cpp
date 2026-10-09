@@ -57,6 +57,7 @@ class FakeRoutes : public RouteTable {
   int fetch_calls = 0;
   bool lookup_ok = true;
   int lookup_calls = 0;
+  unsigned long lookup_luid = 99;
   bool cancel_during_fetch = false;
   unsigned long hardware_index = 18;
   CancelFlag* cancel = nullptr;
@@ -159,7 +160,7 @@ class FakeRoutes : public RouteTable {
   bool lookup_route(const std::string&, RouteLookup& out) override {
     ++lookup_calls;
     if (!lookup_ok) return false;
-    out.interface_luid = 99;
+    out.interface_luid = lookup_luid;
     out.interface_index = 5;
     out.prefix_length = 32;
     out.next_hop = "0.0.0.0";
@@ -1042,6 +1043,18 @@ void test_route_lookup_is_diagnostic_only() {
   expect(still.phase == TunnelPhase::Connected, "a failed lookup does not stop the tunnel");
   expect(blind.routes.fetch_calls == 1, "the canary still runs when the lookup cannot answer");
   expect(first_with(blind.log, "route_lookup", "none") >= 0, "a failed lookup is recorded as none");
+
+  // Windows accepts a route row and can then lose it when the adapter's network
+  // is re-identified. The stack stops picking our adapter, which is the only
+  // visible sign, so the row goes back once and the probe runs afterwards.
+  Harness moved;
+  moved.routes.lookup_luid = 7;  // some other adapter, not ours
+  const auto healed = moved.connect();
+  expect(healed.phase == TunnelPhase::Connected, "a lost route is put back and the session connects");
+  expect(moved.routes.canary_calls == 2, "the canary is re-asserted once");
+  expect(first_with(moved.log, "routes", "canary_reasserted") >= 0,
+         "the re-assert is recorded, so a silent drop stops being invisible");
+  expect(first_with(moved.log, "gate", "egress") >= 0, "the probe still runs after the repair");
 }
 
 void test_resolve_and_route_table_failures() {
