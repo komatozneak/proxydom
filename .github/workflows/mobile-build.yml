@@ -107,6 +107,10 @@ jobs:
           filters: |
             go:
               - 'mobile/android/hysteria-bind/**'
+              # The archive is a committed build product, and aar_stamp_test.go
+              # checks it against the package source. Watching it here means the
+              # check also runs when only the archive moved.
+              - 'mobile/android/app/libs/hysteria-client.aar'
               - 'mobile/assets/legal/**'
               - '.github/workflows/mobile-build.yml'
 

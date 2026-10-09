@@ -15,37 +15,33 @@ is not on the Gradle classpath.
 `mobile/android/hysteria-bind/license_guard_test.go` has an empty
 `knownViolations` map: a copyleft module in this archive fails the build.
 
-## The committed archive can fall behind its source
+## The committed archive is tied to its source by a stamp
 
-The archive in this folder is a build product, and nothing rebuilds it
-automatically: no workflow runs `build-aar.sh`, and `hy2bind.go` only carries a
-comment telling the reader to rebuild after changing the package. So the
-committed archive and `mobile/android/hysteria-bind` can disagree — and the APK
-links the archive, not the source.
+The archive in this folder is a build product, and no workflow rebuilds it. So
+the committed archive and `mobile/android/hysteria-bind` could disagree — and
+the APK links the archive, not the source. That happened: #317 changed the
+shared package and did not rebuild, and CI stayed green because the Go tests
+test the source while the Android tests link the stale archive.
 
-That is the state as of 2026-10-09. `refactor/windows-own-engine` (#317) changed
-the shared `hy2bind` package — `maybeHop`, `startFlowAPI`, `setHijackDNS`,
-`setUDPDirect`, `setExtraForceSuffixes`, `bindOutsidePacket` and seven new
-`startConfig` fields — and did not rebuild this archive. Measured by reading
-strings and symbols out of `jni/arm64-v8a/libhyjni.so`: every one of them is
-absent from the committed archive while present in the source. Positive controls
-(`salamander`, `unsupported obfs`, `setDirectSuffixes`, `StartShare`) are present
-in the same file, so the search is not vacuous.
+That is now enforced rather than trusted. `build-aar.sh` writes
+`mobile/android/hysteria-bind/aar_stamp.go` — a hash of the package source —
+before it binds, so the archive carries the hash of what it was built from.
+`aar_stamp_test.go` then checks both halves:
 
-**Nothing is wrong on Android today, and that was checked rather than assumed.**
-Each addition is inert off Windows: `prepareOutsideDial` and `bindOutsidePacket`
-are empty stubs in `hy2bind_direct_other.go`; `maybeHop` returns its input when
-`server_ports` is empty; `startFlowAPI` returns when the port is 0; and
-`HysteriaBridge.kt` sends only server, auth, sni, socks_listen, insecure, obfs,
-obfs_password and direct_domain_suffixes — none of the new fields. The Windows
-document is the only sender of those.
+- the stamp in the tree matches the package source;
+- the stamp is present inside `jni/arm64-v8a/libhyjni.so` of the committed
+  archive.
 
-The hazard is the next change, not this one: an edit to the shared package made
-for Android would silently not ship, and CI would stay green, because the Go
-tests test the source while the Android tests link the stale archive.
+Editing the stamp by hand passes the second check and fails the first.
+Rewriting it without rebuilding passes the first and fails the second. Only
+`build-aar.sh`, which stamps and then binds, passes both. Both checks run in the
+existing `hy2bind Go tests` job, which needs no NDK and takes seconds.
 
-The structural fix is a guard, not another rebuild — rebuild the archive in CI
-and fail when it differs from the committed one, or stop committing it and build
-it inside the Android job. Until one of those exists, rebuild by hand with
-`build-aar.sh` after touching the package.
+`build-aar.sh` also passes `-trimpath`, and that is load-bearing rather than
+cosmetic: gomobile builds in a randomly named temporary directory and compiles
+that path into the libraries. Measured on one machine, two binds of the same
+source without `-trimpath` produced arm64 libraries of 31 033 792 and
+31 033 832 bytes with different hashes; with it, two binds produced one
+identical 30 957 992-byte library. It also keeps the build machine's absolute
+paths, and the user name inside them, out of the shipped APK.
 

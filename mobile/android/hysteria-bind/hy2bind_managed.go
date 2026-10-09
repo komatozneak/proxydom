@@ -107,6 +107,10 @@ type clientHealth struct {
 	LastError       string `json:"last_error,omitempty"`
 	LastResetReason string `json:"last_reset_reason,omitempty"`
 	Running         bool   `json:"running"`
+	// SourceStamp names the source this binary was built from. It is the same
+	// value aar_stamp_test.go reads back out of the committed archive, so a
+	// report from a phone says which revision of the package it is running.
+	SourceStamp string `json:"source_stamp"`
 }
 
 var (
@@ -331,6 +335,7 @@ func HealthJSON() string {
 		LastError:       lastErr,
 		LastResetReason: lastReason,
 		Running:         running,
+		SourceStamp:     aarSourceStamp,
 	}
 	b, err := json.Marshal(h)
 	if err != nil {
