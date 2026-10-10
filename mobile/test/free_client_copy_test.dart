@@ -95,7 +95,6 @@ void main() {
       final normalized = relative.replaceAll('\\', '/');
       if (normalized.contains('/test/')) return;
       if (normalized.endsWith('.md') || normalized.endsWith('.pbxproj')) return;
-      if (normalized.endsWith('geosite.dat')) return;
       hits.addAll(copyViolations(normalized, file.readAsStringSync()));
     }
 

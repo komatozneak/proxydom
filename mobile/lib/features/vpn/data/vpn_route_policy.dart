@@ -1,42 +1,13 @@
-// Single source of truth for runtime route feature flags (VLESS engine / ADR 005).
+// Single source of truth for the Hy2 site-split force-proxy list.
 //
-// Ads policy: curated auction hosts via TLS sniff when [kEngineAdsBlockEnabled]
-// is true. Огонь `geosite:category-ads-all` stays experimental
-// ([kEngineOgonAdsAllEnabled]). Mid-roll SSAI on `googlevideo.com` is not
-// removable via VPN routing. Default both OFF during speed benches; tests may
-// force ON via RoutePolicy.
+// YouTube and Google must not fall through to the RU-direct final: the TSPU
+// resets those routes, so they are forced onto the tunnel rather than split out.
+// The same list is mirrored in `mobile/android/hysteria-bind/hy2bind_split.go`.
 
-/// Curated-list ads reject (no FakeDNS). OFF by default — sniffing collateral.
-const bool kEngineAdsBlockEnabled = false;
-
-/// Legacy alias for callers still using the sing-box-era name.
-const bool kAdsBlockEnabled = kEngineAdsBlockEnabled;
-
-/// Огонь FakeDNS + `geosite:category-ads-all`. Prod stays OFF.
-const bool kEngineOgonAdsAllEnabled = false;
-
-/// Exact/suffix hosts eligible for `ads-reject` when [kEngineAdsBlockEnabled] is true.
-/// Auction/tracker only — never video CDN (`googlevideo.com`, `gvt1.com`, …).
-const kEngineAdsBlockDomains = <String>[
-  'doubleclick.net',
-  'googleadservices.com',
-  'googlesyndication.com',
-  'adservice.google.com',
-  'ads.youtube.com',
-  'pagead2.googlesyndication.com',
-];
-
-/// geoip:ru → direct (nest home-speed). Domain geosite alone misses IP-literals.
-const bool kGeoipRuEnabled = true;
-
-/// Smart-mode RU geosite → direct («Что работает без VPN?» bundle).
-const bool kSmartRuSplitEnabled = true;
-
-/// Hev → SOCKS bridge A/B. Default gVisor `protocol:tun` + setTunFd.
-const bool kUseHevTunBridge = false;
-
-/// Domains that must use proxy **before** RU geosite directs.
-/// Media CDN (`googlevideo`, `gvt*`) stays here — RF DPI / TSPU, not split-tunnel.
+/// Domains that must use the tunnel.
+///
+/// Media CDN (`googlevideo`, `gvt*`) is here because RF DPI and the TSPU break
+/// it, not because of split-tunnel policy.
 const kSmartProxyForceSuffixes = <String>[
   'youtube.com',
   'youtu.be',
@@ -79,11 +50,3 @@ List<String> stripForceProxySuffixes(Iterable<String> raw) {
   }
   return out.toList()..sort();
 }
-
-/// Extra hosts only needed when ads reject is on (player bootstrap).
-const kAdsRejectBypassSuffixes = <String>[
-  ...kSmartProxyForceSuffixes,
-  'doubleclick.net',
-  'googleadservices.com',
-  'googlesyndication.com',
-];
