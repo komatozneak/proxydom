@@ -18,12 +18,46 @@ concurrency:
 env:
   FLUTTER_VERSION: "3.35.1"
   JAVA_VERSION: "17"
+  # Matches mobile-build.yml and ios-testflight.yml.
+  HYSTERIA_TAG: "v2.13.0"
+  GO_VERSION: "1.25.x"
 
 jobs:
+  # Its own machine, because this job used to build the archive inline and then
+  # die with "No space left on device" while packaging the four-ABI APK.
+  # The same split lives in mobile-build.yml.
+  hy2bind-aar:
+    name: Build hy2bind AAR
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+          lfs: true
+
+      - name: Build hysteria-client.aar
+        uses: ./.github/actions/build-hy2bind-aar
+        with:
+          hysteria-tag: ${{ env.HYSTERIA_TAG }}
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Upload hysteria-client.aar
+        uses: actions/upload-artifact@v4
+        with:
+          name: hy2bind-aar
+          path: |
+            mobile/android/app/libs/hysteria-client.aar
+            mobile/android/app/libs/hysteria-client.aar.source-hash
+          retention-days: 7
+          if-no-files-found: error
+
   build-android:
     name: Build Android APK
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    needs: hy2bind-aar
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v4
@@ -43,6 +77,14 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
+
+      # The APK links hy2bind through this archive, and the archive is not in
+      # the repository.
+      - name: Download hysteria-client.aar
+        uses: actions/download-artifact@v4
+        with:
+          name: hy2bind-aar
+          path: mobile/android/app/libs
 
       - name: Install dependencies
         working-directory: mobile

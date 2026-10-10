@@ -1,23 +1,21 @@
-// Package aarstamp ties the committed hysteria-client.aar back to the hy2bind
-// source it was built from.
+// Package aarstamp ties a hysteria-client.aar back to the hy2bind source it was
+// built from.
 //
-// The archive is a build product that is committed to the repository, and
-// nothing rebuilt it automatically: #317 changed this package, the archive
-// stayed behind, and CI was green because the Go tests test the source while
-// the Android tests link the stale archive.
+// The archive is a build product: CI builds it before the jobs that need it,
+// and mobile/android/build-sideload.ps1 builds a production APK from whatever
+// archive is on disk. That second path is what this guards. Gradle links
+// libs/hysteria-client.aar and not the Go source, so editing hy2bind and
+// building a sideload APK without rerunning build-aar.sh ships the old engine
+// silently. #317 was exactly that mistake.
 //
-// "Rebuild and compare bytes" is not enough on its own for a guard: a byte
-// comparison needs the exact toolchain of whoever built the archive, and it
-// needs the Android NDK on the runner. So the archive carries a hash of the
-// source instead, and the test enforces both halves -- the stamp in the tree
-// must match the package, and the stamp inside the committed archive must match
-// the tree. Passing both means the archive really was rebuilt: editing the
-// stamp by hand fails the first check, and rewriting it without rebuilding
-// fails the second.
+// "Rebuild and compare bytes" is not the guard: a byte comparison needs the
+// exact toolchain of whoever built the archive. So build-aar.sh writes a hash
+// of the source into a sidecar next to the archive, and both the Go test and
+// build-sideload.ps1 compare that hash to the source.
 //
-// The hash covers what reaches the archive: the package's non-test Go files
-// plus go.mod and go.sum. Test files are excluded because they are never linked
-// into the archive, and the stamp file is excluded because it holds the hash.
+// The sidecar lives beside the archive rather than inside it so that nothing
+// has to rewrite the zip. Both files are written by the same script run and are
+// gitignored, so they cannot drift from each other in normal use.
 package aarstamp
 
 import (
@@ -30,12 +28,19 @@ import (
 	"strings"
 )
 
-// StampFile holds the stamp. build-aar.sh rewrites it before every bind.
-const StampFile = "aar_stamp.go"
+// SidecarSuffix is appended to the archive path.
+const SidecarSuffix = ".source-hash"
 
-const stampConst = "const aarSourceStamp = "
+// SidecarPath returns the stamp path for an archive.
+func SidecarPath(aarPath string) string {
+	return aarPath + SidecarSuffix
+}
 
 // SourceFiles lists the package files that reach the archive, sorted.
+//
+// Only the top-level package is hashed, because only it is linked into the
+// archive: cmd/proxydom-engine is a separate main package that is never
+// imported by hy2bind. Test files are excluded for the same reason.
 func SourceFiles(pkgDir string) ([]string, error) {
 	entries, err := os.ReadDir(pkgDir)
 	if err != nil {
@@ -47,7 +52,7 @@ func SourceFiles(pkgDir string) ([]string, error) {
 		if e.IsDir() || !strings.HasSuffix(name, ".go") {
 			continue
 		}
-		if strings.HasSuffix(name, "_test.go") || name == StampFile {
+		if strings.HasSuffix(name, "_test.go") {
 			continue
 		}
 		names = append(names, name)
@@ -80,53 +85,50 @@ func SourceHash(pkgDir string) (string, error) {
 	return hex.EncodeToString(digest.Sum(nil)), nil
 }
 
-// CurrentStamp reads the stamp recorded in the stamp file. Empty when the file
-// is absent or carries no stamp.
-func CurrentStamp(pkgDir string) (string, error) {
-	body, err := os.ReadFile(filepath.Join(pkgDir, StampFile))
+// Write records the source hash beside the archive and returns it.
+func Write(pkgDir, aarPath string) (string, error) {
+	hash, err := SourceHash(pkgDir)
+	if err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(SidecarPath(aarPath), []byte(hash+"\n"), 0o644); err != nil {
+		return "", err
+	}
+	return hash, nil
+}
+
+// Read returns the recorded hash, or "" when there is no sidecar.
+func Read(aarPath string) (string, error) {
+	body, err := os.ReadFile(SidecarPath(aarPath))
 	if os.IsNotExist(err) {
 		return "", nil
 	}
 	if err != nil {
 		return "", err
 	}
-	for _, line := range strings.Split(string(body), "\n") {
-		line = strings.TrimSpace(line)
-		if !strings.HasPrefix(line, stampConst) {
-			continue
-		}
-		quoted := strings.TrimPrefix(line, stampConst)
-		if i := strings.Index(quoted, `"`); i >= 0 {
-			if j := strings.Index(quoted[i+1:], `"`); j >= 0 {
-				return quoted[i+1 : i+1+j], nil
-			}
-		}
-	}
-	return "", nil
+	return strings.TrimSpace(string(body)), nil
 }
 
-// Write rewrites the stamp file with the hash of the current source and
-// returns that hash.
-func Write(pkgDir string) (string, error) {
-	hash, err := SourceHash(pkgDir)
+// Verify reports whether the archive on disk was built from the current source.
+// A missing archive or sidecar is an error: build-aar.sh writes both, so their
+// absence means the caller skipped it.
+func Verify(pkgDir, aarPath string) error {
+	if _, err := os.Stat(aarPath); err != nil {
+		return fmt.Errorf("%s is missing: run mobile/android/hysteria-bind/build-aar.sh", aarPath)
+	}
+	want, err := SourceHash(pkgDir)
 	if err != nil {
-		return "", err
+		return err
 	}
-	body := fmt.Sprintf(`// Code generated by cmd/aarstamp from build-aar.sh. DO NOT EDIT.
-//
-// It is rewritten before every gomobile bind, so the committed archive carries
-// the hash of the source it was built from. See internal/aarstamp and
-// aar_stamp_test.go for what enforces it.
-
-package hy2bind
-
-// aarSourceStamp is the hash of this package's source when the committed
-// hysteria-client.aar was built.
-const aarSourceStamp = %q
-`, hash)
-	path := filepath.Join(pkgDir, StampFile)
-	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
-		return "", err
+	have, err := Read(aarPath)
+	if err != nil {
+		return err
 	}
-	return hash, nil
+	if have == "" {
+		return fmt.Errorf("%s has no %s: run build-aar.sh", aarPath, SidecarSuffix)
+	}
+	if have != want {
+		return fmt.Errorf("the archive predates the source:\n  source  %s\n  archive %s\nrun build-aar.sh", want, have)
+	}
+	return nil
 }

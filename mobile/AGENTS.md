@@ -23,6 +23,8 @@ Trojan, Shadowsocks, and VMess stay out of the product: the parser reads them, t
 
 `libXray.aar` was removed because it embeds `sagernet/sing` (GPL-3.0, ADR 036); do not fetch it back. `libbox` is sing-box and must not be vendored. hev stays dormant — do not call it from the active connect path. Policy: `docs/product-policy.md`. Authority: `docs/decisions/033-client-hy2-only-dial-set.md` (catalog) and `docs/decisions/035-imported-document-dial-set.md` (import).
 
+`hysteria-client.aar` is a build product and is not in git: `hysteria-bind/build-aar.sh` produces it, a `hy2bind-aar` job in `mobile-build.yml` and `android-apk.yml` runs it once and passes the archive to the jobs that link it as an artifact (building it inside each consumer runs out of disk on the four-ABI APK), and `android/build-sideload.ps1` refuses to build a production APK when the archive predates `hysteria-bind`. Do not commit it, and do not read it as source — the Go package is the source. iOS works the same way with `Hy2bind.xcframework`. Details: `android/app/libs/README.md`.
+
 ## Brand / palette
 
 **Current:** palette **v3 «Дуб и мох»** (2026-07-11).

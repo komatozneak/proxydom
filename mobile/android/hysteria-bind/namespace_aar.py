@@ -132,7 +132,9 @@ def _rewrite_elf(so: bytes) -> bytes:
         import lief
     except ImportError as err:
         raise SystemExit(
-            "namespace_aar: pip install lief  (ELF GNU hash rebuild)"
+            "namespace_aar: pip install lief==1.0.0  "
+            "(ELF GNU hash rebuild; CI installs the same pin in "
+            ".github/actions/build-hy2bind-aar)"
         ) from err
 
     reverse = tuple((new, old) for old, new in _JNI_PREFIX_RENAMES)

@@ -137,8 +137,8 @@ func SetProtector(p Protector) {
 //
 // Site-split suffixes are JSON-only (`direct_domain_suffixes`). Rebuild
 // hysteria-client.aar after changing this package — an old AAR ignores the
-// field. That is enforced, not just asked: build-aar.sh stamps the source into
-// the archive and aar_stamp_test.go fails when the two disagree.
+// field. build-aar.sh records a hash of this source beside the archive, and
+// build-sideload.ps1 refuses to build a production APK when the two disagree.
 func Start(configJSON string) string {
 	applyTunnelLogLevel(configJSON)
 	var cfg startConfig

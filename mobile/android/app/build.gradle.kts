@@ -160,10 +160,17 @@ dependencies {
     // Official Hy2 AAR (`hysteria-bind/build-aar.sh`). Do not add
     // libs/libXray.aar: it embeds sagernet/sing (GPL-3.0) and was removed
     // (ADR 036).
+    //
+    // The archive is a build product and is not committed, so its absence is a
+    // missing build step. Fail here with the command to run: `if (exists())`
+    // would instead drop the dependency and surface much later as an
+    // unresolved reference to hy2bind.Hy2bind from HysteriaBridge.kt.
     val hy2Aar = file("libs/hysteria-client.aar")
-    if (hy2Aar.exists()) {
-        implementation(files(hy2Aar))
+    check(hy2Aar.exists()) {
+        "libs/hysteria-client.aar is missing. Run: " +
+            "bash mobile/android/hysteria-bind/build-aar.sh"
     }
+    implementation(files(hy2Aar))
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.material:material:1.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")

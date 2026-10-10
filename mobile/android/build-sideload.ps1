@@ -79,6 +79,30 @@ if ($keyText -match "YOUR_.*_PASSWORD_HERE") {
     Write-Error "Edit key.properties: replace YOUR_STORE_PASSWORD_HERE and YOUR_KEY_PASSWORD_HERE"
 }
 
+# The APK links libs/hysteria-client.aar, not the Go source, and that archive is
+# a build product kept out of git. Refuse to build a production APK from an
+# archive that predates hy2bind: #317 shipped an engine that was 9 commits old
+# exactly this way, and nothing complained.
+$hy2bindDir = Join-Path $androidDir "hysteria-bind"
+$hy2Aar = Join-Path $androidDir "app\libs\hysteria-client.aar"
+Write-Host "Checking hysteria-client.aar against hy2bind..."
+$prevEap = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+Push-Location $hy2bindDir
+try {
+    $stampOut = & go run ./cmd/aarstamp verify . "$hy2Aar" 2>&1
+    $stampCode = $LASTEXITCODE
+} finally {
+    Pop-Location
+    $ErrorActionPreference = $prevEap
+}
+if ($stampCode -ne 0) {
+    Write-Host ($stampOut | Out-String)
+    Write-Error ("hysteria-client.aar does not match hysteria-bind. Run: " +
+        "bash mobile/android/hysteria-bind/build-aar.sh")
+}
+Write-Host ($stampOut | Out-String)
+
 $storePass = Read-KeyProperty "storePassword"
 $keyPass = Read-KeyProperty "keyPassword"
 $alias = Read-KeyProperty "keyAlias"

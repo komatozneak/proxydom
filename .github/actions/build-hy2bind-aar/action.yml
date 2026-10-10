@@ -1,0 +1,61 @@
+name: Build hy2bind AAR
+description: >-
+  Build mobile/android/app/libs/hysteria-client.aar from
+  mobile/android/hysteria-bind with gomobile. The archive is a build product and
+  is not committed, for the same reason iOS does not commit
+  Hy2bind.xcframework: it is produced from source on the machine that needs it.
+
+inputs:
+  hysteria-tag:
+    description: apernet/hysteria release to build against.
+    required: false
+    default: "v2.13.0"
+  go-version:
+    description: Go toolchain version.
+    required: false
+    default: "1.25.x"
+
+runs:
+  using: composite
+  steps:
+    # Warms GOCACHE and the module cache, which is what makes this affordable.
+    # Measured on one machine: a cold gomobile bind of all four ABIs took 387s,
+    # and with a warm cache and an edited hy2bind it took 26s.
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ inputs.go-version }}
+        cache-dependency-path: mobile/android/hysteria-bind/go.sum
+
+    # gomobile drives javac to produce classes.jar, so a JDK must be present
+    # before the bind, not merely before Gradle.
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: "17"
+
+    # namespace_aar.py renames the JNI exports with LIEF. A raw byte replacement
+    # leaves DT_GNU_HASH keyed on the old names and hy.Seq.init() dies with
+    # UnsatisfiedLinkError, so LIEF is required, not optional.
+    #
+    # setup-python rather than the runner's Python: Ubuntu 24.04 marks its
+    # system Python externally managed (PEP 668), where a bare pip install is
+    # refused. Pinned because the ELF rewrite depends on the LIEF API.
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install LIEF
+      shell: bash
+      run: python -m pip install --disable-pip-version-check "lief==1.0.0"
+
+    - name: Build hysteria-client.aar
+      shell: bash
+      env:
+        HYSTERIA_TAG: ${{ inputs.hysteria-tag }}
+      run: |
+        set -euo pipefail
+        cd mobile/android/hysteria-bind
+        bash build-aar.sh
