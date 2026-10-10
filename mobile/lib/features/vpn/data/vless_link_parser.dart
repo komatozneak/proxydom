@@ -37,7 +37,8 @@ class ParsedVlessLink {
 
 /// Parse a Marzban `vless://uuid@host:port?…#name` link.
 ///
-/// Mirrors [backend/app/services/vless_parser.py] — no env Reality fallbacks.
+/// No Reality fallbacks are read from the environment: whatever the link does
+/// not carry is absent, and the engine gate refuses what it cannot express.
 ParsedVlessLink parseVlessLink(String link) {
   final trimmed = link.trim();
   if (trimmed.isEmpty) {

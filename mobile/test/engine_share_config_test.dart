@@ -7,7 +7,7 @@ import 'package:proxydom/features/vpn/data/engine_share_config.dart';
 void main() {
   test('vless reality link is refused by the parked engine', () {
     // v2ray-core has no Reality engine, so the builder must not hand the loader
-    // a document it will reject (docs/ops/engine-migration/02-reality-spike-findings.md).
+    // a document it will reject.
     const raw =
         'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
         '?security=reality&sni=www.example.com&pbk=PUBLIC&sid=ab&fp=chrome#Alpha';

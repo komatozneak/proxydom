@@ -10,8 +10,9 @@ Network Extension target is in `Runner.xcodeproj` (`VpnTunnelProvider`).
 4. App Store provisioning profiles for **both** IDs — CI creates them via
    `app-store-connect fetch-signing-files --strict-match-identifier`, вручную не нужны.
 
-Team `LG3N5WA9TD`; App Store seller — `UMIKUM, TOO` (D&B record, DUNS `685529367`). Скриншот-порядок
-и проверка: `docs/ops/apple-org-umicum-runbook.md` §4.
+Team `LG3N5WA9TD`; App Store seller — `UMIKUM, TOO` (D&B record, DUNS `685529367`). Оба App ID
+создаются в портале с App Groups и Network Extensions; `group.su.proxydom.app` привязан к
+обоим, профили пересоздаёт Xcode — вручную не заводим.
 
 ## Hy2bind.xcframework (required to link)
 

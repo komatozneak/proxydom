@@ -1,11 +1,16 @@
-"""Bake the Прокси Дом app mark for the public site.
+"""Bake the Прокси Дом app mark for the project website.
 
 Source: `assets/icon/nav_vpn_proxydom.png` — the same cutout the Windows runner
 icon is baked from. Two outputs, both from that one source, so the header
 lockup, the download card and the browser tab can never drift apart:
 
-  `web/proxydom/assets/img/app-icon.png`  — the card mark, 512px
-  `web/proxydom/assets/img/favicon-32.png` — the tab mark, 32px
+  `app-icon.png`    — the card mark, 512px
+  `favicon-32.png`  — the tab mark, 32px
+
+Both are written to `../web/proxydom/assets/img`, relative to the repository
+root — that is, to a website tree sitting **next to** this repository. The
+website is not part of this repository, so this script only runs in the monorepo
+layout where the client is checked out beside the site.
 
 The corner pass lives in `bake_windows_icon` — both consumers want a mark that
 adapts to the surface behind it, and a black field baked into the PNG does not.

@@ -15,9 +15,10 @@ states) are secondary; license alone is a ship-blocker.
 
 ## Research
 
-See wiki (when synced): `queries/research-ai-visuals-flutter-alpha-2026-07-12.md`  
-In-repo workflow: `docs/hermes-cursor-workflow.md`  
-Product gates: `docs/product-first-users.md`
+The decision rests on licence, not taste: FLUX.2 Klein 9B output carries a
+non-commercial licence, so it cannot be shipped in a distributed client. The
+in-repo record is this file plus the palette decision in
+`mobile/docs/design/palette-v3-decision.md`.
 
 ## Replacement path (Visual epic #2 = A→B)
 

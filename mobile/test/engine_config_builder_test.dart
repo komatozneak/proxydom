@@ -817,7 +817,7 @@ void main() {
         spiderX: '/',
       );
       // v2ray-core carries no Reality engine, and xtls/reality ships only
-      // the server half (docs/ops/engine-migration/02-reality-spike-findings.md).
+      // the server half, so there is nothing to dial against.
       expect(
         () => EngineConfigBuilder.buildCandidateConfigs(
           const VpnSessionInputs(

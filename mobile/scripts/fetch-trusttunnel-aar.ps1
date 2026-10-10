@@ -1,7 +1,7 @@
 # Fetch trusttunnel-client-android AAR into android/app/libs/.
 # Source: GitHub Packages of TrustTunnel/TrustTunnelClient (no Maven Central
 # publication; building from source needs Conan+CMake+NDK — avoid).
-# See docs/decisions/006-dual-core-trusttunnel.md
+# The artefact is not on the Gradle classpath; see android/app/libs/README.md.
 #
 # REQUIRES: a GitHub PAT with `read:packages` scope in $env:GPR_KEY.
 # Create at https://github.com/settings/tokens (read:packages, public_repo).

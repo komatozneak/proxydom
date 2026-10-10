@@ -51,7 +51,7 @@ jobs:
             fi
           done
           if [ "$fail" -ne 0 ]; then
-            echo "See docs/ops/apple-testflight-checklist.md"
+            echo "Missing App Store Connect secrets. Required: APP_STORE_CONNECT_ISSUER_ID, APP_STORE_CONNECT_KEY_ID, APP_STORE_CONNECT_PRIVATE_KEY, BUILD_CERTIFICATE_BASE64, P12_PASSWORD."
             exit 1
           fi
 

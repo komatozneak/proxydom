@@ -17,19 +17,21 @@ const kEngineSocksPort = 10808;
 /// JSON config constructor for the parked VLESS engine on Android.
 ///
 /// The engine is `v2fly/v2ray-core` (MIT). It replaced `xtls/xray-core`, which
-/// pulled `sagernet/sing` (GPL-3.0) into the AAR and the xcframework; see
-/// `docs/decisions/036-permissive-only-engine-stack.md` and
-/// `docs/ops/engine-migration/03-mobile-engine-swap.md`.
+/// pulled `sagernet/sing` (GPL-3.0) into the AAR and the xcframework. That is
+/// not a preference: GPL-3.0 cannot be shipped in an App Store build at all,
+/// because its §10 forbids extra restrictions and §12 forbids distributing an
+/// incompatible work, and the store terms are exactly such restrictions. See
+/// `AGENTS.md` for the licence boundary this repository holds to.
 ///
 /// Two Xray features do not exist in this engine and are refused here rather
 /// than emitted for the loader to reject later ([_unsupportedSecurity],
 /// [_unsupportedTransport]):
 ///
 ///   - **Reality** — v2ray-core carries no Reality at all, and `xtls/reality`
-///     ships only the server half (docs/ops/engine-migration/02-reality-spike-findings.md).
+///     ships only the server half, so there is nothing to dial against.
 ///   - **XHTTP** — an Xray-only transport; v2ray-core has no `xhttp` dialer.
 ///
-/// Both sit behind the parked VLESS gate (ADR 033), so refusing them changes no
+/// Both sit behind the parked VLESS gate, so refusing them changes no
 /// user-visible behaviour today.
 ///
 /// Packet path: `hy2bind.StartShare` runs the engine with the SOCKS inbound
@@ -424,7 +426,7 @@ class EngineConfigBuilder {
       security,
       'creds.security',
       'the v2ray engine cannot express this security ($why); '
-      'see docs/ops/engine-migration/02-reality-spike-findings.md',
+      'Reality and XHTTP are Xray-only and are not supported by this engine',
     );
   }
 

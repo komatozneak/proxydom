@@ -1,19 +1,10 @@
 # Palette v3 decision — «Дуб и мох» (2026-07-11)
 
-## Source of truth
+> This file is the source of truth for the palette. It was written before the
+> project kept its design notes anywhere else, and it stays self-contained on
+> purpose: everything needed to reproduce the decision is below.
 
-Wiki (Hermes): `wiki/raw/papers/teremok-palette-v3-decision-2026-07-11.md`
-
-> At epic start this file was not yet pushed to the `teremok-wiki-` submodule.
-> This mobile doc mirrors the user-locked decision from Cursor Brief v6 so the
-> app tree stays self-contained until Hermes completes the wiki sweep.
-
-Related research (expected wiki paths):
-
-- `wiki/raw/papers/palettes-oak-moss-peach-cream-research-2026-07-11.md`
-- `wiki/raw/papers/flux-klein-prompt-patterns-2026-07-11.md`
-
-Moodboard source (local): `Desktop/moodboard/v3_oak_moss/oak_moss_hero_01.png`
+Moodboard source: `oak_moss_hero_01.png` (local moodboard)
 → shipped as `mobile/assets/brand/onboarding_globe.png`.
 
 ## Why oak+moss

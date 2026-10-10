@@ -1,11 +1,13 @@
 # Proxy Dom — мобильный клиент
 
-> Локальный конфигуратор Hysteria2 (ADR 033). minSdk **26**. Пакет Play: `com.proxy.dom`.  
+> Локальный конфигуратор прокси: Hysteria2 на всех платформах, VLESS на Android.
+> minSdk **26**. Пакет Play: `com.proxy.dom`.
 > Правила: [`mobile/AGENTS.md`](./AGENTS.md), корневой [`AGENTS.md`](../AGENTS.md).
 
 ## Стек
 
 - Flutter + Riverpod + go_router
+- Движок: `hy2bind` — Go, `v2fly/v2ray-core` v5.54.2 (MIT) и `apernet/hysteria`
 - MethodChannel `proxydom/vpn`
 
 ## Команды
@@ -30,6 +32,7 @@ cd mobile\android
 
 ## Не делать
 
-- Не возвращать libbox / sing-box / Flash Call.
+- Не возвращать `libbox` / `sing-box` / `xray-core` — это GPL-3.0, он не может
+  входить в поставку (см. корневой `AGENTS.md` и `android/app/libs/README.md`).
 - Не добавлять `com.android.vending.BILLING`.
 - Не хардкодить `Color(0xFF…)` — только `AppBrand` / `ColorScheme`.

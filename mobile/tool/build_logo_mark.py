@@ -2,14 +2,16 @@
 
 Source of truth is the same cutout `bake_web_icon.py` bakes the PNG marks from —
 `assets/icon/nav_vpn_proxydom.png`, which reaches this script through the baked
-512px `web/proxydom/assets/img/app-icon.png`. The house is traced from that icon
-rather than from `mascot-mask.png`: the mask is a derived raster that lost the
-door under the O, and the icon is the master the launcher is baked from. The door
-is part of the outer contour there, so tracing the icon's own house outline
-carries it for free.
+512px `app-icon.png` that `bake_web_icon.py` writes into the website tree beside
+this repository. The house is traced from that icon rather than from
+`mascot-mask.png`: the mask is a derived raster that lost the door under the O,
+and the icon is the master the launcher is baked from. The door is part of the
+outer contour there, so tracing the icon's own house outline carries it for free.
 
 Output is a mask, not a picture: CSS paints it in `currentColor`, so the site
-keeps one ink for the lockup and the mark stays sharp at any zoom.
+keeps one ink for the lockup and the mark stays sharp at any zoom. The site is
+not part of this repository, so this script only runs in the monorepo layout
+where the client is checked out beside it.
 
 Run: `python mobile/tool/build_logo_mark.py` (from mobile/tool, or repo root —
 paths resolve off this file, not the cwd).
