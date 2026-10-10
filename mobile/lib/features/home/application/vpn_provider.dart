@@ -1252,7 +1252,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
           // A reissued document rotates every node password, so the cached
           // config presents a stale secret and the node masquerades (405).
           // Re-read the document and redial once before calling the key dead.
-          if (startError.code == kVpnNodeAuthRefusedErrorCode &&
+          if (startError.code == kNodeAuthRefusedErrorCode &&
               shouldRefreshAfterAuthRefusal(
                 alreadyRefreshed: _authRefreshRetried,
                 userStopping: _suppressAutoReconnect,

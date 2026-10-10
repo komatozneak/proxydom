@@ -16,7 +16,7 @@ const kVpnPathIncompatibleErrorCode = 'path_incompatible';
 const kVpnApiUnreachableErrorCode = 'api_unreachable';
 
 /// Hy2 answered with the masquerade site's HTTP 405, not our error code.
-const kVpnNodeAuthRefusedErrorCode = 'node_auth_refused';
+const kNodeAuthRefusedErrorCode = 'node_auth_refused';
 
 /// Why an Auto mint produced no config.
 enum AutoMintSkipKind {
@@ -79,8 +79,8 @@ VpnError vpnErrorFromNativeDetail(
   }
   if (_isNodeAuthRefusal(detail)) {
     return const VpnError(
-      message: kVpnNodeAuthRefusedErrorCode,
-      code: kVpnNodeAuthRefusedErrorCode,
+      message: kNodeAuthRefusedErrorCode,
+      code: kNodeAuthRefusedErrorCode,
     );
   }
   return VpnError(message: 'vpn: $detail');

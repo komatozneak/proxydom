@@ -72,8 +72,8 @@ void main() {
       final err = vpnErrorFromNativeDetail(
         'hy2 client: authentication error, HTTP status code: 405',
       );
-      expect(err.code, kVpnNodeAuthRefusedErrorCode);
-      expect(err.message, kVpnNodeAuthRefusedErrorCode);
+      expect(err.code, kNodeAuthRefusedErrorCode);
+      expect(err.message, kNodeAuthRefusedErrorCode);
       expect(err.message, isNot(contains('405')));
     });
 

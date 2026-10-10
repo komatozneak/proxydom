@@ -743,7 +743,7 @@ class _FreeClientHome extends StatelessWidget {
         l.freeSubscriptionDeviceLimit,
       VpnError(:final code) when code == 'client_refused' =>
         l.freeSubscriptionClientRefused,
-      VpnError(:final code) when code == kVpnNodeAuthRefusedErrorCode =>
+      VpnError(:final code) when code == kNodeAuthRefusedErrorCode =>
         l.homeNodeAuthRefused,
       VpnError() => l.homeErrorFriendly,
       _ => null,
