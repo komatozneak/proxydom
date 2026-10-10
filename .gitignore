@@ -1,0 +1,104 @@
+# Secrets & env
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+.gcp/
+.aws/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
+*.egg-info/
+dist/
+build/
+*.whl
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+
+# Node / Flutter / Dart
+node_modules/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+*.apk
+*.aab
+*.ipa
+*.app
+
+# Local logs and databases
+*.db
+*.sqlite
+*.sqlite3
+*.log
+logs/
+
+# OS
+Thumbs.db
+desktop.ini
+
+# Coverage reports
+coverage/
+.nyc_output/
+
+# Windows Hy2 host: official bins and local zip (SHA256SUMS is committed)
+desktop/windows/bin/*
+!desktop/windows/bin/.gitignore
+desktop/windows/dist/
+
+# Local debug / smoke artifacts (VPN troubleshooting dumps)
+tmp_*
+tmp-*/
+empty.txt
+filled.txt
+new.txt
+old.txt
+mobile/tmp_*.xml
+
+# Local Windows ACL repair dumps. They record this machine's SIDs.
+.dsh-acl-out/
+
+# Scratch renders: local experiments, not source.
+_piltest.png
+.scratch/
+scratch/
+
+# GPL engines must not come back. libXray.aar embedded github.com/sagernet/sing
+# (GPL-3.0-or-later) and was removed, along with libbox.aar and the sing-box-*
+# binaries. Do not download them and do not put them on the Gradle classpath:
+# a copyleft dependency breaks the iOS build, because the App Store terms are
+# incompatible with GPL-3.0 regardless of whether the app is paid.
+mobile/android/app/libs/*.aar
+
+# hysteria-client.aar is a build product, not a committed artifact.
+# build-aar.sh produces it; in CI a single hy2bind-aar job builds it and passes
+# it to the jobs that link it as an artifact. iOS never committed
+# Hy2bind.xcframework either. The .jar is the sources archive gomobile writes
+# next to it, and .source-hash records which hy2bind source the archive was
+# built from, so build-sideload.ps1 can refuse a stale one.
+mobile/android/app/libs/*.jar
+mobile/android/app/libs/*.source-hash
+
+# Flutter writes absolute paths into these when it resolves plugins.
+mobile/windows/flutter/ephemeral/

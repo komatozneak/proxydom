@@ -1,0 +1,25 @@
+# Proxy Dom — review ownership.
+#
+# The licence guard and the engine boundary are the two places where a mistake
+# is expensive and hard to reverse, so they ask for an explicit review.
+
+# Default owner for everything.
+*                                   @komatozneak
+
+# The Go engine. A copyleft module reaching this build breaks the iOS release.
+/mobile/android/hysteria-bind/      @komatozneak
+
+# The shipped notice inventory. MIT, BSD and Apache require these notices to be
+# preserved; regenerating it wrong is a licence violation, not a typo.
+/mobile/assets/legal/               @komatozneak
+
+# CI that builds and hands off the engine archive.
+/.github/actions/                   @komatozneak
+/.github/workflows/mobile-build.yml @komatozneak
+/.github/workflows/android-apk.yml  @komatozneak
+/.github/workflows/ios-testflight.yml @komatozneak
+
+# Licence and security policy.
+/LICENSE                            @komatozneak
+/SECURITY.md                        @komatozneak
+/CONTRIBUTING.md                    @komatozneak
