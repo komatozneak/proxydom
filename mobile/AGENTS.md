@@ -17,14 +17,14 @@ iOS bundle id is **`su.proxydom.app`** (extension `su.proxydom.app.VpnTunnelProv
 
 ## Dial set
 
-**Two sets, do not mix them (ADR 035):**
+**Two sets exist and must not be mixed (ADR 035). Only the second is in this repo:**
 
-- **Catalog dial set** — nodes the catalog and the bot serve: **Hysteria2 only** (ADR 018, ADR 033), `hy2://` and `hysteria2://` including `obfs=salamander` and port hop.
+- **The catalog is not in this repo.** Nodes the bot's catalog serves are **Hysteria2 only** (ADR 018, ADR 033), `hy2://` and `hysteria2://` including `obfs=salamander` and port hop. The client is a local configurator and never receives them: `VpnNode`, the model of `GET /api/v1/vpn/nodes`, was removed with the account era, so nothing here reads a catalog.
 - **Imported-document dial set** — lines the user pastes or pulls from a foreign HTTPS document: **Hysteria2 on every OS, and VLESS where the engine can carry the line.** That is Android and Windows, and it is one engine: in-process `v2fly/v2ray-core` v5.54.2 (MIT) inside hy2bind on Android, the same core inside `proxydom-engine.exe` on Windows; ADR 036 is why it is not `xray-core`. Reality and XHTTP are not describable, so those lines stay inactive. iOS has no VLESS engine and its gate stays closed until its own task. `lib/features/vpn/data/dial_set.dart` is the single authority.
 
 Trojan, Shadowsocks, and VMess stay out of the product: the parser reads them, the dial gate does not admit them (ADR 033 §3, ADR 035 §5). A mixed document imports whole and is never deleted. A line this platform cannot start is a neutral badge, not an error.
 
-`libXray.aar` was removed because it embeds `sagernet/sing` (GPL-3.0); do not fetch it back. `libbox` is sing-box and must not be vendored. hev stays dormant — do not call it from the active connect path. GPL-3.0 and AGPL-3.0 cannot enter the client build at all: §10 forbids extra restrictions on the rights granted and §12 forbids distributing an incompatible work, and the App Store terms are exactly such restrictions — which is why the licence boundary is about distribution, not about price. `dial_set.dart` (catalog gate) and the import gate below are the authority for what may run.
+`libXray.aar` was removed because it embeds `sagernet/sing` (GPL-3.0); do not fetch it back. `libbox` is sing-box and must not be vendored. hev stays dormant — do not call it from the active connect path. GPL-3.0 and AGPL-3.0 cannot enter the client build at all: §10 forbids extra restrictions on the rights granted and §12 forbids distributing an incompatible work, and the App Store terms are exactly such restrictions — which is why the licence boundary is about distribution, not about price. `dial_set.dart` is the authority for what may run.
 
 `hysteria-client.aar` is a build product and is not in git: `hysteria-bind/build-aar.sh` produces it, a `hy2bind-aar` job in `mobile-build.yml` and `android-apk.yml` runs it once and passes the archive to the jobs that link it as an artifact (building it inside each consumer runs out of disk on the four-ABI APK), and `android/build-sideload.ps1` refuses to build a production APK when the archive predates `hysteria-bind`. Do not commit it, and do not read it as source — the Go package is the source. iOS works the same way with `Hy2bind.xcframework`. Details: `android/app/libs/README.md`.
 
