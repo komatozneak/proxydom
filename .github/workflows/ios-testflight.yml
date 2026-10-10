@@ -119,6 +119,59 @@ jobs:
           chmod 600 "$RUNNER_TEMP/cert_key"
           test -s "$RUNNER_TEMP/cert_key"
 
+          # The first --create (run 38037626182) minted these profiles before
+          # App Groups was saved on the App IDs. fetch-signing-files reuses an
+          # existing IOS_APP_STORE profile, so the archive still rejects
+          # group.su.proxydom.app. Delete those two by name; --create below
+          # mints replacements from the current App ID capabilities.
+          python - <<'PY'
+          import json, subprocess
+          stale = {
+              "Proxy Dom iOS ios_app_store 1791620707",
+              "Proxy Dom VPN Extension ios_app_store 1791620709",
+          }
+          raw = subprocess.check_output(
+              [
+                  "app-store-connect", "profiles", "list",
+                  "--type", "IOS_APP_STORE",
+                  "--json",
+                  "--no-color",
+                  "-s",
+              ],
+              text=True,
+          )
+          raw = raw.strip()
+          try:
+              data = json.loads(raw)
+          except json.JSONDecodeError:
+              data = None
+              for index, char in enumerate(raw):
+                  if char not in "[{":
+                      continue
+                  try:
+                      data = json.loads(raw[index:])
+                      break
+                  except json.JSONDecodeError:
+                      continue
+              if data is None:
+                  raise SystemExit("profiles list did not return JSON")
+          if isinstance(data, dict):
+              data = data.get("data") or data.get("profiles") or []
+          for item in data:
+              attrs = item.get("attributes") or {}
+              name = attrs.get("name") or item.get("name")
+              profile_id = item.get("id")
+              if name in stale and profile_id:
+                  print(f"Deleting stale profile {name} ({profile_id})")
+                  subprocess.check_call(
+                      [
+                          "app-store-connect", "profiles", "delete",
+                          profile_id,
+                          "--ignore-not-found",
+                      ]
+                  )
+          PY
+
           # --strict-match-identifier: do not also match RunnerTests
           # (su.proxydom.app.RunnerTests).
           app-store-connect fetch-signing-files "$APP_BUNDLE_ID" \

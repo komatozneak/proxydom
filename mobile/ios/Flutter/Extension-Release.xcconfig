@@ -1,0 +1,3 @@
+// Packet tunnel must not include Release.xcconfig. pod install prepends the
+// Pods-Runner xcconfig there, and that links Flutter plugins into the appex.
+#include "Generated.xcconfig"

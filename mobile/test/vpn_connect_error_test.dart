@@ -639,4 +639,29 @@ void main() {
       );
     });
   });
+
+  group('iOS session wire names', () {
+    test('ConnectedHealthy with a newer generation is a live connect', () {
+      final snap = VpnSessionSnapshot.fromJson({
+        'phase': 'ConnectedHealthy',
+        'generation': 2,
+        'reason': 'None',
+        'legacyStatus': 'connected',
+      });
+      expect(snap.phase, VpnSessionPhase.connectedHealthy);
+      expect(snap.isConnected, isTrue);
+      expect(snap.generation, 2);
+      expect(snap.reason, VpnSessionReason.none);
+    });
+
+    test('lowercase phase names are not a connect', () {
+      final snap = VpnSessionSnapshot.fromJson({
+        'phase': 'connectedHealthy',
+        'generation': 0,
+        'reason': 'none',
+      });
+      expect(snap.phase, VpnSessionPhase.unknown);
+      expect(snap.isConnected, isFalse);
+    });
+  });
 }

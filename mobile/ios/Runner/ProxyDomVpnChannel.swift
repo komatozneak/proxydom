@@ -116,8 +116,10 @@ enum ProxyDomVpnChannel {
       case "setCoreLogLevel":
         // Was a stub that answered `true` and touched nothing, so the level
         // picker did nothing on this platform and the ring had no gate.
+        let args = call.arguments as? [String: Any]
+        let level = args?["level"] as? String ?? "info"
         ProxyDomVpnShared.defaults?.set(
-          call.argument<String>("level") ?? "info",
+          level,
           forKey: ProxyDomVpnShared.nativeLogLevelKey
         )
         result(true)
@@ -608,21 +610,27 @@ private final class SessionStreamHandler: NSObject, FlutterStreamHandler {
   }
 
   private static func snapshot(for status: String) -> [String: Any] {
+    // Wire names are SessionPhase.name (ConnectedHealthy, Binding, …).
+    // Flutter's parser does not accept the lowercase forms, so a connected
+    // event was unknown, never cleared the dial generation, and the Nest
+    // stayed on Connecting after the tunnel was already up.
+    // generation is the App Group counter startTunnel bumps. A snapshot
+    // whose generation is not above the floor taken before start is ignored.
     let phase: String
     switch status {
     case "connected":
-      phase = "connectedHealthy"
+      phase = "ConnectedHealthy"
     case "connecting", "preparing":
-      phase = "binding"
+      phase = "Binding"
     case "disconnecting":
-      phase = "stopping"
+      phase = "Stopping"
     default:
-      phase = "idle"
+      phase = "Idle"
     }
     return [
       "phase": phase,
-      "generation": 0,
-      "reason": "none",
+      "generation": ProxyDomVpnShared.currentGeneration(),
+      "reason": "None",
       "legacyStatus": status,
     ]
   }

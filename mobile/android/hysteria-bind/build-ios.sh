@@ -32,7 +32,7 @@ go test -count=1 -run 'TestLicenseGuard$' .
 gomobile init >/dev/null 2>&1 || true
 
 # ios + simulator fat xcframework. Do not commit the binary.
-gomobile bind -v -target=ios -iosversion=13.0 \
+gomobile bind -v -target=ios -iosversion=15.0 \
   -o "$OUT_DIR/Hy2bind.xcframework" .
 
 echo "Wrote $OUT_DIR/Hy2bind.xcframework"
