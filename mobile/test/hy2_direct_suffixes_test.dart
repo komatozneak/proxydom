@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:proxydom/features/settings/data/split_tunnel_prefs.dart';
-import 'package:proxydom/features/vpn/data/vpn_config.dart';
+import 'package:proxydom/features/vpn/data/hysteria_profile.dart';
 import 'package:proxydom/features/vpn/data/vpn_controller.dart';
 import 'package:proxydom/features/vpn/data/vpn_route_policy.dart';
 
@@ -41,11 +41,11 @@ void main() {
     expect(isSmartForceProxyHost('vk.com'), isFalse);
   });
 
-  test('buildStartParamsJson ships RF defaults and strips YouTube', () async {
+  test('buildHy2StartParamsJson ships RF defaults and strips YouTube', () async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     SharedPreferences.setMockInitialValues({});
-    final defaultJson = await VpnController.instance.buildStartParamsJson(
-      _hy2Config(),
+    final defaultJson = await VpnController.instance.buildHy2StartParamsJson(
+      _hy2Profile(),
     );
     final defaultMap = jsonDecode(defaultJson) as Map<String, dynamic>;
     final defaultSuffixes = List<String>.from(
@@ -63,7 +63,7 @@ void main() {
     await SplitTunnelPrefs.addSite(domain: 'example.com');
     await SplitTunnelPrefs.addSite(domain: 'youtube.com');
     final wired = jsonDecode(
-      await VpnController.instance.buildStartParamsJson(_hy2Config()),
+      await VpnController.instance.buildHy2StartParamsJson(_hy2Profile()),
     ) as Map<String, dynamic>;
     final suffixes = List<String>.from(
       wired['directDomainSuffixes'] as List<dynamic>,
@@ -81,7 +81,7 @@ void main() {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     SharedPreferences.setMockInitialValues({});
     final plain = jsonDecode(
-      await VpnController.instance.buildStartParamsJson(_hy2Config()),
+      await VpnController.instance.buildHy2StartParamsJson(_hy2Profile()),
     ) as Map<String, dynamic>;
     expect(plain, isNot(contains('hysteriaCongestion')));
     expect(plain, isNot(contains('hysteriaMaxIdleTimeout')));
@@ -90,8 +90,8 @@ void main() {
     expect(plain, isNot(contains('hysteriaBandwidthUp')));
 
     final declared = jsonDecode(
-      await VpnController.instance.buildStartParamsJson(
-        _hy2Config(
+      await VpnController.instance.buildHy2StartParamsJson(
+        _hy2Profile(
           congestion: 'brutal',
           bbrProfile: 'aggressive',
           maxIdleTimeout: '20',
@@ -113,7 +113,7 @@ void main() {
 
     final started = await _captureStartParams(
       () => VpnController.instance.startHysteria(
-        _hy2Config(maxIdleTimeout: '1', congestion: 'brutal').hysteriaProfile!,
+        _hy2Profile(maxIdleTimeout: '1', congestion: 'brutal'),
       ),
     );
     expect(started['hysteriaMaxIdleTimeout'], '1');
@@ -126,7 +126,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     await SplitTunnelPrefs.setDisallowedPackage('ru.yandex.taxi', true);
     final map = jsonDecode(
-      await VpnController.instance.buildStartParamsJson(_hy2Config()),
+      await VpnController.instance.buildHy2StartParamsJson(_hy2Profile()),
     ) as Map<String, dynamic>;
     expect(map, contains('directDomainSuffixes'));
     expect(
@@ -144,7 +144,7 @@ void main() {
     await SplitTunnelPrefs.setDisallowedPackage('com.example.android', true);
 
     final map = jsonDecode(
-      await VpnController.instance.buildStartParamsJson(_hy2Config()),
+      await VpnController.instance.buildHy2StartParamsJson(_hy2Profile()),
     ) as Map<String, dynamic>;
     expect(map, isNot(contains('directDomainSuffixes')));
     expect(map, isNot(contains('disallowedApplications')));
@@ -176,7 +176,7 @@ void main() {
     );
 
     await VpnController.instance.startHysteria(
-      _hy2Config().hysteriaProfile!,
+      _hy2Profile(),
     );
     final map = jsonDecode(captured!) as Map<String, dynamic>;
     expect(map, isNot(contains('directDomainSuffixes')));
@@ -246,31 +246,25 @@ Future<Map<String, dynamic>> _captureStartParams(
   return jsonDecode(captured!) as Map<String, dynamic>;
 }
 
-VpnConfig _hy2Config({
+HysteriaProfile _hy2Profile({
   String congestion = '',
   String bbrProfile = '',
   String maxIdleTimeout = '',
   String keepAlivePeriod = '',
   String fmDeclared = '',
 }) {
-  return VpnConfig.fromJson({
-    'username': 'test_user',
-    'links': const <String>[],
-    'expire': 1785654092,
-    'active_core': 'hysteria',
-    'hysteria_profile': {
-      'schema_version': 1,
-      'node_id': 'eu-hy2-1',
-      'server': 'hy2.example:443',
-      'auth': 'user:pass',
-      'username': 'user',
-      'sni': 'hy2.example',
-      'socks_listen': '127.0.0.1:10808',
-      if (congestion.isNotEmpty) 'congestion': congestion,
-      if (bbrProfile.isNotEmpty) 'bbr_profile': bbrProfile,
-      if (maxIdleTimeout.isNotEmpty) 'max_idle_timeout': maxIdleTimeout,
-      if (keepAlivePeriod.isNotEmpty) 'keep_alive_period': keepAlivePeriod,
-      if (fmDeclared.isNotEmpty) 'fm_declared': fmDeclared,
-    },
-  });
+  return HysteriaProfile(
+    schemaVersion: 1,
+    nodeId: 'eu-hy2-1',
+    server: 'hy2.example:443',
+    auth: 'user:pass',
+    username: 'user',
+    sni: 'hy2.example',
+    socksListen: '127.0.0.1:10808',
+    congestion: congestion,
+    bbrProfile: bbrProfile,
+    maxIdleTimeout: maxIdleTimeout,
+    keepAlivePeriod: keepAlivePeriod,
+    fmDeclared: fmDeclared,
+  );
 }

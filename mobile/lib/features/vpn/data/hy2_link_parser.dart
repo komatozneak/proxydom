@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'vpn_config.dart';
+import 'hysteria_profile.dart';
 
 /// One pasted Hysteria2 server.
 class ParsedHy2Link {

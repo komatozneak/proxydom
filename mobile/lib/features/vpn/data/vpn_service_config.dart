@@ -1,13 +1,17 @@
-import 'dart:convert';
-
 import '../../../core/app_locale.dart';
 import '../../../core/config.dart';
 import 'node_display.dart';
-import 'vpn_config.dart';
-import 'vpn_node.dart';
 
 /// User-facing brand name for VPN session / fallback labels (no Marzban id).
 const kVpnBrandSessionName = 'Прокси Дом';
+
+/// Scheme of the selected local line, as `dial_set.dart` names it.
+///
+/// These were declared beside the catalog `VpnNode` class, which went with the
+/// account era. The schemes themselves are live: [sessionProtocolLabel] keys
+/// off them, because a Hy2 or TrustTunnel line must not be labelled VLESS.
+const kDialSchemeHysteria2 = 'hysteria2';
+const kDialSchemeTrusttunnel = 'trusttunnel';
 
 /// Normalize outbound type for native/UI (never `"unknown"`).
 String normalizeOutboundType(String? type) {
@@ -20,22 +24,15 @@ String normalizeOutboundType(String? type) {
 String friendlyProtocolLabel(String? type) =>
     normalizeOutboundType(type).toUpperCase();
 
-/// Session protocol for logs / Home: Hy2 and TrustTunnel must not fall back to VLESS.
-String sessionProtocolLabel({
-  required VpnConfig? config,
-  String? selectedNodeProtocol,
-}) {
+/// Session protocol for logs / Home: Hy2 and TrustTunnel must not fall back to
+/// VLESS.
+String sessionProtocolLabel({String? selectedNodeProtocol}) {
   final selected = (selectedNodeProtocol ?? '').trim().toLowerCase();
-  if (config?.isHysteriaSession == true ||
-      selected == kVpnNodeProtocolHysteria2) {
+  if (selected == kDialSchemeHysteria2) {
     return 'HYSTERIA2';
   }
-  if (config?.isTrustTunnelSession == true ||
-      selected == kVpnNodeProtocolTrusttunnel) {
+  if (selected == kDialSchemeTrusttunnel) {
     return 'TRUSTTUNNEL';
-  }
-  if (config?.engineProfile?.candidates.isNotEmpty == true) {
-    return friendlyProtocolLabel(config!.primaryCandidate.protocol);
   }
   if (selected.isNotEmpty) {
     return friendlyProtocolLabel(selected);
@@ -57,199 +54,32 @@ String localizeVpnLabel(String raw) {
   return stripped;
 }
 
-/// Human label for region/node; never Marzban `username`.
+/// Human label for the active hop; never Marzban `username`.
 ///
-/// Order: explicit [displayLabel] → [VpnConfig.nodeHost] /
-/// [VpnConfig.expectedEgressHost] → primary candidate host → brand name.
-String resolveVpnDisplayLabel(VpnConfig config, {String? displayLabel}) {
+/// The explicit label the user's own line carries wins. There is nothing else to
+/// fall back to now: the catalog host the old signature consulted came from the
+/// backend config the local configurator never fetches, so the brand name is the
+/// honest answer when no label is set.
+String connectedServerName({String? displayLabel}) {
   final explicit = displayLabel?.trim();
   if (explicit != null && explicit.isNotEmpty) {
     return localizeVpnLabel(explicit);
   }
+  return kVpnBrandSessionName;
+}
 
+/// Extra hosts for Android `excludeRoute`, so they stay off TUN. The selected
+/// node is excluded separately as its own server. A hostname of the control
+/// plane is not pinned to a baked-in address.
+List<String> controlPlaneHostsOf() {
   final hosts = <String>{};
-  void addHost(String? value) {
-    final h = value?.trim();
-    if (h != null && h.isNotEmpty && h != 'unknown') {
-      hosts.add(h);
+  try {
+    final host = Uri.parse(AppConfig.baseUrl).host;
+    if (RegExp(r'^(\d{1,3}\.){3}\d{1,3}$').hasMatch(host)) {
+      hosts.add(host);
     }
+  } catch (_) {
+    // ignore malformed baseUrl in tests
   }
-
-  addHost(config.nodeHost);
-  addHost(config.expectedEgressHost);
-  final profile = config.engineProfile;
-  if (profile != null && profile.candidates.isNotEmpty) {
-    addHost(config.primaryCandidate.host);
-  }
-
-  for (final host in hosts) {
-    final known = placeForKnownHost(host);
-    if (known != null) return known.displayTitle(_uiLanguageCode());
-  }
-
-  for (final host in hosts) {
-    final place = placeForHost(host);
-    if (!_isGenericServerPlaceholder(place.title)) {
-      return place.displayTitle(_uiLanguageCode());
-    }
-  }
-
-  return kVpnBrandSessionName;
-}
-
-/// Home card / logs: catalog label wins even when Flutter has no live mint yet.
-String connectedServerName({VpnConfig? config, String? displayLabel}) {
-  final explicit = displayLabel?.trim();
-  if (explicit != null && explicit.isNotEmpty) {
-    return localizeVpnLabel(explicit);
-  }
-  if (config != null) {
-    return resolveVpnDisplayLabel(config);
-  }
-  return kVpnBrandSessionName;
-}
-
-bool _isGenericServerPlaceholder(String title) =>
-    RegExp(r'^(Сервер|Server) \d+$').hasMatch(title);
-
-/// Peer address for TUN (/30) used by [VpnService.Builder.addDnsServer].
-String tunDnsPeerAddress(String address, int prefixLength) {
-  final octets = address.split('.').map(int.parse).toList();
-  if (octets.length != 4) return '172.19.0.2';
-
-  final ip =
-      (octets[0] << 24) | (octets[1] << 16) | (octets[2] << 8) | octets[3];
-  final mask = prefixLength == 0 ? 0 : (-1 << (32 - prefixLength));
-  final network = ip & mask;
-  final broadcast = network | (~mask & 0xffffffff);
-  final host1 = network + 1;
-  final host2 = broadcast - 1;
-
-  final int peer;
-  if (ip == host1) {
-    peer = host2;
-  } else if (ip == host2) {
-    peer = host1;
-  } else {
-    peer = host2;
-  }
-  return '${(peer >> 24) & 0xff}.${(peer >> 16) & 0xff}'
-      '.${(peer >> 8) & 0xff}.${peer & 0xff}';
-}
-
-/// Parameters for VpnService.Builder — Flutter ↔ Android via MethodChannel.
-class VpnServiceConfig {
-  const VpnServiceConfig({
-    required this.sessionName,
-    required this.displayLabel,
-    required this.outboundType,
-    required this.mtu,
-    required this.address,
-    required this.addressPrefix,
-    required this.routes,
-    required this.dnsServers,
-    required this.outboundServer,
-    required this.outboundServerPort,
-    required this.outboundUuid,
-    required this.outboundFlow,
-    required this.outboundTlsFingerprint,
-    required this.outboundTlsSni,
-    required this.outboundTlsPublicKey,
-    required this.outboundTlsShortId,
-    this.egressHosts = const [],
-  });
-
-  final String sessionName;
-  final String displayLabel;
-  final String outboundType;
-  final int mtu;
-  final String address;
-  final int addressPrefix;
-  final List<String> routes;
-  final List<String> dnsServers;
-  final String outboundServer;
-  final int outboundServerPort;
-  final String outboundUuid;
-  final String? outboundFlow;
-  final String? outboundTlsFingerprint;
-  final String? outboundTlsSni;
-  final String? outboundTlsPublicKey;
-  final String? outboundTlsShortId;
-  final List<String> egressHosts;
-
-  /// Hosts that must stay off TUN via Android [excludeRoute].
-  List<String> get controlPlaneHosts => controlPlaneHostsOf();
-
-  /// Extra hosts for Android [excludeRoute]. The selected node is excluded
-  /// separately as [outboundServer]. A hostname of the old control plane is
-  /// not pinned to a baked-in address.
-  static List<String> controlPlaneHostsOf() {
-    final hosts = <String>{};
-    try {
-      final host = Uri.parse(AppConfig.baseUrl).host;
-      if (RegExp(r'^(\d{1,3}\.){3}\d{1,3}$').hasMatch(host)) {
-        hosts.add(host);
-      }
-    } catch (_) {
-      // ignore malformed baseUrl in tests
-    }
-    return hosts.toList();
-  }
-
-  Map<String, dynamic> toMap() {
-    return {
-      'sessionName': sessionName,
-      'displayLabel': displayLabel,
-      'outboundType': outboundType,
-      'mtu': mtu,
-      'address': address,
-      'addressPrefix': addressPrefix,
-      'routes': routes,
-      'dnsServers': dnsServers,
-      'outboundServer': outboundServer,
-      'outboundServerPort': outboundServerPort,
-      'outboundUuid': outboundUuid,
-      'outboundFlow': outboundFlow,
-      'outboundTlsFingerprint': outboundTlsFingerprint,
-      'outboundTlsSni': outboundTlsSni,
-      'outboundTlsPublicKey': outboundTlsPublicKey,
-      'outboundTlsShortId': outboundTlsShortId,
-      'controlPlaneHosts': controlPlaneHosts,
-      'egressHosts': egressHosts,
-    };
-  }
-
-  String toJsonString() => jsonEncode(toMap());
-
-  /// Build TUN + outbound flat fields from a minted config (Hy2 or leftover cache).
-  factory VpnServiceConfig.fromVpnConfig(
-    VpnConfig config, {
-    String? displayLabel,
-  }) {
-    final primary = config.primaryCandidate;
-    const address = '10.255.255.1';
-    const addressPrefix = 30;
-    final routes = <String>['0.0.0.0/0'];
-    final dnsServers = [tunDnsPeerAddress(address, addressPrefix)];
-
-    return VpnServiceConfig(
-      sessionName: kVpnBrandSessionName,
-      displayLabel: resolveVpnDisplayLabel(config, displayLabel: displayLabel),
-      outboundType: normalizeOutboundType(primary.protocol),
-      mtu: 1500,
-      address: address,
-      addressPrefix: addressPrefix,
-      routes: routes,
-      dnsServers: dnsServers,
-      outboundServer: primary.host,
-      outboundServerPort: primary.port,
-      outboundUuid: primary.uuid,
-      outboundFlow: primary.flow,
-      outboundTlsFingerprint: primary.fingerprint,
-      outboundTlsSni: primary.serverName,
-      outboundTlsPublicKey: primary.publicKey,
-      outboundTlsShortId: primary.shortId,
-      egressHosts: config.egressHosts,
-    );
-  }
+  return hosts.toList();
 }

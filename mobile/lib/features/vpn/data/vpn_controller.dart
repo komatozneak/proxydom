@@ -4,10 +4,9 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
-import '../../settings/data/installed_apps_channel.dart';
 import '../../settings/data/split_tunnel_prefs.dart';
 import '../../../core/ios_store_gates.dart';
-import 'vpn_config.dart';
+import 'hysteria_profile.dart';
 import 'vpn_route_policy.dart';
 import 'vpn_service_config.dart';
 import 'vpn_session_snapshot.dart';
@@ -70,36 +69,19 @@ class VpnController {
     return result.ok;
   }
 
-  /// Build MethodChannel params for one minted Hy2 config.
-  Future<String> buildStartParamsJson(
-    VpnConfig config, {
+  /// Build the MethodChannel params for one Hy2 dial.
+  ///
+  /// Reads split-tunnel prefs but touches no MethodChannel, so the tests can
+  /// assert the map directly. `startHysteria` calls this, which is why the
+  /// assertions in `hy2_direct_suffixes_test.dart` describe the live dial.
+  @visibleForTesting
+  Future<String> buildHy2StartParamsJson(
+    HysteriaProfile profile, {
     String? displayLabel,
-    String? catalogNodeId,
   }) async {
-    final profile = config.hysteriaProfile;
-    if (!config.isHysteriaSession || profile == null) {
-      throw VpnControllerException('hy2_provision_failed');
-    }
-    if (!_isIosSplit) {
-      try {
-        final apps = await InstalledAppsChannel.listLauncherApps(
-          includeIcons: false,
-        );
-        if (apps.isNotEmpty) {
-          // Empty list would still set one-shot seed flags and skip later
-          // Home/connect once the plugin is ready.
-          await SplitTunnelPrefs.seedDefaultBypassIfNeeded(
-            apps.map((a) => a.packageName),
-          );
-        }
-      } catch (_) {}
-    }
     final disallowedApps = _isIosSplit
         ? const <String>[]
         : ((await SplitTunnelPrefs.loadDisallowedPackages()).toList()..sort());
-    if (_isIosSplit) {
-      await SplitTunnelPrefs.ensureIosSitesAllEnabledIfNeeded();
-    }
     final directSuffixes = _isIosSplit
         ? const <String>[]
         : stripForceProxySuffixes(
@@ -118,7 +100,6 @@ class VpnController {
     return jsonEncode({
       'schemaVersion': 2,
       'vpnCore': 'hysteria',
-      'autoJob': true,
       'sessionName': kVpnBrandSessionName,
       'displayLabel': (displayLabel?.trim().isNotEmpty == true)
           ? displayLabel!.trim()
@@ -129,7 +110,6 @@ class VpnController {
       'hysteriaSni': profile.sni,
       'hysteriaSocksListen': profile.socksListen,
       'hysteriaNodeId': profile.nodeId,
-      if (catalogNodeId != null) 'autoNodeId': catalogNodeId,
       if (profile.bandwidthUp != null)
         'hysteriaBandwidthUp': profile.bandwidthUp,
       if (profile.bandwidthDown != null)
@@ -144,43 +124,18 @@ class VpnController {
         'hysteriaKeepAlivePeriod': profile.keepAlivePeriod,
       if (profile.fmDeclared.isNotEmpty)
         'hysteriaFmDeclared': profile.fmDeclared,
-      'controlPlaneHosts': VpnServiceConfig.controlPlaneHostsOf(),
+      if (profile.insecure) 'hysteriaInsecure': true,
+      if (profile.obfs.isNotEmpty) 'hysteriaObfs': profile.obfs,
+      if (profile.obfsPassword.isNotEmpty)
+        'hysteriaObfsPassword': profile.obfsPassword,
+      'controlPlaneHosts': controlPlaneHostsOf(),
       if (disallowedApps.isNotEmpty) 'disallowedApplications': disallowedApps,
-      // Android: Go hyDialer suffixes. iOS: prioritized OS routes only.
       if (directSuffixes.isNotEmpty) 'directDomainSuffixes': directSuffixes,
-      if (iosCustomHosts.isNotEmpty) 'iosCustomResolutionHosts': iosCustomHosts,
+      if (iosCustomHosts.isNotEmpty)
+        'iosCustomResolutionHosts': iosCustomHosts,
       if (iosCatalogHosts.isNotEmpty)
         'iosCatalogResolutionHosts': iosCatalogHosts,
     });
-  }
-
-  /// Start Hy2 VPN with [VpnConfig.hysteriaProfile].
-  Future<bool> start(VpnConfig config, {String? displayLabel}) async {
-    final profile = config.hysteriaProfile;
-    if (profile == null) {
-      throw VpnControllerException('hy2_provision_failed');
-    }
-    return startHysteria(profile, displayLabel: displayLabel);
-  }
-
-  /// Auto: sequential data-plane prove over already-minted [paramsJson] rows.
-  Future<bool> startAuto(List<String> paramsJsonList,
-      {String? sessionId}) async {
-    if (paramsJsonList.isEmpty) {
-      throw VpnControllerException('auto pool empty');
-    }
-    try {
-      final result = await _methodChannel.invokeMethod<bool>(
-        'startAuto',
-        {
-          'candidatesJson': paramsJsonList,
-          if (sessionId != null) 'sessionId': sessionId
-        },
-      );
-      return result ?? false;
-    } on PlatformException catch (e) {
-      throw VpnControllerException('auto start failed: ${e.code} ${e.message}');
-    }
   }
 
   /// Start Hysteria2 core (ADR 015). Native proves via local SOCKS, not QUIC-up.
@@ -194,64 +149,10 @@ class VpnController {
     String? sessionId,
   }) async {
     try {
-      final disallowedApps = _isIosSplit
-          ? const <String>[]
-          : ((await SplitTunnelPrefs.loadDisallowedPackages()).toList()
-            ..sort());
-      final directSuffixes = _isIosSplit
-          ? const <String>[]
-          : stripForceProxySuffixes(
-              await SplitTunnelPrefs.enabledDomainSuffixes(),
-            );
-      final iosCustomHosts = !_isIosSplit
-          ? const <String>[]
-          : stripForceProxySuffixes(
-              await SplitTunnelPrefs.enabledIosCustomResolutionHosts(),
-            );
-      final iosCatalogHosts = !_isIosSplit
-          ? const <String>[]
-          : stripForceProxySuffixes(
-              await SplitTunnelPrefs.enabledIosCatalogResolutionHosts(),
-            );
-      final paramsJson = jsonEncode({
-        'schemaVersion': 2,
-        'vpnCore': 'hysteria',
-        'sessionName': kVpnBrandSessionName,
-        'displayLabel': (displayLabel?.trim().isNotEmpty == true)
-            ? displayLabel!.trim()
-            : kVpnBrandSessionName,
-        'outboundType': 'hysteria2',
-        'hysteriaServer': profile.server,
-        'hysteriaAuth': profile.auth,
-        'hysteriaSni': profile.sni,
-        'hysteriaSocksListen': profile.socksListen,
-        'hysteriaNodeId': profile.nodeId,
-        if (profile.bandwidthUp != null)
-          'hysteriaBandwidthUp': profile.bandwidthUp,
-        if (profile.bandwidthDown != null)
-          'hysteriaBandwidthDown': profile.bandwidthDown,
-        if (profile.congestion.isNotEmpty)
-          'hysteriaCongestion': profile.congestion,
-        if (profile.bbrProfile.isNotEmpty)
-          'hysteriaBbrProfile': profile.bbrProfile,
-        if (profile.maxIdleTimeout.isNotEmpty)
-          'hysteriaMaxIdleTimeout': profile.maxIdleTimeout,
-        if (profile.keepAlivePeriod.isNotEmpty)
-          'hysteriaKeepAlivePeriod': profile.keepAlivePeriod,
-        if (profile.fmDeclared.isNotEmpty)
-          'hysteriaFmDeclared': profile.fmDeclared,
-        if (profile.insecure) 'hysteriaInsecure': true,
-        if (profile.obfs.isNotEmpty) 'hysteriaObfs': profile.obfs,
-        if (profile.obfsPassword.isNotEmpty)
-          'hysteriaObfsPassword': profile.obfsPassword,
-        'controlPlaneHosts': VpnServiceConfig.controlPlaneHostsOf(),
-        if (disallowedApps.isNotEmpty) 'disallowedApplications': disallowedApps,
-        if (directSuffixes.isNotEmpty) 'directDomainSuffixes': directSuffixes,
-        if (iosCustomHosts.isNotEmpty)
-          'iosCustomResolutionHosts': iosCustomHosts,
-        if (iosCatalogHosts.isNotEmpty)
-          'iosCatalogResolutionHosts': iosCatalogHosts,
-      });
+      final paramsJson = await buildHy2StartParamsJson(
+        profile,
+        displayLabel: displayLabel,
+      );
 
       final result = await _methodChannel.invokeMethod<bool>(
         'start',

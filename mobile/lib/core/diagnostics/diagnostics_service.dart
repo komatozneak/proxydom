@@ -10,7 +10,6 @@ import 'app_log_buffer.dart';
 import 'tunnel_log_redact.dart';
 import 'egress_verify.dart';
 import '../../features/home/application/vpn_status.dart';
-import '../../features/vpn/data/vpn_config.dart';
 import '../../features/vpn/data/vpn_controller.dart';
 
 /// Collects a local diagnostic bundle for the user to paste into support.
@@ -34,7 +33,7 @@ class DiagnosticsService {
   @visibleForTesting
   static Duration egressProbeTimeout = const Duration(seconds: 5);
 
-  /// Catalog `VpnNode.host` for Pixel E2E (IP↔IP vs icanhazip, not SNI).
+  /// The dialed host, for the Pixel E2E check (IP↔IP against icanhazip, not SNI).
   static String formatCatalogHost(String? host) {
     final trimmed = host?.trim();
     if (trimmed == null || trimmed.isEmpty) return '(none)';
@@ -43,7 +42,6 @@ class DiagnosticsService {
 
   Future<String> buildReport({
     required VpnStatus vpnUi,
-    VpnConfig? cachedConfig,
     String? autoWinnerId,
     String? autoWinnerLabel,
     String? lastProve,

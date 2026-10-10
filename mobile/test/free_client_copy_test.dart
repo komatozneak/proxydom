@@ -36,8 +36,6 @@ const allowlist = <String, List<String>>{
   // Foreign document suffixes («· Premium») are data, not product copy.
   'lib/features/vpn/data/node_display.dart': ['Premium', 'Премиум', 'Бесплатно'],
   'lib/features/vpn/data/subscription_label.dart': ['Premium'],
-  'lib/features/vpn/data/vpn_node.dart': ['Premium'],
-  'lib/features/vpn/data/node_auto_selector.dart': ['Premium'],
   'lib/features/vpn/presentation/locations_screen.dart': ['Premium'],
   'lib/features/home/presentation/widgets/server_card.dart': ['Premium'],
   // Links already sent by the bot stay importable.

@@ -1,8 +1,7 @@
-import '../../../l10n/app_localizations.dart';
 import 'geo_ip_service.dart';
-import 'vpn_node.dart';
 
-/// Human-facing labels for Marzban nodes (ids like `node-185` are ops names).
+/// Human-facing labels for the imported line the user picked (ids like `node-185`
+/// are ops names and never shown).
 class NodePlace {
   const NodePlace({
     required this.title,
@@ -166,9 +165,6 @@ const NodePlace kUsaMobilePlace = NodePlace(
   flag: kFlagUsa,
 );
 
-/// Locations list section for grouping (Auto is separate UI row).
-enum LocationSection { premium, general, other }
-
 /// Drop catalog «· Free / · Premium» — country or product name only.
 String stripTierRole(String raw) {
   return raw.trim().replaceFirst(
@@ -246,47 +242,11 @@ NodePlace placeFromProductLabel(String raw, {String? flag}) {
   );
 }
 
-/// Locations / Home blurb when [NodePlace.subtitle] is empty.
-String displaySubtitleForNode(VpnNode node, AppL10n l) {
-  if (node.isYoutube) return l.regionBlurbYoutube;
-  if (node.isGaming) return l.regionBlurbGaming;
-  if (node.isGeoIn) return l.regionBlurbIndia;
-  return l.regionBlurbFree;
-}
-
 /// Strip tier suffixes and reject ops/FQDN labels for Home fallback copy.
 String sanitizeHomeLabel(String raw) {
   final t = raw.trim();
   if (t.isEmpty || _isUnsafeUserFacingLabel(t)) return '';
   return stripTierRole(t);
-}
-
-/// First catalog node whose host matches [host] (port-normalized).
-VpnNode? catalogNodeForHost(Iterable<VpnNode> catalog, String? host) {
-  final key = normalizeNodeHost(host ?? '');
-  if (key.isEmpty) return null;
-  for (final n in catalog) {
-    if (normalizeNodeHost(n.host) == key) return n;
-  }
-  return null;
-}
-
-/// Flag for catalog product labels / node.region (not GeoIP).
-String flagForNode(VpnNode node, {String? productLabel}) {
-  if (node.isYoutube) return 'youtube';
-  if (node.isGaming) return kFlagGaming;
-  if (node.isGeoIn) return kFlagIndia;
-  final region = (node.region ?? '').trim().toLowerCase();
-  if (region == 'eu' || region == 'europe') return kFlagEurope;
-  if (region == 'us' || region == 'usa') return kFlagUsa;
-  if (region == 'in' || region == 'india') return kFlagIndia;
-  if (node.isGeoUs) return kFlagUsa;
-
-  final label =
-      (productLabel ?? (node.label.isNotEmpty ? node.label : node.name))
-          .trim()
-          .toLowerCase();
-  return flagForProductLabel(label);
 }
 
 /// Infer EU/US/IN flag from user-facing catalog copy.
@@ -304,98 +264,6 @@ String flagForProductLabel(String label) {
     return kFlagUsa;
   }
   return kFlagGlobe;
-}
-
-/// Unique location flags in Auto pool order (Home Connecting cycle).
-List<String> uniqueAutoPoolFlags(Iterable<VpnNode> pool) {
-  final seen = <String>{};
-  final out = <String>[];
-  for (final node in pool) {
-    final flag = flagForNode(node);
-    if (flag == kFlagGlobe) continue;
-    if (seen.add(flag)) out.add(flag);
-  }
-  if (out.isEmpty) return [kFlagGlobe];
-  return out;
-}
-
-/// Catalog node that Auto proved, if [winnerId] is still in [catalog].
-VpnNode? autoWinnerNode(Iterable<VpnNode> catalog, String? winnerId) {
-  if (winnerId == null || winnerId.isEmpty) return null;
-  for (final n in catalog) {
-    if (n.id == winnerId) return n;
-  }
-  return null;
-}
-
-/// Product flag for Auto on Home and the Locations Auto row.
-///
-/// Winner uses [placeForNode] so YouTube / Gaming / India / Latvia / USA match.
-/// Until prove finishes, both screens use the first Auto-pool flag.
-String autoSelectionDisplayFlag({
-  required Iterable<VpnNode> catalog,
-  String? winnerId,
-  List<String>? poolFlags,
-}) {
-  final winner = autoWinnerNode(catalog, winnerId);
-  if (winner != null) return placeForNode(winner).flag;
-  final flags = poolFlags ?? uniqueAutoPoolFlags(catalog);
-  if (flags.isNotEmpty) return flags.first;
-  return kFlagGlobe;
-}
-
-/// Which list a route belongs to. Paid sections are not used.
-LocationSection locationSectionFor(VpnNode node) {
-  final region = (node.region ?? '').trim().toLowerCase();
-  final label = (node.label.isNotEmpty ? node.label : node.name).toLowerCase();
-  if (region == 'eu' ||
-      region == 'europe' ||
-      label.contains('европа') ||
-      label.contains('europe') ||
-      label.contains('латвия') ||
-      label.contains('latvia') ||
-      region == 'us' ||
-      region == 'usa' ||
-      node.isGeoUs ||
-      label.contains('сша') ||
-      label.contains('usa') ||
-      label.contains('united states')) {
-    return LocationSection.general;
-  }
-  final flag = flagForNode(node);
-  if (flag == kFlagEurope || flag == kFlagUsa) return LocationSection.general;
-  return LocationSection.other;
-}
-
-int _generalRank(VpnNode node) {
-  final flag = flagForNode(node);
-  if (flag == kFlagEurope) return 0;
-  if (flag == kFlagUsa) return 1;
-  return 2;
-}
-
-/// Partition online nodes into Premium → General (EU then US) → Other.
-Map<LocationSection, List<VpnNode>> groupNodesByLocationSection(
-  Iterable<VpnNode> nodes,
-) {
-  final out = <LocationSection, List<VpnNode>>{
-    for (final s in LocationSection.values) s: <VpnNode>[],
-  };
-  for (final n in nodes) {
-    out[locationSectionFor(n)]!.add(n);
-  }
-  for (final entry in out.entries) {
-    entry.value.sort((a, b) {
-      if (entry.key == LocationSection.general) {
-        final rank = _generalRank(a).compareTo(_generalRank(b));
-        if (rank != 0) return rank;
-      }
-      final la = a.label.isNotEmpty ? a.label : a.name;
-      final lb = b.label.isNotEmpty ? b.label : b.name;
-      return la.toLowerCase().compareTo(lb.toLowerCase());
-    });
-  }
-  return out;
 }
 
 /// Sync place: YouTube → product label → known pool → GeoIP → placeholder.
@@ -421,65 +289,6 @@ NodePlace placeForHost(String host, {int index = 0, String? fallbackLabel}) {
     titleEn: 'Server ${index + 1}',
     subtitle: '',
     flag: kFlagGlobe,
-  );
-}
-
-NodePlace placeForNode(VpnNode node, {int index = 0}) {
-  // YouTube / gaming / India product labels win over GeoIP.
-  if (node.isYoutube) return kYoutubePremiumPlace;
-  if (node.isGaming) return kGamingPremiumPlace;
-  if (node.isGeoIn) return kIndiaPremiumPlace;
-  final raw = node.label.isNotEmpty
-      ? node.label
-      : (node.name.isNotEmpty ? node.name : '');
-  if (raw.isNotEmpty && !_isUnsafeUserFacingLabel(raw)) {
-    final fromLabel = canonicalPlaceForProductLabel(raw);
-    if (fromLabel != null) return fromLabel;
-  }
-
-  if (node.isHysteria) {
-    final hyLabel = raw;
-    final lowerLabel = hyLabel.toLowerCase();
-    if (hyLabel.isNotEmpty &&
-        _isSafeProductLabel(hyLabel) &&
-        !lowerLabel.contains('европа') &&
-        !lowerLabel.contains('europe')) {
-      return placeFromProductLabel(
-        hyLabel,
-        flag: flagForNode(node, productLabel: hyLabel),
-      );
-    }
-    if (node.isGeoUs) {
-      return kUsaMobilePlace;
-    }
-    return kHysteriaMobilePlace;
-  }
-
-  // Catalog product labels beat IP-geo known map (EU → not Frankfurt).
-  if (raw.isNotEmpty && _isSafeProductLabel(raw)) {
-    return placeFromProductLabel(
-      raw,
-      flag: flagForNode(node, productLabel: raw),
-    );
-  }
-
-  final known = placeForKnownHost(node.host);
-  if (known != null) return known;
-
-  final cached = _placeFromCache(node.host);
-  if (cached != null) return cached;
-
-  if (raw.isEmpty || _isUnsafeUserFacingLabel(raw)) {
-    return NodePlace(
-      title: 'Сервер ${index + 1}',
-      titleEn: 'Server ${index + 1}',
-      subtitle: '',
-      flag: flagForNode(node),
-    );
-  }
-  return placeFromProductLabel(
-    raw,
-    flag: flagForNode(node, productLabel: raw),
   );
 }
 
@@ -565,9 +374,4 @@ Future<NodePlace> resolvePlaceForHost(
 }) async {
   await warmGeoCache(host);
   return placeForHost(host, index: index, fallbackLabel: fallbackLabel);
-}
-
-Future<NodePlace> resolvePlaceForNode(VpnNode node, {int index = 0}) async {
-  await warmGeoCache(node.host);
-  return placeForNode(node, index: index);
 }

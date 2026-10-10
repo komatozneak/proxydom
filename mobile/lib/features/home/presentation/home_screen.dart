@@ -566,8 +566,10 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
 
   Future<void> _warmGeoIfNeeded() async {
     if (widget.status is! VpnConnected) return;
-    final vpnConfig = ref.read(vpnProvider.notifier).config;
-    final host = vpnConfig?.expectedEgressHost;
+    // The host of the line actually dialed. This used to read the egress host off
+    // the backend config, which the local configurator never fetches, so the
+    // read was always null and the warm-up never ran.
+    final host = ref.read(vpnProvider.notifier).profileHost;
     if (host == null || host == _warmingHost) return;
     _warmingHost = host;
     await warmGeoCache(host);

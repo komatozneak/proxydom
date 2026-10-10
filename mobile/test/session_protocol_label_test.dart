@@ -1,17 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:proxydom/core/app_locale.dart';
-import 'package:proxydom/features/vpn/data/vpn_node.dart';
 import 'package:proxydom/features/vpn/data/vpn_service_config.dart';
 
 void main() {
   test('imported share schemes keep their own label', () {
     expect(
-      sessionProtocolLabel(config: null, selectedNodeProtocol: 'vless'),
+      sessionProtocolLabel(selectedNodeProtocol: 'vless'),
       'VLESS',
     );
     expect(
-      sessionProtocolLabel(config: null, selectedNodeProtocol: 'hysteria2'),
+      sessionProtocolLabel(selectedNodeProtocol: 'hysteria2'),
       'HYSTERIA2',
     );
   });
@@ -19,8 +18,7 @@ void main() {
   test('Hy2 session is HYSTERIA2 not VLESS', () {
     expect(
       sessionProtocolLabel(
-        config: null,
-        selectedNodeProtocol: kVpnNodeProtocolHysteria2,
+        selectedNodeProtocol: kDialSchemeHysteria2,
       ),
       'HYSTERIA2',
     );
@@ -29,34 +27,33 @@ void main() {
   test('TrustTunnel session is TRUSTTUNNEL', () {
     expect(
       sessionProtocolLabel(
-        config: null,
-        selectedNodeProtocol: kVpnNodeProtocolTrusttunnel,
+        selectedNodeProtocol: kDialSchemeTrusttunnel,
       ),
       'TRUSTTUNNEL',
     );
   });
 
-  test('connectedServerName uses catalog label without a live config', () {
+  test('connectedServerName uses the label the line carries', () {
     expect(
-      connectedServerName(config: null, displayLabel: 'Латвия'),
+      connectedServerName(displayLabel: 'Латвия'),
       'Латвия',
     );
-    expect(connectedServerName(config: null), kVpnBrandSessionName);
+    expect(connectedServerName(), kVpnBrandSessionName);
   });
 
   test('connectedServerName drops · Бесплатно and localizes USA', () {
     AppLocale.set(const Locale('ru'));
     expect(
-      connectedServerName(config: null, displayLabel: 'США · Бесплатно'),
+      connectedServerName(displayLabel: 'США · Бесплатно'),
       'США',
     );
     AppLocale.set(const Locale('en'));
     expect(
-      connectedServerName(config: null, displayLabel: 'США · Бесплатно'),
+      connectedServerName(displayLabel: 'США · Бесплатно'),
       'USA',
     );
     expect(
-      connectedServerName(config: null, displayLabel: 'США · Бесплатно'),
+      connectedServerName(displayLabel: 'США · Бесплатно'),
       isNot(contains('Free')),
     );
     AppLocale.set(const Locale('ru'));

@@ -14,7 +14,6 @@ import '../../vpn/data/hy2_import_store.dart';
 import '../../vpn/data/share_session_log.dart';
 import '../../vpn/data/subscription_device.dart';
 import '../../vpn/data/subscription_label.dart';
-import '../../vpn/data/vpn_config.dart';
 import '../../vpn/data/vpn_controller.dart';
 import '../../vpn/data/windows_tunnel.dart';
 import '../../vpn/data/windows_tunnel_protocol.dart';
@@ -50,8 +49,6 @@ Future<void> runHotRegionSwitch({
 
 /// VPN-контроллер. Шаг 16: retry/reconnect логика поверх VpnController + native.
 class VpnNotifier extends Notifier<VpnStatus> {
-  VpnConfig? _config;
-
   /// Label from catalog after Auto/manual pick (overrides generic host fallback).
   String? _displayLabel;
   String? _sid;
@@ -65,9 +62,6 @@ class VpnNotifier extends Notifier<VpnStatus> {
 
   String? _autoActiveNodeId;
 
-  /// Последний полученный конфиг. Доступен из UI для preview.
-  VpnConfig? get config => _config;
-
   /// Friendly region label for the active egress hop (read-only Home card).
   String? get displayLabel => _displayLabel;
 
@@ -77,10 +71,11 @@ class VpnNotifier extends Notifier<VpnStatus> {
   /// Last prove snapshot for owner reports (id + outcome, no secrets).
   String? get lastProveSummary => _lastProveSummary;
 
-  String? get catalogHost => _catalogHost;
+  /// Endpoint host of the line the user selected. Home warms the GeoIP cache for
+  /// it so the place label is resolved before the connected card paints.
+  String? get profileHost => _profileHost;
 
   String? _lastProveSummary;
-  String? _catalogHost;
 
   /// Session Binding/Proving/TunUp/CoreStarting owns error/idle until terminal.
   bool _sessionOwnsUi = false;
@@ -565,13 +560,10 @@ class VpnNotifier extends Notifier<VpnStatus> {
       _lastSessionPhase = VpnSessionPhase.connectedHealthy;
     }
     await _hydrateConnectedUi();
-    final config = _config;
     final serverName = connectedServerName(
-      config: config,
       displayLabel: _displayLabel,
     );
     final protocol = sessionProtocolLabel(
-      config: config,
       selectedNodeProtocol: _selectedNodeProtocol,
     );
     final sessionKey = '${_sessionScheme(protocol)}|$_profileHost|$serverName';
@@ -672,9 +664,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
   /// A free key client has no catalog session. The selected local profile owns
   /// user-facing identity; native owns only lifecycle.
   Future<void> _hydrateImportedProfileUi() async {
-    _config = null;
     _autoActiveNodeId = null;
-    _catalogHost = null;
     final imported = await Hy2ImportStore.instance.selected();
     _displayLabel = imported == null ? null : labelForShareLink(imported).title;
     _selectedNodeProtocol = imported?.scheme;
@@ -699,7 +689,6 @@ class VpnNotifier extends Notifier<VpnStatus> {
       return;
     }
     try {
-      _catalogHost = null;
       final ip = await VpnController.instance.provenEgressIp();
       if (mine != _egressProbeToken || state is! VpnConnected) return;
       final shownIp = ip?.trim() ?? '';
@@ -1171,9 +1160,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
           );
           return;
         }
-        _config = null;
         _autoActiveNodeId = null;
-        _catalogHost = null;
         final shown = labelForShareLink(imported);
         _displayLabel = shown.title;
         _selectedNodeProtocol = imported.scheme;
