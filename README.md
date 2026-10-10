@@ -72,6 +72,18 @@ XCFramework для iOS и обычный `.exe` для Windows. Это сдел�
 соединения должна совпадать на всех платформах, а не расходиться по трём
 реализациям.
 
+## Документация
+
+| Что нужно | Где |
+|---|---|
+| Поднять свой сервер Hysteria2 | [`docs/guide/own-hy2-server.md`](docs/guide/own-hy2-server.md) |
+| Понять, как вставить ссылку и подключиться | [`docs/guide/using-the-client.md`](docs/guide/using-the-client.md) |
+| Что-то не подключается | [`docs/guide/troubleshooting.md`](docs/guide/troubleshooting.md) |
+| Правила для ИИ-агентов | [`AGENTS.md`](AGENTS.md), [`mobile/AGENTS.md`](mobile/AGENTS.md) |
+
+Начать стоит с [`docs/guide/README.md`](docs/guide/README.md) — там оглавление
+и три вещи, которые надо понять сразу.
+
 ## Сборка
 
 Нужны Flutter 3.24+, Go 1.26+ и JDK 17.
