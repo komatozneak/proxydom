@@ -8,7 +8,7 @@ kept as the audit record. They were never listed in `pubspec.yaml` assets.
 
 12 PNGs under `assets/backgrounds/textures/` and `assets/backgrounds/empty_states/`
 were generated with **FLUX.2 Klein 9B**, which has a **non-commercial license**.
-They must not ship in a commercial VPN client (Teremok Connect).
+They must not ship in a commercial VPN client.
 
 Additional quality issues (oak→orange drift, noisy textures, look-alike empty
 states) are secondary; license alone is a ship-blocker.
