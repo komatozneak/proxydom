@@ -15,7 +15,7 @@ if (-not (Test-Path $jks)) {
     Write-Error "Missing teremok-upload.jks in mobile\android"
 }
 if (-not (Test-Path $keyProps)) {
-    Write-Error "Missing key.properties — copy from key.properties.template"
+    Write-Error "Missing key.properties - copy from key.properties.template"
 }
 $text = Get-Content $keyProps -Raw
 if ($text -match "YOUR_.*_PASSWORD_HERE") {

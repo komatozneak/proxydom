@@ -18,7 +18,7 @@ if (-not (Test-Path $storeFile)) {
     $storeFile = Join-Path $PSScriptRoot "teremok-upload.jks"
 }
 $out = Join-Path $PSScriptRoot "upload_certificate.pem"
-$keytool -export -rfc `
+& keytool -export -rfc `
     -alias $cfg["keyAlias"] `
     -file $out `
     -keystore $storeFile `
