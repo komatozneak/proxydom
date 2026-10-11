@@ -51,7 +51,9 @@ jobs:
             fi
           done
           if [ "$fail" -ne 0 ]; then
-            echo "Missing App Store Connect secrets. Required: APP_STORE_CONNECT_ISSUER_ID, APP_STORE_CONNECT_KEY_ID, APP_STORE_CONNECT_PRIVATE_KEY, BUILD_CERTIFICATE_BASE64, P12_PASSWORD."
+            echo "Missing GitHub secrets. Add these five under Settings → Secrets and variables → Actions:"
+            echo "  APPSTORE_ISSUER_ID, APPSTORE_KEY_ID, APPSTORE_PRIVATE_KEY, BUILD_CERTIFICATE_BASE64, P12_PASSWORD"
+            echo "(they feed the APP_STORE_CONNECT_* env vars named above)"
             exit 1
           fi
 
