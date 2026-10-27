@@ -90,6 +90,18 @@ class AppL10nEn extends AppL10n {
   String get homeTrafficLabel => 'TRAFFIC';
 
   @override
+  String get homeAddServer => 'Add server';
+
+  @override
+  String get homeMetricTime => 'Time';
+
+  @override
+  String get homeMetricSpeed => 'Speed';
+
+  @override
+  String get homeMetricTraffic => 'Traffic';
+
+  @override
   String get homeTrafficUnlimited => 'UNLIMITED';
 
   @override
@@ -656,6 +668,24 @@ class AppL10nEn extends AppL10n {
       'Licenses of the engine and the libraries it links';
 
   @override
+  String get licensesTitle => 'Licenses';
+
+  @override
+  String get licensesSearch => 'Search packages';
+
+  @override
+  String get licensesEngine => 'Engine';
+
+  @override
+  String get licensesPackages => 'Packages';
+
+  @override
+  String get licensesFonts => 'Fonts';
+
+  @override
+  String get licensesNoResults => 'Nothing found';
+
+  @override
   String get settingsThemeSystem => 'Auto';
 
   @override
@@ -809,8 +839,7 @@ class AppL10nEn extends AppL10n {
       'Tile already in Quick Settings — open the shade and scroll';
 
   @override
-  String get settingsQsTileAddedHint =>
-      'The tile is in Quick Settings. Tap to remove it';
+  String get settingsQsTileAddedHint => 'Tap to remove';
 
   @override
   String get settingsQsTileRemove => 'Remove';
@@ -1528,7 +1557,7 @@ class AppL10nEn extends AppL10n {
   String get locationsSelected => 'IN USE';
 
   @override
-  String get locationsActive => 'active';
+  String get locationsActive => 'Active';
 
   @override
   String get locationsNotUsed => 'NOT USED';

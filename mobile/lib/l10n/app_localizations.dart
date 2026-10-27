@@ -259,6 +259,30 @@ abstract class AppL10n {
   /// **'TRAFFIC'**
   String get homeTrafficLabel;
 
+  /// No description provided for @homeAddServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Add server'**
+  String get homeAddServer;
+
+  /// No description provided for @homeMetricTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Time'**
+  String get homeMetricTime;
+
+  /// No description provided for @homeMetricSpeed.
+  ///
+  /// In en, this message translates to:
+  /// **'Speed'**
+  String get homeMetricSpeed;
+
+  /// No description provided for @homeMetricTraffic.
+  ///
+  /// In en, this message translates to:
+  /// **'Traffic'**
+  String get homeMetricTraffic;
+
   /// No description provided for @homeTrafficUnlimited.
   ///
   /// In en, this message translates to:
@@ -1279,6 +1303,42 @@ abstract class AppL10n {
   /// **'Licenses of the engine and the libraries it links'**
   String get settingsLicensesHint;
 
+  /// No description provided for @licensesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Licenses'**
+  String get licensesTitle;
+
+  /// No description provided for @licensesSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search packages'**
+  String get licensesSearch;
+
+  /// No description provided for @licensesEngine.
+  ///
+  /// In en, this message translates to:
+  /// **'Engine'**
+  String get licensesEngine;
+
+  /// No description provided for @licensesPackages.
+  ///
+  /// In en, this message translates to:
+  /// **'Packages'**
+  String get licensesPackages;
+
+  /// No description provided for @licensesFonts.
+  ///
+  /// In en, this message translates to:
+  /// **'Fonts'**
+  String get licensesFonts;
+
+  /// No description provided for @licensesNoResults.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing found'**
+  String get licensesNoResults;
+
   /// No description provided for @settingsThemeSystem.
   ///
   /// In en, this message translates to:
@@ -1558,7 +1618,7 @@ abstract class AppL10n {
   /// No description provided for @settingsQsTileAddedHint.
   ///
   /// In en, this message translates to:
-  /// **'The tile is in Quick Settings. Tap to remove it'**
+  /// **'Tap to remove'**
   String get settingsQsTileAddedHint;
 
   /// No description provided for @settingsQsTileRemove.
@@ -2878,7 +2938,7 @@ abstract class AppL10n {
   /// No description provided for @locationsActive.
   ///
   /// In en, this message translates to:
-  /// **'active'**
+  /// **'Active'**
   String get locationsActive;
 
   /// No description provided for @locationsNotUsed.

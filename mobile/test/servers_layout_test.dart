@@ -1,4 +1,4 @@
-// The Servers tab reads as one page again.
+﻿// The Servers tab reads as one page again.
 //
 // It was rebuilt around its own numbers: the heading sat on the shared page
 // gutter, the list on 44/16, and the key bar under it on a third pair. Every
@@ -74,7 +74,6 @@ Widget _wrap(Widget child, {ThemeData? theme}) {
 ProfileInstrument _instrument({
   List<NodeLine> nodes = const [],
   List<({String text, bool accent})> facts = const [
-    (text: '2aq93K0', accent: false),
     (text: '14 ГБ', accent: true),
   ],
   String? updated = 'обновлено 04.10',
@@ -115,10 +114,10 @@ void main() {
     final facts = profileFacts(
       trafficMeta: 'upload=1; download=2; total=15000000000',
       russian: true,
-      keyHandle: '2aq93K0',
+      keyHandle: '',
     );
-    expect(facts.map((fact) => fact.text), ['2aq93K0', '14 ГБ']);
-    expect(facts.map((fact) => fact.accent), [false, true]);
+    expect(facts.map((fact) => fact.text), ['14 ГБ']);
+    expect(facts.map((fact) => fact.accent), [true]);
     expect(
       profileUpdatedLabel(
         lastUpdated: '2026-10-04T12:22:09Z',
@@ -128,7 +127,7 @@ void main() {
     );
   });
 
-  testWidgets('the update stamp sits under the rings, not beside the traffic',
+  testWidgets('the key prefix is gone and the stamp sits under the actions',
       (tester) async {
     tester.view
       ..physicalSize = const Size(520, 800) * _dpr
@@ -138,46 +137,35 @@ void main() {
     await tester.pumpWidget(_wrap(_instrument()));
     await tester.pump();
 
-    final handle = tester.getRect(find.text('2AQ93K0'));
-    final traffic = tester.getRect(find.text('14 ГБ'));
-    final updated = tester.getRect(find.text('ОБНОВЛЕНО 04.10'));
-    final rings = find.byType(AppRingButton);
-    var span = tester.getRect(rings.at(0));
-    span = span.expandToInclude(tester.getRect(rings.at(1)));
-    span = span.expandToInclude(tester.getRect(rings.at(2)));
-
-    // The key and the traffic are one line. The stamp used to be the third
-    // reading on that line, jammed against the figure it does not describe.
-    expect(traffic.center.dy, closeTo(handle.center.dy, 2));
-    expect(updated.top, greaterThan(span.bottom - 1));
-    expect(updated.right, closeTo(span.right, 1.5));
+    expect(find.text('2AQ93K0'), findsNothing);
+    final updated = tester.getRect(find.text('обновлено 04.10'));
+    final ring = tester.getRect(find.byType(AppRingButton));
+    expect(updated.top, greaterThanOrEqualTo(ring.bottom - 1));
   });
 
-  testWidgets('the actions are three rings, not three framed squares',
+  testWidgets('one refresh ring and one overflow, not three peer rings',
       (tester) async {
     await tester.pumpWidget(_wrap(_instrument()));
     await tester.pump();
 
-    expect(find.byType(AppRingButton), findsNWidgets(3));
-    // A ring, so nothing on the card wears a frame but the card itself.
-    for (final ring
-        in tester.widgetList<AppRingButton>(find.byType(AppRingButton))) {
-      expect(ring.size, lessThan(34));
-    }
+    expect(find.byType(AppRingButton), findsOneWidget);
+    expect(find.byType(PopupMenuButton<String>), findsOneWidget);
+    final ring = tester.widget<AppRingButton>(find.byType(AppRingButton));
+    expect(ring.size, 40);
   });
 
-  testWidgets('copy wears the add-server gold and delete wears clay',
+  testWidgets('the refresh ring is neutral; delete lives in the menu',
       (tester) async {
     await tester.pumpWidget(_wrap(_instrument()));
     await tester.pump();
 
-    final rings = tester
-        .widgetList<AppRingButton>(find.byType(AppRingButton))
-        .toList();
-    expect(rings, hasLength(3));
-    expect(rings[0].color, AppBrand.actionSky);
-    expect(rings[1].color, AppBrand.mascotGold);
-    expect(rings[2].color, AppBrand.actionClay);
+    final ring = tester.widget<AppRingButton>(find.byType(AppRingButton));
+    expect(ring.color, AppTheme.light.colorScheme.onSurfaceVariant);
+    // The destructive action is still reachable, but only after opening the
+    // overflow — it is not a coloured peer of refresh.
+    await tester.tap(find.byType(PopupMenuButton<String>));
+    await tester.pumpAndSettle();
+    expect(find.text('Удалить'), findsOneWidget);
   });
 
   testWidgets('the pool is ruled lines on one plate', (tester) async {
@@ -200,13 +188,14 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('YouTube'), findsOneWidget);
+    // The active line is named in the header and again in the pool.
+    expect(find.text('YouTube'), findsWidgets);
     expect(find.text('США'), findsOneWidget);
     // One rule between two lines, and none around them: the rows used to be
     // four cards inside the card.
     expect(find.byType(NodeRule), findsNWidgets(3));
-    expect(find.text('УЗЛЫ'), findsOneWidget);
-    expect(find.text('АКТИВЕН'), findsOneWidget);
+    expect(find.text('Узлы'), findsOneWidget);
+    expect(find.text('Активен'), findsOneWidget);
   });
 
   testWidgets('a saved announcement is on the profile card', (tester) async {
@@ -226,7 +215,7 @@ void main() {
 
     // Between the traffic reading and the pool, not dropped off the plate.
     final traffic = tester.getRect(find.textContaining('ГБ'));
-    final nodes = tester.getRect(find.text('УЗЛЫ'));
+    final nodes = tester.getRect(find.text('Узлы'));
     final body = tester.getRect(note);
     expect(body.top, greaterThan(traffic.bottom));
     expect(body.bottom, lessThan(nodes.top));
@@ -253,8 +242,8 @@ void main() {
     final card = tester.getRect(find.byType(ProfileInstrument));
     expect(heading.left, AppBrand.pageGutter);
     expect(card.left, AppBrand.pageGutter);
-    expect(find.text('ТЕРЕМОК'), findsWidgets);
-    expect(find.text('УЗЛЫ'), findsOneWidget);
+    expect(find.text('Теремок'), findsWidgets);
+    expect(find.text('Узлы'), findsOneWidget);
 
     // The key bar is on the same two lines as the list above it.
     final key = tester.getRect(find.text('Добавить сервер'));
@@ -262,3 +251,6 @@ void main() {
     expect(find.byType(AppActionButton), findsWidgets);
   });
 }
+
+
+

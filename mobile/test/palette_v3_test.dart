@@ -41,10 +41,10 @@ void main() {
     final on = dark.switchTheme.trackColor!.resolve({WidgetState.selected});
     expect(_argb(off!), isNot(_argb(dark.colorScheme.outline)));
     expect(_argb(off), isNot(_argb(dark.colorScheme.surfaceContainerHighest)));
-    // The on state wears the app's moss, not the old bright #558B2F: that
-    // green was the last Material colour left and read as a stock switch
-    // sitting on a hand-made night.
-    expect(_argb(on!), _argb(AppBrand.moss));
+    // The on state wears the lit house gold, not moss and not the old bright
+    // #558B2F. Moss stays the success *fill*; a switch that turns green reads
+    // as a second accent next to the gold Save.
+    expect(_argb(on!), _argb(AppBrand.switchTrackOnDark));
   });
 
   test('dark muted labels and card outline lift off the card', () {

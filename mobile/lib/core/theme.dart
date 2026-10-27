@@ -192,6 +192,35 @@ class AppBrand {
   /// Thin rim on the unselected dark track so it does not melt into the card.
   static const Color switchTrackOutlineDark = Color(0xFFE4E4E7);
 
+  // ── Text variants that pass 4.5:1 ────────────────────────────────────────
+  //
+  // The bright brand hues are light or glow: at 9–11 sp on paper the gold gave
+  // 2.5:1, the moss 3.65:1 and the alarm red 3.76:1. These are the same hues
+  // stepped down (or up on the night) until a small letter can sit in them.
+  // Fills and status dots keep the bright values above.
+  static const Color inkGoldLight = Color(0xFF7A4F00);
+  static const Color inkGoldDark = Color(0xFFE1AF49);
+
+  /// Moss as a letter. [moss] itself is the same value; the alias exists so a
+  /// call site says "this is text", not "this is the success fill".
+  static const Color inkMossLight = Color(0xFF2F5238);
+  static const Color inkMossDark = Color(0xFF8FBF6A);
+
+  static const Color inkDangerLight = Color(0xFFB3261E);
+  static const Color inkDangerDark = Color(0xFFFF8A80);
+
+  /// Switch on-track: the deep house gold in daylight, the lit gold at night.
+  /// White on the light track is 3.84:1 (component threshold 3:1); the dark
+  /// thumb is 8.64:1 on the night track.
+  static const Color switchTrackOnLight = mascotGoldDeep;
+  static const Color switchTrackOnDark = inkGoldDark;
+  static const Color switchThumbOnDark = primary;
+
+  /// Off track in daylight. The old track was lineLight on paper (~1.3:1),
+  /// so every off switch in a list read as disabled rather than as a control.
+  /// This is 3.4:1 against paper; the white thumb still stands out against it.
+  static const Color switchTrackOffLight = Color(0xFF8F877E);
+
   static const Color surfaceElevatedLight = Color(0xFFFFFFFF);
 
   static const Color inkLight = Color(0xFF1A1A1A);
@@ -392,20 +421,20 @@ class AppTheme {
       ),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith((s) {
-          // On, the thumb takes the moss that grows in the light of the rail's
-          // lip; off, it stays the plain plate. A switch is a lamp, and the
-          // lamp in this app is never a colour the palette does not own.
+          // On, the thumb is the plate against the house gold: white in
+          // daylight, charcoal at night. Off, it stays the plain plate.
           if (s.contains(WidgetState.selected) && isDark) {
-            return AppBrand.mossLight;
+            return AppBrand.switchThumbOnDark;
           }
           return AppBrand.surfaceElevatedLight;
         }),
         trackColor: WidgetStateProperty.resolveWith((s) {
           if (s.contains(WidgetState.selected)) {
-            // Deep moss, not the old bright #558B2F: that green was the last
-            // Material colour left in the app and it read as a default switch
-            // sitting on a hand-made night.
-            return AppBrand.moss;
+            // House gold, not moss: the switch is the same "on" as the house.
+            // White on the light track is 3.84:1, the dark thumb 8.64:1.
+            return isDark
+                ? AppBrand.switchTrackOnDark
+                : AppBrand.switchTrackOnLight;
           }
           return isDark ? AppBrand.switchTrackOffDark : AppBrand.inkMutedLight;
         }),
@@ -494,7 +523,7 @@ class AppTheme {
       titleMedium: TextStyle(
         fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
         fontSize: 16,
-        fontWeight: FontWeight.w600,
+        fontWeight: FontWeight.w700,
         color: scheme.onSurface,
       ),
       bodyLarge: TextStyle(
@@ -502,11 +531,18 @@ class AppTheme {
         fontSize: 16,
         fontWeight: FontWeight.w400,
         color: scheme.onSurface,
-        height: 1.5,
+        height: 1.45,
       ),
       bodyMedium: TextStyle(
         fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
         fontSize: 14,
+        fontWeight: FontWeight.w400,
+        color: scheme.onSurfaceVariant,
+        height: 1.4,
+      ),
+      bodySmall: TextStyle(
+        fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
+        fontSize: 12,
         fontWeight: FontWeight.w400,
         color: scheme.onSurfaceVariant,
         height: 1.4,
@@ -517,9 +553,15 @@ class AppTheme {
         fontWeight: FontWeight.w600,
         color: scheme.onSurface,
       ),
+      labelMedium: TextStyle(
+        fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        color: scheme.onSurface,
+      ),
       labelSmall: TextStyle(
         fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: FontWeight.w600,
         color: scheme.onSurfaceVariant,
       ),

@@ -18,12 +18,12 @@ import '../../home/application/vpn_provider.dart';
 import '../../home/application/vpn_status.dart';
 import '../data/dial_set.dart';
 import '../data/hy2_import_store.dart';
+import '../data/hy2_link_parser.dart';
 import '../data/route_document.dart';
 import '../data/share_link_parser.dart';
 import '../data/subscription_device.dart';
 import '../data/subscription_label.dart';
 import '../data/subscription_link_inbox.dart';
-import 'free_client_chrome.dart';
 import 'server_instrument_parts.dart';
 import 'windows_share_qr.dart';
 
@@ -69,8 +69,9 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
     final pending = SubscriptionLinkInbox.take();
     if (pending != null && pending.isNotEmpty) {
       _clipboardApplied = true;
-      _controller.text = pending;
-      _previewInput(pending, immediate: true);
+      final shown = _extractUrl(pending);
+      _controller.text = shown;
+      _previewInput(shown, immediate: true);
       return;
     }
     if (_clipboardApplied) return;
@@ -99,8 +100,20 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
       extra: {'chars': text.length},
     );
     if (!mounted || text.isEmpty) return;
-    _controller.text = text;
-    _previewInput(text, immediate: true);
+    final shown = _extractUrl(text);
+    _controller.text = shown;
+    _previewInput(shown, immediate: true);
+  }
+
+  /// The field shows the document address, not the `proxydom://import/` wrapper.
+  /// [Hy2ImportStore.saveInput] re-parses whatever the field holds, so the
+  /// nested https address is enough; a plain key stays untouched.
+  String _extractUrl(String raw) {
+    try {
+      return subscriptionDocumentTarget(raw)?.url ?? raw;
+    } on FormatException {
+      return raw;
+    }
   }
 
   void _previewInput(String raw, {bool immediate = false}) {
@@ -288,7 +301,6 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
   Widget build(BuildContext context) {
     final l = AppL10n.of(context);
     final theme = Theme.of(context);
-    final keyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
     final dark = theme.brightness == Brightness.dark;
     final mute = dark ? AppBrand.inkMutedDark : AppBrand.inkMutedLight;
 
@@ -358,8 +370,8 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
                                 child: TextField(
                                   controller: _controller,
                                   focusNode: _fieldFocus,
-                                  minLines: keyboard ? 2 : 1,
-                                  maxLines: keyboard ? 3 : 4,
+                                  minLines: 1,
+                                  maxLines: 1,
                                   onChanged: _previewInput,
                                   cursorColor: AppBrand.mascotGold,
                                   style: theme.textTheme.bodyMedium?.copyWith(
@@ -381,9 +393,33 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
                                     isDense: true,
                                     contentPadding:
                                         const EdgeInsets.symmetric(vertical: 12),
-                                    suffixIcon: _controller.text.isEmpty
-                                        ? null
-                                        : IconButton(
+                                    // Paste and scan live in the field: they
+                                    // are input methods, not peer actions next
+                                    // to it.
+                                    suffixIcon: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        IconButton(
+                                          tooltip: l.freePaste,
+                                          onPressed: _pasteClipboard,
+                                          icon: const AppIcon(
+                                            AppIcons.clipboard,
+                                            size: 18,
+                                          ),
+                                        ),
+                                        IconButton(
+                                          tooltip: l.freeQr,
+                                          onPressed: () {
+                                            UiLog.action('import', 'scan');
+                                            openFreeClientCapture(context);
+                                          },
+                                          icon: const AppIcon(
+                                            AppIcons.qrCode,
+                                            size: 18,
+                                          ),
+                                        ),
+                                        if (_controller.text.isNotEmpty)
+                                          IconButton(
                                             onPressed: () {
                                               _controller.clear();
                                               _previewInput('');
@@ -393,17 +429,14 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
                                               size: 18,
                                             ),
                                           ),
+                                      ],
+                                    ),
+                                    suffixIconConstraints: const BoxConstraints(
+                                      minHeight: 48,
+                                      minWidth: 48,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              const SizedBox(height: 12),
-                              FreeClientActionBar(
-                                draft: true,
-                                onPaste: _pasteClipboard,
-                                onScan: () {
-                                  UiLog.action('import', 'scan');
-                                  openFreeClientCapture(context);
-                                },
                               ),
                               if (_loadingPreview) ...[
                                 const SizedBox(height: 12),
@@ -609,10 +642,10 @@ class _StepLabel extends StatelessWidget {
         ),
         const SizedBox(width: 9),
         Text(
-          text.toUpperCase(),
+          text,
           style: TextStyle(
-            fontSize: 10,
-            letterSpacing: 2.2,
+            fontSize: 12.5,
+            letterSpacing: 0.2,
             fontWeight: FontWeight.w700,
             color: mute,
           ),

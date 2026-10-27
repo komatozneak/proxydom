@@ -14,7 +14,9 @@ import 'server_glyph.dart';
 /// same hue, the one a letter can sit in.
 Color goldInk(BuildContext context) {
   final dark = Theme.of(context).brightness == Brightness.dark;
-  return dark ? AppBrand.mascotGoldLit : AppBrand.mascotGoldDeep;
+  // 6.34:1 on paper and 9.30:1 on the night. mascotGoldDeep was 3.84:1 and
+  // mascotGoldLit 2.5:1 — enough for a dot, not for a 10–12 sp word.
+  return dark ? AppBrand.inkGoldDark : AppBrand.inkGoldLight;
 }
 
 /// Short mark for a share scheme. Hysteria2 stays `HY2`; everything else is

@@ -9,6 +9,7 @@ import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
 import '../../../core/toasts/proxy_dom_toast.dart';
 import '../../../core/widgets/app_icon.dart';
+import '../../../core/widgets/app_switch.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../home/application/vpn_provider.dart';
@@ -374,10 +375,10 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
                   a.packageName.toLowerCase().contains(q),
             )
             .toList();
-    return sortLauncherAppsBypassFirst(
-      apps: filtered,
-      disallowedPackages: _disallowed,
-    );
+    // Native order is alphabetical. The old bypass-first sort moved the row
+    // that was just switched to the top, so the next tap landed on a different
+    // app. The count, not the position, says how many are selected.
+    return filtered;
   }
 
   List<SplitTunnelSite> get _filteredSites {
@@ -497,18 +498,70 @@ class _AppsTab extends StatelessWidget {
           )
         else
           for (final app in apps)
-            SwitchListTile.adaptive(
-              contentPadding: EdgeInsets.zero,
-              secondary: _AppIconAvatar(
+            _AllowRow(
+              leading: _AppIconAvatar(
                 iconPng: app.iconPng,
                 fallbackLetter:
                     app.label.isNotEmpty ? app.label[0].toUpperCase() : '?',
               ),
-              title: Text(app.label),
+              title: app.label,
               value: disallowed.contains(app.packageName),
               onChanged: (v) => onToggle(app.packageName, v),
             ),
       ],
+    );
+  }
+}
+
+/// One allowlist row, with the house switch. Material's adaptive switch drew a
+/// grey pill here while the same setting on Settings was gold.
+class _AllowRow extends StatelessWidget {
+  const _AllowRow({
+    this.leading,
+    required this.title,
+    this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final Widget? leading;
+  final String title;
+  final String? subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: () => onChanged(!value),
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            if (leading != null) ...[
+              leading!,
+              const SizedBox(width: 16),
+            ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(title, style: theme.textTheme.titleMedium),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 1),
+                    Text(subtitle!, style: theme.textTheme.bodySmall),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            AppSwitch(value: value, onChanged: onChanged),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -645,15 +698,14 @@ class _SitesTab extends StatelessWidget {
         if (osnovnyeExpanded) ...[
           const SizedBox(height: 4),
           for (final cat in kOsnovnyeCategories)
-            SwitchListTile.adaptive(
-              contentPadding: EdgeInsets.zero,
-              secondary: _AppIconAvatar(
+            _AllowRow(
+              leading: _AppIconAvatar(
                 iconPng: iconForOsnovnyeCategory(cat.id, iconsByPackage),
                 iconData: osnovnyeCategoryIcon(cat.id),
                 fallbackLetter: cat.badge.isNotEmpty ? cat.badge[0] : '?',
                 badgeFallback: cat.badge,
               ),
-              title: Text(cat.label(lang)),
+              title: cat.label(lang),
               value: osnovnye[cat.id] ?? cat.defaultEnabled,
               onChanged: (v) => onToggleOsnovnye(cat.id, v),
             ),
@@ -697,12 +749,9 @@ class _SitesTab extends StatelessWidget {
                 color: theme.colorScheme.errorContainer,
                 child: Text(l.splitTunnelDelete),
               ),
-              child: SwitchListTile.adaptive(
-                contentPadding: EdgeInsets.zero,
-                title: Text(
-                  site.label.isNotEmpty ? site.label : site.domain,
-                ),
-                subtitle: site.label.isNotEmpty ? Text(site.domain) : null,
+              child: _AllowRow(
+                title: site.label.isNotEmpty ? site.label : site.domain,
+                subtitle: site.label.isNotEmpty ? site.domain : null,
                 value: site.enabled,
                 onChanged: (v) => onToggleSite(site, v),
               ),

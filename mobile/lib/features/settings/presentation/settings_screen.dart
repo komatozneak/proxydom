@@ -21,6 +21,7 @@ import '../application/locale_provider.dart';
 import '../application/theme_mode_provider.dart';
 import '../data/vpn_notification_prefs.dart';
 import '../data/qs_tile_prefs.dart';
+import 'licenses_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -419,11 +420,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
             subtitle: l.settingsLicensesHint,
             onTap: () {
               UiLog.action('settings', 'licenses');
-              showLicensePage(
-                context: context,
-                applicationName: l.appTitle,
-                applicationVersion:
-                    _versionLabel.isEmpty ? null : _versionLabel,
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const LicensesScreen(),
+                ),
               );
             },
           ),
@@ -463,18 +463,18 @@ class _SectionLabel extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(4, 0, 4, 9),
       child: Row(
         children: [
-          // The same terminal voice as the home head: a rule and a tracked
-          // label. A title in sentence case here read as a different app.
+          // A rule and a section label in sentence case: capitals are reserved
+          // for the protocol badge, not for every word that starts a group.
           Container(width: 2, height: 11, color: AppBrand.mascotGold.withValues(alpha: 0.75)),
           const SizedBox(width: 8),
           Flexible(
             child: Text(
-              text.toUpperCase(),
+              text,
               style: theme.textTheme.labelSmall?.copyWith(
                 color: dark ? AppBrand.inkMutedDark : AppBrand.inkMutedLight,
                 fontWeight: FontWeight.w700,
-                fontSize: 10.5,
-                letterSpacing: 2.2,
+                fontSize: 12.5,
+                letterSpacing: 0.2,
               ),
             ),
           ),
@@ -545,9 +545,9 @@ class _SettingsRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final dark = theme.brightness == Brightness.dark;
-    // The subtitle was allowed to run to four lines under a floating switch,
-    // which broke the row rhythm on every card. Two lines, then it stops.
-    const maxLines = 2;
+    // Long rules need room to finish: a sentence that stops at "…" is worse
+    // than a taller row. Four lines is still bounded.
+    const maxLines = 4;
     return InkWell(
       onTap: onTap,
       child: Padding(

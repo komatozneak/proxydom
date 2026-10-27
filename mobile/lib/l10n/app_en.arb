@@ -1,4 +1,4 @@
-{
+﻿{
   "@@locale": "en",
   "appTitle": "Proxy Dom",
   "@appTitle": {
@@ -42,6 +42,14 @@
   "@homeTrafficExhausted": {},
   "homeTrafficLabel": "TRAFFIC",
   "@homeTrafficLabel": {},
+  "homeAddServer": "Add server",
+  "@homeAddServer": {},
+  "homeMetricTime": "Time",
+  "@homeMetricTime": {},
+  "homeMetricSpeed": "Speed",
+  "@homeMetricSpeed": {},
+  "homeMetricTraffic": "Traffic",
+  "@homeMetricTraffic": {},
   "homeTrafficUnlimited": "UNLIMITED",
   "@homeTrafficUnlimited": {},
   "homeTrafficAmount": "{remaining} / {limit} GB",
@@ -420,6 +428,18 @@
   "@settingsAppearance": {},
   "settingsLicensesHint": "Licenses of the engine and the libraries it links",
   "@settingsLicensesHint": {},
+  "licensesTitle": "Licenses",
+  "@licensesTitle": {},
+  "licensesSearch": "Search packages",
+  "@licensesSearch": {},
+  "licensesEngine": "Engine",
+  "@licensesEngine": {},
+  "licensesPackages": "Packages",
+  "@licensesPackages": {},
+  "licensesFonts": "Fonts",
+  "@licensesFonts": {},
+  "licensesNoResults": "Nothing found",
+  "@licensesNoResults": {},
   "settingsThemeSystem": "Auto",
   "@settingsThemeSystem": {},
   "settingsThemeDark": "Dark",
@@ -504,7 +524,7 @@
   "settingsQsTileAddHint": "Show the system prompt to pin the tile",
   "settingsQsTileAdded": "Tile added to Quick Settings",
   "settingsQsTileAlreadyAdded": "Tile already in Quick Settings — open the shade and scroll",
-  "settingsQsTileAddedHint": "The tile is in Quick Settings. Tap to remove it",
+  "settingsQsTileAddedHint": "Tap to remove",
   "settingsQsTileRemove": "Remove",
   "settingsQsTileRemoveTitle": "Remove the tile",
   "settingsQsTileRemoveBody": "Pull down the shade, tap the pencil, and drag the “Proxy Dom” tile to the trash.",
@@ -805,7 +825,7 @@
   "freeSearch": "Search servers",
   "locationsNodes": "Nodes",
   "locationsSelected": "IN USE",
-  "locationsActive": "active",
+  "locationsActive": "Active",
   "locationsNotUsed": "NOT USED",
   "locationsUseIt": "Connect",
   "locationsInUse": "Connected",
@@ -831,3 +851,4 @@
   "freeStepFound": "FOUND",
   "freeFieldEmpty": "Empty for now. Paste a link and we will see what is inside."
 }
+

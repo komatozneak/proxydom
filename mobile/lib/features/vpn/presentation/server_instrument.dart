@@ -97,19 +97,10 @@ class ProfileInstrument extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        title.toUpperCase(),
+                        title,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        // The same face, size and tracking as the node name on
-                        // the home head: one profile, one voice, whichever
-                        // screen it is read on.
-                        style: terminalText(
-                          context,
-                          size: 16,
-                          color: theme.colorScheme.onSurface,
-                          weight: 700,
-                          spacing: 1.6,
-                        ),
+                        style: theme.textTheme.titleLarge,
                       ),
                       if (facts.isNotEmpty) ...[
                         const SizedBox(height: 9),
@@ -135,12 +126,10 @@ class ProfileInstrument extends StatelessWidget {
                     if (updated != null && updated!.trim().isNotEmpty) ...[
                       const SizedBox(height: 8),
                       Text(
-                        updated!.trim().toUpperCase(),
-                        style: terminalText(
-                          context,
-                          size: 10.5,
+                        updated!.trim(),
+                        style: theme.textTheme.bodySmall?.copyWith(
                           color: mute,
-                          spacing: 1.4,
+                          fontSize: 12,
                         ),
                       ),
                     ],
@@ -215,13 +204,11 @@ class ProfileInstrument extends StatelessWidget {
               child: Row(
                 children: [
                   Text(
-                    l.locationsNodes.toUpperCase(),
-                    style: terminalText(
-                      context,
-                      size: 10,
+                    l.locationsNodes,
+                    style: theme.textTheme.labelSmall?.copyWith(
                       color: mute,
-                      weight: 700,
-                      spacing: 2.2,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -293,6 +280,7 @@ class _FactsLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final gold = goldInk(context);
     return Wrap(
       spacing: 8,
@@ -310,12 +298,10 @@ class _FactsLine extends StatelessWidget {
               ),
             ),
           Text(
-            facts[i].text.toUpperCase(),
-            style: terminalText(
-              context,
-              size: 10.5,
+            facts[i].text,
+            style: theme.textTheme.bodySmall?.copyWith(
               color: facts[i].accent ? gold : mute,
-              spacing: 1.4,
+              fontSize: 12.5,
             ),
           ),
         ],
@@ -344,13 +330,11 @@ class _LiveNode extends StatelessWidget {
       children: [
         const SizedBox(width: 10),
         Text(
-          AppL10n.of(context).locationsActive.toUpperCase(),
-          style: terminalText(
-            context,
-            size: 9.5,
-            color: mute.withValues(alpha: 0.7),
-            weight: 700,
-            spacing: 1.6,
+          AppL10n.of(context).locationsActive,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: mute,
+            fontWeight: FontWeight.w700,
+            fontSize: 11.5,
           ),
         ),
         const SizedBox(width: 7),
@@ -368,16 +352,14 @@ class _LiveNode extends StatelessWidget {
           // ellipsises instead of pushing the count off the left end.
           constraints: const BoxConstraints(maxWidth: 140),
           child: Text(
-            name.toUpperCase(),
+            name,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.right,
-            style: terminalText(
-              context,
-              size: 10,
+            style: theme.textTheme.labelSmall?.copyWith(
               color: gold,
-              weight: 700,
-              spacing: 1.4,
+              fontWeight: FontWeight.w700,
+              fontSize: 11.5,
             ),
           ),
         ),
@@ -417,47 +399,62 @@ class _Toolbar extends StatelessWidget {
   final VoidCallback? onShare;
   final VoidCallback? onDelete;
 
-  static const double _size = 30;
-  static const double _iconSize = 15;
+  static const double _size = 40;
+  static const double _iconSize = 18;
 
   @override
   Widget build(BuildContext context) {
-    // Refresh talks to the network, so it keeps the cool counterpart of the
-    // house gold. Copy is the same gold as the key that adds a server. The
-    // bin is clay: red enough to be the destructive one, quiet enough to sit
-    // on the plate.
-    const wire = AppBrand.actionSky;
-    const copy = AppBrand.mascotGold;
-    const bin = AppBrand.actionClay;
+    final theme = Theme.of(context);
+    final ink = theme.colorScheme.onSurfaceVariant;
+    final danger = theme.brightness == Brightness.dark
+        ? AppBrand.inkDangerDark
+        : AppBrand.inkDangerLight;
+    final hasMenu = onShare != null || onDelete != null;
 
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (onRefresh != null) ...[
+        if (onRefresh != null)
           _ring(
             icon: AppIcons.refresh,
-            color: wire,
+            color: ink,
             tooltip: refreshLabel,
             onTap: busy ? null : onRefresh,
             busy: busy,
           ),
-          if (onShare != null) const SizedBox(width: 8),
-        ],
-        if (onShare != null) ...[
-          _ring(
-            icon: AppIcons.share,
-            color: copy,
-            tooltip: shareLabel,
-            onTap: onShare,
-          ),
-          if (onDelete != null) const SizedBox(width: 8),
-        ],
-        if (onDelete != null)
-          _ring(
-            icon: AppIcons.trash,
-            color: bin,
-            tooltip: deleteLabel,
-            onTap: onDelete,
+        if (onRefresh != null && hasMenu) const SizedBox(width: 2),
+        if (hasMenu)
+          PopupMenuButton<String>(
+            tooltip: MaterialLocalizations.of(context).moreButtonTooltip,
+            icon: AppIcon(AppIcons.more, size: 20, color: ink),
+            onSelected: (value) {
+              if (value == 'share') onShare?.call();
+              if (value == 'delete') onDelete?.call();
+            },
+            itemBuilder: (context) => [
+              if (onShare != null)
+                PopupMenuItem(
+                  value: 'share',
+                  child: Row(
+                    children: [
+                      const AppIcon(AppIcons.share, size: 18),
+                      const SizedBox(width: 10),
+                      Flexible(child: Text(shareLabel)),
+                    ],
+                  ),
+                ),
+              if (onDelete != null)
+                PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      AppIcon(AppIcons.trash, size: 18, color: danger),
+                      const SizedBox(width: 10),
+                      Flexible(child: Text(deleteLabel)),
+                    ],
+                  ),
+                ),
+            ],
           ),
       ],
     );

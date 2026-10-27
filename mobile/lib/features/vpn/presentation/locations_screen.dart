@@ -14,7 +14,6 @@ import '../../../core/widgets/app_icon.dart';
 
 import '../../../core/widgets/terminal_type.dart';
 import '../../../l10n/app_localizations.dart';
-import 'windows_share_qr.dart';
 import '../../home/application/vpn_provider.dart';
 import '../../home/application/vpn_status.dart';
 import '../application/imported_profiles_provider.dart';
@@ -224,12 +223,6 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       ];
 
   /// Rereads every saved document from the key at the foot of this page.
-  ///
-  /// It goes through the same answer as the ring on a plate — one document at a
-  /// time, the selection kept against the list that still holds it — and it
-  /// leaves the person where they stood. The one thing it has to say to the
-  /// tunnel is that the chosen server is gone: a session left up on a key no
-  /// document lists any more is a session nobody asked to keep.
   Future<void> _refreshEveryDocument() async {
     final status = ref.read(vpnProvider);
     final live = status is VpnConnected || status is VpnConnecting;
@@ -356,24 +349,6 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     }
   }
 
-  ({List<int> premium, List<int> general}) _catalogLineIndexes(
-    ShareCatalog catalog,
-  ) {
-    final premium = <int>[];
-    final general = <int>[];
-    for (final raw in catalog.lines) {
-      final index = _imported.indexWhere((link) => link.raw == raw);
-      if (index < 0) continue;
-      final label = labelForShareLink(_imported[index]);
-      if (isPremiumPoolServer(label.title)) {
-        premium.add(index);
-      } else {
-        general.add(index);
-      }
-    }
-    return (premium: premium, general: general);
-  }
-
   NodeLine _nodeLine(AppL10n l, int index) {
     final link = _imported[index];
     final dialable = canDialLink(link);
@@ -401,14 +376,21 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
 
   Widget _catalogCard(ThemeData theme, AppL10n l, ShareCatalog catalog) {
     final title = catalog.title.trim().isEmpty ? l.freeServers : catalog.title;
-    final lines = _catalogLineIndexes(catalog);
+    // Document order. The premium/general split moved YouTube, gaming and
+    // India above the rest, so a line appeared to jump when a document came
+    // back in a different order. The store already keeps the document order.
+    final nodeIndexes = <int>[];
+    for (final raw in catalog.lines) {
+      final index = _imported.indexWhere((link) => link.raw == raw);
+      if (index >= 0) nodeIndexes.add(index);
+    }
     final notice = profileNotice(
       announce: catalog.announce,
       supportUrl: catalog.supportUrl,
     );
     final planeUrl = notice.planeUrl?.trim() ?? '';
     final noticeBody = notice.text?.trim() ?? '';
-    final handle = _keyHandle(catalog);
+
     final selectedLabel = _selectedLabel();
     final russian = Localizations.localeOf(context).languageCode == 'ru';
     final parsed = inspectShareLines(catalog.lines);
@@ -430,7 +412,9 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       facts: profileFacts(
         trafficMeta: catalog.trafficMeta,
         russian: russian,
-        keyHandle: handle,
+        // The seven-character key prefix is gone: it was crypto, not a fact
+        // a person can use. Full key stays behind «Поделиться».
+        keyHandle: '',
       ),
       updated: profileUpdatedLabel(
         lastUpdated: catalog.lastUpdated,
@@ -442,8 +426,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       // chooses something» to everyone but the person holding the mouse.
       onNodeTap: (_) {},
       nodes: [
-        for (final index in [...lines.premium, ...lines.general])
-          _nodeLine(l, index),
+        for (final index in nodeIndexes) _nodeLine(l, index),
       ],
       selectedNodeTitle: selectedLabel,
       telegramLabel: subscriptionPlaneIsTelegram(planeUrl)
@@ -461,20 +444,6 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       showTelegraph: planeUrl.isNotEmpty,
       unsupportedNote: unsupportedNote,
     );
-  }
-
-  /// The short handle a person recognises their own key by, taken from the
-  /// document address: `2aq93K0s`. It is the one string worth showing next to
-  /// the name.
-  String _keyHandle(ShareCatalog catalog) {
-    final text = catalog.subscriptionKey?.trim() ?? '';
-    if (text.isEmpty) return '';
-    if (!text.startsWith('http')) return '';
-    final uri = Uri.tryParse(text);
-    final segment =
-        uri?.pathSegments.isNotEmpty == true ? uri!.pathSegments.last : '';
-    if (segment.length < 6) return '';
-    return segment.substring(0, 7);
   }
 
   String _selectedLabel() {
@@ -594,24 +563,15 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
             alignment: Alignment.topLeft,
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: _pageMeasure),
+              // Add is the primary; reload is the one secondary tool this tab
+              // owns. QR lives in the import field, so it is not a third peer.
               child: FreeClientActionBar(
                 onPaste: () {
-                  UiLog.action('locations', 'paste');
-                  context.push('/import?clipboard=1');
+                  UiLog.action('locations', 'add');
+                  context.push('/import');
                 },
-                onScan: () {
-                  UiLog.action('locations', 'scan');
-                  openFreeClientCapture(context);
-                },
-                // The reload ring was dead here: the key was painted and had
-                // no handler, while every saved document on this tab is
-                // reloadable. Same question as the home key, same answer.
-                //
-                // It answers for this tab and stays on this tab: a reload is not
-                // a server pick, and the profile screen is where a pick goes —
-                // not where a reread goes. The key is here exactly when there
-                // is a saved document behind it, and a plate pasted as plain
-                // lines has none.
+                onScan: () {},
+                showScan: false,
                 onRefresh: _reloadableDocuments.isEmpty
                     ? null
                     : () => _refreshEveryDocument(),

@@ -65,7 +65,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         body: l.freeOnboardAddBody,
       ),
       _OnboardingCard(
-        icon: AppIcons.power,
+        // The copy says "tap the house"; the card has to be a house. A power
+        // glyph taught a different control than the one on Home.
+        icon: AppIcons.houseFill,
         title: l.freeOnboardConnectTitle,
         body: l.freeOnboardConnectBody,
       ),

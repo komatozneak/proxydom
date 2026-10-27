@@ -90,6 +90,18 @@ class AppL10nRu extends AppL10n {
   String get homeTrafficLabel => 'ТРАФИК';
 
   @override
+  String get homeAddServer => 'Добавить сервер';
+
+  @override
+  String get homeMetricTime => 'Время';
+
+  @override
+  String get homeMetricSpeed => 'Скорость';
+
+  @override
+  String get homeMetricTraffic => 'Трафик';
+
+  @override
   String get homeTrafficUnlimited => 'БЕЗ ЛИМИТА';
 
   @override
@@ -658,6 +670,24 @@ class AppL10nRu extends AppL10n {
       'Лицензии движка и библиотек, с которыми он собран';
 
   @override
+  String get licensesTitle => 'Лицензии';
+
+  @override
+  String get licensesSearch => 'Поиск по пакету';
+
+  @override
+  String get licensesEngine => 'Движок';
+
+  @override
+  String get licensesPackages => 'Пакеты';
+
+  @override
+  String get licensesFonts => 'Шрифты';
+
+  @override
+  String get licensesNoResults => 'Ничего не найдено';
+
+  @override
   String get settingsThemeSystem => 'Авто';
 
   @override
@@ -812,8 +842,7 @@ class AppL10nRu extends AppL10n {
       'Плитка уже в шторке — откройте панель и пролистайте';
 
   @override
-  String get settingsQsTileAddedHint =>
-      'Плитка в шторке. Нажмите, чтобы убрать';
+  String get settingsQsTileAddedHint => 'Нажмите, чтобы убрать';
 
   @override
   String get settingsQsTileRemove => 'Убрать';
@@ -1534,7 +1563,7 @@ class AppL10nRu extends AppL10n {
   String get locationsSelected => 'ВЫБРАН';
 
   @override
-  String get locationsActive => 'активен';
+  String get locationsActive => 'Активен';
 
   @override
   String get locationsNotUsed => 'НЕ ВЫБРАН';

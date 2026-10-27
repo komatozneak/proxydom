@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' show FontFeature;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -31,11 +32,11 @@ import '../../vpn/data/node_display.dart';
 import '../../vpn/data/vpn_controller.dart';
 import '../../vpn/data/windows_tunnel_protocol.dart';
 import '../../vpn/domain/vpn_connect_error.dart';
-import '../../vpn/presentation/free_client_chrome.dart';
+import '../../vpn/presentation/server_glyph.dart';
 import '../../vpn/presentation/vpn_disclosure_dialog.dart';
 import '../../vpn/presentation/vpn_platform_copy.dart';
-import '../../vpn/presentation/windows_share_qr.dart';
 import '../data/battery_prompt_prefs.dart';
+import '../application/home_stats_provider.dart';
 import '../application/vpn_provider.dart';
 import '../application/vpn_status.dart';
 
@@ -307,8 +308,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       } else {
         final label = labelForShareLink(selected);
         _serverTitle = label.title;
-        _serverSubtitle =
-            label.subtitle.isEmpty ? selected.endpoint : label.subtitle;
+        // The chip is a server selector: address, not the node's marketing
+        // line. The port is dropped when it is the default 443 — it is the
+        // same address and it is what made the line ellipsise.
+        final endpoint = selected.endpoint;
+        _serverSubtitle = endpoint.endsWith(':443')
+            ? endpoint.substring(0, endpoint.length - 4)
+            : endpoint;
         _importedScheme = selected.scheme;
         _serverFlag = label.flag.isEmpty ? kFlagGlobe : label.flag;
       }
@@ -630,6 +636,9 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
         (nestSize * 0.5) / size.height - 0.5,
       );
 
+    final traffic = ref.watch(trafficStatsProvider).valueOrNull ??
+        const VpnTrafficStats.zero();
+
     return _FreeClientHome(
       nestSize: nestSize,
       charged: widget.charged,
@@ -639,7 +648,10 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
       serverSubtitle: widget.serverSubtitle,
       serverFlag: widget.serverFlag,
       trafficMeta: widget.trafficMeta,
+      speedDown: traffic.downlinkBps,
+      speedUp: traffic.uplinkBps,
       onNestTap: widget.onNestTap,
+      onOpenLocations: widget.onOpenLocations,
       showVpnSettingsCta: showVpnSettingsCta,
       noVpnEnabled: widget.noVpnEnabled,
       noVpnTotal: widget.noVpnTotal,
@@ -658,7 +670,10 @@ class _FreeClientHome extends StatelessWidget {
     this.serverSubtitle,
     this.serverFlag,
     this.trafficMeta,
+    required this.speedDown,
+    required this.speedUp,
     required this.onNestTap,
+    required this.onOpenLocations,
     required this.showVpnSettingsCta,
     required this.noVpnEnabled,
     required this.noVpnTotal,
@@ -679,7 +694,10 @@ class _FreeClientHome extends StatelessWidget {
   /// The flag shown beside the server name in the terminal head.
   final String? serverFlag;
   final String? trafficMeta;
+  final int speedDown;
+  final int speedUp;
   final Future<void> Function() onNestTap;
+  final VoidCallback onOpenLocations;
   final bool showVpnSettingsCta;
   final int noVpnEnabled;
   final int noVpnTotal;
@@ -771,26 +789,46 @@ class _FreeClientHome extends StatelessWidget {
     // One tight cluster: status above, the house in the middle, the keys under.
     // Nothing is scattered across the screen — the eye has one place to land,
     // and that place is the power button.
-    final readout = ConnectionTerminal(
-      status: statusText,
-      serverName: profile,
-      serverFlag: serverFlag,
-      serverSubtitle: empty ? null : serverSubtitle,
-      tile: tileForName(profile),
-      uptime: uptime,
-      trafficLabel: traffic,
-      trafficColor: trafficColor,
-      // The rail fills by what is spent, so it answers "how much is left"
-      // without a second line of arithmetic.
-      trafficUsed: parsedTraffic == null || parsedTraffic.unlimited
-          ? 0
-          : (parsedTraffic.upload + parsedTraffic.download) /
-              parsedTraffic.total,
-      trafficCap: parsedTraffic == null || parsedTraffic.unlimited
-          ? 0
-          : parsedTraffic.total.toDouble(),
-      accent: accent,
-    );
+    final isConnected = status is VpnConnected;
+    final isConnecting = status is VpnConnecting;
+    final progress = switch (status) {
+      VpnConnecting(:final progress) => progress,
+      VpnConnected() => 1.0,
+      _ => 0.0,
+    };
+    final statusInk = switch (status) {
+      VpnConnected() => theme.brightness == Brightness.dark
+          ? AppBrand.inkMossDark
+          : AppBrand.inkMossLight,
+      VpnError() => theme.brightness == Brightness.dark
+          ? AppBrand.inkDangerDark
+          : AppBrand.inkDangerLight,
+      _ => theme.colorScheme.onSurfaceVariant,
+    };
+    final houseLabel = empty
+        ? l.homeAddServer
+        : switch (status) {
+            VpnConnected() => l.homeDisconnect,
+            VpnConnecting() => l.homeConnecting,
+            _ => l.homeConnect,
+          };
+    // The chip already names the state ("Не подключено", "Мешает другой VPN").
+    // The line under the house carries what the chip cannot: the action, the
+    // protected time, or a plain-language failure. Repeating one string twice on
+    // one screen is noise, and it read as two states that disagreed.
+    final String? heroStatus = empty && status is VpnDisconnected
+        ? l.freeNoProfile
+        : switch (status) {
+            VpnConnected() => uptime == null
+                ? l.homeProtected
+                : '${l.homeProtected} · $uptime',
+            VpnConnecting() => l.homeConnectingHint,
+            // The specific hint is rendered below the house by errorHint. A
+            // generic sentence here would repeat it and, for a conflict, would
+            // blame the network for another app's VPN.
+            VpnError() => null,
+            _ => l.homeTapHint,
+          };
     final hero = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -803,17 +841,25 @@ class _FreeClientHome extends StatelessWidget {
             alignment: Alignment.center,
             clipBehavior: Clip.none,
             children: [
+              // The ring says "this is a control, and it is doing something".
+              // Track is ink at 12%; the arc is the house gold.
+              Positioned.fill(
+                child: _ConnectRing(
+                  progress: progress,
+                  color: AppBrand.mascotGold,
+                  track: theme.colorScheme.onSurface.withValues(alpha: 0.12),
+                ),
+              ),
               // The dance belongs to the house, not to the wallpaper: it is
               // drawn around the button and only while the button burns.
               Positioned.fill(
                 child: HouseOrbit(
-                  burning:
-                      charged ? 1.0 : (status is VpnConnecting ? 0.45 : 0.0),
+                  burning: charged ? 1.0 : (isConnecting ? 0.45 : 0.0),
                 ),
               ),
               // The familiar pulse: it answers the finger whether or not
               // the tunnel has moved yet.
-              if (charged || status is VpnConnecting)
+              if (charged || isConnecting)
                 HousePulsar(diameter: nestSize),
               // The artwork is painted larger than the tap box: the mark
               // ships with a wide transparent margin, and at box size the house
@@ -835,7 +881,7 @@ class _FreeClientHome extends StatelessWidget {
                   // phone whole. A window has no empty column to fill any more —
                   // it opens at 826x591 — so both platforms use one scale and
                   // the house spills ~15% past its box instead of 45%.
-                  scale: 1.28,
+                  scale: 1.16,
                   child: SignalNestHero(
                     key: kHomeSignalNestKey,
                     state: treeState,
@@ -847,13 +893,24 @@ class _FreeClientHome extends StatelessWidget {
             ],
           ),
         ),
-        if (_showsEmptyHint) ...[
-          const SizedBox(height: 10),
-          // Inside the FittedBox the hero must have an intrinsic width: an
-          // infinite-width box here forces invalid constraints on the FittedBox
-          // and the whole home fails to lay out.
-          const FreeClientEmptyState(compact: true),
-        ],
+        const SizedBox(height: 6),
+        // The label is the affordance: the house was a picture, and a picture
+        // is not a button. It sits outside the tap box so TalkBack reads one
+        // button, not a decorative image plus a label.
+        Text(
+          houseLabel,
+          textAlign: TextAlign.center,
+          style: theme.textTheme.headlineMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 2),
+        if (heroStatus != null)
+          Text(
+            heroStatus,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodySmall?.copyWith(color: statusInk),
+          ),
       ],
     );
     final actions = <Widget>[
@@ -878,7 +935,9 @@ class _FreeClientHome extends StatelessWidget {
           child: Text(l.settingsKillSwitchOpenVpn),
         ),
       ],
-      if (status is VpnConnected && androidPerAppSplit) ...[
+      // On Android the row is always here, not only while connected: it used
+      // to appear on connect and move the house and the keys under the finger.
+      if (androidPerAppSplit) ...[
         const SizedBox(height: 10),
         _NoVpnHomeRow(
           label: l.homeNoVpnRow,
@@ -887,24 +946,6 @@ class _FreeClientHome extends StatelessWidget {
           onTap: onOpenNoVpn,
         ),
       ],
-      const SizedBox(height: 16),
-      FreeClientActionBar(
-        onPaste: () {
-          UiLog.action('home', 'paste');
-          context.push('/import?clipboard=1');
-        },
-        onScan: () {
-          UiLog.action('home', 'scan');
-          openFreeClientCapture(context);
-        },
-        onRefresh: () => refreshRemoteDocuments(
-          context,
-          scope: 'home',
-          // The answer stands above the keys, not on them: the toast used to
-          // land square on the bar this key belongs to.
-          bottomInset: kActionBarBottomInset,
-        ),
-      ),
     ];
 
     // One composition for both: the house in the middle with the yard around it,
@@ -919,8 +960,17 @@ class _FreeClientHome extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            const SizedBox(height: 4),
+            _ServerChip(
+              title: empty ? l.homeAddServer : profile,
+              subtitle: empty ? l.freeAddHint : (serverSubtitle ?? ''),
+              flag: serverFlag,
+              statusText: statusText,
+              statusInk: statusInk,
+              dotColor: accent,
+              onTap: onOpenLocations,
+            ),
             const SizedBox(height: 8),
-            readout,
             Expanded(
               // Scales the button down on a short window instead of
               // overflowing it: a tunnel that cannot be pressed is worse than
@@ -929,11 +979,23 @@ class _FreeClientHome extends StatelessWidget {
                 child: FittedBox(fit: BoxFit.scaleDown, child: hero),
               ),
             ),
+            if (!empty) ...[
+              const SizedBox(height: 6),
+              _MetricsCard(
+                uptime: isConnected ? uptime : null,
+                downBps: isConnected ? speedDown : 0,
+                upBps: isConnected ? speedUp : 0,
+                traffic: traffic,
+                parsedTraffic: parsedTraffic,
+                trafficColor: trafficColor,
+              ),
+            ],
             if (errorHint != null) ...[
+              const SizedBox(height: 8),
               Text(
                 errorHint,
                 textAlign: TextAlign.center,
-                maxLines: 2,
+                maxLines: 3,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.error,
@@ -949,16 +1011,6 @@ class _FreeClientHome extends StatelessWidget {
     );
   }
 
-  bool get _showsEmptyHint {
-    final noProfile = serverTitle == '…' ||
-        serverTitle == 'Нет ссылки' ||
-        serverTitle == 'No link';
-    return noProfile &&
-        status is! VpnConnecting &&
-        status is! VpnConnected &&
-        status is! VpnError;
-  }
-
   String _formatUptime(DateTime since) {
     final elapsed = DateTime.now().difference(since);
     String two(int value) => value.toString().padLeft(2, '0');
@@ -966,6 +1018,330 @@ class _FreeClientHome extends StatelessWidget {
     final minutes = two(elapsed.inMinutes % 60);
     final seconds = two(elapsed.inSeconds % 60);
     return '$hours:$minutes:$seconds';
+  }
+}
+
+/// The server is a chip, not the hero: name, address, state, one chevron.
+class _ServerChip extends StatelessWidget {
+  const _ServerChip({
+    required this.title,
+    required this.subtitle,
+    required this.flag,
+    required this.statusText,
+    required this.statusInk,
+    required this.dotColor,
+    required this.onTap,
+  });
+
+  final String title;
+  final String subtitle;
+  final String? flag;
+  final String statusText;
+  final Color statusInk;
+  final Color dotColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final line = theme.colorScheme.outline;
+    return Material(
+      color: theme.colorScheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppBrand.radiusCard),
+        side: BorderSide(color: line.withValues(alpha: 0.5)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              // The same mark the list draws: a YouTube tile for a YouTube
+              // line, a flag for a country. LocationFlagIcon's product branch
+              // is not the list's mark and drew a red bar here.
+              ServerGlyph(
+                label: PoolServerLabel(
+                  title: title,
+                  subtitle: '',
+                  tile: tileForName(title),
+                  flag: flag ?? kFlagGlobe,
+                ),
+                size: 36,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium,
+                    ),
+                    if (subtitle.trim().isNotEmpty) ...[
+                      const SizedBox(height: 1),
+                      Text(
+                        subtitle.trim(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontFamily: 'JetBrainsMono',
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: dotColor,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  statusText,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: statusInk,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              AppIcon(
+                AppIcons.chevronRight,
+                size: 16,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A 6 dp ring around the house: quiet track, gold progress.
+class _ConnectRing extends StatelessWidget {
+  const _ConnectRing({
+    required this.progress,
+    required this.color,
+    required this.track,
+  });
+
+  final double progress;
+  final Color color;
+  final Color track;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _ConnectRingPainter(
+        progress: progress.clamp(0.0, 1.0),
+        color: color,
+        track: track,
+      ),
+    );
+  }
+}
+
+class _ConnectRingPainter extends CustomPainter {
+  const _ConnectRingPainter({
+    required this.progress,
+    required this.color,
+    required this.track,
+  });
+
+  final double progress;
+  final Color color;
+  final Color track;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = size.center(Offset.zero);
+    final radius = size.shortestSide / 2 - 3;
+    if (radius <= 0) return;
+    final base = Paint()
+      ..color = track
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 6;
+    canvas.drawCircle(center, radius, base);
+    if (progress <= 0) return;
+    final arc = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 6
+      ..strokeCap = StrokeCap.round;
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      -math.pi / 2,
+      2 * math.pi * progress,
+      false,
+      arc,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_ConnectRingPainter oldDelegate) =>
+      oldDelegate.progress != progress ||
+      oldDelegate.color != color ||
+      oldDelegate.track != track;
+}
+
+/// Time, speed and the remaining traffic. Values that do not exist are "—";
+/// nothing is made up.
+class _MetricsCard extends StatelessWidget {
+  const _MetricsCard({
+    required this.uptime,
+    required this.downBps,
+    required this.upBps,
+    required this.traffic,
+    required this.parsedTraffic,
+    required this.trafficColor,
+  });
+
+  final String? uptime;
+  final int downBps;
+  final int upBps;
+  final String traffic;
+  final SubscriptionTraffic? parsedTraffic;
+  final Color? trafficColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppL10n.of(context);
+    final theme = Theme.of(context);
+    final line = theme.colorScheme.outline;
+    final parsed = parsedTraffic;
+    final used = parsed == null || parsed.unlimited
+        ? 0.0
+        : (parsed.upload + parsed.download) / parsed.total;
+    final down = downBps > 0 ? VpnTrafficStats.formatSpeed(downBps) : '—';
+    final up = upBps > 0 ? VpnTrafficStats.formatSpeed(upBps) : '—';
+    return Material(
+      color: theme.colorScheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppBrand.radiusCard),
+        side: BorderSide(color: line.withValues(alpha: 0.5)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: _Metric(
+                label: l.homeMetricTime,
+                value: uptime ?? '—',
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _Metric(
+                label: l.homeMetricSpeed,
+                value: '↓ $down',
+                second: '↑ $up',
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _Metric(
+                label: l.homeMetricTraffic,
+                value: traffic,
+                bar: parsed == null || parsed.unlimited
+                    ? null
+                    : (used.clamp(0.0, 1.0), trafficColor ?? AppBrand.mascotGold),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Metric extends StatelessWidget {
+  const _Metric({
+    required this.label,
+    required this.value,
+    this.second,
+    this.bar,
+  });
+
+  final String label;
+  final String value;
+  final String? second;
+  final (double, Color)? bar;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final mono = theme.textTheme.titleMedium?.copyWith(
+      fontFamily: 'JetBrainsMono',
+      fontSize: 14,
+      fontWeight: FontWeight.w700,
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            fontSize: 12,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: mono,
+        ),
+        if (second != null)
+          Text(
+            second!,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: mono?.copyWith(fontSize: 12),
+          ),
+        if (bar != null) ...[
+          const SizedBox(height: 4),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(2),
+            child: SizedBox(
+              height: 4,
+              child: Stack(
+                children: [
+                  ColoredBox(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.10),
+                    child: const SizedBox.expand(),
+                  ),
+                  FractionallySizedBox(
+                    widthFactor: bar!.$1,
+                    child: ColoredBox(color: bar!.$2),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
   }
 }
 

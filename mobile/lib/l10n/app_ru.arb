@@ -1,4 +1,4 @@
-{
+﻿{
   "@@locale": "ru",
   "appTitle": "Прокси Дом",
   "loginTitle": "Вход",
@@ -27,6 +27,10 @@
   "homeTrafficRemainder": "Остаток трафика",
   "homeTrafficExhausted": "Трафик закончился",
   "homeTrafficLabel": "ТРАФИК",
+  "homeAddServer": "Добавить сервер",
+  "homeMetricTime": "Время",
+  "homeMetricSpeed": "Скорость",
+  "homeMetricTraffic": "Трафик",
   "homeTrafficUnlimited": "БЕЗ ЛИМИТА",
   "homeTrafficAmount": "{remaining} / {limit} ГБ",
   "@homeTrafficAmount": {
@@ -280,6 +284,12 @@
   "settingsDarkTheme": "Оформление",
   "settingsAppearance": "Оформление",
   "settingsLicensesHint": "Лицензии движка и библиотек, с которыми он собран",
+  "licensesTitle": "Лицензии",
+  "licensesSearch": "Поиск по пакету",
+  "licensesEngine": "Движок",
+  "licensesPackages": "Пакеты",
+  "licensesFonts": "Шрифты",
+  "licensesNoResults": "Ничего не найдено",
   "settingsThemeSystem": "Авто",
   "settingsThemeDark": "Тёмное",
   "settingsThemeLight": "Светлое",
@@ -354,7 +364,7 @@
   "settingsQsTileAddHint": "Показать системный запрос на добавление плитки",
   "settingsQsTileAdded": "Плитка добавлена в шторку",
   "settingsQsTileAlreadyAdded": "Плитка уже в шторке — откройте панель и пролистайте",
-  "settingsQsTileAddedHint": "Плитка в шторке. Нажмите, чтобы убрать",
+  "settingsQsTileAddedHint": "Нажмите, чтобы убрать",
   "settingsQsTileRemove": "Убрать",
   "settingsQsTileRemoveTitle": "Убрать плитку",
   "settingsQsTileRemoveBody": "Потяните шторку вниз, нажмите на карандаш и перетащите плитку «Прокси Дом» в корзину.",
@@ -629,7 +639,7 @@
   "freeSearch": "Поиск серверов",
   "locationsNodes": "Узлы",
   "locationsSelected": "ВЫБРАН",
-  "locationsActive": "активен",
+  "locationsActive": "Активен",
   "locationsNotUsed": "НЕ ВЫБРАН",
   "locationsUseIt": "Подключить",
   "locationsInUse": "Подключено",
@@ -655,3 +665,4 @@
   "freeStepFound": "Найдено",
   "freeFieldEmpty": "Пока пусто. Вставьте ссылку — и мир увидит что внутри."
 }
+

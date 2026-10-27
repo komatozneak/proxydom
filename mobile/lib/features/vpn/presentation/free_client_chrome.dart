@@ -143,11 +143,17 @@ class FreeClientActionBar extends StatelessWidget {
     required this.onScan,
     this.onRefresh,
     this.draft = false,
+    this.showScan = true,
   });
 
   final VoidCallback onPaste;
   final VoidCallback onScan;
   final VoidCallback? onRefresh;
+
+  /// The QR ring is for the import field. The Servers tab keeps add + reload
+  /// and sends scanning to the import screen, so the footer is not three
+  /// peer buttons.
+  final bool showScan;
 
   /// True on the import screen's first step.
   ///
@@ -212,14 +218,16 @@ class FreeClientActionBar extends StatelessWidget {
             tooltip: l.freeRefresh,
             size: barHeight,
           ),
-          gap,
-          AppRingButton(
-            icon: AppIcons.qrCode,
-            color: AppBrand.mascotGoldDeep,
-            onPressed: onScan,
-            tooltip: l.freeQr,
-            size: barHeight,
-          ),
+          if (showScan) ...[
+            gap,
+            AppRingButton(
+              icon: AppIcons.qrCode,
+              color: AppBrand.mascotGoldDeep,
+              onPressed: onScan,
+              tooltip: l.freeQr,
+              size: barHeight,
+            ),
+          ],
         ],
       ),
     );
