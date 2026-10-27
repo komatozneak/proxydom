@@ -218,7 +218,13 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
                   ),
                 if (_pending)
                   Material(
-                    color: theme.colorScheme.tertiaryContainer,
+                    // tertiaryContainer is not set in AppTheme, so it falls
+                    // back to `tertiary`: near-black in light, near-white in
+                    // dark. bodySmall keeps onSurface, which is the same ink
+                    // colour — the sentence was invisible in both themes and
+                    // the strip looked like an empty band with a stray button.
+                    // A surface token keeps the text on onSurfaceVariant.
+                    color: theme.colorScheme.surfaceContainerHighest,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
@@ -229,7 +235,9 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
                           Expanded(
                             child: Text(
                               l.splitTunnelPendingBody,
-                              style: theme.textTheme.bodySmall,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
                             ),
                           ),
                           FilledButton(
