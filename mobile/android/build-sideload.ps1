@@ -25,9 +25,22 @@ function Invoke-Flutter {
         $bat = $cmd.Source
     }
     Write-Host ('>> flutter {0}' -f ($FlutterArgs -join ' '))
-    & $bat @FlutterArgs
-    if ($LASTEXITCODE -ne 0) {
-        Write-Error ('flutter {0} failed with exit {1}' -f ($FlutterArgs -join ' '), $LASTEXITCODE)
+    # ErrorActionPreference=Stop at the script level turns the first line an
+    # external tool writes to stderr into a terminating NativeCommandError.
+    # Gradle and javac warn on stderr on a healthy release build (for example
+    # "source value 8 is obsolete"), so that setting aborted this script after
+    # assembleRelease had already succeeded and skipped every APK check below.
+    # Only the exit code decides whether flutter failed.
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        & $bat @FlutterArgs
+        $code = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $prevEap
+    }
+    if ($code -ne 0) {
+        Write-Error ('flutter {0} failed with exit {1}' -f ($FlutterArgs -join ' '), $code)
     }
 }
 
