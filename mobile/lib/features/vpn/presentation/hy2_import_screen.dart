@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -47,6 +49,11 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
   var _clipboardApplied = false;
   int _previewGen = 0;
 
+  /// Pending subscription fetch. Typing a URL used to fetch on every keystroke:
+  /// one request and one DNS lookup per character, each logged as a `doc.fetch`
+  /// failure for a host that could not exist yet.
+  Timer? _previewDebounce;
+
   @override
   void initState() {
     super.initState();
@@ -63,7 +70,7 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
     if (pending != null && pending.isNotEmpty) {
       _clipboardApplied = true;
       _controller.text = pending;
-      _previewInput(pending);
+      _previewInput(pending, immediate: true);
       return;
     }
     if (_clipboardApplied) return;
@@ -76,6 +83,7 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
 
   @override
   void dispose() {
+    _previewDebounce?.cancel();
     _controller.dispose();
     _fieldFocus.dispose();
     super.dispose();
@@ -92,12 +100,13 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
     );
     if (!mounted || text.isEmpty) return;
     _controller.text = text;
-    _previewInput(text);
+    _previewInput(text, immediate: true);
   }
 
-  void _previewInput(String raw) {
+  void _previewInput(String raw, {bool immediate = false}) {
     final text = raw.trim();
     final gen = ++_previewGen;
+    _previewDebounce?.cancel();
     if (isPendingSubscriptionUrl(text)) {
       setState(() {
         _subscriptionUrl = true;
@@ -107,47 +116,17 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
         _skipped = const [];
         _previewTitle = null;
       });
-      Hy2ImportStore.instance.previewSubscription(text).then((result) {
-        if (!mounted || gen != _previewGen) return;
-        setState(() {
-          _loadingPreview = false;
-          _preview = result.links;
-          _skipped = result.skipped;
-          _previewTitle = result.title;
-          _error = result.links.isEmpty && result.skipped.isEmpty
-              ? 'empty'
-              : result.links.isEmpty
-                  ? null
-                  : switch (shareImportDial(
-                  result.links,
-                  fromDocument: true,
-                )) {
-                  ShareImportDial.noneDialable => 'no_hy2',
-                  ShareImportDial.singleUnsupported => 'hy2_only',
-                  ShareImportDial.dialable => null,
-                };
-        });
-      }).catchError((Object error) {
-        if (!mounted || gen != _previewGen) return;
-        UiLog.action(
-          'import',
-          'preview',
-          result: 'fail',
-          reason: error.runtimeType.toString(),
+      // Paste and deep links arrive complete, so they fetch at once. A typed
+      // URL waits until the edits stop; otherwise every character issues a
+      // request and a DNS lookup for a host that is still being spelled.
+      if (immediate) {
+        _fetchSubscriptionPreview(text, gen);
+      } else {
+        _previewDebounce = Timer(
+          const Duration(milliseconds: 900),
+          () => _fetchSubscriptionPreview(text, gen),
         );
-        setState(() {
-          _loadingPreview = false;
-          _preview = const [];
-          _previewTitle = null;
-          _error = switch (error) {
-            SubscriptionDocumentException(:final code) => code,
-            DocumentSyncException(:final decision)
-                when decision == DocumentSyncDecision.drop =>
-              'missing',
-            _ => 'load',
-          };
-        });
-      });
+      }
       return;
     }
     setState(() {
@@ -182,6 +161,52 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
         _error = 'bad';
       });
     }
+  }
+
+  /// Fetches and previews a subscription document. [gen] drops an answer that
+  /// belongs to an edit the field has already moved past.
+  void _fetchSubscriptionPreview(String text, int gen) {
+    Hy2ImportStore.instance.previewSubscription(text).then((result) {
+      if (!mounted || gen != _previewGen) return;
+      setState(() {
+        _loadingPreview = false;
+        _preview = result.links;
+        _skipped = result.skipped;
+        _previewTitle = result.title;
+        _error = result.links.isEmpty && result.skipped.isEmpty
+            ? 'empty'
+            : result.links.isEmpty
+                ? null
+                : switch (shareImportDial(
+                    result.links,
+                    fromDocument: true,
+                  )) {
+                    ShareImportDial.noneDialable => 'no_hy2',
+                    ShareImportDial.singleUnsupported => 'hy2_only',
+                    ShareImportDial.dialable => null,
+                  };
+      });
+    }).catchError((Object error) {
+      if (!mounted || gen != _previewGen) return;
+      UiLog.action(
+        'import',
+        'preview',
+        result: 'fail',
+        reason: error.runtimeType.toString(),
+      );
+      setState(() {
+        _loadingPreview = false;
+        _preview = const [];
+        _previewTitle = null;
+        _error = switch (error) {
+          SubscriptionDocumentException(:final code) => code,
+          DocumentSyncException(:final decision)
+              when decision == DocumentSyncDecision.drop =>
+            'missing',
+          _ => 'load',
+        };
+      });
+    });
   }
 
   Future<void> _stopLiveTunnel({required String reason}) async {
