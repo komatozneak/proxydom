@@ -40,6 +40,10 @@
   "@homeTrafficRemainder": {},
   "homeTrafficExhausted": "Traffic used up",
   "@homeTrafficExhausted": {},
+  "homeTrafficLabel": "TRAFFIC",
+  "@homeTrafficLabel": {},
+  "homeTrafficUnlimited": "UNLIMITED",
+  "@homeTrafficUnlimited": {},
   "homeTrafficAmount": "{remaining} / {limit} GB",
   "@homeTrafficAmount": {
     "placeholders": {

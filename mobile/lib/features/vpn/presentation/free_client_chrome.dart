@@ -537,7 +537,7 @@ class _TrafficRail extends StatelessWidget {
         Row(
           children: [
             Text(
-              'ТРАФИК',
+              AppL10n.of(context).homeTrafficLabel,
               style: mono(
                 context,
                 size: 9.5,
@@ -580,7 +580,7 @@ class _TrafficRail extends StatelessWidget {
         if (!capped) ...[
           const SizedBox(height: 7),
           Text(
-            'БЕЗ ЛИМИТА',
+            AppL10n.of(context).homeTrafficUnlimited,
             style: mono(
               context,
               size: 9.5,

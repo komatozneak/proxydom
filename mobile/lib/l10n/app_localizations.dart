@@ -253,6 +253,18 @@ abstract class AppL10n {
   /// **'Traffic used up'**
   String get homeTrafficExhausted;
 
+  /// No description provided for @homeTrafficLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'TRAFFIC'**
+  String get homeTrafficLabel;
+
+  /// No description provided for @homeTrafficUnlimited.
+  ///
+  /// In en, this message translates to:
+  /// **'UNLIMITED'**
+  String get homeTrafficUnlimited;
+
   /// No description provided for @homeTrafficAmount.
   ///
   /// In en, this message translates to:

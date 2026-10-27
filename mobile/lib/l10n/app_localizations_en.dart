@@ -87,6 +87,12 @@ class AppL10nEn extends AppL10n {
   String get homeTrafficExhausted => 'Traffic used up';
 
   @override
+  String get homeTrafficLabel => 'TRAFFIC';
+
+  @override
+  String get homeTrafficUnlimited => 'UNLIMITED';
+
+  @override
   String homeTrafficAmount(String remaining, String limit) {
     return '$remaining / $limit GB';
   }

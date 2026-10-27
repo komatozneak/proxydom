@@ -26,6 +26,8 @@
   "navModes": "Режимы",
   "homeTrafficRemainder": "Остаток трафика",
   "homeTrafficExhausted": "Трафик закончился",
+  "homeTrafficLabel": "ТРАФИК",
+  "homeTrafficUnlimited": "БЕЗ ЛИМИТА",
   "homeTrafficAmount": "{remaining} / {limit} ГБ",
   "@homeTrafficAmount": {
     "placeholders": {
