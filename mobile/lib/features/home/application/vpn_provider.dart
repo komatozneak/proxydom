@@ -974,7 +974,20 @@ class VpnNotifier extends Notifier<VpnStatus> {
     // connect() owns the native channels; the cancel above must not be the last
     // word, or the resumed session never repaints and Nest spins forever.
     _subscribeToStatus();
-    return state is VpnConnected;
+    // connect() returns when the service accepts the start, not when the
+    // session is proven. Returning here reported a successful reconnect as a
+    // failure: the tunnel came up, the toast said «Не удалось применить», and
+    // the banner kept saying changes were pending (Pixel 7 Pro, 14:32).
+    final deadline = DateTime.now().add(const Duration(seconds: 20));
+    while (DateTime.now().isBefore(deadline)) {
+      if (state is VpnConnected) {
+        await _markSplitTunnelApplied();
+        return true;
+      }
+      if (state is VpnError) return false;
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    }
+    return false;
   }
 
   Future<void> connect({
