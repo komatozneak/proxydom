@@ -38,7 +38,13 @@ gomobile init >/dev/null 2>&1 || true
 
 go get "github.com/apernet/hysteria/core/v2@${HYSTERIA_TAG}"
 # Go 1.25+: gomobile bind needs x/mobile in this module's tool graph.
-go get -tool golang.org/x/mobile/cmd/gobind
+# Pin the tool to the version go.mod already selects. `go get -tool ...@latest`
+# rewrote eight x/* modules in go.mod and go.sum on every bind, so the archive
+# that shipped was built from a dependency graph the commit did not name — and
+# two machines binding the same commit could disagree. aarstamp hashes go.mod
+# and go.sum, so that drift also invalidated every sidecar written elsewhere.
+GOBIND_VERSION="$(go list -m -f '{{.Version}}' golang.org/x/mobile)"
+go get -tool "golang.org/x/mobile/cmd/gobind@${GOBIND_VERSION}"
 go mod tidy
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
