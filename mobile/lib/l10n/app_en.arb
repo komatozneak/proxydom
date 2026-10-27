@@ -1,4 +1,4 @@
-﻿{
+{
   "@@locale": "en",
   "appTitle": "Proxy Dom",
   "@appTitle": {
@@ -517,6 +517,7 @@
   "settingsReportNetworkError": "Can't reach the server — try again later",
   "@settingsReportNetworkError": {},
   "settingsVpnNotificationTitle": "Shade notification",
+  "settingsVpnNotificationShort": "Shade card with Disconnect",
   "settingsVpnNotificationHint": "Card in the shade with Disconnect. Off hides the card; VPN stays on.",
   "settingsQsTileTitle": "Quick Settings tile",
   "settingsQsTileHint": "Add a tile to connect and disconnect from Quick Settings",
@@ -759,6 +760,11 @@
   "iosBillingUnavailableBody": "In-app payment is not available. Free locations still work.",
   "iosAdvancedFeaturesCta": "Advanced features",
   "vpnDisclosureTitle": "How the tunnel starts",
+  "vpnDisclosureBullet1": "The tunnel starts only on your command and only on this device.",
+  "vpnDisclosureBullet2": "Keys and node addresses are never sent to a server.",
+  "vpnDisclosureBullet3": "No account, no payments, no ads.",
+  "vpnDisclosureMore": "Details",
+  "vpnDisclosureClose": "Close",
   "vpnDisclosureLead": "The house starts a tunnel from the line you chose. This screen explains that before Android asks for VPN permission.",
   "vpnDisclosureVpnTitle": "What the app does",
   "vpnDisclosureVpnBody": "After you accept, the house opens a local tunnel for the selected line. Device traffic goes to the server in that line. Android then shows its own VPN permission once.",
@@ -823,6 +829,9 @@
   "freeSchemeParked": "This protocol cannot start.",
   "freePoolGeneral": "General",
   "freeSearch": "Search servers",
+  "freeSearchEmpty": "No servers found",
+  "qrHint": "Point the camera at the QR code",
+  "qrTorch": "Torch",
   "locationsNodes": "Nodes",
   "locationsSelected": "IN USE",
   "locationsActive": "Active",

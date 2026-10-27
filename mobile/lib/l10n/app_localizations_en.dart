@@ -815,6 +815,9 @@ class AppL10nEn extends AppL10n {
   String get settingsVpnNotificationTitle => 'Shade notification';
 
   @override
+  String get settingsVpnNotificationShort => 'Shade card with Disconnect';
+
+  @override
   String get settingsVpnNotificationHint =>
       'Card in the shade with Disconnect. Off hides the card; VPN stays on.';
 
@@ -1361,6 +1364,23 @@ class AppL10nEn extends AppL10n {
   String get vpnDisclosureTitle => 'How the tunnel starts';
 
   @override
+  String get vpnDisclosureBullet1 =>
+      'The tunnel starts only on your command and only on this device.';
+
+  @override
+  String get vpnDisclosureBullet2 =>
+      'Keys and node addresses are never sent to a server.';
+
+  @override
+  String get vpnDisclosureBullet3 => 'No account, no payments, no ads.';
+
+  @override
+  String get vpnDisclosureMore => 'Details';
+
+  @override
+  String get vpnDisclosureClose => 'Close';
+
+  @override
   String get vpnDisclosureLead =>
       'The house starts a tunnel from the line you chose. This screen explains that before Android asks for VPN permission.';
 
@@ -1549,6 +1569,15 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get freeSearch => 'Search servers';
+
+  @override
+  String get freeSearchEmpty => 'No servers found';
+
+  @override
+  String get qrHint => 'Point the camera at the QR code';
+
+  @override
+  String get qrTorch => 'Torch';
 
   @override
   String get locationsNodes => 'Nodes';

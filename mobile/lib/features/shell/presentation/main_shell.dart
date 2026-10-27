@@ -207,7 +207,12 @@ class _MainShellState extends ConsumerState<MainShell> {
             body: _StatusBarStyle(dark: dark, child: page),
             bottomNavigationBar: MossySlab(
               light: !dark,
-              child: bar,
+              // Navigation is chrome: at 2× the 12 sp labels overlapped the
+              // system bar. 1.3× keeps them legible without clipping.
+              child: MediaQuery.withClampedTextScaling(
+                maxScaleFactor: 1.3,
+                child: bar,
+              ),
             ),
           ),
           Positioned(
@@ -392,12 +397,12 @@ class _RailItemState extends State<_RailItem> {
         builder: (context, hovered) {
           final fill = widget.selected
               ? (dark
-                    ? AppBrand.mossDeep.withValues(alpha: 0.92)
-                    : AppBrand.mossLight.withValues(alpha: 0.12))
+                  ? AppBrand.mossDeep.withValues(alpha: 0.92)
+                  : AppBrand.mossLight.withValues(alpha: 0.12))
               : hovered
                   ? (dark
-                        ? AppBrand.lightSource.withValues(alpha: 0.045)
-                        : AppBrand.inkLight.withValues(alpha: 0.035))
+                      ? AppBrand.lightSource.withValues(alpha: 0.045)
+                      : AppBrand.inkLight.withValues(alpha: 0.035))
                   : null;
           return AnimatedContainer(
             duration: AppBrand.motionReveal,
@@ -409,8 +414,8 @@ class _RailItemState extends State<_RailItem> {
               border: Border.all(
                 color: widget.selected
                     ? (dark
-                          ? AppBrand.moss.withValues(alpha: 0.35)
-                          : AppBrand.moss.withValues(alpha: 0.28))
+                        ? AppBrand.moss.withValues(alpha: 0.35)
+                        : AppBrand.moss.withValues(alpha: 0.28))
                     : Colors.transparent,
               ),
             ),
@@ -522,8 +527,8 @@ class _SideNavGlyph extends StatelessWidget {
             decoration: BoxDecoration(
               color: selected
                   ? (dark
-                        ? AppBrand.mossDeep.withValues(alpha: 0.92)
-                        : AppBrand.mossLight.withValues(alpha: 0.12))
+                      ? AppBrand.mossDeep.withValues(alpha: 0.92)
+                      : AppBrand.mossLight.withValues(alpha: 0.12))
                   : Colors.transparent,
               borderRadius: BorderRadius.circular(AppBrand.radiusNavPill),
               border: Border.all(
@@ -570,55 +575,58 @@ class _CenterNavMark extends StatelessWidget {
     final l = AppL10n.of(context);
     final active = AppBrand.mascotGold;
     final idle = theme.colorScheme.onSurfaceVariant;
-    return SizedBox(
-      width: 84,
-      height: _domButtonSize,
-      child: Semantics(
-        button: true,
-        selected: selected,
-        label: semanticLabel,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Material(
-              type: MaterialType.transparency,
-              shape: const CircleBorder(),
-              child: InkWell(
-                onTap: onTap,
-                customBorder: const CircleBorder(),
-                child: Container(
-                  width: _domCircleSize,
-                  height: _domCircleSize,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: selected
-                          ? active
-                          : theme.colorScheme.outline.withValues(alpha: 0.6),
-                      width: _domRingWidth,
+    return MediaQuery.withClampedTextScaling(
+      maxScaleFactor: 1.3,
+      child: SizedBox(
+        width: 84,
+        height: _domButtonSize,
+        child: Semantics(
+          button: true,
+          selected: selected,
+          label: semanticLabel,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Material(
+                type: MaterialType.transparency,
+                shape: const CircleBorder(),
+                child: InkWell(
+                  onTap: onTap,
+                  customBorder: const CircleBorder(),
+                  child: Container(
+                    width: _domCircleSize,
+                    height: _domCircleSize,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: selected
+                            ? active
+                            : theme.colorScheme.outline.withValues(alpha: 0.6),
+                        width: _domRingWidth,
+                      ),
+                    ),
+                    child: AppIcon(
+                      AppIcons.house,
+                      size: 24,
+                      color: selected ? active : idle,
                     ),
                   ),
-                  child: AppIcon(
-                    AppIcons.house,
-                    size: 24,
-                    color: selected ? active : idle,
+                ),
+              ),
+              const SizedBox(height: 1),
+              ExcludeSemantics(
+                child: Text(
+                  l.navHome,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    fontSize: 12,
+                    color: selected ? theme.colorScheme.onSurface : idle,
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 1),
-            ExcludeSemantics(
-              child: Text(
-                l.navHome,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  fontSize: 12,
-                  color: selected ? theme.colorScheme.onSurface : idle,
-                ),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

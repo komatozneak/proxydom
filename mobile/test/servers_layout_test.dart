@@ -1,4 +1,4 @@
-﻿// The Servers tab reads as one page again.
+// The Servers tab reads as one page again.
 //
 // It was rebuilt around its own numbers: the heading sat on the shared page
 // gutter, the list on 44/16, and the key bar under it on a third pair. Every
@@ -50,6 +50,24 @@ void _seedTeremok() {
             _line('Индия'),
             _line('Игровой'),
             _line('YouTube'),
+          ],
+        },
+      ],
+      'selected': 0,
+    }),
+  });
+}
+
+void _seedManyNodes(int count) {
+  SharedPreferences.setMockInitialValues({
+    'hy2_import_v1': jsonEncode({
+      'catalogs': [
+        {
+          'id': 'big',
+          'title': 'Большой',
+          'url': 'https://panel.proxydom.su/big',
+          'lines': [
+            for (var i = 0; i < count; i++) _line('Узел $i'),
           ],
         },
       ],
@@ -249,6 +267,41 @@ void main() {
     final key = tester.getRect(find.text('Добавить сервер'));
     expect(key.left, greaterThanOrEqualTo(AppBrand.pageGutter));
     expect(find.byType(AppActionButton), findsWidgets);
+  });
+
+  testWidgets('a profile over eight nodes offers search and filters lines',
+      (tester) async {
+    tester.view
+      ..physicalSize = _phone * _dpr
+      ..devicePixelRatio = _dpr;
+    addTearDown(tester.view.reset);
+    _seedManyNodes(10);
+
+    await tester.pumpWidget(_wrap(const LocationsScreen()));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 4));
+
+    expect(find.byType(TextField), findsOneWidget);
+    expect(find.text('Узел 8'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), 'Узел 9');
+    await tester.pump();
+    // The field itself also contains the query text.
+    expect(find.text('Узел 9'), findsWidgets);
+    expect(find.text('Узел 8'), findsNothing);
+
+    await tester.enterText(find.byType(TextField), 'нет такого');
+    await tester.pump();
+    expect(find.text('Серверы не найдены'), findsOneWidget);
+  });
+
+  testWidgets('a short profile has no search line', (tester) async {
+    _seedTeremok();
+    await tester.pumpWidget(_wrap(const LocationsScreen()));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 4));
+
+    expect(find.byType(TextField), findsNothing);
   });
 }
 

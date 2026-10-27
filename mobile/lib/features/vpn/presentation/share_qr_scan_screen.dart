@@ -4,7 +4,9 @@ import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../../core/diagnostics/ui_log.dart';
+import '../../../core/theme.dart';
 import '../../../core/toasts/proxy_dom_toast.dart';
+import '../../../core/widgets/app_icon.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../home/application/vpn_provider.dart';
@@ -24,7 +26,17 @@ class _ShareQrScanScreenState extends ConsumerState<ShareQrScanScreen> {
     detectionSpeed: DetectionSpeed.noDuplicates,
   );
   var _handled = false;
+  var _torch = false;
   String? _error;
+
+  Future<void> _toggleTorch() async {
+    try {
+      await _scanner.toggleTorch();
+      if (mounted) setState(() => _torch = !_torch);
+    } catch (_) {
+      // A device without a torch simply keeps the button inert.
+    }
+  }
 
   @override
   void dispose() {
@@ -69,16 +81,66 @@ class _ShareQrScanScreenState extends ConsumerState<ShareQrScanScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(l.freeQr)),
       body: Stack(
+        fit: StackFit.expand,
         children: [
           MobileScanner(controller: _scanner, onDetect: _onDetect),
-          if (_error != null)
-            Align(
-              alignment: Alignment.bottomCenter,
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(_error!, textAlign: TextAlign.center),
+          // A viewfinder, not a bare camera: without a frame the screen gives
+          // no clue what to point at.
+          IgnorePointer(
+            child: Center(
+              child: Container(
+                width: 240,
+                height: 240,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white70, width: 2),
+                ),
               ),
             ),
+          ),
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: 24,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_error != null) ...[
+                  Text(
+                    _error!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                Container(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.55),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          l.qrHint,
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: _toggleTorch,
+                        tooltip: l.qrTorch,
+                        icon: AppIcon(
+                          AppIcons.flashlight,
+                          color: _torch ? AppBrand.mascotGold : Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

@@ -1573,6 +1573,12 @@ abstract class AppL10n {
   /// **'Shade notification'**
   String get settingsVpnNotificationTitle;
 
+  /// No description provided for @settingsVpnNotificationShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Shade card with Disconnect'**
+  String get settingsVpnNotificationShort;
+
   /// No description provided for @settingsVpnNotificationHint.
   ///
   /// In en, this message translates to:
@@ -2575,6 +2581,36 @@ abstract class AppL10n {
   /// **'How the tunnel starts'**
   String get vpnDisclosureTitle;
 
+  /// No description provided for @vpnDisclosureBullet1.
+  ///
+  /// In en, this message translates to:
+  /// **'The tunnel starts only on your command and only on this device.'**
+  String get vpnDisclosureBullet1;
+
+  /// No description provided for @vpnDisclosureBullet2.
+  ///
+  /// In en, this message translates to:
+  /// **'Keys and node addresses are never sent to a server.'**
+  String get vpnDisclosureBullet2;
+
+  /// No description provided for @vpnDisclosureBullet3.
+  ///
+  /// In en, this message translates to:
+  /// **'No account, no payments, no ads.'**
+  String get vpnDisclosureBullet3;
+
+  /// No description provided for @vpnDisclosureMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Details'**
+  String get vpnDisclosureMore;
+
+  /// No description provided for @vpnDisclosureClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get vpnDisclosureClose;
+
   /// No description provided for @vpnDisclosureLead.
   ///
   /// In en, this message translates to:
@@ -2922,6 +2958,24 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Search servers'**
   String get freeSearch;
+
+  /// No description provided for @freeSearchEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No servers found'**
+  String get freeSearchEmpty;
+
+  /// No description provided for @qrHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Point the camera at the QR code'**
+  String get qrHint;
+
+  /// No description provided for @qrTorch.
+  ///
+  /// In en, this message translates to:
+  /// **'Torch'**
+  String get qrTorch;
 
   /// No description provided for @locationsNodes.
   ///

@@ -379,10 +379,24 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     // Document order. The premium/general split moved YouTube, gaming and
     // India above the rest, so a line appeared to jump when a document came
     // back in a different order. The store already keeps the document order.
+    final query = _query.trim().toLowerCase();
     final nodeIndexes = <int>[];
     for (final raw in catalog.lines) {
       final index = _imported.indexWhere((link) => link.raw == raw);
-      if (index >= 0) nodeIndexes.add(index);
+      if (index < 0) continue;
+      if (query.isNotEmpty) {
+        final link = _imported[index];
+        final label = labelForShareLink(link);
+        final hay =
+            '${label.title} ${link.endpoint} ${link.scheme}'.toLowerCase();
+        if (!hay.contains(query)) continue;
+      }
+      nodeIndexes.add(index);
+    }
+    // A profile with no matching lines is not drawn; the page says once that
+    // nothing was found instead of repeating an empty card per document.
+    if (query.isNotEmpty && nodeIndexes.isEmpty) {
+      return const SizedBox.shrink();
     }
     final notice = profileNotice(
       announce: catalog.announce,
@@ -477,14 +491,51 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     }
     final connected = ref.watch(vpnProvider) is VpnConnected;
 
+    final query = _query.trim().toLowerCase();
+    final hasMatch = query.isEmpty ||
+        _imported.any((link) {
+          final label = labelForShareLink(link);
+          final hay =
+              '${label.title} ${link.endpoint} ${link.scheme}'.toLowerCase();
+          return hay.contains(query);
+        });
     final body = _catalogs.isNotEmpty
-        ? ListView(
-            padding: const EdgeInsets.only(top: 2),
+        ? Column(
             children: [
-              for (var i = 0; i < _catalogs.length; i++) ...[
-                if (i > 0) const SizedBox(height: 12),
-                _catalogCard(theme, l, _catalogs[i]),
-              ],
+              // A short profile does not need a search line; eight is where
+              // scrolling starts and a query saves time.
+              if (_imported.length > 8)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2, bottom: 12),
+                  child: _SearchField(
+                    hint: l.freeSearch,
+                    onChanged: (value) => setState(() => _query = value),
+                  ),
+                ),
+              Expanded(
+                child: !hasMatch
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Text(
+                            l.freeSearchEmpty,
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      )
+                    : ListView(
+                        padding: const EdgeInsets.only(top: 2),
+                        children: [
+                          for (var i = 0; i < _catalogs.length; i++) ...[
+                            if (i > 0) const SizedBox(height: 12),
+                            _catalogCard(theme, l, _catalogs[i]),
+                          ],
+                        ],
+                      ),
+              ),
             ],
           )
         : Column(

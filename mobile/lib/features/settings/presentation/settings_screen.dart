@@ -312,6 +312,44 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     );
   }
 
+  /// The full sentence behind an info icon. A settings row keeps one line;
+  /// the explanation opens here instead of stretching the list.
+  void _showInfo(BuildContext context, String title, String body) {
+    final theme = Theme.of(context);
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title,
+                style: theme.textTheme.titleLarge,
+              ),
+              const SizedBox(height: 10),
+              Text(
+                body,
+                style: theme.textTheme.bodyMedium?.copyWith(height: 1.45),
+              ),
+              const SizedBox(height: 18),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text(
+                  MaterialLocalizations.of(ctx).closeButtonLabel,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   List<Widget> _settingsSections({
     required AppL10n l,
     required bool showNotif,
@@ -352,7 +390,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
             _SettingsRow(
               icon: AppIcons.notifications,
               title: l.settingsVpnNotificationTitle,
-              subtitle: l.settingsVpnNotificationHint,
+              subtitle: l.settingsVpnNotificationShort,
+              onInfo: () => _showInfo(
+                context,
+                l.settingsVpnNotificationTitle,
+                l.settingsVpnNotificationHint,
+              ),
               trailing: AppSwitch(
                 value: notifOn,
                 onChanged: _notifLoading || _notifEnabled == null
@@ -465,7 +508,10 @@ class _SectionLabel extends StatelessWidget {
         children: [
           // A rule and a section label in sentence case: capitals are reserved
           // for the protocol badge, not for every word that starts a group.
-          Container(width: 2, height: 11, color: AppBrand.mascotGold.withValues(alpha: 0.75)),
+          Container(
+              width: 2,
+              height: 11,
+              color: AppBrand.mascotGold.withValues(alpha: 0.75)),
           const SizedBox(width: 8),
           Flexible(
             child: Text(
@@ -532,6 +578,7 @@ class _SettingsRow extends StatelessWidget {
     required this.subtitle,
     this.trailing,
     this.onTap,
+    this.onInfo,
   }) : assert(icon != null || leading != null);
 
   final IconData? icon;
@@ -540,6 +587,9 @@ class _SettingsRow extends StatelessWidget {
   final String subtitle;
   final Widget? trailing;
   final VoidCallback? onTap;
+
+  /// A long rule lives behind this, not in a truncated subtitle.
+  final VoidCallback? onInfo;
 
   @override
   Widget build(BuildContext context) {
@@ -586,10 +636,18 @@ class _SettingsRow extends StatelessWidget {
                 ],
               ),
             ),
+            if (onInfo != null) ...[
+              const SizedBox(width: 4),
+              IconButton(
+                onPressed: onInfo,
+                tooltip: MaterialLocalizations.of(context).moreButtonTooltip,
+                icon: const AppIcon(AppIcons.info, size: 18),
+              ),
+            ],
             if (trailing != null) ...[
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               trailing!,
-            ] else if (onTap != null) ...[
+            ] else if (onTap != null && onInfo == null) ...[
               const SizedBox(width: 10),
               AppIcon(
                 AppIcons.chevronRight,

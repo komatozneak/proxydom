@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/config.dart';
 import '../../../core/theme.dart';
+import '../../../core/widgets/app_icon.dart';
 import '../../../l10n/app_localizations.dart';
 import '../data/vpn_disclosure_prefs.dart';
 import 'vpn_platform_copy.dart';
@@ -64,24 +65,21 @@ class VpnDisclosureDialog extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    _Section(title: vpnTitle, body: vpnBody),
-                    const SizedBox(height: 16),
-                    _Section(
-                      title: l.vpnDisclosureDataTitle,
-                      body: dataBody,
-                    ),
-                    const SizedBox(height: 16),
-                    _Section(
-                      title: l.vpnDisclosureNotTitle,
-                      body: l.vpnDisclosureNotBody,
-                    ),
+                    _Bullet(text: l.vpnDisclosureBullet1),
                     const SizedBox(height: 12),
-                    TextButton(
-                      onPressed: () => launchUrl(
-                        Uri.parse(AppConfig.privacyPolicyUrl),
-                        mode: LaunchMode.externalApplication,
+                    _Bullet(text: l.vpnDisclosureBullet2),
+                    const SizedBox(height: 12),
+                    _Bullet(text: l.vpnDisclosureBullet3),
+                    const SizedBox(height: 12),
+                    TextButton.icon(
+                      onPressed: () => _showDetails(
+                        context,
+                        vpnTitle: vpnTitle,
+                        vpnBody: vpnBody,
+                        dataBody: dataBody,
                       ),
-                      child: Text(l.settingsPrivacyPlaceholder),
+                      icon: const AppIcon(AppIcons.info, size: 18),
+                      label: Text(l.vpnDisclosureMore),
                     ),
                   ],
                 ),
@@ -115,6 +113,104 @@ class VpnDisclosureDialog extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  void _showDetails(
+    BuildContext context, {
+    required String vpnTitle,
+    required String vpnBody,
+    required String dataBody,
+  }) {
+    final l = AppL10n.of(context);
+    final theme = Theme.of(context);
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  l.vpnDisclosureMore,
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _Section(title: vpnTitle, body: vpnBody),
+                const SizedBox(height: 16),
+                _Section(
+                  title: l.vpnDisclosureDataTitle,
+                  body: dataBody,
+                ),
+                const SizedBox(height: 16),
+                _Section(
+                  title: l.vpnDisclosureNotTitle,
+                  body: l.vpnDisclosureNotBody,
+                ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    onPressed: () => launchUrl(
+                      Uri.parse(AppConfig.privacyPolicyUrl),
+                      mode: LaunchMode.externalApplication,
+                    ),
+                    child: Text(l.settingsPrivacyPlaceholder),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                FilledButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: Text(l.vpnDisclosureClose),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Bullet extends StatelessWidget {
+  const _Bullet({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: AppBrand.secondary.withValues(alpha: 0.15),
+            shape: BoxShape.circle,
+          ),
+          child: const AppIcon(
+            AppIcons.check,
+            size: 16,
+            color: AppBrand.secondary,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            text,
+            style: theme.textTheme.bodyLarge?.copyWith(height: 1.45),
+          ),
+        ),
+      ],
     );
   }
 }

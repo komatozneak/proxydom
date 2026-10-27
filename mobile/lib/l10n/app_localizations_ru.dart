@@ -817,6 +817,9 @@ class AppL10nRu extends AppL10n {
   String get settingsVpnNotificationTitle => 'Уведомление в шторке';
 
   @override
+  String get settingsVpnNotificationShort => 'Карточка в шторке с «Отключить»';
+
+  @override
   String get settingsVpnNotificationHint =>
       'Карточка с кнопкой «Отключить». Выключите — карточка спрячется, VPN останется.';
 
@@ -1364,6 +1367,23 @@ class AppL10nRu extends AppL10n {
   String get vpnDisclosureTitle => 'Как включается туннель';
 
   @override
+  String get vpnDisclosureBullet1 =>
+      'Туннель включается только по вашей команде и только на этом устройстве.';
+
+  @override
+  String get vpnDisclosureBullet2 =>
+      'Ключи и адреса узлов не отправляются на сервер.';
+
+  @override
+  String get vpnDisclosureBullet3 => 'Ни аккаунта, ни платежей, ни рекламы.';
+
+  @override
+  String get vpnDisclosureMore => 'Подробнее';
+
+  @override
+  String get vpnDisclosureClose => 'Закрыть';
+
+  @override
   String get vpnDisclosureLead =>
       'Домик включает туннель по выбранной строке. Этот экран — до системного разрешения Android.';
 
@@ -1555,6 +1575,15 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get freeSearch => 'Поиск серверов';
+
+  @override
+  String get freeSearchEmpty => 'Серверы не найдены';
+
+  @override
+  String get qrHint => 'Наведите камеру на QR-код';
+
+  @override
+  String get qrTorch => 'Фонарик';
 
   @override
   String get locationsNodes => 'Узлы';

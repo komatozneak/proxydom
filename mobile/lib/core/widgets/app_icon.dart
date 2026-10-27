@@ -87,6 +87,9 @@ abstract final class AppIcons {
   static const IconData clipboard = PhosphorIconsRegular.clipboardText;
   static const IconData qrCode = PhosphorIconsRegular.qrCode;
   static const IconData check = PhosphorIconsRegular.check;
+
+  /// QR screen torch.
+  static const IconData flashlight = PhosphorIconsRegular.flashlight;
   static const IconData checkCircle = PhosphorIconsRegular.checkCircle;
   static const IconData circle = PhosphorIconsRegular.circle;
   static const IconData checkCircleFill = PhosphorIconsFill.checkCircle;

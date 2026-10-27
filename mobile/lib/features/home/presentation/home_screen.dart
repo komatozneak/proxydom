@@ -819,9 +819,8 @@ class _FreeClientHome extends StatelessWidget {
     final String? heroStatus = empty && status is VpnDisconnected
         ? l.freeNoProfile
         : switch (status) {
-            VpnConnected() => uptime == null
-                ? l.homeProtected
-                : '${l.homeProtected} · $uptime',
+            VpnConnected() =>
+              uptime == null ? l.homeProtected : '${l.homeProtected} · $uptime',
             VpnConnecting() => l.homeConnectingHint,
             // The specific hint is rendered below the house by errorHint. A
             // generic sentence here would repeat it and, for a conflict, would
@@ -859,8 +858,7 @@ class _FreeClientHome extends StatelessWidget {
               ),
               // The familiar pulse: it answers the finger whether or not
               // the tunnel has moved yet.
-              if (charged || isConnecting)
-                HousePulsar(diameter: nestSize),
+              if (charged || isConnecting) HousePulsar(diameter: nestSize),
               // The artwork is painted larger than the tap box: the mark
               // ships with a wide transparent margin, and at box size the house
               // read as a small token lost in the middle of the screen.
@@ -939,11 +937,14 @@ class _FreeClientHome extends StatelessWidget {
       // to appear on connect and move the house and the keys under the finger.
       if (androidPerAppSplit) ...[
         const SizedBox(height: 10),
-        _NoVpnHomeRow(
-          label: l.homeNoVpnRow,
-          enabled: noVpnEnabled,
-          total: noVpnTotal,
-          onTap: onOpenNoVpn,
+        MediaQuery.withClampedTextScaling(
+          maxScaleFactor: 1.4,
+          child: _NoVpnHomeRow(
+            label: l.homeNoVpnRow,
+            enabled: noVpnEnabled,
+            total: noVpnTotal,
+            onTap: onOpenNoVpn,
+          ),
         ),
       ],
     ];
@@ -961,14 +962,20 @@ class _FreeClientHome extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SizedBox(height: 4),
-            _ServerChip(
-              title: empty ? l.homeAddServer : profile,
-              subtitle: empty ? l.freeAddHint : (serverSubtitle ?? ''),
-              flag: serverFlag,
-              statusText: statusText,
-              statusInk: statusInk,
-              dotColor: accent,
-              onTap: onOpenLocations,
+            // Dense chrome caps at 1.5×; the hero copy and the rest of the
+            // app still follow the system scale. At 2× the chip was showing
+            // "Не подк…" and the address lost the host.
+            MediaQuery.withClampedTextScaling(
+              maxScaleFactor: 1.5,
+              child: _ServerChip(
+                title: empty ? l.homeAddServer : profile,
+                subtitle: empty ? l.freeAddHint : (serverSubtitle ?? ''),
+                flag: serverFlag,
+                statusText: statusText,
+                statusInk: statusInk,
+                dotColor: accent,
+                onTap: onOpenLocations,
+              ),
             ),
             const SizedBox(height: 8),
             Expanded(
@@ -981,13 +988,16 @@ class _FreeClientHome extends StatelessWidget {
             ),
             if (!empty) ...[
               const SizedBox(height: 6),
-              _MetricsCard(
-                uptime: isConnected ? uptime : null,
-                downBps: isConnected ? speedDown : 0,
-                upBps: isConnected ? speedUp : 0,
-                traffic: traffic,
-                parsedTraffic: parsedTraffic,
-                trafficColor: trafficColor,
+              MediaQuery.withClampedTextScaling(
+                maxScaleFactor: 1.4,
+                child: _MetricsCard(
+                  uptime: isConnected ? uptime : null,
+                  downBps: isConnected ? speedDown : 0,
+                  upBps: isConnected ? speedUp : 0,
+                  traffic: traffic,
+                  parsedTraffic: parsedTraffic,
+                  trafficColor: trafficColor,
+                ),
               ),
             ],
             if (errorHint != null) ...[
@@ -1260,7 +1270,10 @@ class _MetricsCard extends StatelessWidget {
                 value: traffic,
                 bar: parsed == null || parsed.unlimited
                     ? null
-                    : (used.clamp(0.0, 1.0), trafficColor ?? AppBrand.mascotGold),
+                    : (
+                        used.clamp(0.0, 1.0),
+                        trafficColor ?? AppBrand.mascotGold
+                      ),
               ),
             ),
           ],
