@@ -216,27 +216,6 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     await _applyImported(links);
   }
 
-  /// The saved documents a reload could actually reach.
-  List<ShareCatalog> get _reloadableDocuments => [
-        for (final catalog in _catalogs)
-          if (catalog.url != null && catalog.url!.isNotEmpty) catalog,
-      ];
-
-  /// Rereads every saved document from the key at the foot of this page.
-  Future<void> _refreshEveryDocument() async {
-    final status = ref.read(vpnProvider);
-    final live = status is VpnConnected || status is VpnConnecting;
-    await refreshRemoteDocuments(
-      context,
-      scope: 'locations',
-      bottomInset: kActionBarBottomInset,
-      onSelectionLeft: () async {
-        if (!live) return;
-        await ref.read(vpnProvider.notifier).disconnect(reason: 'refresh');
-      },
-    );
-  }
-
   Future<void> _shareCatalog(ShareCatalog catalog) async {
     final key = catalog.subscriptionKey;
     if (key == null || !mounted) {
@@ -264,7 +243,11 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     }
     if (!mounted) return;
     UiLog.action('locations', 'share', result: 'copied');
-    showProxyDomToast(l.freeShareCopied, tone: ToastTone.success);
+    showProxyDomToast(
+      l.freeShareCopied,
+      tone: ToastTone.success,
+      bottomInset: kActionBarBottomInset,
+    );
   }
 
   Future<void> _refreshCatalog(ShareCatalog catalog) async {
@@ -330,6 +313,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       showProxyDomToast(
         l.freeRefreshDone(outcome.count),
         tone: ToastTone.success,
+        bottomInset: kActionBarBottomInset,
       );
       if (outcome.selectionLeftThisList && live) {
         await ref.read(vpnProvider.notifier).disconnect(reason: 'refresh');
@@ -343,7 +327,11 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
         result: 'fail',
         reason: e.runtimeType.toString(),
       );
-      showProxyDomToast(l.freeRefreshFail, tone: ToastTone.failure);
+      showProxyDomToast(
+        l.freeRefreshFail,
+        tone: ToastTone.failure,
+        bottomInset: kActionBarBottomInset,
+      );
     } finally {
       if (mounted) setState(() => _refreshing.remove(catalog.id));
     }
@@ -614,8 +602,8 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
             alignment: Alignment.topLeft,
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: _pageMeasure),
-              // Add is the primary; reload is the one secondary tool this tab
-              // owns. QR lives in the import field, so it is not a third peer.
+              // One action. Each profile keeps its own reload in the
+              // overflow; a tab-wide reload beside Add made two peers.
               child: FreeClientActionBar(
                 onPaste: () {
                   UiLog.action('locations', 'add');
@@ -623,9 +611,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
                 },
                 onScan: () {},
                 showScan: false,
-                onRefresh: _reloadableDocuments.isEmpty
-                    ? null
-                    : () => _refreshEveryDocument(),
+                onRefresh: null,
               ),
             ),
           ),
@@ -850,10 +836,10 @@ class _ServerCount extends StatelessWidget {
     final gold = dark ? AppBrand.mascotGoldLit : AppBrand.mascotGoldDeep;
     final wide = count > 9;
     return Container(
-      width: wide ? null : 22,
-      height: 22,
-      constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
-      padding: EdgeInsets.symmetric(horizontal: wide ? 7 : 0),
+      width: wide ? null : 28,
+      height: 28,
+      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+      padding: EdgeInsets.symmetric(horizontal: wide ? 8 : 0),
       alignment: Alignment.center,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
@@ -863,10 +849,10 @@ class _ServerCount extends StatelessWidget {
         '$count',
         style: terminalText(
           context,
-          size: 11.5,
+          size: 14,
           color: gold,
           weight: 700,
-          spacing: 0.6,
+          spacing: 0.4,
         ),
       ),
     );

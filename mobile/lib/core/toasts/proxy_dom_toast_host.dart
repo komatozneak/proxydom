@@ -79,7 +79,9 @@ class _ProxyDomToastHostState extends State<ProxyDomToastHost>
     // alert drawn full width across a 1160px window is the phone's slab with
     // more of it, and it covers the keys of the page it is answering.
     final corner = windowsDesktop && MediaQuery.sizeOf(context).width >= 720;
-    final bottom = (corner ? kToastCornerInset : 12) + toast.bottomInset;
+    // A phone alert sits above the gesture bar, not under it.
+    final safe = corner ? 0.0 : MediaQuery.paddingOf(context).bottom;
+    final bottom = (corner ? kToastCornerInset : 12 + safe) + toast.bottomInset;
     return Stack(
       children: [
         widget.child,
@@ -92,13 +94,16 @@ class _ProxyDomToastHostState extends State<ProxyDomToastHost>
             animation: _motion,
             builder: (context, child) {
               final v = Curves.easeOutCubic.transform(_motion.value);
-              return Opacity(
-                opacity: v,
-                child: FractionalTranslation(
-                  // From the edge the alert lives on: the corner one comes in
-                  // sideways, the phone one rises.
-                  translation: Offset(corner ? 0.35 * (1 - v) : 0, 1.0 - v),
-                  child: child,
+              return Transform.scale(
+                scale: 0.94 + 0.06 * v,
+                child: Opacity(
+                  opacity: v,
+                  child: FractionalTranslation(
+                    // From the edge the alert lives on: the corner one comes
+                    // in sideways, the phone one rises.
+                    translation: Offset(corner ? 0.35 * (1 - v) : 0, 1.0 - v),
+                    child: child,
+                  ),
                 ),
               );
             },
@@ -133,24 +138,35 @@ class _Plate extends StatelessWidget {
       ToastTone.success => dark ? AppBrand.mossLight : AppBrand.moss,
       ToastTone.failure => theme.colorScheme.error,
     };
+    final toneIcon = switch (toast.tone) {
+      ToastTone.info => AppIcons.info,
+      ToastTone.success => AppIcons.checkCircle,
+      ToastTone.failure => AppIcons.warning,
+    };
+    final base =
+        dark ? AppBrand.surfaceRaisedDark : AppBrand.surfaceElevatedLight;
 
     return Container(
       key: kProxyDomToastPlate,
-      constraints: const BoxConstraints(maxWidth: 420),
+      constraints: const BoxConstraints(maxWidth: 480),
       decoration: BoxDecoration(
-        color:
-            dark ? AppBrand.surfaceRaisedDark : AppBrand.surfaceElevatedLight,
-        borderRadius: BorderRadius.circular(10),
+        // A wash of the tone, not a neutral card with a coloured line: the
+        // alert has to be noticed from the corner of the eye.
+        color: Color.alphaBlend(
+          accent.withValues(alpha: dark ? 0.12 : 0.07),
+          base,
+        ),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: (dark ? AppBrand.edgeDark : AppBrand.edgeLight)
-              .withValues(alpha: 0.7),
+          color: accent.withValues(alpha: 0.45),
+          width: 1.2,
         ),
         boxShadow: [
           BoxShadow(
-            color: AppBrand.shadeSource.withValues(alpha: dark ? 0.45 : 0.14),
-            blurRadius: 24,
-            spreadRadius: -6,
-            offset: const Offset(0, 8),
+            color: AppBrand.shadeSource.withValues(alpha: dark ? 0.55 : 0.18),
+            blurRadius: 32,
+            spreadRadius: -4,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
@@ -159,20 +175,34 @@ class _Plate extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // The edge carries the news. Same grammar as the plate that is
-            // chosen: a bar on the leading edge, never a filled pill.
-            Container(width: 3, color: accent),
+            Container(width: 4, color: accent),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(13, 11, 13, 11),
-                child: Text(
-                  toast.message,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: ink,
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w600,
-                    height: 1.25,
-                  ),
+                padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: accent.withValues(alpha: 0.16),
+                        shape: BoxShape.circle,
+                      ),
+                      child: AppIcon(toneIcon, size: 19, color: accent),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        toast.message,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: ink,
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w600,
+                          height: 1.3,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -185,8 +215,8 @@ class _Plate extends StatelessWidget {
                   color: mute,
                   onPressed: ProxyDomToasts.instance.dismiss,
                   tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
-                  size: 26,
-                  iconSize: 12,
+                  size: 30,
+                  iconSize: 14,
                 ),
               ),
           ],

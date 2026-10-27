@@ -715,12 +715,6 @@ class _FreeClientHome extends StatelessWidget {
       parsedTraffic,
       russian: Localizations.localeOf(context).languageCode == 'ru',
     );
-    final trafficColor = switch (trafficRemainderBand(parsedTraffic)) {
-      TrafficRemainderBand.above20 => AppBrand.success,
-      TrafficRemainderBand.from5to20 => AppBrand.flame,
-      TrafficRemainderBand.below5 => AppBrand.destructive,
-      TrafficRemainderBand.none => null,
-    };
     final current = status;
     final uptime =
         current is VpnConnected ? _formatUptime(current.connectedSince) : null;
@@ -791,11 +785,6 @@ class _FreeClientHome extends StatelessWidget {
     // and that place is the power button.
     final isConnected = status is VpnConnected;
     final isConnecting = status is VpnConnecting;
-    final progress = switch (status) {
-      VpnConnecting(:final progress) => progress,
-      VpnConnected() => 1.0,
-      _ => 0.0,
-    };
     final statusInk = switch (status) {
       VpnConnected() => theme.brightness == Brightness.dark
           ? AppBrand.inkMossDark
@@ -840,15 +829,9 @@ class _FreeClientHome extends StatelessWidget {
             alignment: Alignment.center,
             clipBehavior: Clip.none,
             children: [
-              // The ring says "this is a control, and it is doing something".
-              // Track is ink at 12%; the arc is the house gold.
-              Positioned.fill(
-                child: _ConnectRing(
-                  progress: progress,
-                  color: AppBrand.mascotGold,
-                  track: theme.colorScheme.onSurface.withValues(alpha: 0.12),
-                ),
-              ),
+              // The house is a control, but the ring was a second, static
+              // control around it. The orbit and the lit gradient are the
+              // animation; there is no hoop.
               // The dance belongs to the house, not to the wallpaper: it is
               // drawn around the button and only while the button burns.
               Positioned.fill(
@@ -996,7 +979,6 @@ class _FreeClientHome extends StatelessWidget {
                   upBps: isConnected ? speedUp : 0,
                   traffic: traffic,
                   parsedTraffic: parsedTraffic,
-                  trafficColor: trafficColor,
                 ),
               ),
             ],
@@ -1107,31 +1089,36 @@ class _ServerChip extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: dotColor,
-                ),
-              ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 12),
+              // Profile on the left, state on the right edge. The chevron
+              // spent the last 20 dp on a second "this is tappable" and left
+              // the status floating short of the edge.
               Flexible(
-                child: Text(
-                  statusText,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: statusInk,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: dotColor,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        statusText,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: statusInk,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(width: 4),
-              AppIcon(
-                AppIcons.chevronRight,
-                size: 16,
-                color: theme.colorScheme.onSurfaceVariant,
               ),
             ],
           ),
@@ -1139,73 +1126,6 @@ class _ServerChip extends StatelessWidget {
       ),
     );
   }
-}
-
-/// A 6 dp ring around the house: quiet track, gold progress.
-class _ConnectRing extends StatelessWidget {
-  const _ConnectRing({
-    required this.progress,
-    required this.color,
-    required this.track,
-  });
-
-  final double progress;
-  final Color color;
-  final Color track;
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(
-      painter: _ConnectRingPainter(
-        progress: progress.clamp(0.0, 1.0),
-        color: color,
-        track: track,
-      ),
-    );
-  }
-}
-
-class _ConnectRingPainter extends CustomPainter {
-  const _ConnectRingPainter({
-    required this.progress,
-    required this.color,
-    required this.track,
-  });
-
-  final double progress;
-  final Color color;
-  final Color track;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = size.center(Offset.zero);
-    final radius = size.shortestSide / 2 - 3;
-    if (radius <= 0) return;
-    final base = Paint()
-      ..color = track
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 6;
-    canvas.drawCircle(center, radius, base);
-    if (progress <= 0) return;
-    final arc = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 6
-      ..strokeCap = StrokeCap.round;
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      -math.pi / 2,
-      2 * math.pi * progress,
-      false,
-      arc,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_ConnectRingPainter oldDelegate) =>
-      oldDelegate.progress != progress ||
-      oldDelegate.color != color ||
-      oldDelegate.track != track;
 }
 
 /// Time, speed and the remaining traffic. Values that do not exist are "—";
@@ -1217,7 +1137,6 @@ class _MetricsCard extends StatelessWidget {
     required this.upBps,
     required this.traffic,
     required this.parsedTraffic,
-    required this.trafficColor,
   });
 
   final String? uptime;
@@ -1225,7 +1144,6 @@ class _MetricsCard extends StatelessWidget {
   final int upBps;
   final String traffic;
   final SubscriptionTraffic? parsedTraffic;
-  final Color? trafficColor;
 
   @override
   Widget build(BuildContext context) {
@@ -1236,6 +1154,23 @@ class _MetricsCard extends StatelessWidget {
     final used = parsed == null || parsed.unlimited
         ? 0.0
         : (parsed.upload + parsed.download) / parsed.total;
+    final remaining = (1.0 - used).clamp(0.0, 1.0);
+    // A tank gauge, not a spend meter: full is green, empty is red, and the
+    // bar shrinks as the remaining traffic does. Green holds down to 60% so a
+    // healthy tank reads green, not olive.
+    final barColor = remaining >= 0.6
+        ? AppBrand.success
+        : remaining >= 0.3
+            ? Color.lerp(
+                AppBrand.flame,
+                AppBrand.success,
+                (remaining - 0.3) / 0.3,
+              )!
+            : Color.lerp(
+                AppBrand.destructive,
+                AppBrand.flame,
+                remaining / 0.3,
+              )!;
     final down = downBps > 0 ? VpnTrafficStats.formatSpeed(downBps) : '—';
     final up = upBps > 0 ? VpnTrafficStats.formatSpeed(upBps) : '—';
     return Material(
@@ -1270,10 +1205,7 @@ class _MetricsCard extends StatelessWidget {
                 value: traffic,
                 bar: parsed == null || parsed.unlimited
                     ? null
-                    : (
-                        used.clamp(0.0, 1.0),
-                        trafficColor ?? AppBrand.mascotGold
-                      ),
+                    : (remaining, barColor),
               ),
             ),
           ],
@@ -1335,20 +1267,33 @@ class _Metric extends StatelessWidget {
         if (bar != null) ...[
           const SizedBox(height: 4),
           ClipRRect(
-            borderRadius: BorderRadius.circular(2),
+            borderRadius: BorderRadius.circular(3),
             child: SizedBox(
-              height: 4,
-              child: Stack(
-                children: [
-                  ColoredBox(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.10),
-                    child: const SizedBox.expand(),
+              height: 7,
+              child: LayoutBuilder(
+                builder: (context, constraints) =>
+                    TweenAnimationBuilder<double>(
+                  tween: Tween<double>(begin: 0, end: bar!.$1),
+                  duration: const Duration(milliseconds: 650),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, value, _) => Stack(
+                    children: [
+                      Positioned.fill(
+                        child: ColoredBox(
+                          color: theme.colorScheme.onSurface
+                              .withValues(alpha: 0.10),
+                        ),
+                      ),
+                      Positioned(
+                        left: 0,
+                        top: 0,
+                        bottom: 0,
+                        width: constraints.maxWidth * value,
+                        child: ColoredBox(color: bar!.$2),
+                      ),
+                    ],
                   ),
-                  FractionallySizedBox(
-                    widthFactor: bar!.$1,
-                    child: ColoredBox(color: bar!.$2),
-                  ),
-                ],
+                ),
               ),
             ),
           ),

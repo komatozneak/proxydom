@@ -28,6 +28,7 @@ import 'package:proxydom/core/toasts/proxy_dom_toast.dart';
 import 'package:proxydom/core/toasts/proxy_dom_toast_host.dart';
 import 'package:proxydom/features/vpn/presentation/free_client_chrome.dart';
 import 'package:proxydom/features/vpn/presentation/locations_screen.dart';
+import 'package:proxydom/features/vpn/presentation/server_instrument.dart';
 import 'package:proxydom/l10n/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -154,100 +155,28 @@ void main() {
     _seedDocuments();
   });
 
-  testWidgets('a tab that lists documents offers its own refresh', (
+  testWidgets('the tab offers Add only; a profile keeps its own refresh', (
     tester,
   ) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     final router = await _pumpServers(tester);
 
     expect(find.text('Сервера'), findsOneWidget);
+    expect(find.text('Добавить сервер'), findsOneWidget);
     expect(
       _barRefresh(),
+      findsNothing,
+      reason: 'the tab-wide refresh was removed; reload lives in the card',
+    );
+    // The card's own ring is still there.
+    expect(
+      find.descendant(
+        of: find.byType(ProfileInstrument),
+        matching: find.byType(AppRingButton),
+      ),
       findsOneWidget,
-      reason: 'a tab that lists saved documents has to offer a refresh',
     );
     expect(router.routeInformationProvider.value.uri.path, '/locations');
-    // The alert this tab raises is a timer: let it end inside the test.
-    ProxyDomToasts.instance.dismiss();
-    debugDefaultTargetPlatformOverride = null;
-  });
-
-  testWidgets('the key reads this tab and keeps this tab', (tester) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.android;
-    final router = await _pumpServers(tester);
-
-    AppLogBuffer.instance.clear();
-    await tester.tap(_barRefresh(), warnIfMissed: true);
-    await tester.pump();
-
-    final path = router.routeInformationProvider.value.uri.path;
-    final lines = AppLogBuffer.instance.recentLines().join('\n');
-
-    expect(
-      lines.contains('ui.action screen=locations action=refresh'),
-      isTrue,
-      reason: 'the press was never logged against this tab:\n$lines',
-    );
-    expect(
-      lines.contains('screen=home action=refresh'),
-      isFalse,
-      reason: 'the profile tab refreshed instead:\n$lines',
-    );
-    expect(path, '/locations');
-    expect(find.text('ПРОФИЛЬ'), findsNothing);
-    // The alert this tab raises is a timer: let it end inside the test.
-    ProxyDomToasts.instance.dismiss();
-    debugDefaultTargetPlatformOverride = null;
-  });
-
-  testWidgets('the ring on a plate keeps this tab too', (tester) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.android;
-    final router = await _pumpServers(tester);
-
-    final rings = find.byType(AppRingButton);
-    expect(rings, findsWidgets);
-    AppLogBuffer.instance.clear();
-    await tester.tap(rings.first, warnIfMissed: true);
-    await tester.pump();
-
-    expect(
-      router.routeInformationProvider.value.uri.path,
-      '/locations',
-      reason: 'reloading a document is not picking a server',
-    );
-    expect(find.text('ПРОФИЛЬ'), findsNothing);
-    // The alert this tab raises is a timer: let it end inside the test.
-    ProxyDomToasts.instance.dismiss();
-    debugDefaultTargetPlatformOverride = null;
-  });
-
-  testWidgets('the answer does not swallow the key that asked', (
-    tester,
-  ) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.android;
-    await _pumpServers(tester);
-
-    // The answer is up and standing over the bottom of the page. If it owned
-    // the band the keys sit in, the key that just asked could not be asked
-    // again for as long as the answer lives — which reads as a dead button.
-    showProxyDomToast('Обновлено: 5', bottomInset: kActionBarBottomInset);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 250));
-    expect(find.text('Обновлено: 5'), findsOneWidget);
-
-    AppLogBuffer.instance.clear();
-    await tester.tapAt(tester.getCenter(_barRefresh()));
-    await tester.pump();
-
-    expect(
-      AppLogBuffer.instance
-          .recentLines()
-          .join('\n')
-          .contains('ui.action screen=locations action=refresh'),
-      isTrue,
-      reason: 'the answer was still up and the key did not answer',
-    );
-    // The alert this tab raises is a timer: let it end inside the test.
     ProxyDomToasts.instance.dismiss();
     debugDefaultTargetPlatformOverride = null;
   });

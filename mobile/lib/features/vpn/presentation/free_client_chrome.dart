@@ -127,7 +127,11 @@ Future<void> refreshRemoteDocuments(
 /// that answers from that page has to stand above it — [kActionBarBottomInset]
 /// is that standing room: the keys plus the page's own padding above and below.
 const double kActionBarHeight = 54;
-const double kActionBarBottomInset = kActionBarHeight + 22;
+
+/// The bar sits above the shell's 48 dp navigation and the system inset, so
+/// an alert has to clear more than the bar alone. 72 is that chrome plus the
+/// page's own padding.
+const double kActionBarBottomInset = kActionBarHeight + 72;
 
 /// Paste, and on the phone a matching QR. Windows has no camera and no QR.
 ///
@@ -210,14 +214,16 @@ class FreeClientActionBar extends StatelessWidget {
       child: Row(
         children: [
           Expanded(child: add),
-          gap,
-          AppRingButton(
-            icon: AppIcons.refresh,
-            color: AppBrand.actionSky,
-            onPressed: refresh,
-            tooltip: l.freeRefresh,
-            size: barHeight,
-          ),
+          if (refresh != null) ...[
+            gap,
+            AppRingButton(
+              icon: AppIcons.refresh,
+              color: AppBrand.actionSky,
+              onPressed: refresh,
+              tooltip: l.freeRefresh,
+              size: barHeight,
+            ),
+          ],
           if (showScan) ...[
             gap,
             AppRingButton(
