@@ -399,6 +399,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     final planeUrl = (manifest?.supportUrl ?? notice.planeUrl?.trim()) ?? '';
     final noticeBody = manifest?.description ?? notice.text?.trim() ?? '';
     final legacyTraffic = parseSubscriptionTraffic(catalog.trafficMeta);
+    final sourceHost = Uri.tryParse(catalog.url ?? '')?.host ?? '';
     final trafficUpdatedAt = manifest?.traffic?.updatedAt ??
         DateTime.tryParse(
             catalog.trafficUpdatedAt ?? catalog.lastUpdated ?? '');
@@ -431,6 +432,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       parsedTraffic: legacyTraffic,
       manifestTraffic: manifest?.traffic,
       planName: manifest?.planName,
+      sourceLabel: sourceHost.isEmpty ? l.profileSourceLocal : sourceHost,
       trafficUpdatedAt: trafficUpdatedAt,
       updateIntervalHours: catalog.updateIntervalHours,
       expiresAt: manifest?.traffic?.expiresAt ?? legacyTraffic?.expire,

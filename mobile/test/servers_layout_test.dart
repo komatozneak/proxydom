@@ -104,6 +104,7 @@ ProfileInstrument _instrument({
   DateTime? trafficUpdatedAt,
   int? updateIntervalHours,
   DateTime? expiresAt,
+  String? sourceLabel,
 }) {
   return ProfileInstrument(
     title: 'Мой профиль',
@@ -111,6 +112,7 @@ ProfileInstrument _instrument({
     facts: facts,
     parsedTraffic: parsedTraffic,
     manifestTraffic: manifestTraffic,
+    sourceLabel: sourceLabel,
     trafficUpdatedAt: trafficUpdatedAt,
     updateIntervalHours: updateIntervalHours,
     expiresAt: expiresAt,
@@ -396,6 +398,20 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('истекает: 29.09.2027'), findsOneWidget);
+  });
+
+  testWidgets('the card names the document it was loaded from', (tester) async {
+    await tester.pumpWidget(
+      _wrap(
+        _instrument(
+          facts: const [],
+          sourceLabel: 'id.docdn.pro',
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('id.docdn.pro'), findsOneWidget);
   });
 
   testWidgets('profile and nodes are two sections of one plate',

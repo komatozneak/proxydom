@@ -261,7 +261,7 @@ class Hy2ImportStore {
     final key = _keyAt(blob, blob.selected);
     final owned = _catalogOwnsKey(catalog, key);
     try {
-      final pulled = await _pull(catalog);
+      final pulled = await _pull(catalog, forceFresh: true);
       if (pulled == null) {
         return ShareRefreshOutcome(
           kind: ShareRefreshKind.unchanged,
@@ -433,6 +433,10 @@ class Hy2ImportStore {
     final String? trafficMeta;
     final String? hwidMaxDevices;
     final SubscriptionNotice notice;
+    final ProfileManifest? manifest;
+    final String? trafficUpdatedAt;
+    final int? updateIntervalHours;
+    final String? webPageUrl;
     if (target == null) {
       body = text;
       profileTitle = null;
@@ -440,6 +444,10 @@ class Hy2ImportStore {
       trafficMeta = subscriptionTrafficMeta(body: text);
       hwidMaxDevices = null;
       notice = subscriptionNotice(body: text);
+      manifest = null;
+      trafficUpdatedAt = null;
+      updateIntervalHours = null;
+      webPageUrl = null;
     } else {
       final fetched = await _fetch(target.url);
       body = fetched.body;
@@ -451,6 +459,14 @@ class Hy2ImportStore {
         body: fetched.body,
       );
       notice = fetched.notice;
+      manifest = fetched.manifest;
+      trafficUpdatedAt =
+          fetched.manifest?.traffic?.updatedAt?.toIso8601String() ??
+              (trafficMeta?.trim().isNotEmpty == true
+                  ? DateTime.now().toUtc().toIso8601String()
+                  : null);
+      updateIntervalHours = fetched.updateIntervalHours;
+      webPageUrl = fetched.webPageUrl;
     }
     final links = _linesToKeep(
       parseShareSubscription(body),
@@ -481,6 +497,11 @@ class Hy2ImportStore {
             observed: trafficMeta,
             saved: previous.trafficMeta,
           ),
+          trafficUpdatedAt: trafficUpdatedAt ?? previous.trafficUpdatedAt,
+          manifest: manifest,
+          updateIntervalHours:
+              updateIntervalHours ?? previous.updateIntervalHours,
+          webPageUrl: webPageUrl ?? previous.webPageUrl,
           lastUpdated: DateTime.now().toUtc().toIso8601String(),
           supportUrl: notice.planeUrl,
           announce: notice.text,
@@ -496,6 +517,10 @@ class Hy2ImportStore {
             etag: etag,
             fallbackTitle: target.title,
             trafficMeta: keptTrafficMeta(observed: trafficMeta),
+            trafficUpdatedAt: trafficUpdatedAt,
+            manifest: manifest,
+            updateIntervalHours: updateIntervalHours,
+            webPageUrl: webPageUrl,
             lastUpdated: DateTime.now().toUtc().toIso8601String(),
             supportUrl: notice.planeUrl,
             announce: notice.text,
@@ -808,21 +833,31 @@ class _Pulled {
   final bool announceFrame;
 }
 
-Future<_Pulled?> _pull(ShareCatalog catalog, {bool followed = false}) async {
+Future<_Pulled?> _pull(
+  ShareCatalog catalog, {
+  bool followed = false,
+  bool forceFresh = false,
+}) async {
   final url = catalog.url;
   if (url == null || url.isEmpty) return null;
   final fetched = await Hy2ImportStore.instance._fetch(
     url,
-    etag: etagUnlessTrafficUnknown(
-      etag: catalog.etag,
-      trafficKnown: hasTrafficSnapshot(catalog.trafficMeta),
-    ),
+    etag: forceFresh
+        ? null
+        : etagUnlessTrafficUnknown(
+            etag: catalog.etag,
+            trafficKnown: hasTrafficSnapshot(catalog.trafficMeta),
+          ),
     localLinks: catalog.lines.length,
   );
   if (fetched.status == HttpStatus.notModified) return null;
   final nextUrl = fetched.redirectUrl?.trim();
   if (!followed && nextUrl != null && nextUrl.isNotEmpty && nextUrl != url) {
-    return _pull(catalog.copyWith(url: nextUrl), followed: true);
+    return _pull(
+      catalog.copyWith(url: nextUrl),
+      followed: true,
+      forceFresh: forceFresh,
+    );
   }
   final links = _linesToKeep(
     parseShareSubscription(fetched.body),

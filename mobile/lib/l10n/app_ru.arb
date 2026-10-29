@@ -36,6 +36,7 @@
   "profileTrafficNoData": "нет данных о лимите",
   "profileTrafficStale": "устарело",
   "profileTrafficExpires": "истекает",
+  "profileSourceLocal": "локальный импорт",
   "homeTrafficAmount": "{remaining} / {limit} ГБ",
   "@homeTrafficAmount": {
     "placeholders": {

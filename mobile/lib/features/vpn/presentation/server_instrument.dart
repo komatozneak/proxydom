@@ -44,6 +44,7 @@ class ProfileInstrument extends StatelessWidget {
     this.parsedTraffic,
     this.manifestTraffic,
     this.planName,
+    this.sourceLabel,
     this.trafficUpdatedAt,
     this.updateIntervalHours,
     this.expiresAt,
@@ -79,6 +80,7 @@ class ProfileInstrument extends StatelessWidget {
   final ProfileTraffic? manifestTraffic;
 
   final String? planName;
+  final String? sourceLabel;
   final DateTime? trafficUpdatedAt;
   final int? updateIntervalHours;
   final DateTime? expiresAt;
@@ -253,6 +255,22 @@ class ProfileInstrument extends StatelessWidget {
                         color: gold,
                         weight: 700,
                         spacing: 1.4,
+                      ),
+                    ),
+                  ],
+                  if (sourceLabel != null &&
+                      sourceLabel!.trim().isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      sourceLabel!.trim(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: terminalText(
+                        context,
+                        size: 9.5,
+                        color: mute,
+                        weight: 600,
+                        spacing: 0.4,
                       ),
                     ),
                   ],
