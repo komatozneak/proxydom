@@ -433,7 +433,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       selectedNodeTitle: selectedLabel,
       telegramLabel: subscriptionPlaneIsTelegram(planeUrl)
           ? l.freeTelegram
-          : l.freeSharePool,
+          : l.settingsSupport,
       onTelegram:
           planeUrl.isEmpty ? null : () => openSubscriptionPlane(planeUrl),
       onRefresh: catalog.url == null || catalog.url!.isEmpty

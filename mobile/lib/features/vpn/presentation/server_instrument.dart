@@ -9,18 +9,14 @@ import '../../../l10n/app_localizations.dart';
 import '../data/subscription_traffic.dart';
 import 'server_instrument_parts.dart';
 
-/// The profile pass and the node pool are separate plates, not one long card.
-const kProfilePassKey = ValueKey<String>('profile-pass');
-const kProfilePoolKey = ValueKey<String>('profile-pool');
-
 /// A bought profile, drawn as an instrument.
 ///
-/// The profile is a detached ticket pass: a warm paper tint, a gold spine, the
-/// remaining traffic as the largest reading on the page, and a punched stub
-/// carrying the update stamp. The node pool is a second plate with its own
-/// header; the two never dissolve into one long surface. What you can do to the
-/// profile sits on the right of its name, in rings rather than squares — quiet
-/// controls that do not outrank the thing they act on.
+/// One plate, two sections: the hoster's profile band, then its node pool.
+/// Every visible string is document data — title, announce, support URL,
+/// traffic and update stamp. The widget adds no owner-specific copy, so a
+/// hoster can supply their own profile in the subscription document. The gold
+/// left rail and traffic reading give the profile its weight; the node header
+/// follows on the same surface, not on a second card.
 class ProfileInstrument extends StatelessWidget {
   const ProfileInstrument({
     super.key,
@@ -91,269 +87,188 @@ class ProfileInstrument extends StatelessWidget {
       }
     }
 
-    // The profile is a pass, not a card header: tinted paper, a gold spine,
-    // a punched dashed rule and a stub with the update stamp. The node pool is
-    // a separate plate below it, so the quota and the servers no longer dissolve
-    // into one long surface.
-    final tint = Color.lerp(
-      theme.colorScheme.surface,
-      AppBrand.mascotGold,
-      selected ? (dark ? 0.10 : 0.07) : (dark ? 0.05 : 0.035),
-    )!;
+    // One neutral plate, not a brown card inside a dark one: the profile band
+    // is lifted a few percent from the surface and the gold spine carries the
+    // identity. Hoster content, not synthetic labels, gives it its shape.
+    final tint = dark
+        ? Color.lerp(
+            theme.colorScheme.surface,
+            AppBrand.lightSource,
+            selected ? 0.045 : 0.022,
+          )!
+        : Color.lerp(
+            theme.colorScheme.surface,
+            AppBrand.mascotGold,
+            selected ? 0.04 : 0.016,
+          )!;
 
-    final pass = AppSurface(
-      key: kProfilePassKey,
-      clip: true,
-      tint: tint,
-      child: Stack(
-        children: [
-          Positioned(
-            left: 0,
-            top: 0,
-            bottom: 0,
+    final profile = Container(
+      decoration: BoxDecoration(
+        color: tint,
+        border: Border(
+          left: BorderSide(
+            color: gold.withValues(alpha: selected ? 0.9 : 0.5),
             width: 3,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: gold.withValues(alpha: selected ? 0.95 : 0.60),
+          ),
+        ),
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 14, 14, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleLarge,
+                    ),
+                    if (captions.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      _FactsLine(facts: captions, mute: mute),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              _Toolbar(
+                busy: refreshing,
+                refreshLabel: l.freeRefresh,
+                onRefresh: onRefresh,
+                shareLabel: l.locationsShareKey,
+                onShare: onShare,
+                deleteLabel: l.freeDelete,
+                onDelete: onDelete,
+              ),
+            ],
+          ),
+          if (traffic != null) ...[
+            const SizedBox(height: 7),
+            Text(
+              traffic,
+              style: terminalText(
+                context,
+                size: 22,
+                color: gold,
+                weight: 700,
+                spacing: 0.2,
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(17, 15, 14, 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            l.freeProfile.toUpperCase(),
-                            style: terminalText(
-                              context,
-                              size: 10,
-                              color: gold.withValues(alpha: 0.9),
-                              weight: 700,
-                              spacing: 2.2,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.titleLarge,
-                          ),
-                          if (captions.isNotEmpty) ...[
-                            const SizedBox(height: 8),
-                            _FactsLine(facts: captions, mute: mute),
-                          ],
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    _Toolbar(
-                      busy: refreshing,
-                      refreshLabel: l.freeRefresh,
-                      onRefresh: onRefresh,
-                      shareLabel: l.locationsShareKey,
-                      onShare: onShare,
-                      deleteLabel: l.freeDelete,
-                      onDelete: onDelete,
-                    ),
-                  ],
-                ),
-                if (traffic != null) ...[
-                  const SizedBox(height: 14),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: Text(
-                          l.freeTrafficLeft.toUpperCase(),
-                          style: terminalText(
-                            context,
-                            size: 9.5,
-                            color: mute,
-                            weight: 700,
-                            spacing: 1.4,
-                          ),
-                        ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        traffic,
-                        style: terminalText(
-                          context,
-                          size: 30,
-                          color: gold,
-                          weight: 700,
-                          spacing: 0.6,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-                if (description.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  LayoutBuilder(
-                    builder: (context, box) {
-                      final note = Text(
-                        description,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontSize: 13.5,
-                          height: 1.45,
-                          fontWeight: FontWeight.w600,
-                          color: theme.colorScheme.onSurface
-                              .withValues(alpha: 0.88),
-                        ),
-                      );
-                      final link = onTelegram == null
-                          ? null
-                          : ToolAction(
-                              icon: AppIcons.paperPlane,
-                              label: telegramLabel ?? l.freeTelegram,
-                              onTap: onTelegram,
-                              tone: AppActionTone.link,
-                              dense: true,
-                            );
-                      final side = box.hasBoundedWidth &&
-                          box.maxWidth >= 460 &&
-                          link != null;
-                      return _Block(
-                        child: side
-                            ? Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  Expanded(child: note),
-                                  const SizedBox(width: 12),
-                                  link,
-                                ],
-                              )
-                            : Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  note,
-                                  if (link != null) ...[
-                                    const SizedBox(height: 12),
-                                    Align(
-                                      alignment: Alignment.centerLeft,
-                                      child: link,
-                                    ),
-                                  ],
-                                ],
-                              ),
-                      );
-                    },
-                  ),
-                ],
-                const SizedBox(height: 14),
-                _Perforation(
-                  line: mute.withValues(alpha: 0.32),
-                  punch: gold.withValues(alpha: 0.75),
-                ),
-                const SizedBox(height: 9),
-                Row(
-                  children: [
-                    if (updated != null && updated!.trim().isNotEmpty)
-                      Text(
-                        updated!.trim(),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: mute,
-                          fontSize: 11.5,
-                        ),
-                      ),
-                    const Spacer(),
-                    _TicketBars(color: gold.withValues(alpha: 0.55)),
-                  ],
-                ),
-              ],
+          ],
+          if (description.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              description,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontSize: 13.5,
+                height: 1.45,
+                fontWeight: FontWeight.w600,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.82),
+              ),
             ),
-          ),
+          ],
+          if (onTelegram != null) ...[
+            const SizedBox(height: 7),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: ToolAction(
+                icon: AppIcons.paperPlane,
+                label: telegramLabel ?? l.freeTelegram,
+                onTap: onTelegram,
+                tone: AppActionTone.link,
+                dense: true,
+              ),
+            ),
+          ],
+          if (updated != null && updated!.trim().isNotEmpty) ...[
+            const SizedBox(height: 7),
+            Text(
+              updated!.trim(),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: mute,
+                fontSize: 11.5,
+              ),
+            ),
+          ],
         ],
       ),
     );
 
-    final pool = nodes.isEmpty
-        ? null
-        : AppSurface(
-            key: kProfilePoolKey,
-            clip: true,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const _PlateRule(),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 11, 16, 9),
-                  child: Row(
-                    children: [
-                      Text(
-                        l.locationsNodes,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: mute,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 12,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${nodes.length}',
-                        style: terminalText(
-                          context,
-                          size: 10,
-                          color: gold,
-                          weight: 700,
-                          spacing: 1,
-                        ),
-                      ),
-                      if (selectedNodeTitle != null) ...[
-                        const Spacer(),
-                        _LiveNode(name: selectedNodeTitle!),
-                      ],
-                    ],
-                  ),
-                ),
-                Column(
-                  children: [
-                    for (var i = 0; i < nodes.length; i++) ...[
-                      if (i > 0) const NodeRule(),
-                      nodes[i],
-                    ],
-                  ],
-                ),
-                if (unsupportedNote != null &&
-                    unsupportedNote!.trim().isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-                    child: Text(
-                      unsupportedNote!,
-                      style: terminalText(
-                        context,
-                        size: 12,
-                        color: mute,
-                        weight: 500,
-                        spacing: 0.2,
-                      ),
+    return AppSurface(
+      clip: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          profile,
+          const _PlateRule(),
+          if (nodes.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+              child: Row(
+                children: [
+                  Text(
+                    l.locationsNodes,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: mute,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
                     ),
                   ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${nodes.length}',
+                    style: terminalText(
+                      context,
+                      size: 10,
+                      color: gold,
+                      weight: 700,
+                      spacing: 1,
+                    ),
+                  ),
+                  if (selectedNodeTitle != null) ...[
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: _LiveNode(name: selectedNodeTitle!),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            Column(
+              children: [
+                for (var i = 0; i < nodes.length; i++) ...[
+                  if (i > 0) const NodeRule(),
+                  nodes[i],
+                ],
               ],
             ),
-          );
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        pass,
-        if (pool != null) ...[
-          const SizedBox(height: 14),
-          pool,
+          ],
+          if (unsupportedNote != null && unsupportedNote!.trim().isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+              child: Text(
+                unsupportedNote!,
+                style: terminalText(
+                  context,
+                  size: 12,
+                  color: mute,
+                  weight: 500,
+                  spacing: 0.2,
+                ),
+              ),
+            ),
         ],
-      ],
+      ),
     );
   }
 }
@@ -440,10 +355,7 @@ class _LiveNode extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 7),
-        ConstrainedBox(
-          // Room for the name, but never more than the rule has: a long one
-          // ellipsises instead of pushing the count off the left end.
-          constraints: const BoxConstraints(maxWidth: 140),
+        Flexible(
           child: Text(
             name,
             maxLines: 1,
@@ -605,32 +517,6 @@ class _PlateRule extends StatelessWidget {
   }
 }
 
-/// One quiet block of text inside the card.
-class _Block extends StatelessWidget {
-  const _Block({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 11),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.onSurface.withValues(alpha: 0.045),
-        borderRadius: BorderRadius.circular(10),
-        border: Border(
-          left: BorderSide(
-            color: AppBrand.mascotGold.withValues(alpha: 0.55),
-            width: 2.5,
-          ),
-        ),
-      ),
-      child: child,
-    );
-  }
-}
-
 /// Facts for the instrument header, built from what the document really says.
 ///
 /// The traffic figure comes back flagged, because it is the one number on the
@@ -676,82 +562,4 @@ String? _updatedLabel(String? raw, {required bool russian}) {
   final day = local.day.toString().padLeft(2, '0');
   final month = local.month.toString().padLeft(2, '0');
   return russian ? 'обновлено $day.$month' : 'updated $day.$month';
-}
-
-/// A punched ticket rule: two dots and a dashed tear edge.
-class _Perforation extends StatelessWidget {
-  const _Perforation({required this.line, required this.punch});
-
-  final Color line;
-  final Color punch;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        _punchDot(punch),
-        const SizedBox(width: 8),
-        Expanded(
-          child: SizedBox(
-            height: 1,
-            child: CustomPaint(painter: _DashedRulePainter(line)),
-          ),
-        ),
-        const SizedBox(width: 8),
-        _punchDot(punch),
-      ],
-    );
-  }
-
-  Widget _punchDot(Color color) => Container(
-        width: 5,
-        height: 5,
-        decoration: BoxDecoration(shape: BoxShape.circle, color: color),
-      );
-}
-
-class _DashedRulePainter extends CustomPainter {
-  const _DashedRulePainter(this.color);
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 1;
-    var x = 0.0;
-    while (x < size.width) {
-      final end = (x + 5).clamp(0.0, size.width);
-      canvas.drawLine(Offset(x, 0.5), Offset(end, 0.5), paint);
-      x += 9;
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _DashedRulePainter oldDelegate) =>
-      oldDelegate.color != color;
-}
-
-/// A tiny barcode-like mark on the ticket stub. Decorative, not a real code.
-class _TicketBars extends StatelessWidget {
-  const _TicketBars({required this.color});
-
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    const widths = [1.5, 2.5, 1.0, 3.0, 1.5, 2.0, 1.0];
-    const heights = [7.0, 11.0, 6.0, 10.0, 8.0, 5.0, 9.0];
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        for (var i = 0; i < widths.length; i++) ...[
-          if (i > 0) const SizedBox(width: 2),
-          Container(width: widths[i], height: heights[i], color: color),
-        ],
-      ],
-    );
-  }
 }

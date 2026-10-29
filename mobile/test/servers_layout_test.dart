@@ -16,6 +16,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:proxydom/core/theme.dart';
 import 'package:proxydom/core/widgets/app_action_button.dart';
+import 'package:proxydom/core/widgets/app_surface.dart';
 import 'package:proxydom/features/vpn/data/subscription_label.dart';
 import 'package:proxydom/features/vpn/presentation/locations_screen.dart';
 import 'package:proxydom/features/vpn/presentation/server_instrument.dart';
@@ -27,26 +28,26 @@ const _dpr = 3.0;
 const _phone = Size(360, 780);
 
 /// One saved profile, as the store keeps it.
-const _teremokLink =
-    'hysteria2://pw@eu1.proxydom.su:443?sni=eu1.proxydom.su&insecure=1#%D0%A2%D0%B5%D1%80%D0%B5%D0%BC%D0%BE%D0%BA';
+const _profileLink =
+    'hysteria2://pw@eu1.proxydom.su:443?sni=eu1.proxydom.su&insecure=1#%D0%9C%D0%BE%D0%B9%20%D0%BF%D1%80%D0%BE%D1%84%D0%B8%D0%BB%D1%8C';
 
 String _line(String name) =>
     'hysteria2://pw@eu1.proxydom.su:443?sni=eu1.proxydom.su&insecure=1#$name';
 
-void _seedTeremok() {
+void _seedProfile() {
   SharedPreferences.setMockInitialValues({
     'hy2_import_v1': jsonEncode({
       'catalogs': [
         {
-          'id': 'teremok',
-          'title': 'Теремок',
-          'url': 'https://panel.proxydom.su/teremok',
+          'id': 'profile',
+          'title': 'Мой профиль',
+          'url': 'https://panel.example.test/profile',
           'trafficMeta': 'upload=1; download=2; total=15000000000',
           'lastUpdated': '2026-10-04T12:22:09Z',
-          'announce': 'Значок справа ведёт в бота',
-          'supportUrl': 'https://t.me/proxydom_bot',
+          'announce': 'Поддержка и обновления',
+          'supportUrl': 'https://t.me/example',
           'lines': [
-            _teremokLink,
+            _profileLink,
             _line('Индия'),
             _line('Игровой'),
             _line('YouTube'),
@@ -97,14 +98,14 @@ ProfileInstrument _instrument({
   String? updated = 'обновлено 04.10',
 }) {
   return ProfileInstrument(
-    title: 'Теремок',
-    description: 'Значок справа ведёт в бота',
+    title: 'Мой профиль',
+    description: 'Поддержка и обновления',
     facts: facts,
     updated: updated,
     selected: false,
     onNodeTap: (_) {},
     selectedNodeTitle: 'YouTube',
-    telegramLabel: 'Telegram',
+    telegramLabel: 'Поддержка',
     onTelegram: () {},
     onRefresh: () {},
     onShare: () {},
@@ -221,13 +222,13 @@ void main() {
       ..physicalSize = _phone * _dpr
       ..devicePixelRatio = _dpr;
     addTearDown(tester.view.reset);
-    _seedTeremok();
+    _seedProfile();
 
     await tester.pumpWidget(_wrap(const LocationsScreen()));
     await tester.pump();
     await tester.pump(const Duration(seconds: 4));
 
-    final note = find.text('Значок справа ведёт в бота');
+    final note = find.text('Поддержка и обновления');
     expect(note, findsOneWidget);
     expect(tester.getSize(note).height, greaterThan(8));
 
@@ -239,23 +240,22 @@ void main() {
     expect(body.bottom, lessThan(nodes.top));
   });
 
-  testWidgets('the profile pass is detached from the node pool',
+  testWidgets('profile and nodes are two sections of one plate',
       (tester) async {
     await tester.pumpWidget(
       _wrap(
-        Scaffold(
-          body: SingleChildScrollView(
-            child: _instrument(nodes: [_node('Москва')]),
-          ),
+        SingleChildScrollView(
+          child: _instrument(nodes: [_node('Москва')]),
         ),
       ),
     );
     await tester.pump();
 
-    final pass = tester.getRect(find.byKey(kProfilePassKey));
-    final pool = tester.getRect(find.byKey(kProfilePoolKey));
-    expect(pool.top, greaterThan(pass.bottom));
-    expect(pool.top - pass.bottom, greaterThanOrEqualTo(14));
+    final card = find.byType(ProfileInstrument);
+    expect(
+      find.descendant(of: card, matching: find.byType(AppSurface)),
+      findsOneWidget,
+    );
   });
 
   testWidgets('the page starts on the gutter its heading is on',
@@ -264,7 +264,7 @@ void main() {
       ..physicalSize = _phone * _dpr
       ..devicePixelRatio = _dpr;
     addTearDown(tester.view.reset);
-    _seedTeremok();
+    _seedProfile();
 
     await tester.pumpWidget(_wrap(const LocationsScreen()));
     await tester.pump();
@@ -279,7 +279,7 @@ void main() {
     final card = tester.getRect(find.byType(ProfileInstrument));
     expect(heading.left, AppBrand.pageGutter);
     expect(card.left, AppBrand.pageGutter);
-    expect(find.text('Теремок'), findsWidgets);
+    expect(find.text('Мой профиль'), findsWidgets);
     expect(find.text('Узлы'), findsOneWidget);
 
     // The key bar is on the same two lines as the list above it.
@@ -315,7 +315,7 @@ void main() {
   });
 
   testWidgets('a short profile has no search line', (tester) async {
-    _seedTeremok();
+    _seedProfile();
     await tester.pumpWidget(_wrap(const LocationsScreen()));
     await tester.pump();
     await tester.pump(const Duration(seconds: 4));
