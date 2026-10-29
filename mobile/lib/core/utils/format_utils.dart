@@ -26,6 +26,22 @@ String formatBytesPerSec(int bytesPerSec, {bool russian = true}) {
   return russian ? '$bytesPerSec Б/с' : '$bytesPerSec B/s';
 }
 
+/// Formats a tunnel RTT for the compact Home metric.
+///
+/// A missing or out-of-range sample is an em dash, never `0 мс`: zero is not a
+/// measured RTT, and the compact column must stay the same width.
+String formatPingMs(int? ms, {required bool russian}) {
+  if (ms == null || ms < 1 || ms > 5000) return '—';
+  final unit = russian ? 'мс' : 'ms';
+  if (ms >= 1000) {
+    final thousands = ms ~/ 1000;
+    final remainder = (ms % 1000).toString().padLeft(3, '0');
+    final separator = russian ? '\u00A0' : ',';
+    return '$thousands$separator$remainder $unit';
+  }
+  return '$ms $unit';
+}
+
 /// Relative age of last VPN status / traffic heartbeat for Home link cell.
 String formatLinkAge(DateTime? lastSeenAt, {required bool russian}) {
   if (lastSeenAt == null) return russian ? 'сейчас' : 'just now';
