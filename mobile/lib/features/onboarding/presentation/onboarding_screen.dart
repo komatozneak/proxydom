@@ -4,9 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/diagnostics/ui_log.dart';
+import '../../../core/ios_store_gates.dart';
 import '../../../core/router.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
+import '../../../core/widgets/app_surface.dart';
 import '../../../l10n/app_localizations.dart';
 import '../data/onboarding_prefs.dart';
 
@@ -65,7 +67,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         body: l.freeOnboardAddBody,
       ),
       _OnboardingCard(
-        icon: AppIcons.power,
+        // The copy says "tap the house"; the card has to be a house. A power
+        // glyph taught a different control than the one on Home.
+        icon: AppIcons.houseFill,
         title: l.freeOnboardConnectTitle,
         body: l.freeOnboardConnectBody,
       ),
@@ -100,10 +104,123 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     );
   }
 
+  /// Windows has no mobile permission pages and nothing to swipe through.
+  /// One panel, one decision: add a server, or go to Home and do it later.
+  Widget _windowsWelcome(AppL10n l, ThemeData theme) {
+    final scheme = theme.colorScheme;
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(32),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: AppSurface(
+                padding: const EdgeInsets.fromLTRB(36, 34, 36, 30),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: AppBrand.secondary.withValues(alpha: 0.15),
+                            shape: BoxShape.circle,
+                          ),
+                          child: AppIcon(
+                            AppIcons.shield,
+                            size: 22,
+                            color: scheme.onSurface,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          l.appTitle,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          'WINDOWS',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                            letterSpacing: 1.4,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 34),
+                    Text(
+                      l.pcOnboardHeadline,
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        height: 1.15,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      l.pcOnboardBody,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                        height: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const AppIcon(
+                          AppIcons.shieldCheck,
+                          size: 18,
+                          color: AppBrand.secondary,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            l.pcOnboardPrivacy,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 30),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 8,
+                      children: [
+                        FilledButton(
+                          onPressed: () => _finish(openImport: true),
+                          child: Text(l.freeAddServer),
+                        ),
+                        TextButton(
+                          onPressed: _finish,
+                          child: Text(l.freeLater),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppL10n.of(context);
     final theme = Theme.of(context);
+    if (windowsDesktop) return _windowsWelcome(l, theme);
     final cards = _cards(l);
 
     return Scaffold(
@@ -133,7 +250,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                           width: 96,
                           height: 96,
                           decoration: BoxDecoration(
-                            color: AppBrand.secondary.withOpacity(0.15),
+                            color: AppBrand.secondary.withValues(alpha: 0.15),
                             shape: BoxShape.circle,
                           ),
                           child: AppIcon(
@@ -162,6 +279,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 },
               ),
             ),
+            Text(
+              '${_index + 1} / ${cards.length}',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(cards.length, (i) {

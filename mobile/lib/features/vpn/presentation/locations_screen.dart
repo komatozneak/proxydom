@@ -14,7 +14,6 @@ import '../../../core/widgets/app_icon.dart';
 
 import '../../../core/widgets/terminal_type.dart';
 import '../../../l10n/app_localizations.dart';
-import 'windows_share_qr.dart';
 import '../../home/application/vpn_provider.dart';
 import '../../home/application/vpn_status.dart';
 import '../application/imported_profiles_provider.dart';
@@ -217,33 +216,6 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     await _applyImported(links);
   }
 
-  /// The saved documents a reload could actually reach.
-  List<ShareCatalog> get _reloadableDocuments => [
-        for (final catalog in _catalogs)
-          if (catalog.url != null && catalog.url!.isNotEmpty) catalog,
-      ];
-
-  /// Rereads every saved document from the key at the foot of this page.
-  ///
-  /// It goes through the same answer as the ring on a plate — one document at a
-  /// time, the selection kept against the list that still holds it — and it
-  /// leaves the person where they stood. The one thing it has to say to the
-  /// tunnel is that the chosen server is gone: a session left up on a key no
-  /// document lists any more is a session nobody asked to keep.
-  Future<void> _refreshEveryDocument() async {
-    final status = ref.read(vpnProvider);
-    final live = status is VpnConnected || status is VpnConnecting;
-    await refreshRemoteDocuments(
-      context,
-      scope: 'locations',
-      bottomInset: kActionBarBottomInset,
-      onSelectionLeft: () async {
-        if (!live) return;
-        await ref.read(vpnProvider.notifier).disconnect(reason: 'refresh');
-      },
-    );
-  }
-
   Future<void> _shareCatalog(ShareCatalog catalog) async {
     final key = catalog.subscriptionKey;
     if (key == null || !mounted) {
@@ -271,7 +243,11 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     }
     if (!mounted) return;
     UiLog.action('locations', 'share', result: 'copied');
-    showProxyDomToast(l.freeShareCopied, tone: ToastTone.success);
+    showProxyDomToast(
+      l.freeShareCopied,
+      tone: ToastTone.success,
+      bottomInset: kActionBarBottomInset,
+    );
   }
 
   Future<void> _refreshCatalog(ShareCatalog catalog) async {
@@ -337,6 +313,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       showProxyDomToast(
         l.freeRefreshDone(outcome.count),
         tone: ToastTone.success,
+        bottomInset: kActionBarBottomInset,
       );
       if (outcome.selectionLeftThisList && live) {
         await ref.read(vpnProvider.notifier).disconnect(reason: 'refresh');
@@ -350,28 +327,14 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
         result: 'fail',
         reason: e.runtimeType.toString(),
       );
-      showProxyDomToast(l.freeRefreshFail, tone: ToastTone.failure);
+      showProxyDomToast(
+        l.freeRefreshFail,
+        tone: ToastTone.failure,
+        bottomInset: kActionBarBottomInset,
+      );
     } finally {
       if (mounted) setState(() => _refreshing.remove(catalog.id));
     }
-  }
-
-  ({List<int> premium, List<int> general}) _catalogLineIndexes(
-    ShareCatalog catalog,
-  ) {
-    final premium = <int>[];
-    final general = <int>[];
-    for (final raw in catalog.lines) {
-      final index = _imported.indexWhere((link) => link.raw == raw);
-      if (index < 0) continue;
-      final label = labelForShareLink(_imported[index]);
-      if (isPremiumPoolServer(label.title)) {
-        premium.add(index);
-      } else {
-        general.add(index);
-      }
-    }
-    return (premium: premium, general: general);
   }
 
   NodeLine _nodeLine(AppL10n l, int index) {
@@ -401,14 +364,35 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
 
   Widget _catalogCard(ThemeData theme, AppL10n l, ShareCatalog catalog) {
     final title = catalog.title.trim().isEmpty ? l.freeServers : catalog.title;
-    final lines = _catalogLineIndexes(catalog);
+    // Document order. The premium/general split moved YouTube, gaming and
+    // India above the rest, so a line appeared to jump when a document came
+    // back in a different order. The store already keeps the document order.
+    final query = _query.trim().toLowerCase();
+    final nodeIndexes = <int>[];
+    for (final raw in catalog.lines) {
+      final index = _imported.indexWhere((link) => link.raw == raw);
+      if (index < 0) continue;
+      if (query.isNotEmpty) {
+        final link = _imported[index];
+        final label = labelForShareLink(link);
+        final hay =
+            '${label.title} ${link.endpoint} ${link.scheme}'.toLowerCase();
+        if (!hay.contains(query)) continue;
+      }
+      nodeIndexes.add(index);
+    }
+    // A profile with no matching lines is not drawn; the page says once that
+    // nothing was found instead of repeating an empty card per document.
+    if (query.isNotEmpty && nodeIndexes.isEmpty) {
+      return const SizedBox.shrink();
+    }
     final notice = profileNotice(
       announce: catalog.announce,
       supportUrl: catalog.supportUrl,
     );
     final planeUrl = notice.planeUrl?.trim() ?? '';
     final noticeBody = notice.text?.trim() ?? '';
-    final handle = _keyHandle(catalog);
+
     final selectedLabel = _selectedLabel();
     final russian = Localizations.localeOf(context).languageCode == 'ru';
     final parsed = inspectShareLines(catalog.lines);
@@ -430,7 +414,9 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       facts: profileFacts(
         trafficMeta: catalog.trafficMeta,
         russian: russian,
-        keyHandle: handle,
+        // The seven-character key prefix is gone: it was crypto, not a fact
+        // a person can use. Full key stays behind «Поделиться».
+        keyHandle: '',
       ),
       updated: profileUpdatedLabel(
         lastUpdated: catalog.lastUpdated,
@@ -442,8 +428,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       // chooses something» to everyone but the person holding the mouse.
       onNodeTap: (_) {},
       nodes: [
-        for (final index in [...lines.premium, ...lines.general])
-          _nodeLine(l, index),
+        for (final index in nodeIndexes) _nodeLine(l, index),
       ],
       selectedNodeTitle: selectedLabel,
       telegramLabel: subscriptionPlaneIsTelegram(planeUrl)
@@ -461,20 +446,6 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       showTelegraph: planeUrl.isNotEmpty,
       unsupportedNote: unsupportedNote,
     );
-  }
-
-  /// The short handle a person recognises their own key by, taken from the
-  /// document address: `2aq93K0s`. It is the one string worth showing next to
-  /// the name.
-  String _keyHandle(ShareCatalog catalog) {
-    final text = catalog.subscriptionKey?.trim() ?? '';
-    if (text.isEmpty) return '';
-    if (!text.startsWith('http')) return '';
-    final uri = Uri.tryParse(text);
-    final segment =
-        uri?.pathSegments.isNotEmpty == true ? uri!.pathSegments.last : '';
-    if (segment.length < 6) return '';
-    return segment.substring(0, 7);
   }
 
   String _selectedLabel() {
@@ -508,14 +479,51 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     }
     final connected = ref.watch(vpnProvider) is VpnConnected;
 
+    final query = _query.trim().toLowerCase();
+    final hasMatch = query.isEmpty ||
+        _imported.any((link) {
+          final label = labelForShareLink(link);
+          final hay =
+              '${label.title} ${link.endpoint} ${link.scheme}'.toLowerCase();
+          return hay.contains(query);
+        });
     final body = _catalogs.isNotEmpty
-        ? ListView(
-            padding: const EdgeInsets.only(top: 2),
+        ? Column(
             children: [
-              for (var i = 0; i < _catalogs.length; i++) ...[
-                if (i > 0) const SizedBox(height: 12),
-                _catalogCard(theme, l, _catalogs[i]),
-              ],
+              // A short profile does not need a search line; eight is where
+              // scrolling starts and a query saves time.
+              if (_imported.length > 8)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2, bottom: 12),
+                  child: _SearchField(
+                    hint: l.freeSearch,
+                    onChanged: (value) => setState(() => _query = value),
+                  ),
+                ),
+              Expanded(
+                child: !hasMatch
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Text(
+                            l.freeSearchEmpty,
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      )
+                    : ListView(
+                        padding: const EdgeInsets.only(top: 2),
+                        children: [
+                          for (var i = 0; i < _catalogs.length; i++) ...[
+                            if (i > 0) const SizedBox(height: 12),
+                            _catalogCard(theme, l, _catalogs[i]),
+                          ],
+                        ],
+                      ),
+              ),
             ],
           )
         : Column(
@@ -594,27 +602,16 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
             alignment: Alignment.topLeft,
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: _pageMeasure),
+              // One action. Each profile keeps its own reload in the
+              // overflow; a tab-wide reload beside Add made two peers.
               child: FreeClientActionBar(
                 onPaste: () {
-                  UiLog.action('locations', 'paste');
-                  context.push('/import?clipboard=1');
+                  UiLog.action('locations', 'add');
+                  context.push('/import');
                 },
-                onScan: () {
-                  UiLog.action('locations', 'scan');
-                  openFreeClientCapture(context);
-                },
-                // The reload ring was dead here: the key was painted and had
-                // no handler, while every saved document on this tab is
-                // reloadable. Same question as the home key, same answer.
-                //
-                // It answers for this tab and stays on this tab: a reload is not
-                // a server pick, and the profile screen is where a pick goes —
-                // not where a reread goes. The key is here exactly when there
-                // is a saved document behind it, and a plate pasted as plain
-                // lines has none.
-                onRefresh: _reloadableDocuments.isEmpty
-                    ? null
-                    : () => _refreshEveryDocument(),
+                onScan: () {},
+                showScan: false,
+                onRefresh: null,
               ),
             ),
           ),
@@ -839,10 +836,10 @@ class _ServerCount extends StatelessWidget {
     final gold = dark ? AppBrand.mascotGoldLit : AppBrand.mascotGoldDeep;
     final wide = count > 9;
     return Container(
-      width: wide ? null : 22,
-      height: 22,
-      constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
-      padding: EdgeInsets.symmetric(horizontal: wide ? 7 : 0),
+      width: wide ? null : 28,
+      height: 28,
+      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+      padding: EdgeInsets.symmetric(horizontal: wide ? 8 : 0),
       alignment: Alignment.center,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
@@ -852,10 +849,10 @@ class _ServerCount extends StatelessWidget {
         '$count',
         style: terminalText(
           context,
-          size: 11.5,
+          size: 14,
           color: gold,
           weight: 700,
-          spacing: 0.6,
+          spacing: 0.4,
         ),
       ),
     );

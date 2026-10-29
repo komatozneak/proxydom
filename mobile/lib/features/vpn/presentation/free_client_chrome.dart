@@ -127,7 +127,11 @@ Future<void> refreshRemoteDocuments(
 /// that answers from that page has to stand above it — [kActionBarBottomInset]
 /// is that standing room: the keys plus the page's own padding above and below.
 const double kActionBarHeight = 54;
-const double kActionBarBottomInset = kActionBarHeight + 22;
+
+/// The bar sits above the shell's 48 dp navigation and the system inset, so
+/// an alert has to clear more than the bar alone. 72 is that chrome plus the
+/// page's own padding.
+const double kActionBarBottomInset = kActionBarHeight + 72;
 
 /// Paste, and on the phone a matching QR. Windows has no camera and no QR.
 ///
@@ -143,11 +147,17 @@ class FreeClientActionBar extends StatelessWidget {
     required this.onScan,
     this.onRefresh,
     this.draft = false,
+    this.showScan = true,
   });
 
   final VoidCallback onPaste;
   final VoidCallback onScan;
   final VoidCallback? onRefresh;
+
+  /// The QR ring is for the import field. The Servers tab keeps add + reload
+  /// and sends scanning to the import screen, so the footer is not three
+  /// peer buttons.
+  final bool showScan;
 
   /// True on the import screen's first step.
   ///
@@ -204,22 +214,26 @@ class FreeClientActionBar extends StatelessWidget {
       child: Row(
         children: [
           Expanded(child: add),
-          gap,
-          AppRingButton(
-            icon: AppIcons.refresh,
-            color: AppBrand.actionSky,
-            onPressed: refresh,
-            tooltip: l.freeRefresh,
-            size: barHeight,
-          ),
-          gap,
-          AppRingButton(
-            icon: AppIcons.qrCode,
-            color: AppBrand.mascotGoldDeep,
-            onPressed: onScan,
-            tooltip: l.freeQr,
-            size: barHeight,
-          ),
+          if (refresh != null) ...[
+            gap,
+            AppRingButton(
+              icon: AppIcons.refresh,
+              color: AppBrand.actionSky,
+              onPressed: refresh,
+              tooltip: l.freeRefresh,
+              size: barHeight,
+            ),
+          ],
+          if (showScan) ...[
+            gap,
+            AppRingButton(
+              icon: AppIcons.qrCode,
+              color: AppBrand.mascotGoldDeep,
+              onPressed: onScan,
+              tooltip: l.freeQr,
+              size: barHeight,
+            ),
+          ],
         ],
       ),
     );
@@ -537,7 +551,7 @@ class _TrafficRail extends StatelessWidget {
         Row(
           children: [
             Text(
-              'ТРАФИК',
+              AppL10n.of(context).homeTrafficLabel,
               style: mono(
                 context,
                 size: 9.5,
@@ -580,7 +594,7 @@ class _TrafficRail extends StatelessWidget {
         if (!capped) ...[
           const SizedBox(height: 7),
           Text(
-            'БЕЗ ЛИМИТА',
+            AppL10n.of(context).homeTrafficUnlimited,
             style: mono(
               context,
               size: 9.5,

@@ -19,29 +19,34 @@ class AppSwitch extends StatelessWidget {
 
   final ValueChanged<bool>? onChanged;
 
-  static const double _trackW = 46;
-  static const double _trackH = 27;
-  static const double _thumb = 21;
+  static const double _trackW = 48;
+  static const double _trackH = 30;
+  static const double _thumb = 24;
 
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final enabled = onChanged != null;
 
+    final onTrack =
+        dark ? AppBrand.switchTrackOnDark : AppBrand.switchTrackOnLight;
+    // On the night, surfaceSunkDark is almost the card itself: off switches
+    // became floating white dots with no track. Use the rimmed dark track.
+    final offTrack =
+        dark ? AppBrand.switchTrackOffDark : AppBrand.switchTrackOffLight;
     final trackTop = value
-        ? Color.lerp(
-            AppBrand.secondary, AppBrand.lightSource, dark ? 0.16 : 0.11)!
-        : dark
-            ? AppBrand.surfaceSunkDark
-            : AppBrand.honeySurface;
+        ? Color.lerp(onTrack, AppBrand.lightSource, dark ? 0.12 : 0.10)!
+        : Color.lerp(offTrack, AppBrand.lightSource, 0.10)!;
     final trackFloor = value
-        ? AppBrand.secondary
+        ? onTrack
         : dark
             ? AppBrand.surfaceVariantDark
-            : AppBrand.lineLight;
+            : Color.lerp(offTrack, AppBrand.shadeSource, 0.18)!;
     final border = dark
         ? AppBrand.lightSource.withValues(alpha: value ? 0.10 : 0.08)
-        : AppBrand.shadeSource.withValues(alpha: 0.10);
+        : AppBrand.shadeSource.withValues(alpha: value ? 0.10 : 0.24);
+    final thumb =
+        value && dark ? AppBrand.switchThumbOnDark : AppBrand.surfaceElevatedLight;
 
     return Opacity(
       opacity: enabled ? 1 : 0.45,
@@ -69,7 +74,7 @@ class AppSwitch extends StatelessWidget {
               boxShadow: value
                   ? [
                       BoxShadow(
-                        color: AppBrand.secondary.withValues(alpha: 0.35),
+                        color: onTrack.withValues(alpha: 0.35),
                         blurRadius: 10,
                         spreadRadius: -3,
                         offset: const Offset(0, 3),
@@ -86,7 +91,7 @@ class AppSwitch extends StatelessWidget {
                 height: _thumb,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppBrand.surfaceElevatedLight,
+                  color: thumb,
                   boxShadow: [
                     BoxShadow(
                       color: AppBrand.shadeSource.withValues(alpha: 0.32),

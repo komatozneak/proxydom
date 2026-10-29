@@ -23,6 +23,7 @@ type engineConfig struct {
 	DirectDomains     []string       `json:"direct_domains"`
 	ForceProxyDomains []string       `json:"force_proxy_domains"`
 	UDPDirect         bool           `json:"udp_direct"`
+	UDPMode           string         `json:"udp_mode"`
 	DNSHijack         bool           `json:"dns_hijack"`
 	APIPort           int            `json:"api_port"`
 	APISecret         string         `json:"api_secret"`
@@ -39,22 +40,22 @@ type tunConfig struct {
 }
 
 type outboundConfig struct {
-	Type         string   `json:"type"`
-	Server       string   `json:"server"`
-	ServerPort   int      `json:"server_port"`
-	Password     string   `json:"password"`
-	SNI          string   `json:"sni"`
-	Insecure     bool     `json:"insecure"`
-	Obfs         string   `json:"obfs"`
-	ObfsPassword string   `json:"obfs_password"`
-	ServerPorts  string   `json:"server_ports"`
-	HopInterval  string   `json:"hop_interval"`
-	UUID         string   `json:"uuid"`
-	Flow         string   `json:"flow"`
-	Security     string   `json:"security"`
-	Fingerprint  string   `json:"fingerprint"`
-	PublicKey    string   `json:"public_key"`
-	ShortID      string   `json:"short_id"`
+	Type         string `json:"type"`
+	Server       string `json:"server"`
+	ServerPort   int    `json:"server_port"`
+	Password     string `json:"password"`
+	SNI          string `json:"sni"`
+	Insecure     bool   `json:"insecure"`
+	Obfs         string `json:"obfs"`
+	ObfsPassword string `json:"obfs_password"`
+	ServerPorts  string `json:"server_ports"`
+	HopInterval  string `json:"hop_interval"`
+	UUID         string `json:"uuid"`
+	Flow         string `json:"flow"`
+	Security     string `json:"security"`
+	Fingerprint  string `json:"fingerprint"`
+	PublicKey    string `json:"public_key"`
+	ShortID      string `json:"short_id"`
 	// Transport of a VLESS line. Without these a vless:// over WebSocket or
 	// gRPC cannot be described at all, and the row that needs them is exactly
 	// the one subscriptions hand out.
@@ -99,6 +100,16 @@ func (o outboundConfig) alpnList() []string {
 		}
 	}
 	return out
+}
+
+// udpMode is the policy the engine will apply. "direct_non_forced" is the
+// explicit game mode; everything else is proxy_all, including an old client
+// that only knew the legacy udp_direct flag.
+func (c engineConfig) udpMode() string {
+	if strings.EqualFold(strings.TrimSpace(c.UDPMode), "direct_non_forced") {
+		return "direct_non_forced"
+	}
+	return "proxy_all"
 }
 
 // engineKind is which core a session needs. The two have separate start calls
@@ -198,9 +209,7 @@ func (c engineConfig) hy2StartJSON() ([]byte, error) {
 	if len(c.ForceProxyDomains) > 0 {
 		body["force_proxy_domains"] = c.ForceProxyDomains
 	}
-	if c.UDPDirect {
-		body["udp_direct"] = true
-	}
+	body["udp_mode"] = c.udpMode()
 	if c.Tun != nil && c.Tun.DNS != "" && !c.Probe {
 		body["dns_address"] = c.Tun.DNS
 	}
@@ -306,6 +315,15 @@ func (c engineConfig) vlessStartJSON() ([]byte, error) {
 			}},
 		},
 	}
+	// The TUN dialer in front of this core reads these fields; v2ray itself
+	// ignores unknown top-level keys. One policy document, two engines.
+	if len(c.DirectDomains) > 0 {
+		doc["direct_domain_suffixes"] = c.DirectDomains
+	}
+	if len(c.ForceProxyDomains) > 0 {
+		doc["force_proxy_domains"] = c.ForceProxyDomains
+	}
+	doc["udp_mode"] = c.udpMode()
 	return json.Marshal(doc)
 }
 
@@ -325,25 +343,24 @@ func (c engineConfig) statusLine() string {
 		clash = "applied"
 	}
 	// routing_applied and dns_hijack name what the engine did, not what the
-	// document asked for. Only the hysteria2 path applies the split lists and
-	// hijacks DNS; the share document carries neither, and its dialer sends
-	// every destination verbatim. The tun's dns address is not evidence on its
-	// own: the broker sends it for both schemes.
-	appliesSplit := false
-	if kind, ok := c.kind(); ok && kind == engineHy2 {
-		appliesSplit = true
-	}
+	// document asked for. Both engines now run the same TUN-level classifier,
+	// so a VLESS session applies its lists too; only the hysteria2 dialer
+	// hijacks DNS, the VLESS one sends DNS through the core.
+	kind, kindOK := c.kind()
+	appliesSplit := kindOK && (len(c.DirectDomains) > 0 || len(c.ForceProxyDomains) > 0 ||
+		c.udpMode() == "direct_non_forced")
 	dns := "false"
-	if appliesSplit && (c.DNSHijack || (c.Tun != nil && c.Tun.DNS != "" && !c.Probe)) {
+	if kindOK && kind == engineHy2 && !c.Probe {
 		dns = "true"
 	}
 	routing := "false"
-	if appliesSplit && (c.RoutingApplied || len(c.DirectDomains) > 0 || len(c.ForceProxyDomains) > 0 || c.UDPDirect) {
+	if appliesSplit {
 		routing = "true"
 	}
 	return fmt.Sprintf(
-		"proxydom-engine scheme=%s transport=%s tun=%s socks=%s routing_applied=%s dns_hijack=%s udp_direct=%t clash_api=%s direct_domains=%d force_proxy_domains=%d hop=%s",
+		"proxydom-engine scheme=%s transport=%s tun=%s socks=%s routing_applied=%s dns_hijack=%s udp_mode=%s udp_direct=%t clash_api=%s direct_domains=%d force_proxy_domains=%d hop=%s",
 		strings.ToLower(strings.TrimSpace(c.Outbound.Type)), c.Outbound.networkName(),
-		tun, c.SocksListen, routing, dns, c.UDPDirect, clash, len(c.DirectDomains), len(c.ForceProxyDomains), hop,
+		tun, c.SocksListen, routing, dns, c.udpMode(), c.udpMode() == "direct_non_forced", clash,
+		len(c.DirectDomains), len(c.ForceProxyDomains), hop,
 	)
 }

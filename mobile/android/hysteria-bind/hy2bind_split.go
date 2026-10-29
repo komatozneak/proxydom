@@ -1,10 +1,12 @@
 package hy2bind
 
 import (
+	"container/list"
 	"errors"
 	"log"
 	"net"
 	"net/netip"
+	"sort"
 	"strings"
 	"sync"
 	"syscall"
@@ -38,22 +40,44 @@ var forceProxySuffixes = []string{
 	"google.com",
 }
 
-const dnsCacheCap = 4096
+const (
+	dnsCacheCap   = 4096
+	maxHostsPerIP = 16
+
+	// DNS TTLs for CDNs are often 30-60 seconds while the client keeps using
+	// the address for minutes. The lease is clamped instead of copied so a
+	// direct site does not flicker between direct and proxied mid-page.
+	minHostLease     = time.Minute
+	maxHostLease     = 30 * time.Minute
+	defaultHostLease = 10 * time.Minute
+)
+
+// ipHostLeases is every name the resolver has answered with this address,
+// with the moment its lease expires. One host per IP was the old model and it
+// made shared CDN addresses decide by whichever answer arrived last.
+type ipHostLeases struct {
+	leases map[string]time.Time
+	lru    *list.Element
+}
 
 var (
 	splitMu      sync.RWMutex
 	directSuffix []string
 	extraForce   []string
-	dnsIPToHost  = map[netip.Addr]string{}
+	ipHosts      = map[netip.Addr]*ipHostLeases{}
+	ipHostLRU    = list.New()
 	udpDirect    bool
-	hijackDNS    netip.Addr
 )
+
+func normalizeHost(host string) string {
+	return strings.ToLower(strings.TrimSpace(strings.TrimSuffix(host, ".")))
+}
 
 func setExtraForceSuffixes(raw []string) {
 	out := make([]string, 0, len(raw))
 	seen := map[string]struct{}{}
 	for _, s := range raw {
-		s = strings.ToLower(strings.TrimSpace(strings.TrimSuffix(s, ".")))
+		s = normalizeHost(s)
 		if s == "" {
 			continue
 		}
@@ -80,33 +104,11 @@ func udpDirectOn() bool {
 	return udpDirect
 }
 
-func setHijackDNS(raw string) {
-	ip, err := netip.ParseAddr(strings.TrimSpace(raw))
-	splitMu.Lock()
-	defer splitMu.Unlock()
-	if err != nil {
-		hijackDNS = netip.Addr{}
-		return
-	}
-	hijackDNS = ip.Unmap()
-}
-
-func hijackDNSAddr(ip netip.Addr) bool {
-	if !ip.IsValid() {
-		return false
-	}
-	ip = ip.Unmap()
-	splitMu.RLock()
-	want := hijackDNS
-	splitMu.RUnlock()
-	return want.IsValid() && want == ip
-}
-
 func setDirectSuffixes(raw []string) {
 	out := make([]string, 0, len(raw))
 	seen := map[string]struct{}{}
 	for _, s := range raw {
-		s = strings.ToLower(strings.TrimSpace(strings.TrimSuffix(s, ".")))
+		s = normalizeHost(s)
 		if s == "" || isForceProxyHost(s) {
 			continue
 		}
@@ -126,38 +128,179 @@ func clearSplitState() {
 	directSuffix = nil
 	extraForce = nil
 	udpDirect = false
-	hijackDNS = netip.Addr{}
-	dnsIPToHost = map[netip.Addr]string{}
+	ipHosts = map[netip.Addr]*ipHostLeases{}
+	ipHostLRU = list.New()
 	splitMu.Unlock()
 }
 
+func clampLease(ttl time.Duration) time.Duration {
+	if ttl <= 0 {
+		return defaultHostLease
+	}
+	if ttl < minHostLease {
+		return minHostLease
+	}
+	if ttl > maxHostLease {
+		return maxHostLease
+	}
+	return ttl
+}
+
+// rememberHostIP keeps the legacy signature: the DNS parser passes the wire
+// TTL through rememberHostIPTTL, while tests and SVCB hints get the default.
 func rememberHostIP(host string, ip netip.Addr) {
-	host = strings.ToLower(strings.TrimSpace(strings.TrimSuffix(host, ".")))
+	rememberHostIPTTL(host, ip, defaultHostLease)
+}
+
+func rememberHostIPTTL(host string, ip netip.Addr, ttl time.Duration) {
+	host = normalizeHost(host)
 	if host == "" || !ip.IsValid() {
 		return
 	}
 	ip = ip.Unmap()
+	expire := time.Now().Add(clampLease(ttl))
 	splitMu.Lock()
 	defer splitMu.Unlock()
-	if len(dnsIPToHost) >= dnsCacheCap {
-		dnsIPToHost = map[netip.Addr]string{}
+	entry := ipHosts[ip]
+	if entry == nil {
+		entry = &ipHostLeases{leases: map[string]time.Time{}}
+		entry.lru = ipHostLRU.PushFront(ip)
+		ipHosts[ip] = entry
+	} else {
+		ipHostLRU.MoveToFront(entry.lru)
 	}
-	dnsIPToHost[ip] = host
+	if _, exists := entry.leases[host]; !exists && len(entry.leases) >= maxHostsPerIP {
+		var oldestHost string
+		var oldestExpire time.Time
+		for h, e := range entry.leases {
+			if oldestHost == "" || e.Before(oldestExpire) {
+				oldestHost, oldestExpire = h, e
+			}
+		}
+		delete(entry.leases, oldestHost)
+	}
+	entry.leases[host] = expire
+	if len(ipHosts) > dnsCacheCap {
+		evictLeasesLocked()
+	}
 }
 
-func hostForIP(ip netip.Addr) string {
+// evictLeasesLocked drops expired names and then evicts one least-recently
+// used address at a time. The old code emptied the whole table at the cap,
+// which silently turned the whitelist off for the rest of the session.
+func evictLeasesLocked() {
+	now := time.Now()
+	for ip, entry := range ipHosts {
+		for host, expire := range entry.leases {
+			if !expire.After(now) {
+				delete(entry.leases, host)
+			}
+		}
+		if len(entry.leases) == 0 {
+			delete(ipHosts, ip)
+			ipHostLRU.Remove(entry.lru)
+		}
+	}
+	for len(ipHosts) > dnsCacheCap {
+		back := ipHostLRU.Back()
+		if back == nil {
+			break
+		}
+		ip, _ := back.Value.(netip.Addr)
+		entry := ipHosts[ip]
+		delete(ipHosts, ip)
+		if entry != nil {
+			ipHostLRU.Remove(entry.lru)
+		} else {
+			ipHostLRU.Remove(back)
+		}
+	}
+}
+
+func hostsForIP(ip netip.Addr) []string {
 	if !ip.IsValid() {
-		return ""
+		return nil
 	}
 	ip = ip.Unmap()
-	splitMu.RLock()
-	defer splitMu.RUnlock()
-	return dnsIPToHost[ip]
+	now := time.Now()
+	splitMu.Lock()
+	defer splitMu.Unlock()
+	entry := ipHosts[ip]
+	if entry == nil {
+		return nil
+	}
+	out := make([]string, 0, len(entry.leases))
+	for host, expire := range entry.leases {
+		if expire.After(now) {
+			out = append(out, host)
+			continue
+		}
+		delete(entry.leases, host)
+	}
+	if len(entry.leases) == 0 {
+		delete(ipHosts, ip)
+		ipHostLRU.Remove(entry.lru)
+		return nil
+	}
+	ipHostLRU.MoveToFront(entry.lru)
+	sort.Strings(out)
+	return out
+}
+
+// hostForIP is kept for logs and for the legacy shouldDirectUDP checks. The
+// decision itself uses every known name on the address, not this first one.
+func hostForIP(ip netip.Addr) string {
+	hosts := hostsForIP(ip)
+	if len(hosts) == 0 {
+		return ""
+	}
+	return hosts[0]
+}
+
+// ipAllDirect answers "may this address go direct" for flows with no domain.
+// It is fail-closed: one name outside the list, or one forced name, keeps the
+// whole address on the tunnel. A CDN address is shared, so an unknown name is
+// not evidence of anything, and leaking it is worse than proxying a direct one.
+func ipAllDirect(ip netip.Addr) (string, bool) {
+	hosts := hostsForIP(ip)
+	if len(hosts) == 0 {
+		return "", false
+	}
+	for _, host := range hosts {
+		if isForceProxyHost(host) {
+			return "", false
+		}
+	}
+	for _, host := range hosts {
+		if !hostMatchesDirect(host) {
+			return "", false
+		}
+	}
+	return hosts[0], true
+}
+
+// routeFor is the single decision both engines use once a domain is known (or
+// not known). "why" is logged so support can tell a miss from a leak.
+func routeFor(host string, dst netip.Addr) (bool, string) {
+	host = normalizeHost(host)
+	if host != "" {
+		if isForceProxyHost(host) {
+			return false, "force"
+		}
+		if hostMatchesDirect(host) {
+			return true, "host"
+		}
+		return false, "host-miss"
+	}
+	if _, ok := ipAllDirect(dst); ok {
+		return true, "dns"
+	}
+	return false, "unknown"
 }
 
 func suffixMatches(host, suffix string) bool {
-	host = strings.ToLower(strings.TrimSuffix(host, "."))
-	suffix = strings.ToLower(strings.TrimSuffix(suffix, "."))
+	host = normalizeHost(host)
+	suffix = normalizeHost(suffix)
 	if host == "" || suffix == "" {
 		return false
 	}
@@ -196,11 +339,14 @@ func hostMatchesDirect(host string) bool {
 	return false
 }
 
+// shouldDirectTCP is the DNS-only fallback. New callers should use routeFor,
+// which prefers the SNI/Host classifier and falls back to this.
 func shouldDirectTCP(m *M.Metadata) bool {
 	if m == nil {
 		return false
 	}
-	return hostMatchesDirect(hostForIP(m.DstIP))
+	direct, _ := routeFor("", m.DstIP)
+	return direct
 }
 
 func protectAndDial(network, address string) (net.Conn, error) {

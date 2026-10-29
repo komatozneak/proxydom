@@ -5,13 +5,22 @@
 # literal went stale, and a build went out with the wrong version stamped into
 # the MSI and its file name. A required parameter cannot go stale; the caller
 # states the version every time, and there is no second place holding one.
+#
+# -Signing controls Authenticode signing. "auto" signs when a certificate is
+# configured and warns when it is not, "require" refuses to ship an unsigned
+# build, "off" skips signing for a local experiment. Windows 11 Smart App
+# Control blocks unsigned executables, so a release is built with "require".
+# docs/windows-signing.md has the certificate and environment variable list.
 param(
     [Parameter(Mandatory = $true)]
     [string]$Version,
-    [switch]$Quiet
+    [switch]$Quiet,
+    [ValidateSet("auto", "require", "off")]
+    [string]$Signing = "auto"
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "signing.ps1")
 
 # A native tool writing to stderr is not a failure. Under ErrorActionPreference
 # "Stop" PowerShell promotes every CMake or WiX warning to a terminating error
@@ -39,6 +48,19 @@ $ThirdParty = Join-Path $WindowsRoot "third_party"
 $Payload = Join-Path $Installer "payload"
 $OutDir = Join-Path $Installer "out"
 $FlutterRelease = Join-Path $Mobile "build\windows\x64\runner\Release"
+
+# The signing identity is resolved before the first compile. A missing, expired
+# or token-less certificate is a first-second mistake, and finding it after ten
+# minutes of Flutter and CMake work is a waste of the build.
+$signingConfiguration = $null
+if ($Signing -ne "off") {
+    $signingConfiguration = Resolve-ProxyDomSigningConfiguration
+}
+if ($Signing -eq "require" -and -not $signingConfiguration) {
+    throw ("-Signing require was passed but no certificate is configured. Set " +
+           "PROXYDOM_SIGN_THUMBPRINT, PROXYDOM_SIGN_PFX_PATH or the PROXYDOM_ARTIFACT_SIGNING_* " +
+           "variables; docs/windows-signing.md has the details.")
+}
 
 function Find-Cmake {
     $cmd = Get-Command cmake -ErrorAction SilentlyContinue
@@ -196,6 +218,45 @@ Write-Host "Checking payload licenses"
 $licenseCheck = Join-Path $Installer "check-payload-licenses.ps1"
 Invoke-Native { & $licenseCheck -Payload $Payload } "Payload license check"
 
+# The payload is signed before WiX packs it: an MSI whose files are signed after
+# packaging would carry a hash mismatch, and a file signed after the MSI would
+# never match what the MSI installs. The MSI itself gets its own signature after
+# the build, which is the one SmartScreen looks at on download.
+if ($signingConfiguration) {
+    Write-Host "Signing payload with $($signingConfiguration.Description)"
+    $signTargets = @(Get-ProxyDomPayloadSignTargets -Payload $Payload)
+    $signed = @(Invoke-ProxyDomSigning -Files $signTargets -Configuration $signingConfiguration -SkipAlreadySigned)
+    foreach ($item in $signed) {
+        Write-Host ("  {0,-7} {1} <- {2}" -f $item.Action, (Split-Path $item.Path -Leaf), $item.Signer)
+    }
+    # A signature Windows does not trust is the same failure as no signature,
+    # only harder to notice: every file we just signed is verified before it
+    # enters the MSI. Files kept because they already carry a valid signature
+    # are not ours to verify; some of them are catalog-signed by Microsoft and
+    # have no embedded signature for signtool verify /pa to find.
+    foreach ($item in @($signed | Where-Object { $_.Action -eq "signed" })) {
+        $check = Test-ProxyDomSignature -Path $item.Path -ExpectedSubject $signingConfiguration.ExpectedSubject
+        if (-not $check.IsValid) {
+            throw ("'$($item.Path)' carries a signature Windows does not trust " +
+                   "(status $($check.Status)). Smart App Control needs a certificate from the " +
+                   "Microsoft Trusted Root Program; docs/windows-signing.md lists the options.")
+        }
+    }
+    # Third-party binaries that keep their own publisher are expected here.
+    # Anything unsigned at this point is a gap in the signature, not a warning.
+    $unsigned = @(Get-ChildItem $Payload -File |
+        Where-Object { $_.Extension -eq ".exe" -or $_.Extension -eq ".dll" } |
+        Where-Object { (Get-AuthenticodeSignature -LiteralPath $_.FullName).Status -ne "Valid" })
+    if ($unsigned.Count -gt 0) {
+        Write-Warning ("Payload files without a trusted signature: " +
+                       (($unsigned | Select-Object -ExpandProperty Name) -join ", "))
+    }
+} else {
+    Write-Warning ("The MSI and its executables will be unsigned. Windows 11 Smart App Control " +
+                   "blocks unsigned programs, and antivirus reputation has nothing to attach to. " +
+                   "Build releases with -Signing require; see docs/windows-signing.md.")
+}
+
 Ensure-WixExtension "WixToolset.UI.wixext"
 Ensure-WixExtension "WixToolset.Util.wixext"
 
@@ -217,3 +278,34 @@ if ($Quiet) { }
 Write-Host "Building MSI"
 Invoke-Native { & wix @wixArgs } "wix build"
 Write-Host "MSI: $msi"
+
+if ($signingConfiguration) {
+    Write-Host "Signing MSI"
+    Invoke-ProxyDomSigning -Files @($msi) -Configuration $signingConfiguration | Out-Null
+    $msiCheck = Test-ProxyDomSignature -Path $msi -ExpectedSubject $signingConfiguration.ExpectedSubject
+    if (-not $msiCheck.IsValid) {
+        throw ("The MSI signature does not validate (status $($msiCheck.Status)). It would be " +
+               "delivered as an unknown publisher; docs/windows-signing.md explains why.")
+    }
+    Write-Host "MSI signed: $($msiCheck.Subject)"
+} else {
+    Write-Warning "MSI is unsigned: Windows will report an unknown publisher for the installer."
+}
+
+# Smart App Control blocks the unsigned build before a person ever sees the app,
+# and the dialog offers no "run anyway". The explanation therefore has to sit
+# next to the installer as a separate file: it is the only thing a blocked user
+# can open. The page it duplicates is docs/guide/windows-sac.md.
+$releaseReadme = Join-Path $Installer "README-RELEASE.txt"
+if (Test-Path -LiteralPath $releaseReadme) {
+    $readmeOut = Join-Path $OutDir "ProxyDom-$Version-README-RU.txt"
+    Copy-Item -LiteralPath $releaseReadme -Destination $readmeOut -Force
+    Write-Host "Instructions for users: $readmeOut"
+}
+
+# A hash next to the installer is the only check a user can run themselves while
+# the build is unsigned: SmartScreen shows no publisher to compare against.
+$msiHash = (Get-FileHash -LiteralPath $msi -Algorithm SHA256).Hash
+$hashFile = "$msi.sha256"
+Set-Content -LiteralPath $hashFile -Value ("{0}  {1}" -f $msiHash, (Split-Path $msi -Leaf)) -Encoding ASCII
+Write-Host "SHA256: $msiHash"

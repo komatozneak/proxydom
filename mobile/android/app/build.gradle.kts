@@ -180,3 +180,19 @@ dependencies {
     implementation("androidx.activity:activity-ktx:1.10.1")
     testImplementation("junit:junit:4.13.2")
 }
+
+// Google Play requires 16 KB page-size support for apps targeting Android 15+.
+// mobile_scanner 5.2.3 pulls CameraX 1.3.3 and ML Kit barcode 17.2.0, whose
+// native libraries are 4 KB aligned (libbarhopper_v3.so,
+// libimage_processing_util_jni.so). Both projects fixed this in later releases;
+// the versions below were checked with llvm-readelf (LOAD alignment 0x4000).
+// Keep all androidx.camera artifacts on the same version: CameraX aborts at
+// runtime when camera-core and camera-camera2 disagree.
+configurations.configureEach {
+    resolutionStrategy {
+        force("androidx.camera:camera-core:1.6.2")
+        force("androidx.camera:camera-camera2:1.6.2")
+        force("androidx.camera:camera-lifecycle:1.6.2")
+        force("com.google.mlkit:barcode-scanning:17.3.0")
+    }
+}

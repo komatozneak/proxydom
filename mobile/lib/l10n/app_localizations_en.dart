@@ -42,13 +42,13 @@ class AppL10nEn extends AppL10n {
   String get homeConnected => 'Connected';
 
   @override
-  String get homeTapHint => 'Tap the house to connect';
+  String get homeTapHint => 'Tap to connect';
 
   @override
-  String get homeConnectingHint => 'Hold on — the house is opening the door…';
+  String get homeConnectingHint => 'Connecting…';
 
   @override
-  String get homeConnectedHint => 'The house is online';
+  String get homeConnectedHint => 'Connected';
 
   @override
   String get homeProtected => 'Protected';
@@ -85,6 +85,24 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get homeTrafficExhausted => 'Traffic used up';
+
+  @override
+  String get homeTrafficLabel => 'TRAFFIC';
+
+  @override
+  String get homeAddServer => 'Add server';
+
+  @override
+  String get homeMetricTime => 'Time';
+
+  @override
+  String get homeMetricSpeed => 'Speed';
+
+  @override
+  String get homeMetricTraffic => 'Traffic';
+
+  @override
+  String get homeTrafficUnlimited => 'UNLIMITED';
 
   @override
   String homeTrafficAmount(String remaining, String limit) {
@@ -206,7 +224,7 @@ class AppL10nEn extends AppL10n {
   String get homeStatPing => 'Ping';
 
   @override
-  String get homeLinkOnline => 'Home online';
+  String get homeLinkOnline => 'Connected';
 
   @override
   String get homeLinkOffline => 'Home offline';
@@ -650,6 +668,24 @@ class AppL10nEn extends AppL10n {
       'Licenses of the engine and the libraries it links';
 
   @override
+  String get licensesTitle => 'Licenses';
+
+  @override
+  String get licensesSearch => 'Search packages';
+
+  @override
+  String get licensesEngine => 'Engine';
+
+  @override
+  String get licensesPackages => 'Packages';
+
+  @override
+  String get licensesFonts => 'Fonts';
+
+  @override
+  String get licensesNoResults => 'Nothing found';
+
+  @override
   String get settingsThemeSystem => 'Auto';
 
   @override
@@ -779,6 +815,9 @@ class AppL10nEn extends AppL10n {
   String get settingsVpnNotificationTitle => 'Shade notification';
 
   @override
+  String get settingsVpnNotificationShort => 'Shade card with Disconnect';
+
+  @override
   String get settingsVpnNotificationHint =>
       'Card in the shade with Disconnect. Off hides the card; VPN stays on.';
 
@@ -803,8 +842,7 @@ class AppL10nEn extends AppL10n {
       'Tile already in Quick Settings — open the shade and scroll';
 
   @override
-  String get settingsQsTileAddedHint =>
-      'The tile is in Quick Settings. Tap to remove it';
+  String get settingsQsTileAddedHint => 'Tap to remove';
 
   @override
   String get settingsQsTileRemove => 'Remove';
@@ -1326,22 +1364,39 @@ class AppL10nEn extends AppL10n {
   String get vpnDisclosureTitle => 'How the tunnel starts';
 
   @override
+  String get vpnDisclosureBullet1 =>
+      'The tunnel starts only on your command and only on this device.';
+
+  @override
+  String get vpnDisclosureBullet2 =>
+      'Keys and node addresses are never sent to a server.';
+
+  @override
+  String get vpnDisclosureBullet3 => 'No account, no payments, no ads.';
+
+  @override
+  String get vpnDisclosureMore => 'Details';
+
+  @override
+  String get vpnDisclosureClose => 'Close';
+
+  @override
   String get vpnDisclosureLead =>
-      'The house starts a tunnel from the line you chose. This screen explains that before Android asks for VPN permission.';
+      'The app starts a tunnel for the selected line. Android will ask for VPN permission once.';
 
   @override
   String get vpnDisclosureVpnTitle => 'What the app does';
 
   @override
   String get vpnDisclosureVpnBody =>
-      'After you accept, the house opens a local tunnel for the selected line. Device traffic goes to the server in that line. Android then shows its own VPN permission once.';
+      'After you agree, the app brings up a local tunnel for the selected line. Traffic goes to the server in that line. Android asks for VPN permission once.';
 
   @override
   String get vpnDisclosureVpnTitleIos => 'What the app does';
 
   @override
   String get vpnDisclosureVpnBodyIos =>
-      'After you accept, the house opens a local tunnel for the selected line. Device traffic goes to the server in that line. iPhone then shows its own VPN permission once.';
+      'After you agree, the app brings up a local tunnel for the selected line. Traffic goes to the server in that line. iPhone asks for VPN permission once.';
 
   @override
   String get vpnDisclosureDataTitle => 'What stays on the phone';
@@ -1472,7 +1527,18 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get freeOnboardConnectBody =>
-      'Tap the house to connect or disconnect. The status stays on this screen.';
+      'Tap the connect button in the centre of the screen. It turns the tunnel on and off. The status stays on this screen.';
+
+  @override
+  String get pcOnboardHeadline => 'Connect on this PC';
+
+  @override
+  String get pcOnboardBody =>
+      'Paste an access key or a document link. The app will show the servers it contains.';
+
+  @override
+  String get pcOnboardPrivacy =>
+      'Keys and server addresses stay on this computer.';
 
   @override
   String get freeLater => 'Later';
@@ -1516,13 +1582,22 @@ class AppL10nEn extends AppL10n {
   String get freeSearch => 'Search servers';
 
   @override
+  String get freeSearchEmpty => 'No servers found';
+
+  @override
+  String get qrHint => 'Point the camera at the QR code';
+
+  @override
+  String get qrTorch => 'Torch';
+
+  @override
   String get locationsNodes => 'Nodes';
 
   @override
   String get locationsSelected => 'IN USE';
 
   @override
-  String get locationsActive => 'active';
+  String get locationsActive => 'Active';
 
   @override
   String get locationsNotUsed => 'NOT USED';
@@ -1570,10 +1645,13 @@ class AppL10nEn extends AppL10n {
   String get freeRefreshFail => 'Could not refresh';
 
   @override
-  String get freeStepLink => 'LINK';
+  String get freeStepLink => 'Link';
 
   @override
-  String get freeStepFound => 'FOUND';
+  String get freeStepFound => 'Found';
+
+  @override
+  String get freeFoundEmpty => 'Servers from the link will appear here.';
 
   @override
   String get freeFieldEmpty =>

@@ -1,4 +1,4 @@
-// A server pick drops the tunnel without pressing the house.
+﻿// A server pick drops the tunnel without pressing the house.
 //
 // The status word follows the tunnel immediately. The rings used to stay,
 // because a fully lit yard was treated as something the listener must not
@@ -74,10 +74,11 @@ void main() {
     vpn.show(const VpnDisconnected());
     await tester.pump();
 
-    expect(find.text('НЕ ПОДКЛЮЧЕНО'), findsOneWidget);
+    expect(find.text('Не подключено'), findsOneWidget);
     expect(find.byType(HousePulsar), findsNothing);
     expect(tester.widget<HouseOrbit>(find.byType(HouseOrbit)).burning, 0);
 
     debugDefaultTargetPlatformOverride = null;
   });
 }
+

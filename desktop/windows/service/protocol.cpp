@@ -277,6 +277,7 @@ bool parse_command(const std::string& json, ClientCommand& out, std::string& err
   // previous command leaks into the next one.
   out.direct_domains.clear();
   out.direct_domains_truncated = false;
+  out.udp_mode.clear();
   bool present = false;
   if (!extract_string_field(json, "command", out.command, present) || !present) {
     error = "command";
@@ -312,6 +313,15 @@ bool parse_command(const std::string& json, ClientCommand& out, std::string& err
     return false;
   }
   out.udp_direct = has_udp_direct && udp_direct != 0;
+  if (!extract_string_field(json, "udp_mode", out.udp_mode, present)) {
+    error = "udp_mode";
+    return false;
+  }
+  if (!present) {
+    out.udp_mode.clear();
+  } else if (out.udp_mode != "proxy_all" && out.udp_mode != "direct_non_forced") {
+    out.udp_mode = "proxy_all";
+  }
   return true;
 }
 
@@ -656,19 +666,17 @@ std::string build_engine_config(const ShareLine& line,
                                 const std::string& server_ip,
                                 const std::vector<std::string>& domains,
                                 const std::vector<std::string>& force_proxy_domains,
-                                bool udp_direct,
+                                const std::string& udp_mode,
                                 unsigned short api_port,
                                 const std::string& api_secret) {
   const std::string outbound = engine_outbound(line, server_ip);
   if (outbound.empty()) return {};
 
-  // routing_applied and dns_hijack describe what the engine will do, so they
-  // are written only for the scheme that does it. Only the hysteria2 body
-  // carries the split lists, and only the hy2 dialer hijacks DNS: the share
-  // document holds neither, and its dialer sends every destination verbatim.
-  // Writing them for a vless line made the engine's status line report
-  // routing_applied=true dns_hijack=true for a session where neither happened.
-  const bool applies_split = line.scheme == "hysteria2";
+  // Both engines sit behind the same TUN-level classifier in hy2bind, so the
+  // lists travel in both documents now. Only the hysteria2 dialer hijacks DNS;
+  // the VLESS dialer sends DNS through the core, so the flag stays false there.
+  const bool hy2 = line.scheme == "hysteria2";
+  const std::string mode = udp_mode == "direct_non_forced" ? udp_mode : "proxy_all";
 
   // auto_route stays false: C++ installs the capture routes.
   std::ostringstream config;
@@ -679,16 +687,11 @@ std::string build_engine_config(const ShareLine& line,
          << "\"tun\":{\"name\":\"" << kTunName << "\",\"address\":\"" << kTunIpv4
          << "/30\",\"dns\":\"198.18.0.2\","
          << "\"mtu\":1280,\"auto_route\":false}";
-  if (applies_split) {
-    // Recorded in the order the sites screen already uses: force-proxy names,
-    // then exclusions, then the UDP flag. The engine applies them: force-proxy
-    // wins over a direct suffix and over UDP bypass.
-    config << ",\"force_proxy_domains\":[" << json_string_array(force_proxy_domains) << "]"
-           << ",\"direct_domains\":[" << json_string_array(domains) << "]"
-           << ",\"udp_direct\":" << (udp_direct ? "true" : "false");
-  }
-  config << ",\"dns_hijack\":" << (applies_split ? "true" : "false")
-         << ",\"routing_applied\":" << (applies_split ? "true" : "false")
+  config << ",\"force_proxy_domains\":[" << json_string_array(force_proxy_domains) << "]"
+         << ",\"direct_domains\":[" << json_string_array(domains) << "]"
+         << ",\"udp_mode\":\"" << mode << "\"";
+  config << ",\"dns_hijack\":" << (hy2 ? "true" : "false")
+         << ",\"routing_applied\":true"
          << ",\"api_port\":" << api_port << ","
          << "\"api_secret\":\"" << json_escape(api_secret) << "\","
          << "\"outbound\":" << outbound << "}";

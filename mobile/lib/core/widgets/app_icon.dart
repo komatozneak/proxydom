@@ -76,6 +76,9 @@ abstract final class AppIcons {
   static const IconData search = PhosphorIconsRegular.magnifyingGlass;
   static const IconData plus = PhosphorIconsRegular.plus;
   static const IconData trash = PhosphorIconsRegular.trash;
+
+  /// Overflow: secondary actions live here, not as coloured peer buttons.
+  static const IconData more = PhosphorIconsRegular.dotsThree;
   static const IconData tree = PhosphorIconsRegular.tree;
   static const IconData treeFill = PhosphorIconsFill.tree;
   static const IconData house = PhosphorIconsRegular.house;
@@ -84,6 +87,9 @@ abstract final class AppIcons {
   static const IconData clipboard = PhosphorIconsRegular.clipboardText;
   static const IconData qrCode = PhosphorIconsRegular.qrCode;
   static const IconData check = PhosphorIconsRegular.check;
+
+  /// QR screen torch.
+  static const IconData flashlight = PhosphorIconsRegular.flashlight;
   static const IconData checkCircle = PhosphorIconsRegular.checkCircle;
   static const IconData circle = PhosphorIconsRegular.circle;
   static const IconData checkCircleFill = PhosphorIconsFill.checkCircle;

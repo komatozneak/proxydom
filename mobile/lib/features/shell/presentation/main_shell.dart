@@ -14,8 +14,6 @@ import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/interaction.dart';
 import '../../../core/widgets/mossy_rail.dart';
 import '../../../core/widgets/proxydom_ground.dart';
-import '../../../core/widgets/proxydom_nav_icon.dart';
-import '../../../core/widgets/window_caption_bar.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../home/application/vpn_provider.dart';
 
@@ -28,36 +26,21 @@ const double _notebookCell = 28;
 /// Previous bar was 76; one cell lower so the rule sits on the next grid line.
 const double _navBarHeight = 76 - _notebookCell;
 
-/// Side tabs (Сервера / Настройки): 15% smaller, then another 20%.
-const double _sideScale = 0.85 * 0.8;
-
-const double _sideIconSize = 32 * _sideScale;
-const double _sidePadH = 14 * _sideScale;
-const double _sidePadV = 6 * _sideScale;
-const double _sideGap = 2 * _sideScale;
-const double _sideLabelSize = 13 * _sideScale;
+/// Side tabs (Сервера / Настройки). The old 0.68 scale made a 13 sp label
+/// 8.8 sp; 12 sp is the floor, so the scale is gone.
+const double _sideIconSize = 24;
+const double _sidePadH = 10;
+const double _sidePadV = 4;
+const double _sideGap = 2;
+const double _sideLabelSize = 12;
 
 /// Top rule thickness on the nav sheet.
 
-/// DOM mark, larger than the nav band and centered on Сервера / Настройки.
+/// Center tab: a 44 dp contour house with a 12 sp caption inside a 62 dp box.
+/// The mascot lives on Home, as the connect button; the dock is navigation.
 const double _domButtonSize = 62;
-
-/// Selection ring, same width as a chosen side tab. Size of the circle stays put.
+const double _domCircleSize = 44;
 const double _domRingWidth = 1.6;
-
-/// `logo_mark_nav.png` is 1024px. Reach is the distance from the center to
-/// the farthest house pixel (420.4px, 440.13px once the light stroke is on).
-/// The bitmap is only a little larger than the ring: that pixel lands on the
-/// inside of the selection circle, and the circle itself stays 62.
-const double _navMarkPx = 1024;
-const double _houseReachPx = 420.4;
-const double _houseReachLightPx = 440.13;
-
-double _domHouseExtent(bool light) {
-  final reach = light ? _houseReachLightPx : _houseReachPx;
-  final innerRadius = (_domButtonSize - _domRingWidth * 2) / 2;
-  return innerRadius * _navMarkPx / reach;
-}
 
 /// How far the DOM circle rises above the nav band. The top rule moves up with it.
 const double _domAboveBar = (_domButtonSize - _navBarHeight) / 2;
@@ -140,26 +123,11 @@ class _MainShellState extends ConsumerState<MainShell> {
     Widget page = widget.navigationShell;
 
     if (windowsDesktop) {
-      // The window has no system caption, so the app draws its own and the
-      // lockup lives in it. The rail used to carry the name at its top; putting
-      // the same lockup in the caption is what makes the window read as one
-      // object instead of a frame with a sidebar that happens to say a name.
+      // The caption now lives above the router (see _WindowsWindowFrame), so
+      // every route gets the same window buttons and drag band.
       final rail = WindowsNavRail(selected: selected, onSelect: _onTap);
       final shell = widget.navigationShell;
-      page = Column(
-        children: [
-          WindowCaptionBar(
-            // Only "Прокси" / "Proxy": the second half of the name is already
-            // cut into the mark beside it, and spelling it out as well said it
-            // twice in one lockup.
-            label: Localizations.localeOf(context).languageCode == 'ru'
-                ? 'Прокси'
-                : 'Proxy',
-            ink: dark ? AppBrand.inkDark : AppBrand.inkLight,
-          ),
-          Expanded(child: Row(children: [rail, Expanded(child: shell)])),
-        ],
-      );
+      page = Row(children: [rail, Expanded(child: shell)]);
       return _yard(
         context,
         child: LayoutBuilder(
@@ -223,7 +191,12 @@ class _MainShellState extends ConsumerState<MainShell> {
             body: _StatusBarStyle(dark: dark, child: page),
             bottomNavigationBar: MossySlab(
               light: !dark,
-              child: bar,
+              // Navigation is chrome: at 2× the 12 sp labels overlapped the
+              // system bar. 1.3× keeps them legible without clipping.
+              child: MediaQuery.withClampedTextScaling(
+                maxScaleFactor: 1.3,
+                child: bar,
+              ),
             ),
           ),
           Positioned(
@@ -234,7 +207,7 @@ class _MainShellState extends ConsumerState<MainShell> {
             child: Center(
               child: _CenterNavMark(
                 selected: selected == MainShell.homeIndex,
-                semanticLabel: l.navVpn,
+                semanticLabel: l.navHome,
                 onTap: () => _onTap(MainShell.homeIndex),
               ),
             ),
@@ -408,12 +381,12 @@ class _RailItemState extends State<_RailItem> {
         builder: (context, hovered) {
           final fill = widget.selected
               ? (dark
-                    ? AppBrand.mossDeep.withValues(alpha: 0.92)
-                    : AppBrand.mossLight.withValues(alpha: 0.12))
+                  ? AppBrand.mossDeep.withValues(alpha: 0.92)
+                  : AppBrand.mossLight.withValues(alpha: 0.12))
               : hovered
                   ? (dark
-                        ? AppBrand.lightSource.withValues(alpha: 0.045)
-                        : AppBrand.inkLight.withValues(alpha: 0.035))
+                      ? AppBrand.lightSource.withValues(alpha: 0.045)
+                      : AppBrand.inkLight.withValues(alpha: 0.035))
                   : null;
           return AnimatedContainer(
             duration: AppBrand.motionReveal,
@@ -425,8 +398,8 @@ class _RailItemState extends State<_RailItem> {
               border: Border.all(
                 color: widget.selected
                     ? (dark
-                          ? AppBrand.moss.withValues(alpha: 0.35)
-                          : AppBrand.moss.withValues(alpha: 0.28))
+                        ? AppBrand.moss.withValues(alpha: 0.35)
+                        : AppBrand.moss.withValues(alpha: 0.28))
                     : Colors.transparent,
               ),
             ),
@@ -538,8 +511,8 @@ class _SideNavGlyph extends StatelessWidget {
             decoration: BoxDecoration(
               color: selected
                   ? (dark
-                        ? AppBrand.mossDeep.withValues(alpha: 0.92)
-                        : AppBrand.mossLight.withValues(alpha: 0.12))
+                      ? AppBrand.mossDeep.withValues(alpha: 0.92)
+                      : AppBrand.mossLight.withValues(alpha: 0.12))
                   : Colors.transparent,
               borderRadius: BorderRadius.circular(AppBrand.radiusNavPill),
               border: Border.all(
@@ -583,43 +556,60 @@ class _CenterNavMark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final light = theme.brightness == Brightness.light;
-    final house = _domHouseExtent(light);
-    return SizedBox(
-      width: _domButtonSize,
-      height: _domButtonSize,
-      child: Material(
-        type: MaterialType.transparency,
-        shape: const CircleBorder(),
-        clipBehavior: Clip.none,
-        child: InkWell(
-          onTap: onTap,
-          customBorder: const CircleBorder(),
-          child: Semantics(
-            button: true,
-            selected: selected,
-            label: semanticLabel,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: selected
-                    ? Border.all(
-                        color: AppBrand.paperMargin,
+    final l = AppL10n.of(context);
+    final active = AppBrand.mascotGold;
+    final idle = theme.colorScheme.onSurfaceVariant;
+    return MediaQuery.withClampedTextScaling(
+      maxScaleFactor: 1.3,
+      child: SizedBox(
+        width: 84,
+        height: _domButtonSize,
+        child: Semantics(
+          button: true,
+          selected: selected,
+          label: semanticLabel,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Material(
+                type: MaterialType.transparency,
+                shape: const CircleBorder(),
+                child: InkWell(
+                  onTap: onTap,
+                  customBorder: const CircleBorder(),
+                  child: Container(
+                    width: _domCircleSize,
+                    height: _domCircleSize,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: selected
+                            ? active
+                            : theme.colorScheme.outline.withValues(alpha: 0.6),
                         width: _domRingWidth,
-                      )
-                    : null,
-              ),
-              child: ClipOval(
-                child: OverflowBox(
-                  maxWidth: house,
-                  maxHeight: house,
-                  child: ProxyDomNavIcon(
-                    selected: selected,
-                    size: house,
+                      ),
+                    ),
+                    child: AppIcon(
+                      AppIcons.house,
+                      size: 24,
+                      color: selected ? active : idle,
+                    ),
                   ),
                 ),
               ),
-            ),
+              const SizedBox(height: 1),
+              ExcludeSemantics(
+                child: Text(
+                  l.navHome,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    fontSize: 12,
+                    color: selected ? theme.colorScheme.onSurface : idle,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),

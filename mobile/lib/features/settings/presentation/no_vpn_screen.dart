@@ -9,6 +9,7 @@ import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
 import '../../../core/toasts/proxy_dom_toast.dart';
 import '../../../core/widgets/app_icon.dart';
+import '../../../core/widgets/app_switch.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../home/application/vpn_provider.dart';
@@ -36,15 +37,11 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
   bool _loading = true;
   bool _pending = false;
   bool _reconnecting = false;
-  bool _osnovnyeExpanded = true;
   bool _lockdownOn = false;
 
   /// Apps tab is Android-only (ADR 025, ADR 029).
   bool get _sitesOnly => sitesOnlySplit;
 
-  Map<String, bool> _osnovnye = {
-    for (final c in kOsnovnyeCategories) c.id: c.defaultEnabled,
-  };
   List<SplitTunnelSite> _sites = const [];
   List<LauncherAppInfo> _apps = const [];
   Set<String> _disallowed = {};
@@ -70,7 +67,6 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
 
   Future<void> _reload() async {
     await SplitTunnelPrefs.purgePresetSites();
-    final cats = await SplitTunnelPrefs.loadOsnovnyeEnabled();
     final sites = await SplitTunnelPrefs.loadSites();
     final apps = _sitesOnly
         ? const <LauncherAppInfo>[]
@@ -89,7 +85,6 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
     final vpn = ref.read(vpnProvider);
     final sessionLive = vpn is VpnConnected || vpn is VpnConnecting;
     setState(() {
-      _osnovnye = cats;
       _sites = sites.where((s) => !s.isPreset).toList();
       _pending = sessionLive && pendingAfterSeed;
       _disallowed = disallowed;
@@ -104,12 +99,10 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
     final pending = vpn is VpnConnected || vpn is VpnConnecting
         ? await SplitTunnelPrefs.hasPendingChanges()
         : false;
-    final cats = await SplitTunnelPrefs.loadOsnovnyeEnabled();
     final sites = await SplitTunnelPrefs.loadSites();
     final disallowed = await SplitTunnelPrefs.loadDisallowedPackages();
     if (!mounted) return;
     setState(() {
-      _osnovnye = cats;
       _sites = sites.where((s) => !s.isPreset).toList();
       _disallowed = disallowed;
       _pending = pending;
@@ -141,7 +134,6 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
     final lang = Localizations.localeOf(context).languageCode;
     final appsLabel = lang == 'en' ? 'Apps' : 'Приложения';
     final sitesLabel = lang == 'en' ? 'Sites' : 'Сайты';
-    final osnovnyeLabel = lang == 'en' ? 'Main' : 'Основные';
     final appsSection = lang == 'en' ? 'Apps' : 'Приложения';
 
     final sheet = theme.brightness == Brightness.dark
@@ -218,7 +210,13 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
                   ),
                 if (_pending)
                   Material(
-                    color: theme.colorScheme.tertiaryContainer,
+                    // tertiaryContainer is not set in AppTheme, so it falls
+                    // back to `tertiary`: near-black in light, near-white in
+                    // dark. bodySmall keeps onSurface, which is the same ink
+                    // colour — the sentence was invisible in both themes and
+                    // the strip looked like an empty band with a stray button.
+                    // A surface token keeps the text on onSurfaceVariant.
+                    color: theme.colorScheme.surfaceContainerHighest,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
@@ -229,7 +227,9 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
                           Expanded(
                             child: Text(
                               l.splitTunnelPendingBody,
-                              style: theme.textTheme.bodySmall,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
                             ),
                           ),
                           FilledButton(
@@ -247,27 +247,8 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
                 Expanded(
                   child: _sitesOnly
                       ? _SitesTab(
-                          osnovnye: _osnovnye,
-                          osnovnyeExpanded: _osnovnyeExpanded,
-                          osnovnyeLabel: osnovnyeLabel,
                           sites: _filteredSites,
-                          lang: lang,
-                          iconsByPackage: const {},
                           showIosNote: true,
-                          onToggleOsnovnye: (id, v) async {
-                            UiLog.action(
-                              'no_vpn',
-                              'main',
-                              extra: {'id': id, 'on': v},
-                            );
-                            await SplitTunnelPrefs.setOsnovnyeEnabled(id, v);
-                            await _afterMutation();
-                          },
-                          onExpandOsnovnye: () {
-                            setState(
-                              () => _osnovnyeExpanded = !_osnovnyeExpanded,
-                            );
-                          },
                           onToggleSite: (site, enabled) async {
                             UiLog.action(
                               'no_vpn',
@@ -305,34 +286,7 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
                               },
                             ),
                             _SitesTab(
-                              osnovnye: _osnovnye,
-                              osnovnyeExpanded: _osnovnyeExpanded,
-                              osnovnyeLabel: osnovnyeLabel,
                               sites: _filteredSites,
-                              lang: lang,
-                              iconsByPackage: {
-                                for (final a in _apps)
-                                  if (a.iconPng != null &&
-                                      a.iconPng!.isNotEmpty)
-                                    a.packageName: a.iconPng!,
-                              },
-                              onToggleOsnovnye: (id, v) async {
-                                UiLog.action(
-                                  'no_vpn',
-                                  'main',
-                                  extra: {'id': id, 'on': v},
-                                );
-                                await SplitTunnelPrefs.setOsnovnyeEnabled(
-                                  id,
-                                  v,
-                                );
-                                await _afterMutation();
-                              },
-                              onExpandOsnovnye: () {
-                                setState(
-                                  () => _osnovnyeExpanded = !_osnovnyeExpanded,
-                                );
-                              },
                               onToggleSite: (site, enabled) async {
                                 UiLog.action(
                                   'no_vpn',
@@ -366,10 +320,16 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
                   a.packageName.toLowerCase().contains(q),
             )
             .toList();
-    return sortLauncherAppsBypassFirst(
-      apps: filtered,
-      disallowedPackages: _disallowed,
-    );
+    // Apps that bypass the tunnel come first, then the rest; each group stays
+    // alphabetical. The active block is what a person opens this tab to check.
+    final sorted = [...filtered];
+    sorted.sort((a, b) {
+      final aOn = _disallowed.contains(a.packageName);
+      final bOn = _disallowed.contains(b.packageName);
+      if (aOn != bOn) return aOn ? -1 : 1;
+      return a.label.toLowerCase().compareTo(b.label.toLowerCase());
+    });
+    return sorted;
   }
 
   List<SplitTunnelSite> get _filteredSites {
@@ -489,14 +449,13 @@ class _AppsTab extends StatelessWidget {
           )
         else
           for (final app in apps)
-            SwitchListTile.adaptive(
-              contentPadding: EdgeInsets.zero,
-              secondary: _AppIconAvatar(
+            _AllowRow(
+              leading: _AppIconAvatar(
                 iconPng: app.iconPng,
                 fallbackLetter:
                     app.label.isNotEmpty ? app.label[0].toUpperCase() : '?',
               ),
-              title: Text(app.label),
+              title: app.label,
               value: disallowed.contains(app.packageName),
               onChanged: (v) => onToggle(app.packageName, v),
             ),
@@ -505,18 +464,67 @@ class _AppsTab extends StatelessWidget {
   }
 }
 
+/// One allowlist row, with the house switch. Material's adaptive switch drew a
+/// grey pill here while the same setting on Settings was gold.
+class _AllowRow extends StatelessWidget {
+  const _AllowRow({
+    this.leading,
+    required this.title,
+    this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final Widget? leading;
+  final String title;
+  final String? subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: () => onChanged(!value),
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            if (leading != null) ...[
+              leading!,
+              const SizedBox(width: 16),
+            ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(title, style: theme.textTheme.titleMedium),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 1),
+                    Text(subtitle!, style: theme.textTheme.bodySmall),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            AppSwitch(value: value, onChanged: onChanged),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _AppIconAvatar extends StatelessWidget {
   const _AppIconAvatar({
     this.iconPng,
-    this.iconData,
     required this.fallbackLetter,
-    this.badgeFallback,
   });
 
   final Uint8List? iconPng;
-  final IconData? iconData;
   final String fallbackLetter;
-  final String? badgeFallback;
 
   @override
   Widget build(BuildContext context) {
@@ -538,21 +546,12 @@ class _AppIconAvatar extends StatelessWidget {
   }
 
   Widget _glyphOrLetter(ThemeData theme) {
-    final glyph = iconData;
-    if (glyph != null) {
-      return CircleAvatar(
-        backgroundColor: theme.colorScheme.surfaceContainerHighest,
-        child: AppIcon(glyph, size: 22),
-      );
-    }
-    final text = badgeFallback ?? fallbackLetter;
     return CircleAvatar(
       backgroundColor: theme.colorScheme.surfaceContainerHighest,
       child: Text(
-        text,
+        fallbackLetter,
         style: theme.textTheme.labelSmall?.copyWith(
           fontWeight: FontWeight.w800,
-          fontSize: badgeFallback != null ? 10 : null,
         ),
       ),
     );
@@ -561,28 +560,14 @@ class _AppIconAvatar extends StatelessWidget {
 
 class _SitesTab extends StatelessWidget {
   const _SitesTab({
-    required this.osnovnye,
-    required this.osnovnyeExpanded,
-    required this.osnovnyeLabel,
     required this.sites,
-    required this.lang,
-    required this.iconsByPackage,
-    required this.onToggleOsnovnye,
-    required this.onExpandOsnovnye,
     required this.onToggleSite,
     required this.onDeleteSite,
     required this.onAddSite,
     this.showIosNote = false,
   });
 
-  final Map<String, bool> osnovnye;
-  final bool osnovnyeExpanded;
-  final String osnovnyeLabel;
   final List<SplitTunnelSite> sites;
-  final String lang;
-  final Map<String, Uint8List> iconsByPackage;
-  final Future<void> Function(String id, bool value) onToggleOsnovnye;
-  final VoidCallback onExpandOsnovnye;
   final Future<void> Function(SplitTunnelSite site, bool enabled) onToggleSite;
   final Future<void> Function(SplitTunnelSite site) onDeleteSite;
   final VoidCallback onAddSite;
@@ -592,20 +577,19 @@ class _SitesTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l = AppL10n.of(context);
-    final enabledCount = kOsnovnyeCategories
-        .where((c) => osnovnye[c.id] ?? c.defaultEnabled)
-        .length;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
-        if (showIosNote) ...[
-          Text(
-            l.splitTunnelSitesLead,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
+        // The preset services are no longer rows: they are already excluded
+        // from the tunnel by default. This tab is only the person's own list.
+        Text(
+          l.splitTunnelSitesLead,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
           ),
+        ),
+        if (showIosNote) ...[
           const SizedBox(height: 8),
           Text(
             l.splitTunnelSitesIosNote,
@@ -613,42 +597,6 @@ class _SitesTab extends StatelessWidget {
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
-          const SizedBox(height: 16),
-        ],
-        InkWell(
-          onTap: onExpandOsnovnye,
-          child: Row(
-            children: [
-              Text('• $osnovnyeLabel', style: theme.textTheme.titleSmall),
-              const Spacer(),
-              Text(
-                '$enabledCount / ${kOsnovnyeCategories.length}',
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              Icon(
-                osnovnyeExpanded ? Icons.expand_less : Icons.expand_more,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ],
-          ),
-        ),
-        if (osnovnyeExpanded) ...[
-          const SizedBox(height: 4),
-          for (final cat in kOsnovnyeCategories)
-            SwitchListTile.adaptive(
-              contentPadding: EdgeInsets.zero,
-              secondary: _AppIconAvatar(
-                iconPng: iconForOsnovnyeCategory(cat.id, iconsByPackage),
-                iconData: osnovnyeCategoryIcon(cat.id),
-                fallbackLetter: cat.badge.isNotEmpty ? cat.badge[0] : '?',
-                badgeFallback: cat.badge,
-              ),
-              title: Text(cat.label(lang)),
-              value: osnovnye[cat.id] ?? cat.defaultEnabled,
-              onChanged: (v) => onToggleOsnovnye(cat.id, v),
-            ),
         ],
         const SizedBox(height: 16),
         Row(
@@ -689,12 +637,9 @@ class _SitesTab extends StatelessWidget {
                 color: theme.colorScheme.errorContainer,
                 child: Text(l.splitTunnelDelete),
               ),
-              child: SwitchListTile.adaptive(
-                contentPadding: EdgeInsets.zero,
-                title: Text(
-                  site.label.isNotEmpty ? site.label : site.domain,
-                ),
-                subtitle: site.label.isNotEmpty ? Text(site.domain) : null,
+              child: _AllowRow(
+                title: site.label.isNotEmpty ? site.label : site.domain,
+                subtitle: site.label.isNotEmpty ? site.domain : null,
                 value: site.enabled,
                 onChanged: (v) => onToggleSite(site, v),
               ),

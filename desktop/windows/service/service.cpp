@@ -158,11 +158,27 @@ struct App {
     worker = std::thread([this] { loop(); });
   }
 
+  // join waits for the tunnel teardown, but never forever. The installer stops
+  // this service with Wait=yes and then replaces files; a teardown that blocks
+  // on a dead engine must not leave the whole MSI transaction stuck. After the
+  // timeout the worker is detached and the process exits, which stops the SCM
+  // waiting on us. The next start reconciles leftover routes and the engine.
   void join() {
     stop.store(true);
     cancel.request();
     queue_cv.notify_all();
-    if (worker.joinable()) worker.join();
+    if (!worker.joinable()) return;
+    const HANDLE handle = static_cast<HANDLE>(worker.native_handle());
+    if (WaitForSingleObject(handle, 15000) == WAIT_OBJECT_0) {
+      worker.join();
+      return;
+    }
+    log.write(0, "stop_timeout", "", 0);
+    // Do not detach and return: the App members are about to be destroyed while
+    // the worker may still touch them. Exiting the process is the only safe
+    // bounded stop; the engine lives in a kill-on-close job and dies with us,
+    // and the next start reconciles any route or adapter left behind.
+    TerminateProcess(GetCurrentProcess(), 0);
   }
 
   std::mutex out_mu;
@@ -377,6 +393,7 @@ struct App {
     request.uri = command.uri;
     request.direct_domains = command.direct_domains;
     request.force_proxy_domains = command.force_proxy_domains;
+    request.udp_mode = command.udp_mode.empty() ? "proxy_all" : command.udp_mode;
     request.udp_direct = command.udp_direct;
     if (command.direct_domains_truncated) {
       // A dropped exclusion row routes its site through the proxy and looks

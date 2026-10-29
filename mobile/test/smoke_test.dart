@@ -59,11 +59,12 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 2));
 
-    // The terminal head sets its fields in caps.
-    expect(find.text('НЕ ПОДКЛЮЧЕНО'), findsOneWidget);
+    // The chip names the state; the hero line names the action.
+    expect(find.text('Не подключено'), findsOneWidget);
     expect(find.byType(ServerCard), findsNothing);
     expect(find.text('Что работает без VPN?'), findsNothing);
-    expect(find.text('1 / 1'), findsNothing);
+    // The allowlist row is always present on Android, not only while connected.
+    expect(find.text('1 / 1'), findsOneWidget);
     expect(
       await SplitTunnelPrefs.loadDisallowedPackages(),
       contains('ru.oneme.app'),
@@ -119,6 +120,7 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
 
     expect(find.text('Что работает без VPN?'), findsNothing);
+    // iOS has no per-app VpnService split: the row stays hidden.
     expect(find.text('1 / 1'), findsNothing);
     expect(find.text('0 / 0'), findsNothing);
 
@@ -362,3 +364,7 @@ void main() {
   });
 
 }
+
+
+
+

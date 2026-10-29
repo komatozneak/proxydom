@@ -16,11 +16,15 @@
     <MajorUpgrade Schedule="afterInstallExecute" DowngradeErrorMessage="Уже установлена более новая версия." />
     <!-- Flutter keeps FileVersion 1.0.0+N. Equal versions would leave the old window in place. -->
     <Property Id="REINSTALLMODE" Value="amus" />
+    <!-- Windows Installer otherwise picks the first drive with free space. On
+         this machine that was a stale Z: mapping; costing it hangs forever.
+         ROOTDRIVE must be a local volume, not a disconnected network drive. -->
+    <Property Id="ROOTDRIVE" Value="C:\" />
+    <!-- Windows Installer writes a verbose log to %TEMP%\MSI*.log by itself.
+         Without this a hung sequence leaves no action name to read, which is
+         exactly how the 1.5.8 install hang had to be diagnosed from event logs. -->
+    <Property Id="MsiLogging" Value="voicewarmupx" />
     <MediaTemplate EmbedCab="yes" />
-    <Icon Id="AppIcon" SourceFile="$(var.PayloadDir)\proxy_dom.exe" />
-    <Property Id="ARPPRODUCTICON" Value="AppIcon" />
-    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Запустить Прокси Дом" />
-    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
     <WixVariable Id="WixUILicenseRtf" Value="$(var.InstallerDir)\license.rtf" />
 
     <Feature Id="Main" Title="Прокси Дом" Level="1">
@@ -91,13 +95,16 @@
     </Component>
 
     <Component Id="DesktopShortcutComponent" Directory="DesktopFolder" Guid="C9A5E3F4-6D70-412C-9E43-8F0A7D2C33B6">
+      <!-- No Icon attribute: the shell takes the icon from the target exe.
+           MSI's Icon table copied the whole exe into the installer cache and
+           failed with 2318/1909 during repair. The Start Menu shortcut already
+           worked this way. -->
       <Shortcut
           Id="DesktopShortcut"
           Name="Прокси Дом"
           Description="Прокси Дом"
           Target="[INSTALLFOLDER]proxy_dom.exe"
-          WorkingDirectory="INSTALLFOLDER"
-          Icon="AppIcon" />
+          WorkingDirectory="INSTALLFOLDER" />
       <RegistryValue
           Root="HKLM"
           Key="Software\Proxy Dom"
@@ -118,36 +125,9 @@
         TerminateProcess="1" />
 
     <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
-    <UI>
-      <Publish
-          Dialog="ExitDialog"
-          Control="Finish"
-          Event="DoAction"
-          Value="LaunchApplication"
-          Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 and NOT Installed" />
-    </UI>
-    <CustomAction
-        Id="LaunchApplication"
-        Directory="INSTALLFOLDER"
-        ExeCommand="&quot;[INSTALLFOLDER]proxy_dom.exe&quot;"
-        Execute="immediate"
-        Impersonate="yes"
-        Return="asyncNoWait" />
-    <CustomAction
-        Id="StopBrokerBeforeValidate"
-        Directory="System64Folder"
-        ExeCommand="&quot;[System64Folder]sc.exe&quot; stop ProxyDomBroker"
-        Execute="immediate"
-        Return="ignore" />
-    <!-- A missing exe or a non-zero reconcile must not roll back install or uninstall.
-         The file is the new package copy: schedule this after InstallFiles. -->
-    <CustomAction
-        Id="ReconcileProxyDomTunnel"
-        FileRef="ServiceExe"
-        ExeCommand="--reconcile"
-        Execute="deferred"
-        Impersonate="no"
-        Return="ignore" />
+    <!-- StopServices (from ServiceControl) stops the broker synchronously before
+         files are replaced. A pre-validate `sc stop` was removed: asyncNoWait
+         let it land after StartServices and left the repaired service stopped. -->
     <!-- Old product uninstall stops the service that StartServices just started.
          Start again after that removal. Already-running is not a failed install. -->
     <CustomAction
@@ -158,14 +138,6 @@
         Impersonate="no"
         Return="ignore" />
     <InstallExecuteSequence>
-      <Custom
-          Action="StopBrokerBeforeValidate"
-          Before="InstallValidate"
-          Condition="Installed AND (REMOVE=&quot;ALL&quot; OR UPGRADINGPRODUCTCODE OR WIX_UPGRADE_DETECTED)" />
-      <Custom
-          Action="ReconcileProxyDomTunnel"
-          After="InstallFiles"
-          Condition="REMOVE=&quot;ALL&quot; OR UPGRADINGPRODUCTCODE" />
       <Custom
           Action="StartBrokerAfterUpgrade"
           After="RemoveExistingProducts"

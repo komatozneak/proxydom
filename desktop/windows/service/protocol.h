@@ -69,8 +69,11 @@ struct ClientCommand {
   // Hosts that must stay on the proxy even when UDP bypass is on. Without them
   // the UDP rule would drag a force-proxied site out through the tunnel.
   std::vector<std::string> force_proxy_domains;
-  // Route UDP to the physical NIC. Game traffic is UDP to bare IPs, which no
-  // domain rule can match, and the addresses change.
+  // UDP policy. "proxy_all" (default) keeps datagrams on the tunnel;
+  // "direct_non_forced" is the explicit game mode. The legacy udp_direct flag
+  // is still parsed so an old window is not rejected, but it is not a policy:
+  // it was hardcoded true and silently leaked every datagram.
+  std::string udp_mode;
   bool udp_direct = false;
 };
 
@@ -84,17 +87,14 @@ bool own_adapter_name(const std::wstring& name);
 bool domain_allowed(const std::string& host);
 
 // [server_ip] is the IPv4 pinned before the adapter comes up. Empty rejects.
-// Domain lists, [udp_direct], and the clash api port are recorded in the
-// document, and routing_applied/dns_hijack are written as what the engine will
-// do. Only the hysteria2 body carries the split lists and only the hy2 dialer
-// hijacks DNS, so a vless line is written with both flags false and without the
-// lists: the share document cannot honour them, and a true flag there made the
-// engine's status line claim routing that never happened.
+// Domain lists and [udp_mode] are recorded in the document. Both engines now
+// run the same TUN-level classifier, so a vless body carries the lists too;
+// only the hysteria2 dialer hijacks DNS, so dns_hijack stays false for vless.
 std::string build_engine_config(const ShareLine& line,
                                 const std::string& server_ip,
                                 const std::vector<std::string>& domains,
                                 const std::vector<std::string>& force_proxy_domains,
-                                bool udp_direct,
+                                const std::string& udp_mode,
                                 unsigned short api_port,
                                 const std::string& api_secret);
 

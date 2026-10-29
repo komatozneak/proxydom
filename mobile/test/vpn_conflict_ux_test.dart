@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -141,7 +141,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     // The terminal head sets its fields in caps.
-    expect(find.text('МЕШАЕТ ДРУГОЙ VPN'), findsOneWidget);
+    expect(find.text('Мешает другой VPN'), findsOneWidget);
     expect(
       find.textContaining('Огонь'),
       findsWidgets,
@@ -180,7 +180,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     // The terminal head sets its fields in caps.
-    expect(find.text('МЕШАЕТ ДРУГОЙ VPN'), findsOneWidget);
+    expect(find.text('Мешает другой VPN'), findsOneWidget);
     expect(
       find.text(
           'Отключите другой VPN в настройках Android, затем подключитесь снова.'),
@@ -218,9 +218,9 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.text('МЕШАЕТ ДРУГОЙ VPN'), findsNothing);
+    expect(find.text('Мешает другой VPN'), findsNothing);
     expect(find.text('Открыть настройки VPN'), findsNothing);
-    expect(find.text('ОШИБКА ПОДКЛЮЧЕНИЯ'), findsOneWidget);
+    expect(find.text('Ошибка подключения'), findsOneWidget);
     expect(
       find.text('Не удалось подключиться. Попробуйте снова.'),
       findsOneWidget,
@@ -260,7 +260,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.text('ОШИБКА ПОДКЛЮЧЕНИЯ'), findsOneWidget);
+    expect(find.text('Ошибка подключения'), findsOneWidget);
     expect(find.textContaining('Разрешите VPN'), findsOneWidget);
     expect(find.text('Открыть настройки VPN'), findsNothing);
   });
@@ -293,7 +293,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.text('ОШИБКА ПОДКЛЮЧЕНИЯ'), findsOneWidget);
+    expect(find.text('Ошибка подключения'), findsOneWidget);
     expect(
       find.text(
         'Не вышло проверить сервер. Нажмите ещё раз или выберите локацию вручную.',
@@ -333,4 +333,5 @@ void main() {
     expect(notifier.disconnectCalls, 1);
   });
 }
+
 

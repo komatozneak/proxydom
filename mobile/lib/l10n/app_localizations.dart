@@ -166,19 +166,19 @@ abstract class AppL10n {
   /// No description provided for @homeTapHint.
   ///
   /// In en, this message translates to:
-  /// **'Tap the house to connect'**
+  /// **'Tap to connect'**
   String get homeTapHint;
 
   /// No description provided for @homeConnectingHint.
   ///
   /// In en, this message translates to:
-  /// **'Hold on — the house is opening the door…'**
+  /// **'Connecting…'**
   String get homeConnectingHint;
 
   /// No description provided for @homeConnectedHint.
   ///
   /// In en, this message translates to:
-  /// **'The house is online'**
+  /// **'Connected'**
   String get homeConnectedHint;
 
   /// No description provided for @homeProtected.
@@ -252,6 +252,42 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Traffic used up'**
   String get homeTrafficExhausted;
+
+  /// No description provided for @homeTrafficLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'TRAFFIC'**
+  String get homeTrafficLabel;
+
+  /// No description provided for @homeAddServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Add server'**
+  String get homeAddServer;
+
+  /// No description provided for @homeMetricTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Time'**
+  String get homeMetricTime;
+
+  /// No description provided for @homeMetricSpeed.
+  ///
+  /// In en, this message translates to:
+  /// **'Speed'**
+  String get homeMetricSpeed;
+
+  /// No description provided for @homeMetricTraffic.
+  ///
+  /// In en, this message translates to:
+  /// **'Traffic'**
+  String get homeMetricTraffic;
+
+  /// No description provided for @homeTrafficUnlimited.
+  ///
+  /// In en, this message translates to:
+  /// **'UNLIMITED'**
+  String get homeTrafficUnlimited;
 
   /// No description provided for @homeTrafficAmount.
   ///
@@ -478,7 +514,7 @@ abstract class AppL10n {
   /// No description provided for @homeLinkOnline.
   ///
   /// In en, this message translates to:
-  /// **'Home online'**
+  /// **'Connected'**
   String get homeLinkOnline;
 
   /// No description provided for @homeLinkOffline.
@@ -1267,6 +1303,42 @@ abstract class AppL10n {
   /// **'Licenses of the engine and the libraries it links'**
   String get settingsLicensesHint;
 
+  /// No description provided for @licensesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Licenses'**
+  String get licensesTitle;
+
+  /// No description provided for @licensesSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search packages'**
+  String get licensesSearch;
+
+  /// No description provided for @licensesEngine.
+  ///
+  /// In en, this message translates to:
+  /// **'Engine'**
+  String get licensesEngine;
+
+  /// No description provided for @licensesPackages.
+  ///
+  /// In en, this message translates to:
+  /// **'Packages'**
+  String get licensesPackages;
+
+  /// No description provided for @licensesFonts.
+  ///
+  /// In en, this message translates to:
+  /// **'Fonts'**
+  String get licensesFonts;
+
+  /// No description provided for @licensesNoResults.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing found'**
+  String get licensesNoResults;
+
   /// No description provided for @settingsThemeSystem.
   ///
   /// In en, this message translates to:
@@ -1501,6 +1573,12 @@ abstract class AppL10n {
   /// **'Shade notification'**
   String get settingsVpnNotificationTitle;
 
+  /// No description provided for @settingsVpnNotificationShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Shade card with Disconnect'**
+  String get settingsVpnNotificationShort;
+
   /// No description provided for @settingsVpnNotificationHint.
   ///
   /// In en, this message translates to:
@@ -1546,7 +1624,7 @@ abstract class AppL10n {
   /// No description provided for @settingsQsTileAddedHint.
   ///
   /// In en, this message translates to:
-  /// **'The tile is in Quick Settings. Tap to remove it'**
+  /// **'Tap to remove'**
   String get settingsQsTileAddedHint;
 
   /// No description provided for @settingsQsTileRemove.
@@ -2503,10 +2581,40 @@ abstract class AppL10n {
   /// **'How the tunnel starts'**
   String get vpnDisclosureTitle;
 
+  /// No description provided for @vpnDisclosureBullet1.
+  ///
+  /// In en, this message translates to:
+  /// **'The tunnel starts only on your command and only on this device.'**
+  String get vpnDisclosureBullet1;
+
+  /// No description provided for @vpnDisclosureBullet2.
+  ///
+  /// In en, this message translates to:
+  /// **'Keys and node addresses are never sent to a server.'**
+  String get vpnDisclosureBullet2;
+
+  /// No description provided for @vpnDisclosureBullet3.
+  ///
+  /// In en, this message translates to:
+  /// **'No account, no payments, no ads.'**
+  String get vpnDisclosureBullet3;
+
+  /// No description provided for @vpnDisclosureMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Details'**
+  String get vpnDisclosureMore;
+
+  /// No description provided for @vpnDisclosureClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get vpnDisclosureClose;
+
   /// No description provided for @vpnDisclosureLead.
   ///
   /// In en, this message translates to:
-  /// **'The house starts a tunnel from the line you chose. This screen explains that before Android asks for VPN permission.'**
+  /// **'The app starts a tunnel for the selected line. Android will ask for VPN permission once.'**
   String get vpnDisclosureLead;
 
   /// No description provided for @vpnDisclosureVpnTitle.
@@ -2518,7 +2626,7 @@ abstract class AppL10n {
   /// No description provided for @vpnDisclosureVpnBody.
   ///
   /// In en, this message translates to:
-  /// **'After you accept, the house opens a local tunnel for the selected line. Device traffic goes to the server in that line. Android then shows its own VPN permission once.'**
+  /// **'After you agree, the app brings up a local tunnel for the selected line. Traffic goes to the server in that line. Android asks for VPN permission once.'**
   String get vpnDisclosureVpnBody;
 
   /// No description provided for @vpnDisclosureVpnTitleIos.
@@ -2530,7 +2638,7 @@ abstract class AppL10n {
   /// No description provided for @vpnDisclosureVpnBodyIos.
   ///
   /// In en, this message translates to:
-  /// **'After you accept, the house opens a local tunnel for the selected line. Device traffic goes to the server in that line. iPhone then shows its own VPN permission once.'**
+  /// **'After you agree, the app brings up a local tunnel for the selected line. Traffic goes to the server in that line. iPhone asks for VPN permission once.'**
   String get vpnDisclosureVpnBodyIos;
 
   /// No description provided for @vpnDisclosureDataTitle.
@@ -2770,8 +2878,26 @@ abstract class AppL10n {
   /// No description provided for @freeOnboardConnectBody.
   ///
   /// In en, this message translates to:
-  /// **'Tap the house to connect or disconnect. The status stays on this screen.'**
+  /// **'Tap the connect button in the centre of the screen. It turns the tunnel on and off. The status stays on this screen.'**
   String get freeOnboardConnectBody;
+
+  /// No description provided for @pcOnboardHeadline.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect on this PC'**
+  String get pcOnboardHeadline;
+
+  /// No description provided for @pcOnboardBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste an access key or a document link. The app will show the servers it contains.'**
+  String get pcOnboardBody;
+
+  /// No description provided for @pcOnboardPrivacy.
+  ///
+  /// In en, this message translates to:
+  /// **'Keys and server addresses stay on this computer.'**
+  String get pcOnboardPrivacy;
 
   /// No description provided for @freeLater.
   ///
@@ -2851,6 +2977,24 @@ abstract class AppL10n {
   /// **'Search servers'**
   String get freeSearch;
 
+  /// No description provided for @freeSearchEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No servers found'**
+  String get freeSearchEmpty;
+
+  /// No description provided for @qrHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Point the camera at the QR code'**
+  String get qrHint;
+
+  /// No description provided for @qrTorch.
+  ///
+  /// In en, this message translates to:
+  /// **'Torch'**
+  String get qrTorch;
+
   /// No description provided for @locationsNodes.
   ///
   /// In en, this message translates to:
@@ -2866,7 +3010,7 @@ abstract class AppL10n {
   /// No description provided for @locationsActive.
   ///
   /// In en, this message translates to:
-  /// **'active'**
+  /// **'Active'**
   String get locationsActive;
 
   /// No description provided for @locationsNotUsed.
@@ -2956,14 +3100,20 @@ abstract class AppL10n {
   /// No description provided for @freeStepLink.
   ///
   /// In en, this message translates to:
-  /// **'LINK'**
+  /// **'Link'**
   String get freeStepLink;
 
   /// No description provided for @freeStepFound.
   ///
   /// In en, this message translates to:
-  /// **'FOUND'**
+  /// **'Found'**
   String get freeStepFound;
+
+  /// No description provided for @freeFoundEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Servers from the link will appear here.'**
+  String get freeFoundEmpty;
 
   /// No description provided for @freeFieldEmpty.
   ///

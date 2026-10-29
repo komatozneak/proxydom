@@ -138,13 +138,12 @@ func TestVLESSBuildsKCPSeed(t *testing.T) {
 	}
 }
 
-// The status line is the journal's record of what the engine did. The broker
-// used to write routing_applied and dns_hijack as true for every scheme, and
-// the tun always carries a dns address, so a vless session was journalled as
-// routed and dns-hijacked while its document held neither the split lists nor a
-// hijack. This document is deliberately the old broker's shape: the engine is
-// the last place that can refuse to repeat a claim the line cannot honour.
-func TestVLESSStatusDoesNotClaimRouting(t *testing.T) {
+// The status line is the journal's record of what the engine did. Both engines
+// now run the same TUN-level classifier, so a VLESS session with lists really
+// applies them; only DNS hijacking stays a hysteria2 feature. This document is
+// deliberately the old broker's shape (udp_direct instead of udp_mode): the
+// engine must ignore the legacy flag and report the policy it actually used.
+func TestVLESSStatusReportsRoutingWithoutDNSHijack(t *testing.T) {
 	cfg, err := parseEngineConfig([]byte(`{
 		"socks_listen":"127.0.0.1:18099",
 		"tun":{"name":"ProxyDomTun","address":"198.18.0.1/30","dns":"198.18.0.2","mtu":1280,"auto_route":false},
@@ -162,11 +161,14 @@ func TestVLESSStatusDoesNotClaimRouting(t *testing.T) {
 	if !strings.Contains(line, "scheme=vless") {
 		t.Fatalf("status line does not name the scheme: %s", line)
 	}
-	if strings.Contains(line, "routing_applied=true") {
-		t.Fatalf("vless was journalled as routed: %s", line)
+	if !strings.Contains(line, "routing_applied=true") {
+		t.Fatalf("vless with lists no longer reports the routing it applies: %s", line)
 	}
 	if strings.Contains(line, "dns_hijack=true") {
 		t.Fatalf("vless was journalled as dns-hijacked: %s", line)
+	}
+	if !strings.Contains(line, "udp_mode=proxy_all") || strings.Contains(line, "udp_direct=true") {
+		t.Fatalf("the legacy udp_direct flag leaked into the policy: %s", line)
 	}
 	// The same document for hysteria2 does apply them, and must keep saying so.
 	hy2, err := parseEngineConfig([]byte(`{

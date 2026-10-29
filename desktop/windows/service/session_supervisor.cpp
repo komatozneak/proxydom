@@ -991,7 +991,7 @@ TunnelSnapshot TunnelSupervisor::run_connect(const ConnectRequest& request, Canc
   }
   const std::string config =
       build_engine_config(line, server_ip, request.direct_domains, request.force_proxy_domains,
-                           request.udp_direct, flows_ ? api_port : 0, api_secret);
+                           request.udp_mode, flows_ ? api_port : 0, api_secret);
   if (config.empty() || !files_.write_config(config)) {
     const unsigned long win32 = config.empty() ? 13u : files_.last_error();
     log_.write(ledger_.generation, "core_config_failed", "", win32);

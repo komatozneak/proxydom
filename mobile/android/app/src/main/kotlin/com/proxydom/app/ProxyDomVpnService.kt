@@ -40,6 +40,20 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
+ * Whether a VPN transport must be treated as another app's VPN.
+ *
+ * Split out from [ProxyDomVpnService.isForeignSystemVpnUp] so the ownership
+ * rule is unit-testable without a ConnectivityManager. A negative [ownerUid]
+ * means "owner unknown" (pre-Q), which stays foreign: the app never owned a
+ * VPN network it cannot name.
+ */
+internal fun isForeignVpnTransport(
+    isVpn: Boolean,
+    ownerUid: Int,
+    myUid: Int,
+): Boolean = isVpn && ownerUid != myUid
+
+/**
  * Android VpnService, Hysteria2-only (ADR 018):
  * VpnService TUN → hy2bind startTun + SOCKS prove on :10808.
  *
@@ -190,7 +204,7 @@ class ProxyDomVpnService : VpnService() {
             val foreignLockdown = lockdown == true && !oursAlwaysOn && !occupying
             // Live VPN from another app (no Always-on required). Skip while we
             // are establishing / already own the TUN / restoring an active session.
-            val foreignVpn = isSystemVpnUp(context) && !occupying
+            val foreignVpn = isForeignSystemVpnUp(context) && !occupying
             val foreign = foreignAlwaysOnPkg || foreignLockdown || foreignVpn
             val label = if (foreign && alwaysOnPkg != null && alwaysOnPkg != context.packageName) {
                 resolveAppLabel(context, alwaysOnPkg)
@@ -283,6 +297,35 @@ class ProxyDomVpnService : VpnService() {
             return cm.allNetworks.any { network ->
                 val caps = cm.getNetworkCapabilities(network)
                 caps?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
+            }
+        }
+
+        /**
+         * A VPN transport that belongs to some app other than this one.
+         *
+         * [isSystemVpnUp] has to keep counting our own network — [resolveUiStatus]
+         * restores a session whose service instance is gone. Conflict detection
+         * asks the opposite question. `stop()` closes the TUN, but
+         * ConnectivityService can keep our VPN network in `allNetworks` for a
+         * few milliseconds while `isOurSessionOccupying()` is already false.
+         * Counting that as foreign made a legitimate «Переподключить» on the
+         * white-list screen paint «Мешает другой VPN» and refuse to dial
+         * (Pixel 7 Pro, Android 17). `ownerUid` (API 29+) names the VPN app, so
+         * ours is skipped; below Q the owner is unknowable and an active VPN
+         * transport still counts as foreign.
+         */
+        fun isForeignSystemVpnUp(context: android.content.Context): Boolean {
+            val cm = context.getSystemService(ConnectivityManager::class.java) ?: return false
+            val myUid = android.os.Process.myUid()
+            return cm.allNetworks.any { network ->
+                val caps = cm.getNetworkCapabilities(network) ?: return@any false
+                if (!caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) return@any false
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return@any true
+                isForeignVpnTransport(
+                    isVpn = true,
+                    ownerUid = caps.ownerUid,
+                    myUid = myUid,
+                )
             }
         }
 

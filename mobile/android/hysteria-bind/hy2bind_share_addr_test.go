@@ -38,12 +38,17 @@ func shareDocWithSocks(port int) string {
 // way forbidden by its access permissions`.
 func freePort(t *testing.T) int {
 	t.Helper()
-	for attempt := 0; attempt < 20; attempt++ {
-		listener, err := net.Listen("tcp", "127.0.0.1:0")
+	// Ask for :0 at your peril. Windows hands out ephemeral ports from a range
+	// that WinNAT and Hyper-V have partly excluded, and when the allocator lands
+	// in a blocked block every retry fails the same way: this machine produced
+	// "no port was free on both tcp and udp after 20 attempts" in roughly half
+	// the runs, while 24000–31999 answered every time. The band is below the
+	// dynamic range, so it is not subject to that allocator at all.
+	for port := 24000; port < 32000; port++ {
+		listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
 		if err != nil {
-			t.Fatal(err)
+			continue
 		}
-		port := listener.Addr().(*net.TCPAddr).Port
 		_ = listener.Close()
 
 		udp, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: port})
@@ -53,7 +58,7 @@ func freePort(t *testing.T) int {
 		_ = udp.Close()
 		return port
 	}
-	t.Fatal("no port was free on both tcp and udp after 20 attempts")
+	t.Fatal("no port was free on both tcp and udp in 24000-31999")
 	return 0
 }
 
