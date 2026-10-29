@@ -20,6 +20,13 @@ bool _trafficIsStale(DateTime? at, int? intervalHours) {
   return !age.isNegative && age.inHours > limitHours;
 }
 
+String _dateText(DateTime date, {required bool russian}) {
+  final local = date.toLocal();
+  final day = local.day.toString().padLeft(2, '0');
+  final month = local.month.toString().padLeft(2, '0');
+  return russian ? '$day.$month.${local.year}' : '${local.year}-$month-$day';
+}
+
 /// A bought profile, drawn as an instrument.
 ///
 /// One plate, two sections: the hoster's profile band, then its node pool.
@@ -39,6 +46,7 @@ class ProfileInstrument extends StatelessWidget {
     this.planName,
     this.trafficUpdatedAt,
     this.updateIntervalHours,
+    this.expiresAt,
     this.updated,
     required this.selected,
     required this.nodes,
@@ -73,6 +81,7 @@ class ProfileInstrument extends StatelessWidget {
   final String? planName;
   final DateTime? trafficUpdatedAt;
   final int? updateIntervalHours;
+  final DateTime? expiresAt;
 
   /// «обновлено 04.10», already formatted. Drawn on the pass stub.
   final String? updated;
@@ -153,6 +162,26 @@ class ProfileInstrument extends StatelessWidget {
         : remainingRatio != null && remainingRatio <= 0.2
             ? AppBrand.flame
             : gold;
+    final usedLabel = usedRatio == null
+        ? null
+        : formatTrafficAmount(
+            usedBytes,
+            russian: russian,
+            decimal: manifest != null,
+          );
+    final totalLabel = usedRatio == null
+        ? null
+        : formatTrafficAmount(
+            totalBytes!,
+            russian: russian,
+            decimal: manifest != null,
+          );
+    final expiresOn =
+        expiresAt == null ? null : _dateText(expiresAt!, russian: russian);
+    final expiresText =
+        expiresOn == null ? null : '${l.profileTrafficExpires}: $expiresOn';
+    final expired =
+        expiresAt != null && expiresAt!.isBefore(DateTime.now().toUtc());
     final stale = _trafficIsStale(trafficUpdatedAt, updateIntervalHours);
     final meta = updated == null
         ? (stale ? l.profileTrafficStale : null)
@@ -254,7 +283,7 @@ class ProfileInstrument extends StatelessWidget {
                           child: TweenAnimationBuilder<double>(
                             tween: Tween<double>(
                               begin: 0,
-                              end: remainingRatio,
+                              end: usedRatio,
                             ),
                             duration: const Duration(milliseconds: 450),
                             curve: Curves.easeOutCubic,
@@ -277,7 +306,7 @@ class ProfileInstrument extends StatelessWidget {
                                         ),
                                       ),
                                       Positioned(
-                                        left: constraints.maxWidth * 0.2,
+                                        left: constraints.maxWidth * 0.8,
                                         top: 0,
                                         bottom: 0,
                                         width: 1,
@@ -294,6 +323,47 @@ class ProfileInstrument extends StatelessWidget {
                           ),
                         ),
                       ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '$usedLabel / $totalLabel',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: terminalText(
+                              context,
+                              size: 10.5,
+                              color: mute,
+                              weight: 600,
+                              spacing: 0.2,
+                            ),
+                          ),
+                        ),
+                        if (expiresText != null) ...[
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              expiresText,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.right,
+                              style: terminalText(
+                                context,
+                                size: 10.5,
+                                color: expired
+                                    ? (dark
+                                        ? AppBrand.inkDangerDark
+                                        : AppBrand.inkDangerLight)
+                                    : mute,
+                                weight: 600,
+                                spacing: 0.2,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     if (exhausted) ...[
                       const SizedBox(height: 5),
@@ -328,6 +398,25 @@ class ProfileInstrument extends StatelessWidget {
                         context,
                         size: 10.5,
                         color: mute,
+                        weight: 600,
+                        spacing: 0.2,
+                      ),
+                    ),
+                  ],
+                  if (remainingRatio == null && expiresText != null) ...[
+                    const SizedBox(height: 5),
+                    Text(
+                      expiresText,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: terminalText(
+                        context,
+                        size: 10.5,
+                        color: expired
+                            ? (dark
+                                ? AppBrand.inkDangerDark
+                                : AppBrand.inkDangerLight)
+                            : mute,
                         weight: 600,
                         spacing: 0.2,
                       ),

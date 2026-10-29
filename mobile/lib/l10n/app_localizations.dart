@@ -307,6 +307,9 @@ abstract class AppL10n {
   /// **'stale'**
   String get profileTrafficStale;
 
+  /// **'expires'**
+  String get profileTrafficExpires;
+
   /// No description provided for @homeTrafficAmount.
   ///
   /// In en, this message translates to:

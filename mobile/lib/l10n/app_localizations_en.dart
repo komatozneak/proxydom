@@ -114,6 +114,9 @@ class AppL10nEn extends AppL10n {
   String get profileTrafficStale => 'stale';
 
   @override
+  String get profileTrafficExpires => 'expires';
+
+  @override
   String homeTrafficAmount(String remaining, String limit) {
     return '$remaining / $limit GB';
   }

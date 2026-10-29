@@ -85,6 +85,24 @@ void main() {
     );
   });
 
+  test('expire is read as a Unix timestamp', () {
+    final traffic = parseSubscriptionTraffic(
+      'upload=0; download=1; total=10; expire=1790951622',
+    );
+    expect(
+      traffic!.expire,
+      DateTime.fromMillisecondsSinceEpoch(1790951622000, isUtc: true),
+    );
+
+    final millis = parseSubscriptionTraffic(
+      'upload=0; download=1; total=10; expire=1790951622000',
+    );
+    expect(
+      millis!.expire,
+      DateTime.fromMillisecondsSinceEpoch(1790951622000, isUtc: true),
+    );
+  });
+
   test('used above total floors at zero', () {
     final traffic = parseSubscriptionTraffic(
       'upload=${3 * gib}; download=${gib}; total=${2 * gib}',
@@ -105,7 +123,10 @@ void main() {
     expect(parseSubscriptionTraffic('not a header'), isNull);
     expect(parseSubscriptionTraffic(''), isNull);
     expect(parseSubscriptionTraffic(null), isNull);
-    expect(parseSubscriptionTraffic('expire=1700000000'), isNull);
+    expect(
+      parseSubscriptionTraffic('expire=1700000000')!.unlimited,
+      isTrue,
+    );
     expect(formatSubscriptionTraffic(null, russian: true), '—');
   });
 

@@ -7,11 +7,15 @@ class SubscriptionTraffic {
     required this.upload,
     required this.download,
     required this.total,
+    this.expire,
   });
 
   final int upload;
   final int download;
   final int total;
+
+  /// Absolute end of the plan, from `expire`. Null when the header omitted it.
+  final DateTime? expire;
 
   /// `total <= 0` is the usual "no cap" signal in this header.
   bool get unlimited => total <= 0;
@@ -74,7 +78,8 @@ String? etagUnlessTrafficUnknown({
   return value;
 }
 
-/// Parses `upload=…; download=…; total=…`. Unknown or broken text is null.
+/// Parses `upload=…; download=…; total=…; expire=…`. Unknown or broken text
+/// is null; `expire` is seconds (or milliseconds when the value is large).
 SubscriptionTraffic? parseSubscriptionTraffic(String? header) {
   if (header == null) return null;
   final text = header.trim();
@@ -82,6 +87,7 @@ SubscriptionTraffic? parseSubscriptionTraffic(String? header) {
   int? upload;
   int? download;
   int? total;
+  DateTime? expire;
   var sawField = false;
   for (final part in text.split(';')) {
     final piece = part.trim();
@@ -100,6 +106,9 @@ SubscriptionTraffic? parseSubscriptionTraffic(String? header) {
     } else if (key == 'total') {
       total = value;
       sawField = true;
+    } else if (key == 'expire') {
+      expire = _expireDate(value);
+      sawField = true;
     }
   }
   if (!sawField) return null;
@@ -107,7 +116,14 @@ SubscriptionTraffic? parseSubscriptionTraffic(String? header) {
     upload: upload ?? 0,
     download: download ?? 0,
     total: total ?? 0,
+    expire: expire,
   );
+}
+
+DateTime? _expireDate(int value) {
+  if (value <= 0) return null;
+  final millis = value >= 100000000000 ? value : value * 1000;
+  return DateTime.fromMillisecondsSinceEpoch(millis, isUtc: true);
 }
 
 const _tib = 1024 * 1024 * 1024 * 1024;

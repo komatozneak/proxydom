@@ -345,6 +345,7 @@ void main() {
                 ),
                 planName: '100 GB',
                 trafficUpdatedAt: DateTime.utc(2026, 10, 29, 9),
+                expiresAt: DateTime.utc(2026, 11, 29),
                 updated: 'обновлено 29.10',
                 selected: true,
                 selectedNodeTitle: 'Москва',
@@ -435,6 +436,7 @@ void _seedSavedProfile() {
               'download': 2500000000,
               'total': 20000000000,
               'updatedAt': '2026-10-29T09:00:00Z',
+              'expiresAt': '2026-11-29T00:00:00Z',
             },
           },
           'lines': [

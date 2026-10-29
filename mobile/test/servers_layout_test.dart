@@ -103,6 +103,7 @@ ProfileInstrument _instrument({
   ProfileTraffic? manifestTraffic,
   DateTime? trafficUpdatedAt,
   int? updateIntervalHours,
+  DateTime? expiresAt,
 }) {
   return ProfileInstrument(
     title: 'Мой профиль',
@@ -112,6 +113,7 @@ ProfileInstrument _instrument({
     manifestTraffic: manifestTraffic,
     trafficUpdatedAt: trafficUpdatedAt,
     updateIntervalHours: updateIntervalHours,
+    expiresAt: expiresAt,
     updated: updated,
     selected: false,
     onNodeTap: (_) {},
@@ -282,7 +284,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(kProfileTrafficBarKey), findsOneWidget);
-    expect(find.text('10 ГБ'), findsOneWidget);
+    expect(find.text('10 ГБ / 20 ГБ'), findsOneWidget);
     expect(find.text('ОСТАЛОСЬ'), findsOneWidget);
     expect(find.text('50%'), findsNothing);
   });
@@ -340,8 +342,8 @@ void main() {
 
     expect(find.text('973 ГБ'), findsOneWidget);
     expect(find.text('ОСТАЛОСЬ'), findsOneWidget);
+    expect(find.text('27 ГБ / 1 ТБ'), findsOneWidget);
     expect(find.text('2,7%'), findsNothing);
-    expect(find.textContaining('использовано'), findsNothing);
   });
 
   testWidgets('exhausted and stale profiles keep their facts', (tester) async {
@@ -376,6 +378,24 @@ void main() {
     await tester.pump();
     expect(find.textContaining('устарело'), findsOneWidget);
     expect(find.text('73 ГБ'), findsOneWidget);
+  });
+
+  testWidgets('a capped profile shows its expiry date', (tester) async {
+    await tester.pumpWidget(
+      _wrap(
+        _instrument(
+          facts: const [],
+          expiresAt: DateTime.utc(2027, 9, 29),
+          manifestTraffic: const ProfileTraffic(
+            download: 2000000000,
+            total: 10000000000,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('истекает: 29.09.2027'), findsOneWidget);
   });
 
   testWidgets('profile and nodes are two sections of one plate',

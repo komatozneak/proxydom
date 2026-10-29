@@ -35,6 +35,7 @@
   "profileTrafficRemaining": "осталось",
   "profileTrafficNoData": "нет данных о лимите",
   "profileTrafficStale": "устарело",
+  "profileTrafficExpires": "истекает",
   "homeTrafficAmount": "{remaining} / {limit} ГБ",
   "@homeTrafficAmount": {
     "placeholders": {

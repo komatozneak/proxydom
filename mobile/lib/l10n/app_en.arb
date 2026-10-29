@@ -54,6 +54,7 @@
   "profileTrafficRemaining": "remaining",
   "profileTrafficNoData": "no limit data",
   "profileTrafficStale": "stale",
+  "profileTrafficExpires": "expires",
   "@homeTrafficUnlimited": {},
   "homeTrafficAmount": "{remaining} / {limit} GB",
   "@homeTrafficAmount": {
