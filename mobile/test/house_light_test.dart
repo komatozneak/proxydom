@@ -1,4 +1,4 @@
-﻿// A server pick drops the tunnel without pressing the house.
+// A server pick drops the tunnel without pressing the house.
 //
 // The status word follows the tunnel immediately. The rings used to stay,
 // because a fully lit yard was treated as something the listener must not
@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:proxydom/core/theme.dart';
 import 'package:proxydom/core/widgets/house_orbit.dart';
 import 'package:proxydom/core/widgets/house_pulsar.dart';
+import 'package:proxydom/features/home/application/home_stats_provider.dart';
 import 'package:proxydom/features/home/application/vpn_provider.dart';
 import 'package:proxydom/features/home/application/vpn_status.dart';
 import 'package:proxydom/features/home/presentation/home_screen.dart';
@@ -55,7 +56,12 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [vpnProvider.overrideWith(() => vpn)],
+        overrides: [
+          vpnProvider.overrideWith(() => vpn),
+          windowsPingSourceProvider.overrideWithValue(
+            () => Stream<int?>.value(null),
+          ),
+        ],
         child: MaterialApp(
           theme: AppTheme.dark,
           locale: const Locale('ru'),
@@ -81,4 +87,3 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 }
-

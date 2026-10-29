@@ -11,15 +11,20 @@ final trafficStatsProvider = StreamProvider<VpnTrafficStats>((ref) {
   return VpnController.instance.trafficStream;
 });
 
+/// The side-effecting probe is injectable so widget tests do not open sockets.
+final windowsPingSourceProvider = Provider<Stream<int?> Function()>((ref) {
+  return () => windowsPingStream();
+});
+
 /// Application-level tunnel RTT for the compact Home metric.
 ///
 /// Windows measures it in this process: Runner's sockets cross the same TUN
 /// and engine as any other application. Mobile platforms still use their own
 /// native probe, so they keep the placeholder until that integration lands.
-final pingDelayMsProvider = StreamProvider<int?>((ref) {
+final pingDelayMsProvider = StreamProvider.autoDispose<int?>((ref) {
   final status = ref.watch(vpnProvider);
   if (!windowsDesktop || status is! VpnConnected) {
     return Stream<int?>.value(null);
   }
-  return windowsPingStream();
+  return ref.watch(windowsPingSourceProvider)();
 });
