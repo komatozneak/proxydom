@@ -52,6 +52,7 @@
   "@homeMetricTraffic": {},
   "homeTrafficUnlimited": "UNLIMITED",
   "profileTrafficRemaining": "remaining",
+  "profileTrafficUsed": "used",
   "profileTrafficNoData": "no limit data",
   "profileTrafficStale": "stale",
   "profileTrafficExpires": "expires",

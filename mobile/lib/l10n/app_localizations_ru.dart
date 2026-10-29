@@ -108,6 +108,9 @@ class AppL10nRu extends AppL10n {
   String get profileTrafficRemaining => 'осталось';
 
   @override
+  String get profileTrafficUsed => 'использовано';
+
+  @override
   String get profileTrafficNoData => 'нет данных о лимите';
 
   @override

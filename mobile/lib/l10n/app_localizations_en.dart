@@ -108,6 +108,9 @@ class AppL10nEn extends AppL10n {
   String get profileTrafficRemaining => 'remaining';
 
   @override
+  String get profileTrafficUsed => 'used';
+
+  @override
   String get profileTrafficNoData => 'no limit data';
 
   @override

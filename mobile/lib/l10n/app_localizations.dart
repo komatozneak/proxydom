@@ -295,6 +295,9 @@ abstract class AppL10n {
   /// **'remaining'**
   String get profileTrafficRemaining;
 
+  /// **'used'**
+  String get profileTrafficUsed;
+
   /// No description provided for @profileTrafficNoData.
   ///
   /// In en, this message translates to:
@@ -313,6 +316,9 @@ abstract class AppL10n {
   /// **'expires'**
   String get profileTrafficExpires;
 
+  /// No description provided for @profileSourceLocal.
+  ///
+  /// In en, this message translates to:
   /// **'local import'**
   String get profileSourceLocal;
 

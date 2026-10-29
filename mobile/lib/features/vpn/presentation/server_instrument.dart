@@ -11,6 +11,7 @@ import '../data/subscription_traffic.dart';
 import 'server_instrument_parts.dart';
 
 const kProfileTrafficBarKey = ValueKey<String>('profile-traffic-bar');
+const kProfileTrafficFillKey = ValueKey<String>('profile-traffic-fill');
 
 bool _trafficIsStale(DateTime? at, int? intervalHours) {
   if (at == null) return false;
@@ -301,7 +302,7 @@ class ProfileInstrument extends StatelessWidget {
                           child: TweenAnimationBuilder<double>(
                             tween: Tween<double>(
                               begin: 0,
-                              end: usedRatio,
+                              end: remainingRatio,
                             ),
                             duration: const Duration(milliseconds: 450),
                             curve: Curves.easeOutCubic,
@@ -318,13 +319,14 @@ class ProfileInstrument extends StatelessWidget {
                                       Align(
                                         alignment: Alignment.centerLeft,
                                         child: FractionallySizedBox(
+                                          key: kProfileTrafficFillKey,
                                           widthFactor: value,
                                           heightFactor: 1,
                                           child: ColoredBox(color: barColor),
                                         ),
                                       ),
                                       Positioned(
-                                        left: constraints.maxWidth * 0.8,
+                                        left: constraints.maxWidth * 0.2,
                                         top: 0,
                                         bottom: 0,
                                         width: 1,
@@ -347,7 +349,7 @@ class ProfileInstrument extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            '$usedLabel / $totalLabel',
+                            '${l.profileTrafficUsed} $usedLabel / $totalLabel',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: terminalText(

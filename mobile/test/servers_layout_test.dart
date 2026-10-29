@@ -286,9 +286,31 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(kProfileTrafficBarKey), findsOneWidget);
-    expect(find.text('10 ГБ / 20 ГБ'), findsOneWidget);
+    expect(find.text('использовано 10 ГБ / 20 ГБ'), findsOneWidget);
     expect(find.text('ОСТАЛОСЬ'), findsOneWidget);
     expect(find.text('50%'), findsNothing);
+  });
+
+  testWidgets('the rail shows what is left, not what was spent',
+      (tester) async {
+    await tester.pumpWidget(
+      _wrap(
+        _instrument(
+          parsedTraffic: const SubscriptionTraffic(
+            upload: 0,
+            download: 15 * 1024 * 1024 * 1024,
+            total: 20 * 1024 * 1024 * 1024,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final fill = tester.widget<FractionallySizedBox>(
+      find.byKey(kProfileTrafficFillKey),
+    );
+    expect(fill.widthFactor, closeTo(0.25, 0.001));
+    expect(find.text('использовано 15 ГБ / 20 ГБ'), findsOneWidget);
   });
 
   testWidgets('unlimited, unknown and used-only states are distinct',
@@ -344,7 +366,7 @@ void main() {
 
     expect(find.text('973 ГБ'), findsOneWidget);
     expect(find.text('ОСТАЛОСЬ'), findsOneWidget);
-    expect(find.text('27 ГБ / 1 ТБ'), findsOneWidget);
+    expect(find.text('использовано 27 ГБ / 1 ТБ'), findsOneWidget);
     expect(find.text('2,7%'), findsNothing);
   });
 
