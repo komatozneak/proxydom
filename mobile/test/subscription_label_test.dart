@@ -34,4 +34,21 @@ hysteria2://user:pass@45.91.248.91:443/?sni=hy2-us.teremokconnect.online#США 
     expect(usa.flag, '🇺🇸');
     expect(usa.subtitle, 'Сервисы, нейросети, сайты');
   });
+
+  test('a manifest line is not used as the profile name', () {
+    const body = '''
+#proxydom-profile: eyJ2ZXJzaW9uIjoxfQ
+#subscription-userinfo: upload=0; download=1; total=10
+# Мой профиль
+hysteria2://user:pass@203.0.113.10:443#Node
+''';
+    expect(titleFromSubscriptionBody(body), 'Мой профиль');
+  });
+
+  test('a profile-title body line is decoded like its header', () {
+    expect(
+      titleFromSubscriptionBody('#profile-title: base64:0KLQtdGA0LXQvA==\n'),
+      'Терем',
+    );
+  });
 }

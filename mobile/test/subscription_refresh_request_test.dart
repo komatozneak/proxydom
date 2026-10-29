@@ -98,6 +98,45 @@ void main() {
     expect(saved.trafficUpdatedAt, old);
     expect(saved.lastUpdated, isNot(old));
   });
+
+  test('stores proxydom-profile and uses its updatedAt for traffic', () async {
+    const line =
+        'hysteria2://user:pass@203.0.113.12:443/?sni=c.example#Charlie';
+    final header = base64Url
+        .encode(utf8.encode(jsonEncode({
+          'version': 1,
+          'displayName': 'Терем',
+          'planName': '100 GB',
+          'traffic': {
+            'upload': 0,
+            'download': 27000000000,
+            'total': 100000000000,
+            'updatedAt': '2026-10-29T09:00:00Z',
+          },
+        })))
+        .replaceAll('=', '');
+    hy2HttpClientFactory = () => _StaticClient(
+          status: HttpStatus.ok,
+          body: line,
+          headers: {'proxydom-profile': header},
+        );
+    final store = Hy2ImportStore.instance;
+    await store.seedForTest([
+      ShareCatalog(
+        id: 'catalog-key',
+        title: 'Старое имя',
+        lines: [line],
+        url: 'http://127.0.0.1/api/v1/sub/token',
+      ),
+    ]);
+
+    await store.refreshCatalog('catalog-key');
+    final saved = (await store.catalogs()).single;
+    expect(saved.manifest, isNotNull);
+    expect(saved.manifest!.displayName, 'Терем');
+    expect(saved.manifest!.traffic!.total, 100000000000);
+    expect(saved.trafficUpdatedAt, '2026-10-29T09:00:00.000Z');
+  });
 }
 
 class _RecordingClient extends Fake implements HttpClient {

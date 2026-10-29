@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'document_fetch_log.dart';
 import 'hy2_link_parser.dart';
+import 'profile_manifest.dart';
 import 'route_document.dart';
 import 'share_link_parser.dart';
 import 'subscription_device.dart';
@@ -33,6 +34,7 @@ class ShareCatalog {
     this.titleIsCustom = false,
     this.trafficMeta,
     this.trafficUpdatedAt,
+    this.manifest,
     this.updateIntervalHours,
     this.lastUpdated,
     this.webPageUrl,
@@ -65,6 +67,10 @@ class ShareCatalog {
   /// A 304 or an empty snapshot must not move this forward.
   final String? trafficUpdatedAt;
 
+  /// New-style profile card from `proxydom-profile`. Null means the hoster did
+  /// not send one; the legacy headers are then the only source.
+  final ProfileManifest? manifest;
+
   final int? updateIntervalHours;
   final String? lastUpdated;
   final String? webPageUrl;
@@ -96,6 +102,7 @@ class ShareCatalog {
     bool? titleIsCustom,
     Object? trafficMeta = _keep,
     Object? trafficUpdatedAt = _keep,
+    Object? manifest = _keep,
     Object? updateIntervalHours = _keep,
     Object? lastUpdated = _keep,
     Object? webPageUrl = _keep,
@@ -119,6 +126,9 @@ class ShareCatalog {
       trafficUpdatedAt: identical(trafficUpdatedAt, _keep)
           ? this.trafficUpdatedAt
           : trafficUpdatedAt as String?,
+      manifest: identical(manifest, _keep)
+          ? this.manifest
+          : manifest as ProfileManifest?,
       updateIntervalHours: identical(updateIntervalHours, _keep)
           ? this.updateIntervalHours
           : updateIntervalHours as int?,
@@ -624,6 +634,10 @@ class Hy2ImportStore {
         frameHeader: response.headers.value('announce-frame'),
         body: body,
       );
+      final manifest = profileManifestFromResponse(
+        header: response.headers.value('proxydom-profile'),
+        body: body,
+      );
       return _Fetched(
         body: body,
         profileTitle:
@@ -639,6 +653,7 @@ class Hy2ImportStore {
         supportUrl: notice.planeUrl,
         announce: notice.text,
         announceFrame: notice.frame,
+        manifest: manifest,
         notice: notice,
         redirectUrl: redirect,
       );
@@ -740,6 +755,7 @@ class _Fetched {
     this.supportUrl,
     this.announce,
     this.announceFrame = false,
+    this.manifest,
     this.notice = const SubscriptionNotice(),
     this.redirectUrl,
   });
@@ -755,6 +771,7 @@ class _Fetched {
   final String? supportUrl;
   final String? announce;
   final bool announceFrame;
+  final ProfileManifest? manifest;
   final SubscriptionNotice notice;
   final String? redirectUrl;
 }
@@ -767,6 +784,7 @@ class _Pulled {
     this.url,
     this.trafficMeta,
     this.trafficUpdatedAt,
+    this.manifest,
     this.updateIntervalHours,
     this.lastUpdated,
     this.webPageUrl,
@@ -781,6 +799,7 @@ class _Pulled {
   final String? url;
   final String? trafficMeta;
   final String? trafficUpdatedAt;
+  final ProfileManifest? manifest;
   final int? updateIntervalHours;
   final String? lastUpdated;
   final String? webPageUrl;
@@ -840,6 +859,11 @@ Future<_Pulled?> _pull(ShareCatalog catalog, {bool followed = false}) async {
   final observedTrafficAt = observedTraffic?.trim().isNotEmpty == true
       ? DateTime.now().toUtc().toIso8601String()
       : null;
+  final manifestTraffic = fetched.manifest?.traffic;
+  final trafficUpdatedAt = manifestTraffic != null
+      ? (manifestTraffic.updatedAt?.toIso8601String() ??
+          DateTime.now().toUtc().toIso8601String())
+      : (observedTrafficAt ?? catalog.trafficUpdatedAt);
   return _Pulled(
     title: title,
     lines: [for (final link in links) link.raw],
@@ -849,7 +873,8 @@ Future<_Pulled?> _pull(ShareCatalog catalog, {bool followed = false}) async {
       observed: observedTraffic,
       saved: catalog.trafficMeta,
     ),
-    trafficUpdatedAt: observedTrafficAt ?? catalog.trafficUpdatedAt,
+    trafficUpdatedAt: trafficUpdatedAt,
+    manifest: fetched.manifest,
     updateIntervalHours: fetched.updateIntervalHours,
     lastUpdated: DateTime.now().toUtc().toIso8601String(),
     webPageUrl: fetched.webPageUrl,
@@ -874,6 +899,7 @@ List<ShareCatalog> _replaceCatalog(
           url: pulled.url ?? item.url,
           trafficMeta: pulled.trafficMeta,
           trafficUpdatedAt: pulled.trafficUpdatedAt,
+          manifest: pulled.manifest,
           updateIntervalHours: pulled.updateIntervalHours,
           lastUpdated: pulled.lastUpdated,
           webPageUrl: pulled.webPageUrl,
@@ -1114,6 +1140,8 @@ class _Blob {
                 'trafficMeta': catalog.trafficMeta,
               if (catalog.trafficUpdatedAt != null)
                 'trafficUpdatedAt': catalog.trafficUpdatedAt,
+              if (catalog.manifest != null)
+                'manifest': catalog.manifest!.toJson(),
               if (catalog.updateIntervalHours != null)
                 'updateIntervalHours': catalog.updateIntervalHours,
               if (catalog.lastUpdated != null)
@@ -1147,6 +1175,7 @@ ShareCatalog _catalogFromJson(Map<dynamic, dynamic> json) {
     titleIsCustom: json['titleIsCustom'] == true,
     trafficMeta: _text(json['trafficMeta']),
     trafficUpdatedAt: _text(json['trafficUpdatedAt']),
+    manifest: ProfileManifest.fromJson(json['manifest']),
     updateIntervalHours: json['updateIntervalHours'] is int
         ? json['updateIntervalHours'] as int
         : null,
