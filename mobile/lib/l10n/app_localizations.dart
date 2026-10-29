@@ -307,6 +307,9 @@ abstract class AppL10n {
   /// **'stale'**
   String get profileTrafficStale;
 
+  /// No description provided for @profileTrafficExpires.
+  ///
+  /// In en, this message translates to:
   /// **'expires'**
   String get profileTrafficExpires;
 
