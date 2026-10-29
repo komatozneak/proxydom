@@ -138,6 +138,11 @@ String formatSubscriptionTraffic(
   return _formatBytes(traffic.remainingBytes, russian: russian);
 }
 
+/// A byte amount for the traffic bar's used/total labels.
+String formatTrafficAmount(int bytes, {required bool russian}) {
+  return _formatBytes(bytes, russian: russian);
+}
+
 String _formatBytes(int bytes, {required bool russian}) {
   final gb = russian ? 'ГБ' : 'GB';
   final mb = russian ? 'МБ' : 'MB';

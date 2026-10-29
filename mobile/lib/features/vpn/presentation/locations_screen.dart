@@ -21,6 +21,7 @@ import '../data/hy2_import_store.dart';
 import '../data/dial_set.dart';
 import '../data/subscription_label.dart';
 import '../data/subscription_notice.dart';
+import '../data/subscription_traffic.dart';
 import 'free_client_chrome.dart';
 import 'server_instrument.dart';
 import 'server_instrument_parts.dart';
@@ -418,6 +419,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
         // a person can use. Full key stays behind «Поделиться».
         keyHandle: '',
       ),
+      parsedTraffic: parseSubscriptionTraffic(catalog.trafficMeta),
       updated: profileUpdatedLabel(
         lastUpdated: catalog.lastUpdated,
         russian: russian,

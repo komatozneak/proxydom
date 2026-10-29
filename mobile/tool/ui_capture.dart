@@ -27,6 +27,7 @@ import 'package:proxydom/features/home/presentation/home_screen.dart';
 import 'package:proxydom/features/settings/presentation/settings_screen.dart';
 import 'package:proxydom/features/shell/presentation/main_shell.dart';
 import 'package:proxydom/features/vpn/data/subscription_label.dart';
+import 'package:proxydom/features/vpn/data/subscription_traffic.dart';
 import 'package:proxydom/features/vpn/presentation/locations_screen.dart';
 import 'package:proxydom/features/vpn/presentation/server_instrument.dart';
 import 'package:proxydom/features/vpn/presentation/server_instrument_parts.dart';
@@ -331,6 +332,11 @@ void main() {
                 facts: const [
                   (text: '15 ГБ из 100 ГБ', accent: true),
                 ],
+                parsedTraffic: const SubscriptionTraffic(
+                  upload: 60 * 1024 * 1024 * 1024,
+                  download: 25 * 1024 * 1024 * 1024,
+                  total: 100 * 1024 * 1024 * 1024,
+                ),
                 updated: 'обновлено 04.10',
                 selected: true,
                 selectedNodeTitle: 'Москва',
@@ -407,7 +413,8 @@ void _seedSavedProfile() {
           'id': 'profile',
           'title': 'Мой профиль',
           'url': 'https://panel.example.test/profile',
-          'trafficMeta': 'upload=1; download=2; total=15000000000',
+          'trafficMeta':
+              'upload=5368709120; download=2147483648; total=21474836480',
           'lastUpdated': '2026-10-04T12:22:09Z',
           'announce': 'Поддержка и обновления',
           'supportUrl': 'https://t.me/example',

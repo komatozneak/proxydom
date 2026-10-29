@@ -9,6 +9,8 @@ import '../../../l10n/app_localizations.dart';
 import '../data/subscription_traffic.dart';
 import 'server_instrument_parts.dart';
 
+const kProfileTrafficBarKey = ValueKey<String>('profile-traffic-bar');
+
 /// A bought profile, drawn as an instrument.
 ///
 /// One plate, two sections: the hoster's profile band, then its node pool.
@@ -23,6 +25,7 @@ class ProfileInstrument extends StatelessWidget {
     required this.title,
     required this.description,
     required this.facts,
+    this.parsedTraffic,
     this.updated,
     required this.selected,
     required this.nodes,
@@ -47,6 +50,9 @@ class ProfileInstrument extends StatelessWidget {
   /// which is the only fact on the card worth a colour. The update stamp is
   /// not one of these: it sits under the rings, not in this line.
   final List<({String text, bool accent})> facts;
+
+  /// The document's cap, if it had one. Drives the watermark and the bar.
+  final SubscriptionTraffic? parsedTraffic;
 
   /// «обновлено 04.10», already formatted. Drawn on the pass stub.
   final String? updated;
@@ -102,7 +108,33 @@ class ProfileInstrument extends StatelessWidget {
             selected ? 0.04 : 0.016,
           )!;
 
+    final trafficData = parsedTraffic;
+    final russian = Localizations.localeOf(context).languageCode == 'ru';
+    final remainingLabel = trafficData == null
+        ? null
+        : formatSubscriptionTraffic(trafficData, russian: russian);
+    final cappedBytes = trafficData?.total ?? 0;
+    final usedBytes =
+        trafficData == null ? 0 : trafficData.upload + trafficData.download;
+    final ratio =
+        trafficData == null || trafficData.unlimited || cappedBytes <= 0
+            ? null
+            : (usedBytes / cappedBytes).clamp(0.0, 1.0);
+    final percent = ratio == null ? null : (ratio * 100).round();
+    final lowTraffic = trafficData != null &&
+        !trafficData.unlimited &&
+        trafficRemainderBand(trafficData) == TrafficRemainderBand.below5;
+    final barColor = lowTraffic
+        ? (dark ? AppBrand.inkDangerDark : AppBrand.inkDangerLight)
+        : gold;
+    final usedLabel =
+        ratio == null ? null : formatTrafficAmount(usedBytes, russian: russian);
+    final totalLabel = ratio == null
+        ? null
+        : formatTrafficAmount(cappedBytes, russian: russian);
+
     final profile = Container(
+      width: double.infinity,
       decoration: BoxDecoration(
         color: tint,
         border: Border(
@@ -112,91 +144,179 @@ class ProfileInstrument extends StatelessWidget {
           ),
         ),
       ),
-      padding: const EdgeInsets.fromLTRB(16, 14, 14, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: Stack(
+        clipBehavior: Clip.hardEdge,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleLarge,
+          if (remainingLabel != null)
+            Positioned(
+              right: 10,
+              top: 2,
+              child: ExcludeSemantics(
+                child: IgnorePointer(
+                  child: Text(
+                    remainingLabel,
+                    maxLines: 1,
+                    textAlign: TextAlign.right,
+                    style: terminalText(
+                      context,
+                      size: 58,
+                      color: gold.withValues(alpha: dark ? 0.075 : 0.055),
+                      weight: 700,
+                      spacing: 0.2,
                     ),
-                    if (captions.isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      _FactsLine(facts: captions, mute: mute),
-                    ],
-                  ],
+                  ),
                 ),
               ),
-              const SizedBox(width: 10),
-              _Toolbar(
-                busy: refreshing,
-                refreshLabel: l.freeRefresh,
-                onRefresh: onRefresh,
-                shareLabel: l.locationsShareKey,
-                onShare: onShare,
-                deleteLabel: l.freeDelete,
-                onDelete: onDelete,
+            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 14, 12),
+            child: SizedBox(
+              width: double.infinity,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontSize: 27,
+                      fontWeight: FontWeight.w800,
+                      height: 1.08,
+                      letterSpacing: -0.4,
+                    ),
+                  ),
+                  if (captions.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    _FactsLine(facts: captions, mute: mute),
+                  ],
+                  if (ratio != null) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Text(
+                          '$usedLabel / $totalLabel',
+                          style: terminalText(
+                            context,
+                            size: 10.5,
+                            color: mute,
+                            weight: 600,
+                            spacing: 0.2,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '$percent%',
+                          style: terminalText(
+                            context,
+                            size: 10.5,
+                            color: barColor,
+                            weight: 700,
+                            spacing: 0.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      key: kProfileTrafficBarKey,
+                      borderRadius: BorderRadius.circular(99),
+                      child: SizedBox(
+                        height: 4,
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            ColoredBox(
+                              color: theme.colorScheme.onSurface
+                                  .withValues(alpha: 0.08),
+                            ),
+                            TweenAnimationBuilder<double>(
+                              tween: Tween<double>(begin: 0, end: ratio),
+                              duration: const Duration(milliseconds: 450),
+                              curve: Curves.easeOutCubic,
+                              builder: (context, value, child) {
+                                return FractionallySizedBox(
+                                  alignment: Alignment.centerLeft,
+                                  widthFactor: value,
+                                  child: ColoredBox(color: barColor),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ] else if (traffic != null) ...[
+                    const SizedBox(height: 7),
+                    Text(
+                      traffic,
+                      style: terminalText(
+                        context,
+                        size: 18,
+                        color: gold,
+                        weight: 700,
+                        spacing: 0.2,
+                      ),
+                    ),
+                  ],
+                  if (description.isNotEmpty) ...[
+                    const SizedBox(height: 9),
+                    Text(
+                      description,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontSize: 13.5,
+                        height: 1.45,
+                        fontWeight: FontWeight.w600,
+                        color:
+                            theme.colorScheme.onSurface.withValues(alpha: 0.82),
+                      ),
+                    ),
+                  ],
+                  if (onTelegram != null) ...[
+                    const SizedBox(height: 7),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: ToolAction(
+                        icon: AppIcons.paperPlane,
+                        label: telegramLabel ?? l.freeTelegram,
+                        onTap: onTelegram,
+                        tone: AppActionTone.link,
+                        dense: true,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 9),
+                  Row(
+                    children: [
+                      if (updated != null && updated!.trim().isNotEmpty)
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 200),
+                          child: Text(
+                            updated!.trim(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: mute,
+                              fontSize: 11.5,
+                            ),
+                          ),
+                        ),
+                      const Spacer(),
+                      _Toolbar(
+                        busy: refreshing,
+                        refreshLabel: l.freeRefresh,
+                        onRefresh: onRefresh,
+                        shareLabel: l.locationsShareKey,
+                        onShare: onShare,
+                        deleteLabel: l.freeDelete,
+                        onDelete: onDelete,
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-          if (traffic != null) ...[
-            const SizedBox(height: 7),
-            Text(
-              traffic,
-              style: terminalText(
-                context,
-                size: 22,
-                color: gold,
-                weight: 700,
-                spacing: 0.2,
-              ),
-            ),
-          ],
-          if (description.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              description,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontSize: 13.5,
-                height: 1.45,
-                fontWeight: FontWeight.w600,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.82),
-              ),
-            ),
-          ],
-          if (onTelegram != null) ...[
-            const SizedBox(height: 7),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: ToolAction(
-                icon: AppIcons.paperPlane,
-                label: telegramLabel ?? l.freeTelegram,
-                onTap: onTelegram,
-                tone: AppActionTone.link,
-                dense: true,
-              ),
-            ),
-          ],
-          if (updated != null && updated!.trim().isNotEmpty) ...[
-            const SizedBox(height: 7),
-            Text(
-              updated!.trim(),
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: mute,
-                fontSize: 11.5,
-              ),
-            ),
-          ],
         ],
       ),
     );

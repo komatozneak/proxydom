@@ -18,6 +18,7 @@ import 'package:proxydom/core/theme.dart';
 import 'package:proxydom/core/widgets/app_action_button.dart';
 import 'package:proxydom/core/widgets/app_surface.dart';
 import 'package:proxydom/features/vpn/data/subscription_label.dart';
+import 'package:proxydom/features/vpn/data/subscription_traffic.dart';
 import 'package:proxydom/features/vpn/presentation/locations_screen.dart';
 import 'package:proxydom/features/vpn/presentation/server_instrument.dart';
 import 'package:proxydom/features/vpn/presentation/server_instrument_parts.dart';
@@ -42,7 +43,8 @@ void _seedProfile() {
           'id': 'profile',
           'title': 'Мой профиль',
           'url': 'https://panel.example.test/profile',
-          'trafficMeta': 'upload=1; download=2; total=15000000000',
+          'trafficMeta':
+              'upload=5368709120; download=2147483648; total=21474836480',
           'lastUpdated': '2026-10-04T12:22:09Z',
           'announce': 'Поддержка и обновления',
           'supportUrl': 'https://t.me/example',
@@ -96,11 +98,13 @@ ProfileInstrument _instrument({
     (text: '14 ГБ', accent: true),
   ],
   String? updated = 'обновлено 04.10',
+  SubscriptionTraffic? parsedTraffic,
 }) {
   return ProfileInstrument(
     title: 'Мой профиль',
     description: 'Поддержка и обновления',
     facts: facts,
+    parsedTraffic: parsedTraffic,
     updated: updated,
     selected: false,
     onNodeTap: (_) {},
@@ -146,8 +150,7 @@ void main() {
     );
   });
 
-  testWidgets('the key prefix is gone and the stamp sits under the actions',
-      (tester) async {
+  testWidgets('the stamp sits beside the actions', (tester) async {
     tester.view
       ..physicalSize = const Size(520, 800) * _dpr
       ..devicePixelRatio = _dpr;
@@ -159,7 +162,24 @@ void main() {
     expect(find.text('2AQ93K0'), findsNothing);
     final updated = tester.getRect(find.text('обновлено 04.10'));
     final ring = tester.getRect(find.byType(AppRingButton));
-    expect(updated.top, greaterThanOrEqualTo(ring.bottom - 1));
+    expect(updated.left, lessThan(ring.left));
+    expect(updated.top, greaterThanOrEqualTo(ring.top - 1));
+    expect(updated.bottom, lessThanOrEqualTo(ring.bottom + 1));
+  });
+
+  testWidgets('the actions sit on the right edge of the profile',
+      (tester) async {
+    tester.view
+      ..physicalSize = const Size(520, 800) * _dpr
+      ..devicePixelRatio = _dpr;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(_wrap(_instrument()));
+    await tester.pump();
+
+    final card = tester.getRect(find.byType(ProfileInstrument));
+    final menu = tester.getRect(find.byType(PopupMenuButton<String>));
+    expect(card.right - menu.right, lessThan(20));
   });
 
   testWidgets('one refresh ring and one overflow, not three peer rings',
@@ -232,12 +252,31 @@ void main() {
     expect(note, findsOneWidget);
     expect(tester.getSize(note).height, greaterThan(8));
 
-    // Between the traffic reading and the pool, not dropped off the plate.
-    final traffic = tester.getRect(find.textContaining('ГБ'));
+    // Between the traffic bar and the pool, not dropped off the plate.
+    final traffic = tester.getRect(find.byKey(kProfileTrafficBarKey));
     final nodes = tester.getRect(find.text('Узлы'));
     final body = tester.getRect(note);
     expect(body.top, greaterThan(traffic.bottom));
     expect(body.bottom, lessThan(nodes.top));
+  });
+
+  testWidgets('a capped profile gets its own traffic bar', (tester) async {
+    await tester.pumpWidget(
+      _wrap(
+        _instrument(
+          parsedTraffic: const SubscriptionTraffic(
+            upload: 5 * 1024 * 1024 * 1024,
+            download: 5 * 1024 * 1024 * 1024,
+            total: 20 * 1024 * 1024 * 1024,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(kProfileTrafficBarKey), findsOneWidget);
+    expect(find.text('10 ГБ / 20 ГБ'), findsOneWidget);
+    expect(find.text('50%'), findsOneWidget);
   });
 
   testWidgets('profile and nodes are two sections of one plate',
