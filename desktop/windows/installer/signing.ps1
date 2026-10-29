@@ -74,6 +74,12 @@ function Invoke-SignToolCommand {
     # A native tool writing to stderr is not a failure. Under
     # ErrorActionPreference "Stop" PowerShell turns the first SignTool warning
     # into a terminating error and hides the exit code that actually matters.
+    #
+    # Save and restore $LASTEXITCODE: a library function must not leak the
+    # result of an internal probe into the caller's process exit code. The
+    # self-test deliberately runs failing SignTool commands, and pwsh -File
+    # would otherwise return the last expected failure as the test's exit code.
+    $previousExitCode = $LASTEXITCODE
     $previous = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {
@@ -81,6 +87,7 @@ function Invoke-SignToolCommand {
         $code = $LASTEXITCODE
     } finally {
         $ErrorActionPreference = $previous
+        $global:LASTEXITCODE = $previousExitCode
     }
     if ($code -ne 0) {
         throw "$What failed (exit $code).`n$($output.Trim())"
@@ -397,7 +404,9 @@ function Test-ProxyDomSignature {
     $resolved = (Resolve-Path -LiteralPath $Path).Path
 
     # verify /pa is the same check Windows itself runs when Smart App Control or
-    # SmartScreen asks "is this publisher real?".
+    # SmartScreen asks "is this publisher real?". A rejected file is a normal
+    # predicate result, not a process failure: keep the caller's exit code.
+    $previousExitCode = $LASTEXITCODE
     $previous = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {
@@ -405,6 +414,7 @@ function Test-ProxyDomSignature {
         $code = $LASTEXITCODE
     } finally {
         $ErrorActionPreference = $previous
+        $global:LASTEXITCODE = $previousExitCode
     }
 
     $signature = Get-AuthenticodeSignature -LiteralPath $resolved

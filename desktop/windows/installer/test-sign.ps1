@@ -170,14 +170,18 @@ try {
     $wrongSubject = Resolve-ProxyDomSigningConfiguration -Method Store -Thumbprint $certificate.Thumbprint -ExpectedSubject "Somebody Else Ltd"
     $otherSample = Join-Path $temp "wrong-subject.exe"
     Copy-Item -LiteralPath $trustedSample -Destination $otherSample
+    $global:LASTEXITCODE = 0
     Assert-SigningThrows {
         Invoke-ProxyDomSigning -Files $otherSample -Configuration $wrongSubject -NoTimestamp
     } "does not match the expected publisher" "a signature from an unexpected publisher"
+    Assert-Signing ($LASTEXITCODE -eq 0) "a rejected signature must not leak the native exit code"
     Write-Host "  unexpected publisher rejected"
 
     $unsignedPath = Join-Path $temp "not-a-program.txt"
     Set-Content -LiteralPath $unsignedPath -Value "nothing to sign here"
+    $global:LASTEXITCODE = 0
     Assert-Signing (-not (Test-ProxyDomSignature -Path $unsignedPath).IsValid) "verification rejects a file with no signature"
+    Assert-Signing ($LASTEXITCODE -eq 0) "a failed verify must not leak the native exit code"
 
     # What the build signs is a decision of its own: every root executable and
     # DLL, but not the assets and not WireGuard's wintun.dll, which keeps the
