@@ -111,7 +111,6 @@ SubscriptionTraffic? parseSubscriptionTraffic(String? header) {
 }
 
 const _gib = 1024 * 1024 * 1024;
-const _mib = 1024 * 1024;
 const _mb = 1000 * 1000;
 const _gb = 1000 * 1000 * 1000;
 const _tb = 1000 * 1000 * 1000 * 1000;
