@@ -42,13 +42,13 @@ class AppL10nRu extends AppL10n {
   String get homeConnected => 'Подключено';
 
   @override
-  String get homeTapHint => 'Нажмите на дом, чтобы войти';
+  String get homeTapHint => 'Нажмите, чтобы подключиться';
 
   @override
-  String get homeConnectingHint => 'Подождите, дом открывает дверь…';
+  String get homeConnectingHint => 'Подключаемся…';
 
   @override
-  String get homeConnectedHint => 'Дом на связи';
+  String get homeConnectedHint => 'Подключено';
 
   @override
   String get homeProtected => 'Защищено';
@@ -225,7 +225,7 @@ class AppL10nRu extends AppL10n {
   String get homeStatPing => 'Пинг';
 
   @override
-  String get homeLinkOnline => 'Дом на связи';
+  String get homeLinkOnline => 'Подключено';
 
   @override
   String get homeLinkOffline => 'Нет подключения';
@@ -1385,21 +1385,21 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get vpnDisclosureLead =>
-      'Домик включает туннель по выбранной строке. Этот экран — до системного разрешения Android.';
+      'Приложение включает туннель по выбранной строке. Сейчас Android один раз спросит разрешение VPN.';
 
   @override
   String get vpnDisclosureVpnTitle => 'Что делает приложение';
 
   @override
   String get vpnDisclosureVpnBody =>
-      'После согласия домик открывает локальный туннель для выбранной строки. Трафик устройства идёт на сервер из этой строки. Затем Android один раз показывает своё разрешение VPN.';
+      'После согласия приложение поднимает локальный туннель для выбранной строки. Трафик идёт на сервер из этой строки. Android один раз спросит разрешение VPN.';
 
   @override
   String get vpnDisclosureVpnTitleIos => 'Что делает приложение';
 
   @override
   String get vpnDisclosureVpnBodyIos =>
-      'После согласия домик открывает локальный туннель для выбранной строки. Трафик устройства идёт на сервер из этой строки. Затем iPhone один раз показывает своё разрешение VPN.';
+      'После согласия приложение поднимает локальный туннель для выбранной строки. Трафик идёт на сервер из этой строки. iPhone один раз спросит разрешение VPN.';
 
   @override
   String get vpnDisclosureDataTitle => 'Что остаётся на телефоне';
@@ -1530,7 +1530,18 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get freeOnboardConnectBody =>
-      'Нажмите на домик, чтобы включить или выключить. Статус остаётся на этом экране.';
+      'Нажмите кнопку подключения в центре экрана. Она включает и выключает туннель. Статус остаётся на этом экране.';
+
+  @override
+  String get pcOnboardHeadline => 'Подключение на компьютере';
+
+  @override
+  String get pcOnboardBody =>
+      'Вставьте ключ доступа или ссылку на документ. Приложение покажет серверы, которые в нём есть.';
+
+  @override
+  String get pcOnboardPrivacy =>
+      'Ключи и адреса серверов хранятся на этом компьютере.';
 
   @override
   String get freeLater => 'Позже';
@@ -1644,6 +1655,9 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get freeStepFound => 'Найдено';
+
+  @override
+  String get freeFoundEmpty => 'Здесь появятся серверы из ссылки.';
 
   @override
   String get freeFieldEmpty =>

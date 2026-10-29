@@ -14,7 +14,6 @@ import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/interaction.dart';
 import '../../../core/widgets/mossy_rail.dart';
 import '../../../core/widgets/proxydom_ground.dart';
-import '../../../core/widgets/window_caption_bar.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../home/application/vpn_provider.dart';
 
@@ -124,26 +123,11 @@ class _MainShellState extends ConsumerState<MainShell> {
     Widget page = widget.navigationShell;
 
     if (windowsDesktop) {
-      // The window has no system caption, so the app draws its own and the
-      // lockup lives in it. The rail used to carry the name at its top; putting
-      // the same lockup in the caption is what makes the window read as one
-      // object instead of a frame with a sidebar that happens to say a name.
+      // The caption now lives above the router (see _WindowsWindowFrame), so
+      // every route gets the same window buttons and drag band.
       final rail = WindowsNavRail(selected: selected, onSelect: _onTap);
       final shell = widget.navigationShell;
-      page = Column(
-        children: [
-          WindowCaptionBar(
-            // Only "Прокси" / "Proxy": the second half of the name is already
-            // cut into the mark beside it, and spelling it out as well said it
-            // twice in one lockup.
-            label: Localizations.localeOf(context).languageCode == 'ru'
-                ? 'Прокси'
-                : 'Proxy',
-            ink: dark ? AppBrand.inkDark : AppBrand.inkLight,
-          ),
-          Expanded(child: Row(children: [rail, Expanded(child: shell)])),
-        ],
-      );
+      page = Row(children: [rail, Expanded(child: shell)]);
       return _yard(
         context,
         child: LayoutBuilder(

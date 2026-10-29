@@ -11,6 +11,7 @@ import 'core/router.dart';
 import 'core/theme.dart';
 import 'core/toasts/proxy_dom_toast_host.dart';
 import 'core/updates/update_check_service.dart';
+import 'core/widgets/window_caption_bar.dart';
 import 'features/settings/application/locale_provider.dart';
 import 'features/settings/application/theme_mode_provider.dart';
 import 'features/vpn/data/hy2_link_parser.dart';
@@ -41,12 +42,41 @@ class ProxyDomApp extends ConsumerWidget {
       routerConfig: AppRouter.config,
       builder: (context, child) {
         final page = child ?? const SizedBox.shrink();
-        return ProxyDomToastHost(
-          child: _UpdateCheckHost(
-            child: windowsDesktop ? _WindowsExit(child: page) : page,
-          ),
+        Widget content = _UpdateCheckHost(
+          child: windowsDesktop ? _WindowsExit(child: page) : page,
         );
+        if (windowsDesktop) {
+          content = _WindowsWindowFrame(child: content);
+        }
+        return ProxyDomToastHost(child: content);
       },
+    );
+  }
+}
+
+/// The window frame belongs to the window, not to one route: onboarding,
+/// import and the shell all need the same caption and window buttons.
+class _WindowsWindowFrame extends StatelessWidget {
+  const _WindowsWindowFrame({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    final russian = Localizations.localeOf(context).languageCode == 'ru';
+    return Material(
+      color: theme.scaffoldBackgroundColor,
+      child: Column(
+        children: [
+          WindowCaptionBar(
+            label: russian ? 'Прокси' : 'Proxy',
+            ink: dark ? AppBrand.inkDark : AppBrand.inkLight,
+          ),
+          Expanded(child: child),
+        ],
+      ),
     );
   }
 }

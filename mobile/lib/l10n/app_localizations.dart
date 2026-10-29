@@ -166,19 +166,19 @@ abstract class AppL10n {
   /// No description provided for @homeTapHint.
   ///
   /// In en, this message translates to:
-  /// **'Tap the house to connect'**
+  /// **'Tap to connect'**
   String get homeTapHint;
 
   /// No description provided for @homeConnectingHint.
   ///
   /// In en, this message translates to:
-  /// **'Hold on — the house is opening the door…'**
+  /// **'Connecting…'**
   String get homeConnectingHint;
 
   /// No description provided for @homeConnectedHint.
   ///
   /// In en, this message translates to:
-  /// **'The house is online'**
+  /// **'Connected'**
   String get homeConnectedHint;
 
   /// No description provided for @homeProtected.
@@ -514,7 +514,7 @@ abstract class AppL10n {
   /// No description provided for @homeLinkOnline.
   ///
   /// In en, this message translates to:
-  /// **'Home online'**
+  /// **'Connected'**
   String get homeLinkOnline;
 
   /// No description provided for @homeLinkOffline.
@@ -2614,7 +2614,7 @@ abstract class AppL10n {
   /// No description provided for @vpnDisclosureLead.
   ///
   /// In en, this message translates to:
-  /// **'The house starts a tunnel from the line you chose. This screen explains that before Android asks for VPN permission.'**
+  /// **'The app starts a tunnel for the selected line. Android will ask for VPN permission once.'**
   String get vpnDisclosureLead;
 
   /// No description provided for @vpnDisclosureVpnTitle.
@@ -2626,7 +2626,7 @@ abstract class AppL10n {
   /// No description provided for @vpnDisclosureVpnBody.
   ///
   /// In en, this message translates to:
-  /// **'After you accept, the house opens a local tunnel for the selected line. Device traffic goes to the server in that line. Android then shows its own VPN permission once.'**
+  /// **'After you agree, the app brings up a local tunnel for the selected line. Traffic goes to the server in that line. Android asks for VPN permission once.'**
   String get vpnDisclosureVpnBody;
 
   /// No description provided for @vpnDisclosureVpnTitleIos.
@@ -2638,7 +2638,7 @@ abstract class AppL10n {
   /// No description provided for @vpnDisclosureVpnBodyIos.
   ///
   /// In en, this message translates to:
-  /// **'After you accept, the house opens a local tunnel for the selected line. Device traffic goes to the server in that line. iPhone then shows its own VPN permission once.'**
+  /// **'After you agree, the app brings up a local tunnel for the selected line. Traffic goes to the server in that line. iPhone asks for VPN permission once.'**
   String get vpnDisclosureVpnBodyIos;
 
   /// No description provided for @vpnDisclosureDataTitle.
@@ -2878,8 +2878,26 @@ abstract class AppL10n {
   /// No description provided for @freeOnboardConnectBody.
   ///
   /// In en, this message translates to:
-  /// **'Tap the house to connect or disconnect. The status stays on this screen.'**
+  /// **'Tap the connect button in the centre of the screen. It turns the tunnel on and off. The status stays on this screen.'**
   String get freeOnboardConnectBody;
+
+  /// No description provided for @pcOnboardHeadline.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect on this PC'**
+  String get pcOnboardHeadline;
+
+  /// No description provided for @pcOnboardBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste an access key or a document link. The app will show the servers it contains.'**
+  String get pcOnboardBody;
+
+  /// No description provided for @pcOnboardPrivacy.
+  ///
+  /// In en, this message translates to:
+  /// **'Keys and server addresses stay on this computer.'**
+  String get pcOnboardPrivacy;
 
   /// No description provided for @freeLater.
   ///
@@ -3082,14 +3100,20 @@ abstract class AppL10n {
   /// No description provided for @freeStepLink.
   ///
   /// In en, this message translates to:
-  /// **'LINK'**
+  /// **'Link'**
   String get freeStepLink;
 
   /// No description provided for @freeStepFound.
   ///
   /// In en, this message translates to:
-  /// **'FOUND'**
+  /// **'Found'**
   String get freeStepFound;
+
+  /// No description provided for @freeFoundEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Servers from the link will appear here.'**
+  String get freeFoundEmpty;
 
   /// No description provided for @freeFieldEmpty.
   ///

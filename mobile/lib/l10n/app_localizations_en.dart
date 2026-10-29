@@ -42,13 +42,13 @@ class AppL10nEn extends AppL10n {
   String get homeConnected => 'Connected';
 
   @override
-  String get homeTapHint => 'Tap the house to connect';
+  String get homeTapHint => 'Tap to connect';
 
   @override
-  String get homeConnectingHint => 'Hold on — the house is opening the door…';
+  String get homeConnectingHint => 'Connecting…';
 
   @override
-  String get homeConnectedHint => 'The house is online';
+  String get homeConnectedHint => 'Connected';
 
   @override
   String get homeProtected => 'Protected';
@@ -224,7 +224,7 @@ class AppL10nEn extends AppL10n {
   String get homeStatPing => 'Ping';
 
   @override
-  String get homeLinkOnline => 'Home online';
+  String get homeLinkOnline => 'Connected';
 
   @override
   String get homeLinkOffline => 'Home offline';
@@ -1382,21 +1382,21 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get vpnDisclosureLead =>
-      'The house starts a tunnel from the line you chose. This screen explains that before Android asks for VPN permission.';
+      'The app starts a tunnel for the selected line. Android will ask for VPN permission once.';
 
   @override
   String get vpnDisclosureVpnTitle => 'What the app does';
 
   @override
   String get vpnDisclosureVpnBody =>
-      'After you accept, the house opens a local tunnel for the selected line. Device traffic goes to the server in that line. Android then shows its own VPN permission once.';
+      'After you agree, the app brings up a local tunnel for the selected line. Traffic goes to the server in that line. Android asks for VPN permission once.';
 
   @override
   String get vpnDisclosureVpnTitleIos => 'What the app does';
 
   @override
   String get vpnDisclosureVpnBodyIos =>
-      'After you accept, the house opens a local tunnel for the selected line. Device traffic goes to the server in that line. iPhone then shows its own VPN permission once.';
+      'After you agree, the app brings up a local tunnel for the selected line. Traffic goes to the server in that line. iPhone asks for VPN permission once.';
 
   @override
   String get vpnDisclosureDataTitle => 'What stays on the phone';
@@ -1527,7 +1527,18 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get freeOnboardConnectBody =>
-      'Tap the house to connect or disconnect. The status stays on this screen.';
+      'Tap the connect button in the centre of the screen. It turns the tunnel on and off. The status stays on this screen.';
+
+  @override
+  String get pcOnboardHeadline => 'Connect on this PC';
+
+  @override
+  String get pcOnboardBody =>
+      'Paste an access key or a document link. The app will show the servers it contains.';
+
+  @override
+  String get pcOnboardPrivacy =>
+      'Keys and server addresses stay on this computer.';
 
   @override
   String get freeLater => 'Later';
@@ -1634,10 +1645,13 @@ class AppL10nEn extends AppL10n {
   String get freeRefreshFail => 'Could not refresh';
 
   @override
-  String get freeStepLink => 'LINK';
+  String get freeStepLink => 'Link';
 
   @override
-  String get freeStepFound => 'FOUND';
+  String get freeStepFound => 'Found';
+
+  @override
+  String get freeFoundEmpty => 'Servers from the link will appear here.';
 
   @override
   String get freeFieldEmpty =>

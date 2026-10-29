@@ -775,7 +775,7 @@ class _FreeClientHome extends StatelessWidget {
         : AppBrand.moss;
     final accent = switch (status) {
       VpnConnected() => ok,
-      VpnConnecting() => AppBrand.mascotEmber,
+      VpnConnecting() => AppBrand.destructive,
       VpnError() => AppBrand.destructive,
       _ => theme.colorScheme.onSurfaceVariant,
     };
@@ -789,34 +789,25 @@ class _FreeClientHome extends StatelessWidget {
       VpnConnected() => theme.brightness == Brightness.dark
           ? AppBrand.inkMossDark
           : AppBrand.inkMossLight,
+      VpnConnecting() => theme.brightness == Brightness.dark
+          ? AppBrand.inkDangerDark
+          : AppBrand.inkDangerLight,
       VpnError() => theme.brightness == Brightness.dark
           ? AppBrand.inkDangerDark
           : AppBrand.inkDangerLight,
       _ => theme.colorScheme.onSurfaceVariant,
     };
-    final houseLabel = empty
+    final String? houseLabel = empty
         ? l.homeAddServer
         : switch (status) {
-            VpnConnected() => l.homeDisconnect,
-            VpnConnecting() => l.homeConnecting,
+            VpnConnected() => null,
+            // While connecting the chip is the only status.
+            VpnConnecting() => null,
             _ => l.homeConnect,
           };
-    // The chip already names the state ("Не подключено", "Мешает другой VPN").
-    // The line under the house carries what the chip cannot: the action, the
-    // protected time, or a plain-language failure. Repeating one string twice on
-    // one screen is noise, and it read as two states that disagreed.
-    final String? heroStatus = empty && status is VpnDisconnected
-        ? l.freeNoProfile
-        : switch (status) {
-            VpnConnected() =>
-              uptime == null ? l.homeProtected : '${l.homeProtected} · $uptime',
-            VpnConnecting() => l.homeConnectingHint,
-            // The specific hint is rendered below the house by errorHint. A
-            // generic sentence here would repeat it and, for a conflict, would
-            // blame the network for another app's VPN.
-            VpnError() => null,
-            _ => l.homeTapHint,
-          };
+    // The house keeps one action label only in the idle/error state. Connected
+    // and connecting states live in the chip; a second "Отключить"/"Защищено"
+    // under the house was a duplicate and made the hero top-heavy.
     final hero = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -877,20 +868,15 @@ class _FreeClientHome extends StatelessWidget {
         const SizedBox(height: 6),
         // The label is the affordance: the house was a picture, and a picture
         // is not a button. It sits outside the tap box so TalkBack reads one
-        // button, not a decorative image plus a label.
-        Text(
-          houseLabel,
-          textAlign: TextAlign.center,
-          style: theme.textTheme.headlineMedium?.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 2),
-        if (heroStatus != null)
+        // button, not a decorative image plus a label. Connecting has no label:
+        // the chip is the one status on this screen.
+        if (houseLabel != null)
           Text(
-            heroStatus,
+            houseLabel,
             textAlign: TextAlign.center,
-            style: theme.textTheme.bodySmall?.copyWith(color: statusInk),
+            style: theme.textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
           ),
       ],
     );
@@ -1037,6 +1023,25 @@ class _ServerChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final line = theme.colorScheme.outline;
+    final dark = theme.brightness == Brightness.dark;
+    final pillFill = Color.lerp(
+      theme.colorScheme.surface,
+      dotColor,
+      dark ? 0.18 : 0.09,
+    )!;
+    final pillLit = Color.lerp(
+      pillFill,
+      AppBrand.lightSource,
+      dark ? 0.05 : 0.20,
+    )!;
+    final pillEdge = Color.lerp(
+      theme.colorScheme.surface,
+      dotColor,
+      dark ? 0.55 : 0.35,
+    )!;
+    final pillShadow = dark
+        ? Colors.black.withValues(alpha: 0.30)
+        : Colors.black.withValues(alpha: 0.08);
     return Material(
       color: theme.colorScheme.surface,
       shape: RoundedRectangleBorder(
@@ -1090,34 +1095,83 @@ class _ServerChip extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              // Profile on the left, state on the right edge. The chevron
-              // spent the last 20 dp on a second "this is tappable" and left
-              // the status floating short of the edge.
-              Flexible(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: dotColor,
-                      ),
+              // Profile on the left, state pinned to the right edge. The state
+              // is a small milled key, not bare text: a tinted plate, a lit top
+              // edge and a soft shadow, the same light language as the house.
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 190),
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(12, 7, 10, 7),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(999),
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [pillLit, pillFill],
                     ),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        statusText,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.right,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: statusInk,
+                    border: Border.all(color: pillEdge),
+                    boxShadow: [
+                      BoxShadow(
+                        color: pillShadow,
+                        blurRadius: 6,
+                        spreadRadius: -2,
+                        offset: const Offset(0, 2),
+                      ),
+                      BoxShadow(
+                        color: AppBrand.lightSource.withValues(
+                          alpha: dark ? 0.05 : 0.35,
+                        ),
+                        blurRadius: 0,
+                        spreadRadius: -1,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          statusText,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.right,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: statusInk,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14.5,
+                            letterSpacing: 0.1,
+                            height: 1.1,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 9),
+                      Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: dotColor,
+                          border: Border.all(
+                            color: Color.lerp(
+                              dotColor,
+                              AppBrand.lightSource,
+                              0.35,
+                            )!,
+                            width: 1.4,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: dotColor.withValues(alpha: 0.35),
+                              blurRadius: 5,
+                              spreadRadius: 1,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],

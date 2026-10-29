@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/config.dart';
+import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../l10n/app_localizations.dart';
@@ -16,6 +17,10 @@ class VpnDisclosureDialog extends StatelessWidget {
 
   /// Returns true if the user already accepted, or accepts now.
   static Future<bool> ensureAccepted(BuildContext context) async {
+    // Windows has no VpnService prompt and no Play disclosure. The desktop
+    // onboarding already carries the privacy line, so a full-screen mobile
+    // dialog here only made the PC build feel like a phone app.
+    if (windowsDesktop) return true;
     if (await VpnDisclosurePrefs.isAccepted()) return true;
     if (!context.mounted) return false;
     final ok = await showDialog<bool>(

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/diagnostics/ui_log.dart';
+import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
 import '../../../core/toasts/proxy_dom_toast.dart';
 import '../../../core/widgets/app_icon.dart';
@@ -161,10 +162,10 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
                 : links.isEmpty
                     ? 'empty'
                     : switch (dial) {
-                    ShareImportDial.singleUnsupported => 'hy2_only',
-                    ShareImportDial.noneDialable => 'no_hy2',
-                    ShareImportDial.dialable => null,
-                  };
+                        ShareImportDial.singleUnsupported => 'hy2_only',
+                        ShareImportDial.noneDialable => 'no_hy2',
+                        ShareImportDial.dialable => null,
+                      };
       });
     } on FormatException {
       UiLog.action('import', 'preview', result: 'bad');
@@ -233,6 +234,14 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
       !_loadingPreview &&
       (_error == null || _error == 'no_hy2') &&
       (_subscriptionUrl || _preview.isNotEmpty || _skipped.isNotEmpty);
+
+  void _goBack() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/home');
+    }
+  }
 
   /// Saves the draft and dials it.
   ///
@@ -304,291 +313,323 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
     final dark = theme.brightness == Brightness.dark;
     final mute = dark ? AppBrand.inkMutedDark : AppBrand.inkMutedLight;
 
+    if (windowsDesktop) {
+      return _WindowsAddScreen(
+        controller: _controller,
+        focusNode: _fieldFocus,
+        onChanged: _previewInput,
+        onPaste: _pasteClipboard,
+        onScan: () {
+          UiLog.action('import', 'scan');
+          openFreeClientCapture(context);
+        },
+        onClear: () {
+          _controller.clear();
+          _previewInput('');
+        },
+        onBack: _goBack,
+        onSave: _canSave ? () => _save() : null,
+        loading: _loadingPreview,
+        errorText: _error == null ? null : _errorFor(l),
+        unsupportedText: _skipped.isEmpty
+            ? null
+            : formatUnsupportedImport(
+                countLine: l.freeImportCount(_preview.length, _skipped.length),
+                skipped: _skipped,
+              ),
+        previewTitle: _previewTitle,
+        preview: _preview,
+      );
+    }
+
     // A link and its result are one thing, so they are one column in one
     // measure. On a phone that is the whole width; in a window it is 640px,
     // because a link field stretched across 1400px is the phone layout wearing
     // a big coat.
     return NightBackdrop(
       child: Scaffold(
-      backgroundColor: Colors.transparent,
-      resizeToAvoidBottomInset: true,
-      appBar: AppBar(
         backgroundColor: Colors.transparent,
-        surfaceTintColor: Colors.transparent,
-        leading: _hasSaved
-            ? IconButton(
-                onPressed: () {
-                  if (context.canPop()) {
-                    context.pop();
-                  } else {
-                    context.go('/home');
-                  }
-                },
-                icon: const _AddBackMark(),
-              )
-            : null,
-        title: Text(l.freeAddTitle),
-      ),
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 640),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    child: ListView(
-                      keyboardDismissBehavior:
-                          ScrollViewKeyboardDismissBehavior.onDrag,
-                      children: [
-                        // Step 1 — the link.
-                        AppSurface(
-                          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              _StepLabel('1', l.freeStepLink),
-                              const SizedBox(height: 12),
-                              Container(
-                                decoration: BoxDecoration(
-                                  color: theme.colorScheme.onSurface
-                                      .withValues(alpha: 0.045),
-                                  borderRadius:
-                                      BorderRadius.circular(AppBrand.radiusCard),
-                                  border: Border.all(
-                                    color: _fieldFocus.hasFocus
-                                        ? AppBrand.mascotGold
-                                            .withValues(alpha: 0.75)
-                                        : theme.colorScheme.outline
-                                            .withValues(alpha: 0.6),
-                                    width: _fieldFocus.hasFocus ? 1.6 : 1,
+        resizeToAvoidBottomInset: true,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+          leading: _hasSaved
+              ? IconButton(
+                  onPressed: () {
+                    if (context.canPop()) {
+                      context.pop();
+                    } else {
+                      context.go('/home');
+                    }
+                  },
+                  icon: const _AddBackMark(),
+                )
+              : null,
+          title: Text(l.freeAddTitle),
+        ),
+        body: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: ListView(
+                        keyboardDismissBehavior:
+                            ScrollViewKeyboardDismissBehavior.onDrag,
+                        children: [
+                          // Step 1 — the link.
+                          AppSurface(
+                            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                _StepLabel('1', l.freeStepLink),
+                                const SizedBox(height: 12),
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.onSurface
+                                        .withValues(alpha: 0.045),
+                                    borderRadius: BorderRadius.circular(
+                                        AppBrand.radiusCard),
+                                    border: Border.all(
+                                      color: _fieldFocus.hasFocus
+                                          ? AppBrand.mascotGold
+                                              .withValues(alpha: 0.75)
+                                          : theme.colorScheme.outline
+                                              .withValues(alpha: 0.6),
+                                      width: _fieldFocus.hasFocus ? 1.6 : 1,
+                                    ),
                                   ),
-                                ),
-                                padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
-                                child: TextField(
-                                  controller: _controller,
-                                  focusNode: _fieldFocus,
-                                  minLines: 1,
-                                  maxLines: 1,
-                                  onChanged: _previewInput,
-                                  cursorColor: AppBrand.mascotGold,
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    fontFamily: 'JetBrainsMono',
-                                    fontFamilyFallback: const ['Onest'],
-                                    fontSize: 14,
-                                    height: 1.5,
-                                  ),
-                                  decoration: InputDecoration(
-                                    hintText: l.freeAddHint,
-                                    hintStyle: theme.textTheme.bodyMedium
-                                        ?.copyWith(
-                                      color: mute.withValues(alpha: 0.6),
+                                  padding:
+                                      const EdgeInsets.fromLTRB(14, 6, 6, 6),
+                                  child: TextField(
+                                    controller: _controller,
+                                    focusNode: _fieldFocus,
+                                    minLines: 1,
+                                    maxLines: 1,
+                                    onChanged: _previewInput,
+                                    cursorColor: AppBrand.mascotGold,
+                                    style: theme.textTheme.bodyMedium?.copyWith(
                                       fontFamily: 'JetBrainsMono',
                                       fontFamilyFallback: const ['Onest'],
-                                      fontSize: 13.5,
+                                      fontSize: 14,
+                                      height: 1.5,
                                     ),
-                                    border: InputBorder.none,
-                                    isDense: true,
-                                    contentPadding:
-                                        const EdgeInsets.symmetric(vertical: 12),
-                                    // Paste and scan live in the field: they
-                                    // are input methods, not peer actions next
-                                    // to it.
-                                    suffixIcon: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        IconButton(
-                                          tooltip: l.freePaste,
-                                          onPressed: _pasteClipboard,
-                                          icon: const AppIcon(
-                                            AppIcons.clipboard,
-                                            size: 18,
-                                          ),
-                                        ),
-                                        IconButton(
-                                          tooltip: l.freeQr,
-                                          onPressed: () {
-                                            UiLog.action('import', 'scan');
-                                            openFreeClientCapture(context);
-                                          },
-                                          icon: const AppIcon(
-                                            AppIcons.qrCode,
-                                            size: 18,
-                                          ),
-                                        ),
-                                        if (_controller.text.isNotEmpty)
+                                    decoration: InputDecoration(
+                                      hintText: l.freeAddHint,
+                                      hintStyle:
+                                          theme.textTheme.bodyMedium?.copyWith(
+                                        color: mute.withValues(alpha: 0.6),
+                                        fontFamily: 'JetBrainsMono',
+                                        fontFamilyFallback: const ['Onest'],
+                                        fontSize: 13.5,
+                                      ),
+                                      border: InputBorder.none,
+                                      isDense: true,
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                              vertical: 12),
+                                      // Paste and scan live in the field: they
+                                      // are input methods, not peer actions next
+                                      // to it.
+                                      suffixIcon: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
                                           IconButton(
-                                            onPressed: () {
-                                              _controller.clear();
-                                              _previewInput('');
-                                            },
+                                            tooltip: l.freePaste,
+                                            onPressed: _pasteClipboard,
                                             icon: const AppIcon(
-                                              AppIcons.x,
+                                              AppIcons.clipboard,
                                               size: 18,
                                             ),
                                           ),
-                                      ],
-                                    ),
-                                    suffixIconConstraints: const BoxConstraints(
-                                      minHeight: 48,
-                                      minWidth: 48,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              if (_loadingPreview) ...[
-                                const SizedBox(height: 12),
-                                const SizedBox(
-                                  height: 2,
-                                  child: LinearProgressIndicator(
-                                    color: AppBrand.mascotGold,
-                                    backgroundColor: Colors.transparent,
-                                  ),
-                                ),
-                              ],
-                              if (_error != null) ...[
-                                const SizedBox(height: 12),
-                                _ErrorLine(_errorFor(l)),
-                              ],
-                              if (_skipped.isNotEmpty) ...[
-                                const SizedBox(height: 12),
-                                Text(
-                                  formatUnsupportedImport(
-                                    countLine: l.freeImportCount(
-                                      _preview.length,
-                                      _skipped.length,
-                                    ),
-                                    skipped: _skipped,
-                                  ),
-                                  style: TextStyle(
-                                    color: mute,
-                                    fontSize: 13,
-                                    height: 1.35,
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        // Step 2 — what the link actually brought in.
-                        AppSurface(
-                          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Row(
-                                children: [
-                                  _StepLabel('2', l.freeStepFound),
-                                  const Spacer(),
-                                  if (_preview.isNotEmpty)
-                                    Text(
-                                      '${_preview.length}',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        letterSpacing: 1,
-                                        fontWeight: FontWeight.w700,
-                                        color: AppBrand.mascotGoldLit,
+                                          IconButton(
+                                            tooltip: l.freeQr,
+                                            onPressed: () {
+                                              UiLog.action('import', 'scan');
+                                              openFreeClientCapture(context);
+                                            },
+                                            icon: const AppIcon(
+                                              AppIcons.qrCode,
+                                              size: 18,
+                                            ),
+                                          ),
+                                          if (_controller.text.isNotEmpty)
+                                            IconButton(
+                                              onPressed: () {
+                                                _controller.clear();
+                                                _previewInput('');
+                                              },
+                                              icon: const AppIcon(
+                                                AppIcons.x,
+                                                size: 18,
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                      suffixIconConstraints:
+                                          const BoxConstraints(
+                                        minHeight: 48,
+                                        minWidth: 48,
                                       ),
                                     ),
+                                  ),
+                                ),
+                                if (_loadingPreview) ...[
+                                  const SizedBox(height: 12),
+                                  const SizedBox(
+                                    height: 2,
+                                    child: LinearProgressIndicator(
+                                      color: AppBrand.mascotGold,
+                                      backgroundColor: Colors.transparent,
+                                    ),
+                                  ),
                                 ],
-                              ),
-                              if (_previewTitle != null &&
-                                  _previewTitle!.isNotEmpty) ...[
-                                const SizedBox(height: 10),
-                                Text(
-                                  _previewTitle!.toUpperCase(),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: 1.1,
-                                  ),
-                                ),
-                              ],
-                              const SizedBox(height: 12),
-                              if (_loadingPreview)
-                                const Padding(
-                                  padding: EdgeInsets.symmetric(vertical: 18),
-                                  child: Center(
-                                    child: SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: AppBrand.mascotGold,
+                                if (_error != null) ...[
+                                  const SizedBox(height: 12),
+                                  _ErrorLine(_errorFor(l)),
+                                ],
+                                if (_skipped.isNotEmpty) ...[
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    formatUnsupportedImport(
+                                      countLine: l.freeImportCount(
+                                        _preview.length,
+                                        _skipped.length,
                                       ),
+                                      skipped: _skipped,
+                                    ),
+                                    style: TextStyle(
+                                      color: mute,
+                                      fontSize: 13,
+                                      height: 1.35,
                                     ),
                                   ),
-                                )
-                              else if (_error != null &&
-                                  _error != 'no_hy2' &&
-                                  _error != 'hy2_only')
-                                _EmptyPreview(l.freeFieldEmpty)
-                              else if (_preview.isEmpty)
-                                _EmptyPreview(l.freeEmptyBody)
-                              else
-                                for (var i = 0; i < _preview.length; i++) ...[
-                                  // The same ruled line the servers tab draws:
-                                  // this is the same list, one step before it is
-                                  // saved, so it has to look like itself.
-                                  if (i > 0) const NodeRule(),
-                                  Builder(
-                                    builder: (context) {
-                                      final label =
-                                          labelForShareLink(_preview[i]);
-                                      final dialable = canDialLink(
-                                        _preview[i],
-                                      );
-                                      return NodeLine(
-                                        label: label,
-                                        protocol: protocolMark(
-                                          _preview[i].scheme,
+                                ],
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          // Step 2 — what the link actually brought in.
+                          AppSurface(
+                            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Row(
+                                  children: [
+                                    _StepLabel('2', l.freeStepFound),
+                                    const Spacer(),
+                                    if (_preview.isNotEmpty)
+                                      Text(
+                                        '${_preview.length}',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          letterSpacing: 1,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppBrand.mascotGoldLit,
                                         ),
-                                        dialable: dialable,
-                                        endpoint: dialable
-                                            ? (label.subtitle.isEmpty
-                                                ? _preview[i].endpoint
-                                                : label.subtitle)
-                                            : l.freeSchemeParked,
-                                        selected: false,
-                                        onTap: () {},
-                                      );
-                                    },
+                                      ),
+                                  ],
+                                ),
+                                if (_previewTitle != null &&
+                                    _previewTitle!.isNotEmpty) ...[
+                                  const SizedBox(height: 10),
+                                  Text(
+                                    _previewTitle!.toUpperCase(),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.titleSmall?.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 1.1,
+                                    ),
                                   ),
                                 ],
-                            ],
+                                const SizedBox(height: 12),
+                                if (_loadingPreview)
+                                  const Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 18),
+                                    child: Center(
+                                      child: SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: AppBrand.mascotGold,
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                else if (_error != null &&
+                                    _error != 'no_hy2' &&
+                                    _error != 'hy2_only')
+                                  _EmptyPreview(l.freeFieldEmpty)
+                                else if (_preview.isEmpty)
+                                  _EmptyPreview(l.freeEmptyBody)
+                                else
+                                  for (var i = 0; i < _preview.length; i++) ...[
+                                    // The same ruled line the servers tab draws:
+                                    // this is the same list, one step before it is
+                                    // saved, so it has to look like itself.
+                                    if (i > 0) const NodeRule(),
+                                    Builder(
+                                      builder: (context) {
+                                        final label =
+                                            labelForShareLink(_preview[i]);
+                                        final dialable = canDialLink(
+                                          _preview[i],
+                                        );
+                                        return NodeLine(
+                                          label: label,
+                                          protocol: protocolMark(
+                                            _preview[i].scheme,
+                                          ),
+                                          dialable: dialable,
+                                          endpoint: dialable
+                                              ? (label.subtitle.isEmpty
+                                                  ? _preview[i].endpoint
+                                                  : label.subtitle)
+                                              : l.freeSchemeParked,
+                                          selected: false,
+                                          onTap: () {},
+                                        );
+                                      },
+                                    ),
+                                  ],
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 14),
-                  // Two keys, in the app's own key language, primary first.
-                  // One key. «Сохранить» and «Только сохранить» asked the same question with
-                  // two answers, and a person who cannot tell them apart
-                  // guesses. The key saves and dials; if the link has nothing
-                  // dialable in it, the key stays dead and the second step
-                  // says why. It is not stretched: a button across the whole
-                  // measure is a banner, not a key.
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: AppActionButton(
-                      onPressed: _canSave ? () => _save() : null,
-                      icon: AppIcons.check,
-                      label: l.freeSaveConnect,
-                      color: AppBrand.mascotGold,
-                      height: 50,
+                    const SizedBox(height: 14),
+                    // Two keys, in the app's own key language, primary first.
+                    // One key. «Сохранить» and «Только сохранить» asked the same question with
+                    // two answers, and a person who cannot tell them apart
+                    // guesses. The key saves and dials; if the link has nothing
+                    // dialable in it, the key stays dead and the second step
+                    // says why. It is not stretched: a button across the whole
+                    // measure is a banner, not a key.
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: AppActionButton(
+                        onPressed: _canSave ? () => _save() : null,
+                        icon: AppIcons.check,
+                        label: l.freeSaveConnect,
+                        color: AppBrand.mascotGold,
+                        height: 50,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
         ),
-      ),
       ),
     );
   }
@@ -619,43 +660,43 @@ class _StepLabel extends StatelessWidget {
     final rule = Container(height: 1, color: mute.withValues(alpha: 0.16));
     return LayoutBuilder(
       builder: (context, box) => Row(
-      children: [
-        Container(
-          width: 16,
-          height: 16,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(4),
-            border: Border.all(
-              color: AppBrand.mascotGold.withValues(alpha: 0.7),
+        children: [
+          Container(
+            width: 16,
+            height: 16,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(
+                color: AppBrand.mascotGold.withValues(alpha: 0.7),
+              ),
+            ),
+            child: Text(
+              step,
+              style: const TextStyle(
+                fontFamily: 'JetBrainsMono',
+                fontSize: 9.5,
+                fontWeight: FontWeight.w700,
+                color: AppBrand.mascotGoldLit,
+              ),
             ),
           ),
-          child: Text(
-            step,
-            style: const TextStyle(
-              fontFamily: 'JetBrainsMono',
-              fontSize: 9.5,
+          const SizedBox(width: 9),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 12.5,
+              letterSpacing: 0.2,
               fontWeight: FontWeight.w700,
-              color: AppBrand.mascotGoldLit,
+              color: mute,
             ),
           ),
-        ),
-        const SizedBox(width: 9),
-        Text(
-          text,
-          style: TextStyle(
-            fontSize: 12.5,
-            letterSpacing: 0.2,
-            fontWeight: FontWeight.w700,
-            color: mute,
-          ),
-        ),
-        const SizedBox(width: 10),
-        // The rule fills what is left, but only where "what is left" exists:
-        // a Row with Expanded under an unbounded width throws, and this label
-        // is also measured inside unbounded probes.
-        if (box.hasBoundedWidth) Expanded(child: rule) else rule,
-      ],
+          const SizedBox(width: 10),
+          // The rule fills what is left, but only where "what is left" exists:
+          // a Row with Expanded under an unbounded width throws, and this label
+          // is also measured inside unbounded probes.
+          if (box.hasBoundedWidth) Expanded(child: rule) else rule,
+        ],
       ),
     );
   }
@@ -736,6 +777,456 @@ class _AddBackMark extends StatelessWidget {
         AppIcons.back,
         size: 18,
         color: dark ? AppBrand.inkDark : AppBrand.inkLight,
+      ),
+    );
+  }
+}
+
+class _WindowsAddScreen extends StatelessWidget {
+  const _WindowsAddScreen({
+    required this.controller,
+    required this.focusNode,
+    required this.onChanged,
+    required this.onPaste,
+    required this.onScan,
+    required this.onClear,
+    required this.onBack,
+    required this.onSave,
+    required this.loading,
+    required this.errorText,
+    required this.unsupportedText,
+    required this.previewTitle,
+    required this.preview,
+  });
+
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onPaste;
+  final VoidCallback onScan;
+  final VoidCallback onClear;
+  final VoidCallback onBack;
+  final VoidCallback? onSave;
+  final bool loading;
+  final String? errorText;
+  final String? unsupportedText;
+  final String? previewTitle;
+  final List<ParsedShareLink> preview;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppL10n.of(context);
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    final mute = dark ? AppBrand.inkMutedDark : AppBrand.inkMutedLight;
+
+    return NightBackdrop(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        resizeToAvoidBottomInset: true,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+          automaticallyImplyLeading: false,
+          title: Text(l.freeAddTitle),
+        ),
+        body: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1080),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(28, 8, 28, 18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: LayoutBuilder(
+                        builder: (context, box) {
+                          final wide = box.maxWidth >= 720;
+                          final link = _linkPanel(
+                            l,
+                            theme,
+                            mute,
+                            fill: wide,
+                          );
+                          final found = _foundPanel(
+                            l,
+                            theme,
+                            mute,
+                            fill: wide,
+                          );
+                          if (!wide) {
+                            return ListView(
+                              keyboardDismissBehavior:
+                                  ScrollViewKeyboardDismissBehavior.onDrag,
+                              children: [
+                                link,
+                                const SizedBox(height: 14),
+                                found,
+                              ],
+                            );
+                          }
+                          return Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              SizedBox(width: 340, child: link),
+                              const SizedBox(width: 18),
+                              Expanded(child: found),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    _footer(l, theme),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _linkPanel(
+    AppL10n l,
+    ThemeData theme,
+    Color mute, {
+    required bool fill,
+  }) {
+    return AppSurface(
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: fill ? MainAxisSize.max : MainAxisSize.min,
+        children: [
+          _ImportSectionHeader(
+            icon: AppIcons.link,
+            title: l.freeStepLink,
+          ),
+          const SizedBox(height: 14),
+          Container(
+            decoration: BoxDecoration(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.045),
+              borderRadius: BorderRadius.circular(AppBrand.radiusCard),
+              border: Border.all(
+                color: focusNode.hasFocus
+                    ? AppBrand.mascotGold.withValues(alpha: 0.75)
+                    : theme.colorScheme.outline.withValues(alpha: 0.6),
+                width: focusNode.hasFocus ? 1.6 : 1,
+              ),
+            ),
+            padding: const EdgeInsets.fromLTRB(14, 4, 4, 4),
+            child: TextField(
+              controller: controller,
+              focusNode: focusNode,
+              minLines: 1,
+              maxLines: 3,
+              onChanged: onChanged,
+              cursorColor: AppBrand.mascotGold,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontFamily: 'JetBrainsMono',
+                fontFamilyFallback: const ['Onest'],
+                fontSize: 14,
+                height: 1.5,
+              ),
+              decoration: InputDecoration(
+                hintText: l.freeAddHint,
+                hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                  color: mute.withValues(alpha: 0.6),
+                  fontFamily: 'JetBrainsMono',
+                  fontFamilyFallback: const ['Onest'],
+                  fontSize: 13.5,
+                ),
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                suffixIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: l.freePaste,
+                      onPressed: onPaste,
+                      icon: const AppIcon(AppIcons.clipboard, size: 18),
+                    ),
+                    IconButton(
+                      tooltip: l.freeQr,
+                      onPressed: onScan,
+                      icon: const AppIcon(AppIcons.qrCode, size: 18),
+                    ),
+                    if (controller.text.isNotEmpty)
+                      IconButton(
+                        onPressed: onClear,
+                        icon: const AppIcon(AppIcons.x, size: 18),
+                      ),
+                  ],
+                ),
+                suffixIconConstraints: const BoxConstraints(
+                  minHeight: 48,
+                  minWidth: 48,
+                ),
+              ),
+            ),
+          ),
+          if (loading) ...[
+            const SizedBox(height: 12),
+            const SizedBox(
+              height: 2,
+              child: LinearProgressIndicator(
+                color: AppBrand.mascotGold,
+                backgroundColor: Colors.transparent,
+              ),
+            ),
+          ],
+          if (errorText != null) ...[
+            const SizedBox(height: 12),
+            _ErrorLine(errorText!),
+          ],
+          if (unsupportedText != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              unsupportedText!,
+              style: TextStyle(
+                color: mute,
+                fontSize: 13,
+                height: 1.35,
+              ),
+            ),
+          ],
+          if (fill) ...[
+            const Spacer(),
+            const SizedBox(height: 20),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AppIcon(AppIcons.shieldCheck, size: 16, color: mute),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    l.vpnDisclosureBullet2,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: mute,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _foundPanel(
+    AppL10n l,
+    ThemeData theme,
+    Color mute, {
+    required bool fill,
+  }) {
+    final content = loading
+        ? const Padding(
+            padding: EdgeInsets.symmetric(vertical: 28),
+            child: Center(
+              child: SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppBrand.mascotGold,
+                ),
+              ),
+            ),
+          )
+        : preview.isEmpty
+            ? _ImportEmpty(l.freeFoundEmpty)
+            : _previewList(l);
+
+    return AppSurface(
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: fill ? MainAxisSize.max : MainAxisSize.min,
+        children: [
+          _ImportSectionHeader(
+            icon: AppIcons.servers,
+            title: l.freeStepFound,
+            trailing: preview.isEmpty
+                ? null
+                : Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppBrand.mascotGold.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      '${preview.length}',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: AppBrand.mascotGoldLit,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+          ),
+          if (previewTitle != null && previewTitle!.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              previewTitle!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          if (fill)
+            Expanded(
+              child: preview.isEmpty || loading
+                  ? Center(child: content)
+                  : SingleChildScrollView(child: content),
+            )
+          else
+            content,
+        ],
+      ),
+    );
+  }
+
+  Widget _previewList(AppL10n l) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var i = 0; i < preview.length; i++) ...[
+          if (i > 0) const NodeRule(),
+          Builder(
+            builder: (context) {
+              final label = labelForShareLink(preview[i]);
+              final dialable = canDialLink(preview[i]);
+              return NodeLine(
+                label: label,
+                protocol: protocolMark(preview[i].scheme),
+                dialable: dialable,
+                endpoint: dialable
+                    ? (label.subtitle.isEmpty
+                        ? preview[i].endpoint
+                        : label.subtitle)
+                    : l.freeSchemeParked,
+                selected: false,
+                onTap: () {},
+              );
+            },
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _footer(AppL10n l, ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.only(top: 12),
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          TextButton.icon(
+            onPressed: onBack,
+            icon: const AppIcon(AppIcons.back, size: 16),
+            label: Text(l.navBack),
+          ),
+          const Spacer(),
+          AppActionButton(
+            onPressed: onSave,
+            icon: AppIcons.check,
+            label: l.freeSaveConnect,
+            color: AppBrand.mascotGold,
+            height: 46,
+            expand: false,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ImportSectionHeader extends StatelessWidget {
+  const _ImportSectionHeader({
+    required this.icon,
+    required this.title,
+    this.trailing,
+  });
+
+  final IconData icon;
+  final String title;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        AppIcon(icon, size: 18, color: AppBrand.mascotGold),
+        const SizedBox(width: 9),
+        Text(
+          title,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.2,
+          ),
+        ),
+        if (trailing != null) ...[
+          const Spacer(),
+          trailing!,
+        ],
+      ],
+    );
+  }
+}
+
+class _ImportEmpty extends StatelessWidget {
+  const _ImportEmpty(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    final mute = dark ? AppBrand.inkMutedDark : AppBrand.inkMutedLight;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 36),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.05),
+              shape: BoxShape.circle,
+            ),
+            child: AppIcon(AppIcons.search, size: 20, color: mute),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            text,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: mute,
+              height: 1.4,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -4,10 +4,54 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:proxydom/core/widgets/app_action_button.dart';
+import 'package:proxydom/core/widgets/app_icon.dart';
 import 'package:proxydom/features/vpn/presentation/hy2_import_screen.dart';
 import 'package:proxydom/l10n/app_localizations.dart';
 
 void main() {
+  testWidgets('Windows keeps Back in the footer, out of the caption band', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    try {
+      final router = GoRouter(
+        routes: [
+          GoRoute(
+            path: '/',
+            builder: (context, state) => const Hy2ImportScreen(),
+          ),
+          GoRoute(
+            path: '/home',
+            builder: (context, state) => const Text('home'),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp.router(
+            routerConfig: router,
+            locale: const Locale('ru'),
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // The leading mark is gone: the Windows caption answers that press as a
+      // window drag. Back is a normal footer button instead.
+      expect(find.byIcon(AppIcons.back), findsOneWidget);
+      expect(find.text('Назад'), findsOneWidget);
+
+      await tester.ensureVisible(find.text('Назад'));
+      await tester.tap(find.text('Назад'));
+      await tester.pumpAndSettle();
+      expect(find.text('home'), findsOneWidget);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
   testWidgets('add screen stays inside the keyboard inset', (tester) async {
     final router = GoRouter(
       routes: [
@@ -74,7 +118,9 @@ void main() {
     expect(find.text('Ошибка подключения'), findsNothing);
   });
 
-  testWidgets('a lone vless key over an unsupported transport is refused on Windows', (tester) async {
+  testWidgets(
+      'a lone vless key over an unsupported transport is refused on Windows',
+      (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.windows;
     try {
       await _pumpImport(tester);
@@ -99,7 +145,8 @@ void main() {
     }
   });
 
-  testWidgets('a lone vless key over WebSocket is accepted on Windows', (tester) async {
+  testWidgets('a lone vless key over WebSocket is accepted on Windows',
+      (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.windows;
     try {
       await _pumpImport(tester);
