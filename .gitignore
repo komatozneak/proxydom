@@ -8,6 +8,10 @@ secrets/
 .gcp/
 .aws/
 
+# Code-signing containers: a PFX is a private key, password or not.
+*.pfx
+*.p12
+
 # Python
 __pycache__/
 *.py[cod]

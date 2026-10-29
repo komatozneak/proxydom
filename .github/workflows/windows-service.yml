@@ -16,6 +16,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The signing script is what makes Smart App Control accept the build on
+  # Windows 11. Its self-test signs a real PE with a throwaway certificate, so a
+  # broken SignTool call fails here instead of in a release.
+  signing:
+    name: Signing self-test
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Self-test under PowerShell 7
+        shell: pwsh
+        working-directory: desktop/windows/installer
+        run: ./test-sign.ps1
+
+      - name: Self-test under Windows PowerShell 5.1
+        shell: powershell
+        working-directory: desktop/windows/installer
+        run: ./test-sign.ps1
+
   # CI has no staged payload; the self-test plants the binaries the check must
   # reject. build-msi.ps1 runs the same check on the real payload (ADR 036).
   payload-licenses:

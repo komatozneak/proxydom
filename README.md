@@ -79,6 +79,8 @@ XCFramework для iOS и обычный `.exe` для Windows. Это сдел�
 | Поднять свой сервер Hysteria2 | [`docs/guide/own-hy2-server.md`](docs/guide/own-hy2-server.md) |
 | Понять, как вставить ссылку и подключиться | [`docs/guide/using-the-client.md`](docs/guide/using-the-client.md) |
 | Что-то не подключается | [`docs/guide/troubleshooting.md`](docs/guide/troubleshooting.md) |
+| Windows блокирует запуск (Smart App Control) | [`docs/guide/windows-sac.md`](docs/guide/windows-sac.md) |
+| Подписать Windows-сборку, пройти Smart App Control | [`docs/windows-signing.md`](docs/windows-signing.md) |
 | Правила для ИИ-агентов | [`AGENTS.md`](AGENTS.md), [`mobile/AGENTS.md`](mobile/AGENTS.md) |
 
 Начать стоит с [`docs/guide/README.md`](docs/guide/README.md) — там оглавление
@@ -112,6 +114,11 @@ python -m pip install lief==1.0.0
 Готовый архив **не коммитится** — это продукт сборки. В CI его собирает джоба
 `hy2bind-aar` и передаёт остальным джобам артефактом. Windows-служба и MSI
 собираются скриптами в `desktop/windows/installer/`.
+
+MSI для релиза собирается с `-Signing require`: Windows 11 с включённым Smart
+App Control не запускает неподписанные программы, а антивирусы не накапливают
+репутацию у файла без издателя. Что нужно для подписи и как проверить
+результат — [`docs/windows-signing.md`](docs/windows-signing.md).
 
 ## Проверка
 
