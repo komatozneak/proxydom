@@ -359,7 +359,7 @@ class ProfileInstrument extends StatelessWidget {
                         spacing: 0.2,
                       ),
                     ),
-                  ] else if (traffic != null) ...[
+                  ] else if (manifest == null && traffic != null) ...[
                     const SizedBox(height: 7),
                     Text(
                       traffic,
