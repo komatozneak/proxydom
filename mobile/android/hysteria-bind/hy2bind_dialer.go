@@ -20,6 +20,8 @@ import (
 // datagram is already inside a session. DNS UDP/53 still goes through Hy2.
 var errQuicReject = errors.New("quic-reject")
 
+var errNilMetadata = errors.New("nil metadata")
+
 // EU Hy2 → these Google caches (SK Broadband / LG Uplus) stall YouTube
 // first-frame ~20s. Fail-fast so Cronet uses 142.251/74.125. Not a /24 poison.
 var errSkipCDN = errors.New("skip-cdn")
@@ -53,7 +55,10 @@ type hyDialer struct {
 
 var _ proxy.Proxy = (*hyDialer)(nil)
 
-func (d *hyDialer) DialContext(_ context.Context, m *M.Metadata) (net.Conn, error) {
+func (d *hyDialer) DialContext(ctx context.Context, m *M.Metadata) (net.Conn, error) {
+	if m == nil {
+		return nil, errNilMetadata
+	}
 	if shouldSkipCDN(m.DstIP) {
 		return nil, errSkipCDN
 	}
@@ -62,19 +67,33 @@ func (d *hyDialer) DialContext(_ context.Context, m *M.Metadata) (net.Conn, erro
 	// never received the packet apart from one that received it and could not
 	// dial, which is the difference between a routing fault and a proxy fault.
 	log.Printf("hy2bind dial tcp %s", addr)
+	if shouldHijackDNS(m.DstIP, m.DstPort) {
+		return d.dialRoute("tcp", addr, false, "dns")
+	}
+	if !sniffablePort(m.DstPort) {
+		direct, why := routeFor("", m.DstIP)
+		return d.dialRoute("tcp", addr, direct, why)
+	}
+	return newSniffConn(ctx, m.DstIP, m.DstPort, addr, d), nil
+}
+
+// dialRoute opens the socket the classifier chose and records the flow under
+// the chain it actually used.
+func (d *hyDialer) dialRoute(network, addr string, direct bool, why string) (net.Conn, error) {
 	chain := "proxy"
 	var conn net.Conn
 	var err error
-	if shouldDirectTCP(m) {
+	if direct {
 		chain = "direct"
-		conn, err = d.dialDirect("tcp", addr)
+		conn, err = d.dialDirect(network, addr)
 	} else {
 		conn, err = d.c.TCP(addr)
 	}
 	if err != nil {
 		return nil, err
 	}
-	return trackStream(conn, "tcp", addr, chain), nil
+	log.Printf("hy2bind route %s %s why=%s", chain, addr, why)
+	return trackStream(conn, network, addr, chain), nil
 }
 
 func (d *hyDialer) DialUDP(m *M.Metadata) (net.PacketConn, error) {
@@ -104,14 +123,25 @@ func (d *hyDialer) DialUDP(m *M.Metadata) (net.PacketConn, error) {
 }
 
 func shouldDirectUDP(m *M.Metadata) bool {
-	if m == nil || !udpDirectOn() {
+	if m == nil || m.DstPort == 53 {
 		return false
 	}
-	if shouldHijackDNS(m.DstIP, m.DstPort) {
+	// A name that the resolver answered and that is unambiguously in the list
+	// may leave directly even in the default (proxy-all) mode. This is what
+	// makes a listed voice/game service work while everything else is tunneled.
+	if _, ok := ipAllDirect(m.DstIP); ok {
+		return true
+	}
+	if !udpDirectOn() {
 		return false
 	}
-	if host := hostForIP(m.DstIP); host != "" && isForceProxyHost(host) {
-		return false
+	// Game mode is a protocol bypass, but it must never drag a force-proxied
+	// name out of the tunnel. Check every known name on the address, not just
+	// the first one.
+	for _, host := range hostsForIP(m.DstIP) {
+		if isForceProxyHost(host) {
+			return false
+		}
 	}
 	return true
 }
@@ -132,16 +162,10 @@ func egressAddr(m *M.Metadata) string {
 }
 
 func shouldHijackDNS(ip netip.Addr, port uint16) bool {
-	if port != 53 {
-		return false
-	}
-	if hijackDNSAddr(ip) {
-		return true
-	}
-	if !ip.IsValid() {
-		return true
-	}
-	return ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsUnspecified()
+	// Every DNS query that reached the tunnel is answered by the engine's
+	// hijack. Leaving public resolvers alone made classification depend on
+	// which resolver the user had configured, and leaked the query itself.
+	return port == 53
 }
 
 type udpRecv struct {

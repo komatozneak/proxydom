@@ -52,8 +52,11 @@ func TestShouldHijackDNS(t *testing.T) {
 	if !shouldHijackDNS(lan, 53) {
 		t.Fatal("LAN DNS must be hijacked")
 	}
-	if shouldHijackDNS(cf, 53) {
-		t.Fatal("public DNS must pass through Hy2 UDP")
+	// A public resolver used to be left alone, which made classification depend
+	// on the user's DNS choice and leaked the query itself. Every port 53 that
+	// reached the tunnel is now answered by the engine's hijack.
+	if !shouldHijackDNS(cf, 53) {
+		t.Fatal("public DNS must be hijacked too")
 	}
 	if shouldHijackDNS(yt, 443) {
 		t.Fatal("YouTube QUIC must not be rewritten")
@@ -98,6 +101,11 @@ func TestDialContextSkipsKRCDN(t *testing.T) {
 		DstPort: 443,
 	})
 	if err != nil {
+		t.Fatal(err)
+	}
+	// The dialer now waits for the first bytes to read the name. An HTTP Host
+	// that is not in the list must keep the flow on the proxy.
+	if _, err := c.Write([]byte("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")); err != nil {
 		t.Fatal(err)
 	}
 	_ = c.Close()

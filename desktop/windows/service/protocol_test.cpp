@@ -92,18 +92,21 @@ int main() {
       "\"uri\":\"hy2://secret@cdn.example:443\","
       "\"direct_domains\":[\"steamserver.net\"],"
       "\"force_proxy_domains\":[\"youtube.com\",\"bad host\"],"
+      "\"udp_mode\":\"direct_non_forced\","
       "\"udp_direct\":1}";
   error.clear();
   expect(parse_command(routed_connect, command, error), "routed connect parses");
   expect(command.force_proxy_domains.size() == 1 && command.force_proxy_domains[0] == "youtube.com",
          "force-proxy list keeps good names only");
-  expect(command.udp_direct, "udp_direct 1 is true");
+  expect(command.udp_mode == "direct_non_forced", "the explicit udp mode is parsed");
+  expect(command.udp_direct, "udp_direct 1 is true for an old window");
   error.clear();
   expect(parse_command(
              "{\"command\":\"connect\",\"protocol_version\":3,\"uri\":\"hy2://s@a:443\","
-             "\"udp_direct\":0}",
+             "\"udp_mode\":\"nonsense\",\"udp_direct\":0}",
              command, error),
-         "udp_direct 0 parses");
+         "an unknown udp mode still parses");
+  expect(command.udp_mode == "proxy_all", "an unknown udp mode falls back to proxy_all");
   expect(!command.udp_direct, "udp_direct 0 is false");
   error.clear();
   expect(parse_command(
@@ -111,6 +114,7 @@ int main() {
              command, error),
          "absent udp_direct parses");
   expect(!command.udp_direct, "absent udp_direct stays off");
+  expect(command.udp_mode.empty(), "an absent udp mode is left for the default");
 
   ShareLine line;
   error.clear();
@@ -127,7 +131,7 @@ int main() {
   expect(line.server_ports == "1000:2000", "hop ports");
   expect(line.hop_interval == "30s", "hop interval");
 
-  const auto config = build_engine_config(line, "203.0.113.10", {"lan.example"}, {}, false, 0, "");
+  const auto config = build_engine_config(line, "203.0.113.10", {"lan.example"}, {}, "proxy_all", 0, "");
   expect(config.find("\"name\":\"ProxyDomTun\"") != std::string::npos, "tun name");
   expect(config.find("\"auto_route\":false") != std::string::npos, "engine does not own routes");
   expect(config.find("\"auto_route\":true") == std::string::npos, "auto_route stays off");
@@ -144,31 +148,31 @@ int main() {
   // The lists reach the document in the order the sites screen uses, and the
   // engine applies them: force-proxy wins over a direct suffix and over UDP.
   const auto udp_config =
-      build_engine_config(line, "203.0.113.10", {"steamserver.net"}, {"youtube.com"}, true, 0, "");
-  expect(udp_config.find("\"udp_direct\":true") != std::string::npos, "udp bypass flag is recorded");
-  expect(build_engine_config(line, "203.0.113.10", {}, {}, false, 0, "")
-             .find("\"udp_direct\":true") == std::string::npos,
-         "no udp bypass when the window did not ask");
+      build_engine_config(line, "203.0.113.10", {"steamserver.net"}, {"youtube.com"}, "direct_non_forced", 0, "");
+  expect(udp_config.find("\"udp_mode\":\"direct_non_forced\"") != std::string::npos, "game mode is recorded as a policy");
+  expect(build_engine_config(line, "203.0.113.10", {}, {}, "proxy_all", 0, "")
+             .find("\"udp_mode\":\"proxy_all\"") != std::string::npos,
+         "the default keeps UDP on the tunnel");
   const auto force_at = udp_config.find("youtube.com");
-  const auto udp_at = udp_config.find("\"udp_direct\":true");
   const auto direct_at = udp_config.find("steamserver.net");
-  expect(force_at != std::string::npos && udp_at != std::string::npos && direct_at != std::string::npos,
-         "config carries force-proxy, exclusions, and the udp flag");
-  expect(force_at < udp_at, "force-proxy sits above the udp flag");
-  expect(direct_at < udp_at, "site exclusions sit above the udp flag");
+  const auto mode_at = udp_config.find("\"udp_mode\":\"direct_non_forced\"");
+  expect(force_at != std::string::npos && mode_at != std::string::npos && direct_at != std::string::npos,
+         "config carries force-proxy, exclusions, and the udp mode");
+  expect(force_at < mode_at, "force-proxy sits above the udp mode");
+  expect(direct_at < mode_at, "site exclusions sit above the udp mode");
   expect(udp_config.find("\"force_proxy_domains\":[\"youtube.com\"]") != std::string::npos,
          "force-proxy names are recorded");
 
   expect(config.find("\"api_port\":0") != std::string::npos, "no controller without a port");
-  const auto api_config = build_engine_config(line, "203.0.113.10", {}, {}, true, 19090, "abc123");
+  const auto api_config = build_engine_config(line, "203.0.113.10", {}, {}, "direct_non_forced", 19090, "abc123");
   expect(api_config.find("\"api_port\":19090") != std::string::npos, "api port is recorded");
   expect(api_config.find("\"api_secret\":\"abc123\"") != std::string::npos, "api secret is recorded");
   expect(api_config.find("0.0.0.0:19090") == std::string::npos, "controller is not on a routable address");
-  expect(api_config.find("\"udp_direct\":true") != std::string::npos, "api fields do not drop the udp flag");
-  const auto quoted = build_engine_config(line, "203.0.113.10", {}, {}, false, 19091, "he\"llo\\there");
+  expect(api_config.find("\"udp_mode\":\"direct_non_forced\"") != std::string::npos, "api fields do not drop the udp mode");
+  const auto quoted = build_engine_config(line, "203.0.113.10", {}, {}, "proxy_all", 19091, "he\"llo\\there");
   expect(quoted.find("\"api_secret\":\"he\\\"llo\\\\there\"") != std::string::npos,
          "a quote or a backslash in the secret cannot break the config");
-  const auto no_api = build_engine_config(line, "203.0.113.10", {}, {}, false, 0, "");
+  const auto no_api = build_engine_config(line, "203.0.113.10", {}, {}, "proxy_all", 0, "");
   expect(no_api.find("\"routing_applied\":true") != std::string::npos, "routing flag is always present");
   expect(no_api.find("\"api_port\":0") != std::string::npos, "absent api is port 0");
 
@@ -176,7 +180,7 @@ int main() {
   error.clear();
   expect(parse_share_line("hy2://secret@cdn.example:443/?sni=cdn.example", slash, error), "slash after port parses");
   expect(slash.port == 443 && slash.server_ports.empty(), "slash is not a port range");
-  const auto slash_config = build_engine_config(slash, "203.0.113.10", {}, {}, false, 0, "");
+  const auto slash_config = build_engine_config(slash, "203.0.113.10", {}, {}, "proxy_all", 0, "");
   expect(slash_config.find("server_ports") == std::string::npos, "plain port omits server_ports");
   expect(!parse_share_line("hy2://secret@cdn.example:443abc", slash, error), "junk port is refused");
   expect(error == "port", "junk port error");
@@ -185,7 +189,7 @@ int main() {
   expect(config.find("\"dns_hijack\":true") != std::string::npos, "dns hijack flag is true");
   expect(config.find("secret+pass") != std::string::npos, "password reaches the engine config");
   expect(config.find("172.19.0.1") == std::string::npos, "tun prefix stays outside 172.16/12");
-  expect(build_engine_config(line, "2001:db8::1", {}, {}, false, 0, "").empty(), "refuse ipv6 pin");
+  expect(build_engine_config(line, "2001:db8::1", {}, {}, "proxy_all", 0, "").empty(), "refuse ipv6 pin");
   const auto probe = build_engine_probe_config(line, "203.0.113.10", 17890);
   expect(probe.find("\"probe\":true") != std::string::npos, "probe flag");
   expect(probe.find("\"socks_listen\":\"127.0.0.1:17890\"") != std::string::npos, "probe is loopback only");
@@ -197,7 +201,7 @@ int main() {
   const std::string vless_uri =
       "vless://11111111-2222-3333-4444-555555555555@edge.example:443?security=reality&pbk=pub&sid=abcd&sni=edge.example&flow=xtls-rprx-vision&fp=chrome";
   expect(parse_share_line(vless_uri, vless, error), "parse vless");
-  const auto vless_config = build_engine_config(vless, "203.0.113.11", {}, {}, false, 0, "");
+  const auto vless_config = build_engine_config(vless, "203.0.113.11", {}, {}, "proxy_all", 0, "");
   expect(vless_config.find("\"public_key\":\"pub\"") != std::string::npos, "reality public key");
   expect(vless_config.find("private_key") == std::string::npos, "no server private key");
   expect(vless_config.find("xtls-rprx-vision") != std::string::npos, "flow");
@@ -209,24 +213,21 @@ int main() {
   expect(vless_config.find("\"type\":\"vless\"") != std::string::npos, "vless is named so the engine knows which core to start");
   expect(vless_config.find("\"security\":\"reality\"") != std::string::npos, "reality is described, then refused by the core that lacks it");
 
-  // The flags say what the engine will do. The share document carries neither
-  // the split lists nor a DNS hijack, so a vless line must not be written as if
-  // it did: the engine echoes these into its status line, and a true flag there
-  // claimed routing on a session that dialled every destination verbatim.
+  // Both engines now run the same TUN-level classifier, so the lists reach the
+  // VLESS document too. Only the DNS hijack stays a hysteria2 feature: the
+  // VLESS dialer sends DNS through the core.
   const auto vless_split =
-      build_engine_config(vless, "203.0.113.11", {"lan.example"}, {"youtube.com"}, true, 0, "");
-  expect(vless_split.find("\"routing_applied\":false") != std::string::npos,
-         "vless does not claim routing was applied");
+      build_engine_config(vless, "203.0.113.11", {"lan.example"}, {"youtube.com"}, "direct_non_forced", 0, "");
+  expect(vless_split.find("\"routing_applied\":true") != std::string::npos,
+         "vless applies the site routing now");
   expect(vless_split.find("\"dns_hijack\":false") != std::string::npos,
          "vless does not claim a dns hijack");
-  expect(vless_split.find("\"routing_applied\":true") == std::string::npos,
-         "vless never claims routing was applied");
-  expect(vless_split.find("youtube.com") == std::string::npos,
-         "the force-proxy list does not reach a document that ignores it");
-  expect(vless_split.find("lan.example") == std::string::npos,
-         "the exclusion list does not reach a document that ignores it");
-  expect(vless_split.find("\"udp_direct\":true") == std::string::npos,
-         "vless does not carry the udp bypass flag");
+  expect(vless_split.find("youtube.com") != std::string::npos,
+         "the force-proxy list reaches the vless dialer");
+  expect(vless_split.find("lan.example") != std::string::npos,
+         "the exclusion list reaches the vless dialer");
+  expect(vless_split.find("\"udp_mode\":\"direct_non_forced\"") != std::string::npos,
+         "the udp mode reaches the vless dialer");
   // The same call for hysteria2 still claims what that engine applies.
   expect(config.find("\"routing_applied\":true") != std::string::npos,
          "hysteria2 still claims the routing it applies");
@@ -244,7 +245,7 @@ int main() {
   expect(ws.path == "/ray", "path is decoded");
   expect(ws.ws_host == "cdn.example", "host header is read");
   expect(ws.alpn == "h2,http/1.1", "the alpn list survives");
-  const auto ws_config = build_engine_config(ws, "203.0.113.11", {}, {}, false, 0, "");
+  const auto ws_config = build_engine_config(ws, "203.0.113.11", {}, {}, "proxy_all", 0, "");
   expect(ws_config.find("\"network\":\"ws\"") != std::string::npos, "transport reaches the engine");
   expect(ws_config.find("\"path\":\"/ray\"") != std::string::npos, "path reaches the engine");
   expect(ws_config.find("\"host\":\"cdn.example\"") != std::string::npos, "host reaches the engine");
@@ -258,7 +259,7 @@ int main() {
          "parse a bare vless line");
   expect(bare.network == "tcp", "a bare vless line is tcp");
   expect(bare.security == "tls", "a bare vless line is tls");
-  const auto bare_config = build_engine_config(bare, "203.0.113.11", {}, {}, false, 0, "");
+  const auto bare_config = build_engine_config(bare, "203.0.113.11", {}, {}, "proxy_all", 0, "");
   expect(bare_config.find("\"network\":\"tcp\"") != std::string::npos, "the default transport is written out");
   expect(bare_config.find("\"security\":\"tls\"") != std::string::npos, "the default security is written out");
   // A link that does not ask for a fingerprint gets the core's own TLS, exactly
@@ -282,7 +283,7 @@ int main() {
          "parse a line that names its sni with peer");
   expect(peer.sni == "front.example", "peer is read as the server name");
   expect(peer.host == "1.2.3.4", "peer does not replace the address we dial");
-  const auto peer_config = build_engine_config(peer, "203.0.113.11", {}, {}, false, 0, "");
+  const auto peer_config = build_engine_config(peer, "203.0.113.11", {}, {}, "proxy_all", 0, "");
   expect(peer_config.find("\"sni\":\"front.example\"") != std::string::npos, "peer reaches the engine as sni");
   // An explicit sni still wins over peer, and the address is still the last
   // resort, so the three do not fight.
@@ -320,7 +321,7 @@ int main() {
              kcp, error),
          "parse a kcp vless line");
   expect(kcp.kcp_seed == "obfuscate-me", "the kcp seed is read");
-  const auto kcp_config = build_engine_config(kcp, "203.0.113.11", {}, {}, false, 0, "");
+  const auto kcp_config = build_engine_config(kcp, "203.0.113.11", {}, {}, "proxy_all", 0, "");
   expect(kcp_config.find("\"kcp_seed\":\"obfuscate-me\"") != std::string::npos, "the kcp seed reaches the engine");
 
   // A line with no protocol in it is malformed, which is not the same complaint

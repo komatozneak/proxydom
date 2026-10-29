@@ -156,6 +156,7 @@ struct ConnectRequest {
   std::string uri;
   std::vector<std::string> direct_domains;
   std::vector<std::string> force_proxy_domains;
+  std::string udp_mode;
   bool udp_direct = false;
 };
 

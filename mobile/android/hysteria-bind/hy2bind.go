@@ -40,13 +40,18 @@ type startConfig struct {
 	HopInterval          string   `json:"hop_interval"`
 	ForceProxy           []string `json:"force_proxy_domains"`
 	UDPDirect            bool     `json:"udp_direct"`
-	DNSAddress           string   `json:"dns_address"`
-	APIPort              int      `json:"api_port"`
-	APISecret            string   `json:"api_secret"`
-	Congestion           string   `json:"congestion"`
-	BBRProfile           string   `json:"bbr_profile"`
-	MaxIdleTimeout       string   `json:"max_idle_timeout"`
-	KeepAlivePeriod      string   `json:"keep_alive_period"`
+	// UDPMode is the policy decision, not a transport detail. "proxy_all" keeps
+	// every unclassified datagram on the tunnel; "direct_non_forced" is the
+	// explicit game mode. The legacy udp_direct flag is read but ignored: it
+	// was hardcoded true by the Windows client and silently leaked all UDP.
+	UDPMode         string `json:"udp_mode"`
+	DNSAddress      string `json:"dns_address"`
+	APIPort         int    `json:"api_port"`
+	APISecret       string `json:"api_secret"`
+	Congestion      string `json:"congestion"`
+	BBRProfile      string `json:"bbr_profile"`
+	MaxIdleTimeout  string `json:"max_idle_timeout"`
+	KeepAlivePeriod string `json:"keep_alive_period"`
 	// Declared lists fm field names that were present. Values stay out: a
 	// quicParams blob can carry a secret-shaped string, and the log only
 	// needs to show which knobs the link asked for.
@@ -147,8 +152,7 @@ func Start(configJSON string) string {
 	}
 	setExtraForceSuffixes(cfg.ForceProxy)
 	setDirectSuffixes(cfg.DirectDomainSuffixes)
-	setUDPDirect(cfg.UDPDirect)
-	setHijackDNS(cfg.DNSAddress)
+	setUDPDirect(cfg.UDPMode == "direct_non_forced")
 	prepareOutsideDial()
 	startFlowAPI(cfg.APIPort, cfg.APISecret)
 	mu.Lock()

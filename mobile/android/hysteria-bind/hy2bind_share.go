@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"strconv"
 	"sync"
@@ -70,6 +71,25 @@ func ShareSocksAddr() string {
 	return addr
 }
 
+// shareSplitPolicy is the part of the VLESS document the core itself does not
+// read. It is separated from the v2ray config so the same policy fields that
+// the Hysteria2 start document uses also reach the TUN dialer for VLESS.
+type shareSplitPolicy struct {
+	Direct  []string `json:"direct_domain_suffixes"`
+	Force   []string `json:"force_proxy_domains"`
+	UDPMode string   `json:"udp_mode"`
+}
+
+func applyShareSplitPolicy(configJSON string) {
+	var policy shareSplitPolicy
+	if err := json.Unmarshal([]byte(configJSON), &policy); err != nil {
+		return
+	}
+	setExtraForceSuffixes(policy.Force)
+	setDirectSuffixes(policy.Direct)
+	setUDPDirect(policy.UDPMode == "direct_non_forced")
+}
+
 // StartShare runs v2ray-core inside this gomobile runtime.
 // A second gomobile runtime deadlocks on Pixel, so this is not a separate AAR.
 // [configJSON] holds credentials; do not log it.
@@ -77,6 +97,11 @@ func StartShare(configJSON string) string {
 	if configJSON == "" {
 		return "empty share config"
 	}
+	// The VLESS document carries the same site policy as the Hy2 start
+	// document. Applying it here, before the core starts, keeps one classifier
+	// for both engines: the TUN dialer decides, v2ray only carries the flow.
+	clearSplitState()
+	applyShareSplitPolicy(configJSON)
 	prepareCoreLog(configJSON)
 	registerEngineProtector()
 	lastProtectErr.Store("")
@@ -127,6 +152,10 @@ func stopShare() {
 	// names. ShareSocksAddr already guards on shareRunning, but leaving a dead
 	// port in the variable means the next reader that forgets the guard dials it.
 	shareAddr.Store("")
+	// The policy belongs to this session. A later Hy2 or VLESS session applies
+	// its own before dialling, and leaving the old suffixes here would route a
+	// stopped session's domains if anything still called the classifier.
+	clearSplitState()
 }
 
 func shareRunning() bool {
@@ -207,11 +236,40 @@ type socksDialer struct {
 var _ proxy.Proxy = (*socksDialer)(nil)
 
 func (d *socksDialer) DialContext(ctx context.Context, m *M.Metadata) (net.Conn, error) {
+	if m == nil {
+		return nil, errNilMetadata
+	}
+	addr := m.DestinationAddress()
+	if !sniffablePort(m.DstPort) {
+		direct, why := routeFor("", m.DstIP)
+		return d.dialRoute("tcp", addr, direct, why)
+	}
+	return newSniffConn(ctx, m.DstIP, m.DstPort, addr, d), nil
+}
+
+func (d *socksDialer) dialRoute(network, addr string, direct bool, why string) (net.Conn, error) {
+	chain := "proxy"
+	var conn net.Conn
+	var err error
+	if direct {
+		chain = "direct"
+		conn, err = dialOutsideTun(network, addr)
+	} else {
+		conn, err = d.dialSocks(addr)
+	}
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("hy2bind share route %s %s why=%s", chain, addr, why)
+	return trackStream(conn, network, addr, chain), nil
+}
+
+func (d *socksDialer) dialSocks(dest string) (net.Conn, error) {
 	conn, err := net.DialTimeout("tcp", d.addr, 5*time.Second)
 	if err != nil {
 		return nil, err
 	}
-	if err := socks5Connect(conn, m.DestinationAddress()); err != nil {
+	if err := socks5Connect(conn, dest); err != nil {
 		_ = conn.Close()
 		return nil, err
 	}
@@ -219,6 +277,13 @@ func (d *socksDialer) DialContext(ctx context.Context, m *M.Metadata) (net.Conn,
 }
 
 func (d *socksDialer) DialUDP(m *M.Metadata) (net.PacketConn, error) {
+	if shouldDirectUDP(m) {
+		pc, err := dialOutsideUDP(m.DestinationAddress())
+		if err != nil {
+			return nil, err
+		}
+		return trackPacket(pc, "udp", m.DestinationAddress(), "direct"), nil
+	}
 	conn, err := net.DialTimeout("tcp", d.addr, 5*time.Second)
 	if err != nil {
 		return nil, err

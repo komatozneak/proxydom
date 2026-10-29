@@ -57,7 +57,7 @@ int main(int argc, char** argv) {
     config = build_engine_probe_config(line, server_ip, static_cast<unsigned short>(port));
   } else if (mode == "full") {
     config = build_engine_config(line, server_ip, std::vector<std::string>(),
-                                 std::vector<std::string>(), false,
+                                 std::vector<std::string>(), "proxy_all",
                                  static_cast<unsigned short>(port), "");
   } else {
     std::cerr << "unknown mode\n";

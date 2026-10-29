@@ -42,7 +42,7 @@ func TestDNSCacheDirectDial(t *testing.T) {
 	setDirectSuffixes([]string{"yandex.ru"})
 	ip := netip.MustParseAddr("77.88.8.8")
 	rememberHostIP("yandex.ru", ip)
-	m := &M.Metadata{DstIP: ip, DstPort: 443}
+	m := &M.Metadata{DstIP: ip, DstPort: 22}
 	if !shouldDirectTCP(m) {
 		t.Fatal("cached yandex.ru A must be direct")
 	}
@@ -65,7 +65,7 @@ func TestDNSCacheDirectDial(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = c.Close()
-	if got != "77.88.8.8:443" {
+	if got != "77.88.8.8:22" {
 		t.Fatalf("direct dest %q", got)
 	}
 }
@@ -126,7 +126,6 @@ func TestStartConfigUnmarshalsSuffixes(t *testing.T) {
 
 func TestTunDNSAddressIsHijacked(t *testing.T) {
 	t.Cleanup(clearSplitState)
-	setHijackDNS("198.18.0.2")
 	ip := netip.MustParseAddr("198.18.0.2")
 	if !shouldHijackDNS(ip, 53) {
 		t.Fatal("adapter DNS must be hijacked")
@@ -134,8 +133,10 @@ func TestTunDNSAddressIsHijacked(t *testing.T) {
 	if shouldHijackDNS(ip, 443) {
 		t.Fatal("only port 53")
 	}
-	if shouldHijackDNS(netip.MustParseAddr("1.1.1.1"), 53) {
-		t.Fatal("public DNS is not the adapter address")
+	// A public resolver is hijacked too now: leaving it alone made the
+	// classifier depend on which DNS the user had configured.
+	if !shouldHijackDNS(netip.MustParseAddr("1.1.1.1"), 53) {
+		t.Fatal("public DNS is hijacked on port 53")
 	}
 }
 

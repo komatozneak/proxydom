@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/netip"
 	"strings"
+	"time"
 )
 
 // Minimal DNS (RFC 1035 + RFC 9460 hints) post-filter for Hy2 UDP/53.
@@ -347,6 +348,7 @@ func rememberDNSFromMessage(msg []byte) {
 			return
 		}
 		typ := binary.BigEndian.Uint16(msg[next : next+2])
+		ttl := time.Duration(binary.BigEndian.Uint32(msg[next+4:next+8])) * time.Second
 		rdlen := int(binary.BigEndian.Uint16(msg[next+8 : next+10]))
 		rdataOff := next + 10
 		end := rdataOff + rdlen
@@ -357,7 +359,7 @@ func rememberDNSFromMessage(msg []byte) {
 		case dnsTypeA, dnsTypeAAAA:
 			ip, ok := netip.AddrFromSlice(msg[rdataOff:end])
 			if ok {
-				rememberHostIP(host, ip)
+				rememberHostIPTTL(host, ip, ttl)
 			}
 		}
 		off = end
