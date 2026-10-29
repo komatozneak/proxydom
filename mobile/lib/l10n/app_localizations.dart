@@ -295,6 +295,9 @@ abstract class AppL10n {
   /// **'remaining'**
   String get profileTrafficRemaining;
 
+  /// No description provided for @profileTrafficUsed.
+  ///
+  /// In en, this message translates to:
   /// **'used'**
   String get profileTrafficUsed;
 
