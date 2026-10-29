@@ -139,7 +139,7 @@ void main() {
       russian: true,
       keyHandle: '',
     );
-    expect(facts.map((fact) => fact.text), ['14 ГБ']);
+    expect(facts.map((fact) => fact.text), ['15 ГБ']);
     expect(facts.map((fact) => fact.accent), [true]);
     expect(
       profileUpdatedLabel(
@@ -265,9 +265,9 @@ void main() {
       _wrap(
         _instrument(
           parsedTraffic: const SubscriptionTraffic(
-            upload: 5 * 1024 * 1024 * 1024,
-            download: 5 * 1024 * 1024 * 1024,
-            total: 20 * 1024 * 1024 * 1024,
+            upload: 5 * 1000 * 1000 * 1000,
+            download: 5 * 1000 * 1000 * 1000,
+            total: 20 * 1000 * 1000 * 1000,
           ),
         ),
       ),

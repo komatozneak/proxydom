@@ -3,30 +3,42 @@ import 'package:proxydom/features/vpn/data/subscription_traffic.dart';
 
 void main() {
   const gib = 1024 * 1024 * 1024;
+  const gb = 1000 * 1000 * 1000;
+  const tb = 1000 * 1000 * 1000 * 1000;
 
-  test('remaining is total minus upload and download', () {
+  test('remaining is a decimal total minus upload and download', () {
     final traffic = parseSubscriptionTraffic(
-      'upload=${2 * gib}; download=0; total=${50 * gib}; expire=1700000000',
+      'upload=${2 * gb}; download=0; total=${50 * gb}; expire=1700000000',
     );
     expect(traffic, isNotNull);
-    expect(traffic!.remainingBytes, 48 * gib);
+    expect(traffic!.remainingBytes, 48 * gb);
     expect(formatSubscriptionTraffic(traffic, russian: true), '48 ГБ');
     expect(formatSubscriptionTraffic(traffic, russian: false), '48 GB');
   });
 
-  test('under 10 GiB keeps one decimal', () {
-    final remaining = (1.4 * gib).round();
+  test('under 10 GB keeps one decimal', () {
+    final remaining = (1.4 * gb).round();
     final traffic = parseSubscriptionTraffic(
-      'upload=0; download=${2 * gib - remaining}; total=${2 * gib}',
+      'upload=0; download=${2 * gb - remaining}; total=${2 * gb}',
     );
     expect(formatSubscriptionTraffic(traffic, russian: true), '1,4 ГБ');
     expect(formatSubscriptionTraffic(traffic, russian: false), '1.4 GB');
   });
 
-  test('under 0.1 GiB is shown in megabytes', () {
-    const used = 50 * 1024 * 1024;
+  test('1 TB stays a terabyte instead of 931 GB', () {
     final traffic = parseSubscriptionTraffic(
-      'upload=$used; download=0; total=${80 * 1024 * 1024}',
+      'upload=${27 * gb}; download=0; total=$tb',
+    );
+    expect(formatSubscriptionTraffic(traffic, russian: true), '973 ГБ');
+    expect(formatTrafficAmount(tb, russian: true), '1 ТБ');
+    expect(formatTrafficAmount(tb, russian: false), '1 TB');
+    expect(formatTrafficAmount((1.5 * tb).round(), russian: true), '1,5 ТБ');
+  });
+
+  test('under 1 GB is shown in megabytes', () {
+    const used = 50 * 1000 * 1000;
+    final traffic = parseSubscriptionTraffic(
+      'upload=$used; download=0; total=${80 * 1000 * 1000}',
     );
     expect(formatSubscriptionTraffic(traffic, russian: true), '30 МБ');
     expect(formatSubscriptionTraffic(traffic, russian: false), '30 MB');
@@ -65,7 +77,8 @@ void main() {
       line,
     );
     expect(
-      subscriptionTrafficMeta(header: 'upload=1; download=0; total=2', body: ''),
+      subscriptionTrafficMeta(
+          header: 'upload=1; download=0; total=2', body: ''),
       'upload=1; download=0; total=2',
     );
   });
@@ -111,7 +124,8 @@ void main() {
     expect(trafficRemainderBand(at(5 * gib)), TrafficRemainderBand.from5to20);
     expect(trafficRemainderBand(at(5 * gib - 1)), TrafficRemainderBand.below5);
     expect(
-      trafficRemainderBand(const SubscriptionTraffic(upload: 0, download: 0, total: 0)),
+      trafficRemainderBand(
+          const SubscriptionTraffic(upload: 0, download: 0, total: 0)),
       TrafficRemainderBand.none,
     );
     expect(trafficRemainderBand(null), TrafficRemainderBand.none);

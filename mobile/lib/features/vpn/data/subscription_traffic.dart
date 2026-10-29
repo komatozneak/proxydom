@@ -112,6 +112,9 @@ SubscriptionTraffic? parseSubscriptionTraffic(String? header) {
 
 const _gib = 1024 * 1024 * 1024;
 const _mib = 1024 * 1024;
+const _mb = 1000 * 1000;
+const _gb = 1000 * 1000 * 1000;
+const _tb = 1000 * 1000 * 1000 * 1000;
 
 /// Home pin bands for the remainder. Above 20 GiB is green, 5–20 is yellow,
 /// below 5 is red. A missing header or an unlimited cap is not a band.
@@ -145,16 +148,24 @@ String formatTrafficAmount(int bytes, {required bool russian}) {
 
 String _formatBytes(int bytes, {required bool russian}) {
   final gb = russian ? 'ГБ' : 'GB';
+  final tb = russian ? 'ТБ' : 'TB';
   final mb = russian ? 'МБ' : 'MB';
-  if (bytes < _gib ~/ 10) {
-    final whole = (bytes / _mib).round();
-    return '$whole $mb';
+  if (bytes <= 0) return '0 $mb';
+  if (bytes >= _tb) {
+    return _number(bytes / _tb, tb, russian);
   }
-  final value = bytes / _gib;
-  if (value >= 10) {
-    return '${value.round()} $gb';
+  if (bytes >= _gb) {
+    return _number(bytes / _gb, gb, russian);
   }
-  final shown = value.toStringAsFixed(1);
+  if (bytes >= _mb) {
+    return _number(bytes / _mb, mb, russian);
+  }
+  return '0 $mb';
+}
+
+String _number(double value, String unit, bool russian) {
+  final digits = value >= 10 || value == value.roundToDouble() ? 0 : 1;
+  final shown = value.toStringAsFixed(digits);
   final text = russian ? shown.replaceAll('.', ',') : shown;
-  return '$text $gb';
+  return '$text $unit';
 }
