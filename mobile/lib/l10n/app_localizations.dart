@@ -289,6 +289,14 @@ abstract class AppL10n {
   /// **'UNLIMITED'**
   String get homeTrafficUnlimited;
 
+  String get profileTrafficUsed;
+
+  String get profileTrafficRemaining;
+
+  String get profileTrafficNoData;
+
+  String get profileTrafficStale;
+
   /// No description provided for @homeTrafficAmount.
   ///
   /// In en, this message translates to:

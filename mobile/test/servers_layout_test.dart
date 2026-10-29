@@ -17,6 +17,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:proxydom/core/theme.dart';
 import 'package:proxydom/core/widgets/app_action_button.dart';
 import 'package:proxydom/core/widgets/app_surface.dart';
+import 'package:proxydom/features/vpn/data/profile_manifest.dart';
 import 'package:proxydom/features/vpn/data/subscription_label.dart';
 import 'package:proxydom/features/vpn/data/subscription_traffic.dart';
 import 'package:proxydom/features/vpn/presentation/locations_screen.dart';
@@ -44,7 +45,7 @@ void _seedProfile() {
           'title': 'Мой профиль',
           'url': 'https://panel.example.test/profile',
           'trafficMeta':
-              'upload=5368709120; download=2147483648; total=21474836480',
+              'upload=5000000000; download=2500000000; total=20000000000',
           'lastUpdated': '2026-10-04T12:22:09Z',
           'announce': 'Поддержка и обновления',
           'supportUrl': 'https://t.me/example',
@@ -99,12 +100,18 @@ ProfileInstrument _instrument({
   ],
   String? updated = 'обновлено 04.10',
   SubscriptionTraffic? parsedTraffic,
+  ProfileTraffic? manifestTraffic,
+  DateTime? trafficUpdatedAt,
+  int? updateIntervalHours,
 }) {
   return ProfileInstrument(
     title: 'Мой профиль',
     description: 'Поддержка и обновления',
     facts: facts,
     parsedTraffic: parsedTraffic,
+    manifestTraffic: manifestTraffic,
+    trafficUpdatedAt: trafficUpdatedAt,
+    updateIntervalHours: updateIntervalHours,
     updated: updated,
     selected: false,
     onNodeTap: (_) {},
@@ -275,8 +282,98 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(kProfileTrafficBarKey), findsOneWidget);
-    expect(find.text('10 ГБ / 20 ГБ'), findsOneWidget);
+    expect(find.text('использовано 10 ГБ / 20 ГБ'), findsOneWidget);
     expect(find.text('50%'), findsOneWidget);
+  });
+
+  testWidgets('unlimited, unknown and used-only states are distinct',
+      (tester) async {
+    await tester.pumpWidget(
+      _wrap(
+        _instrument(
+          facts: const [],
+          manifestTraffic: const ProfileTraffic(
+            unlimited: true,
+            download: 123456789,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('БЕЗ ЛИМИТА'), findsOneWidget);
+    expect(find.byKey(kProfileTrafficBarKey), findsNothing);
+
+    await tester.pumpWidget(
+      _wrap(_instrument(facts: const [])),
+    );
+    await tester.pump();
+    expect(find.text('нет данных о трафике'), findsOneWidget);
+    expect(find.byKey(kProfileTrafficBarKey), findsNothing);
+
+    await tester.pumpWidget(
+      _wrap(
+        _instrument(
+          facts: const [],
+          manifestTraffic: const ProfileTraffic(download: 27000000000),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('использовано 27 ГБ'), findsOneWidget);
+    expect(find.byKey(kProfileTrafficBarKey), findsNothing);
+  });
+
+  testWidgets('a 1 TB profile shows an honest decimal total', (tester) async {
+    await tester.pumpWidget(
+      _wrap(
+        _instrument(
+          facts: const [],
+          manifestTraffic: const ProfileTraffic(
+            download: 27000000000,
+            total: 1000000000000,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('973 ГБ'), findsOneWidget);
+    expect(find.text('использовано 27 ГБ / 1 ТБ'), findsOneWidget);
+    expect(find.text('2,7%'), findsOneWidget);
+  });
+
+  testWidgets('exhausted and stale profiles keep their facts', (tester) async {
+    await tester.pumpWidget(
+      _wrap(
+        _instrument(
+          facts: const [],
+          manifestTraffic: const ProfileTraffic(
+            download: 100000000000,
+            total: 100000000000,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Трафик закончился'), findsOneWidget);
+    expect(find.text('100%'), findsOneWidget);
+
+    await tester.pumpWidget(
+      _wrap(
+        _instrument(
+          facts: const [],
+          updated: 'обновлено 01.10',
+          trafficUpdatedAt: DateTime.utc(2026, 10, 1),
+          manifestTraffic: const ProfileTraffic(
+            download: 27000000000,
+            total: 100000000000,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.textContaining('устарело'), findsOneWidget);
+    expect(find.text('73 ГБ'), findsOneWidget);
   });
 
   testWidgets('profile and nodes are two sections of one plate',

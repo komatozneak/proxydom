@@ -6,10 +6,24 @@ import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/app_surface.dart';
 import '../../../core/widgets/terminal_type.dart';
 import '../../../l10n/app_localizations.dart';
+import '../data/profile_manifest.dart';
 import '../data/subscription_traffic.dart';
 import 'server_instrument_parts.dart';
 
 const kProfileTrafficBarKey = ValueKey<String>('profile-traffic-bar');
+
+String _number(double value, {required bool russian}) {
+  final shown = value.toStringAsFixed(1);
+  return russian ? shown.replaceAll('.', ',') : shown;
+}
+
+bool _trafficIsStale(DateTime? at, int? intervalHours) {
+  if (at == null) return false;
+  final limitHours =
+      ((intervalHours == null ? 48 : intervalHours * 2)).clamp(12, 168).toInt();
+  final age = DateTime.now().toUtc().difference(at);
+  return !age.isNegative && age.inHours > limitHours;
+}
 
 /// A bought profile, drawn as an instrument.
 ///
@@ -26,6 +40,10 @@ class ProfileInstrument extends StatelessWidget {
     required this.description,
     required this.facts,
     this.parsedTraffic,
+    this.manifestTraffic,
+    this.planName,
+    this.trafficUpdatedAt,
+    this.updateIntervalHours,
     this.updated,
     required this.selected,
     required this.nodes,
@@ -53,6 +71,13 @@ class ProfileInstrument extends StatelessWidget {
 
   /// The document's cap, if it had one. Drives the watermark and the bar.
   final SubscriptionTraffic? parsedTraffic;
+
+  /// New-style quota from `proxydom-profile`. It wins over [parsedTraffic].
+  final ProfileTraffic? manifestTraffic;
+
+  final String? planName;
+  final DateTime? trafficUpdatedAt;
+  final int? updateIntervalHours;
 
   /// «обновлено 04.10», already formatted. Drawn on the pass stub.
   final String? updated;
@@ -108,30 +133,50 @@ class ProfileInstrument extends StatelessWidget {
             selected ? 0.04 : 0.016,
           )!;
 
-    final trafficData = parsedTraffic;
     final russian = Localizations.localeOf(context).languageCode == 'ru';
-    final remainingLabel = trafficData == null
+    final legacy = parsedTraffic;
+    final manifest = manifestTraffic;
+    final unlimited = manifest?.unlimited == true ||
+        (manifest == null && legacy?.unlimited == true);
+    final usedBytes = manifest?.usedBytes ??
+        (legacy == null ? 0 : legacy.upload + legacy.download);
+    final totalBytes = manifest?.total ??
+        (legacy != null && !legacy.unlimited ? legacy.total : null);
+    final capped = !unlimited && totalBytes != null && totalBytes > 0;
+    final exhausted = capped && usedBytes >= totalBytes;
+    final usedOnly = !unlimited && !capped && usedBytes > 0;
+    final ratio = capped ? (usedBytes / totalBytes).clamp(0.0, 1.0) : null;
+    final percent = ratio == null ? null : ratio * 100;
+    final percentLabel = percent == null
         ? null
-        : formatSubscriptionTraffic(trafficData, russian: russian);
-    final cappedBytes = trafficData?.total ?? 0;
-    final usedBytes =
-        trafficData == null ? 0 : trafficData.upload + trafficData.download;
-    final ratio =
-        trafficData == null || trafficData.unlimited || cappedBytes <= 0
-            ? null
-            : (usedBytes / cappedBytes).clamp(0.0, 1.0);
-    final percent = ratio == null ? null : (ratio * 100).round();
-    final lowTraffic = trafficData != null &&
-        !trafficData.unlimited &&
-        trafficRemainderBand(trafficData) == TrafficRemainderBand.below5;
-    final barColor = lowTraffic
-        ? (dark ? AppBrand.inkDangerDark : AppBrand.inkDangerLight)
-        : gold;
+        : percent < 10
+            ? _number(percent, russian: russian)
+            : percent.round().toString();
+    final remainingBytes =
+        capped ? (totalBytes - usedBytes).clamp(0, totalBytes) : null;
+    final watermark = unlimited
+        ? '∞'
+        : capped
+            ? formatTrafficAmount(remainingBytes!, russian: russian)
+            : usedOnly
+                ? formatTrafficAmount(usedBytes, russian: russian)
+                : '—';
     final usedLabel =
         ratio == null ? null : formatTrafficAmount(usedBytes, russian: russian);
     final totalLabel = ratio == null
         ? null
-        : formatTrafficAmount(cappedBytes, russian: russian);
+        : formatTrafficAmount(totalBytes!, russian: russian);
+    final barColor = exhausted
+        ? (dark ? AppBrand.inkDangerDark : AppBrand.inkDangerLight)
+        : ratio != null && ratio >= 0.8
+            ? AppBrand.flame
+            : gold;
+    final stale = _trafficIsStale(trafficUpdatedAt, updateIntervalHours);
+    final meta = updated == null
+        ? (stale ? l.profileTrafficStale : null)
+        : stale
+            ? '${updated!} · ${l.profileTrafficStale}'
+            : updated;
 
     final profile = Container(
       width: double.infinity,
@@ -147,27 +192,26 @@ class ProfileInstrument extends StatelessWidget {
       child: Stack(
         clipBehavior: Clip.hardEdge,
         children: [
-          if (remainingLabel != null)
-            Positioned(
-              right: 10,
-              top: 2,
-              child: ExcludeSemantics(
-                child: IgnorePointer(
-                  child: Text(
-                    remainingLabel,
-                    maxLines: 1,
-                    textAlign: TextAlign.right,
-                    style: terminalText(
-                      context,
-                      size: 58,
-                      color: gold.withValues(alpha: dark ? 0.075 : 0.055),
-                      weight: 700,
-                      spacing: 0.2,
-                    ),
+          Positioned(
+            right: 10,
+            top: 2,
+            child: ExcludeSemantics(
+              child: IgnorePointer(
+                child: Text(
+                  watermark,
+                  maxLines: 1,
+                  textAlign: TextAlign.right,
+                  style: terminalText(
+                    context,
+                    size: 58,
+                    color: gold.withValues(alpha: dark ? 0.075 : 0.055),
+                    weight: 700,
+                    spacing: 0.2,
                   ),
                 ),
               ),
             ),
+          ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 14, 14, 12),
             child: SizedBox(
@@ -186,6 +230,21 @@ class ProfileInstrument extends StatelessWidget {
                       letterSpacing: -0.4,
                     ),
                   ),
+                  if (planName != null && planName!.trim().isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      planName!.trim(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: terminalText(
+                        context,
+                        size: 10,
+                        color: gold,
+                        weight: 700,
+                        spacing: 1.4,
+                      ),
+                    ),
+                  ],
                   if (captions.isNotEmpty) ...[
                     const SizedBox(height: 6),
                     _FactsLine(facts: captions, mute: mute),
@@ -194,19 +253,23 @@ class ProfileInstrument extends StatelessWidget {
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        Text(
-                          '$usedLabel / $totalLabel',
-                          style: terminalText(
-                            context,
-                            size: 10.5,
-                            color: mute,
-                            weight: 600,
-                            spacing: 0.2,
+                        Expanded(
+                          child: Text(
+                            '${l.profileTrafficUsed} $usedLabel / $totalLabel',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: terminalText(
+                              context,
+                              size: 10.5,
+                              color: mute,
+                              weight: 600,
+                              spacing: 0.2,
+                            ),
                           ),
                         ),
-                        const Spacer(),
+                        const SizedBox(width: 8),
                         Text(
-                          '$percent%',
+                          '$percentLabel%',
                           style: terminalText(
                             context,
                             size: 10.5,
@@ -246,6 +309,56 @@ class ProfileInstrument extends StatelessWidget {
                         ),
                       ),
                     ),
+                    if (exhausted) ...[
+                      const SizedBox(height: 5),
+                      Text(
+                        l.homeTrafficExhausted,
+                        style: terminalText(
+                          context,
+                          size: 10.5,
+                          color: barColor,
+                          weight: 700,
+                          spacing: 0.2,
+                        ),
+                      ),
+                    ],
+                  ] else if (unlimited) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      l.homeTrafficUnlimited,
+                      style: terminalText(
+                        context,
+                        size: 11,
+                        color: gold,
+                        weight: 700,
+                        spacing: 1.2,
+                      ),
+                    ),
+                    if (usedBytes > 0) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        '${l.profileTrafficUsed} ${formatTrafficAmount(usedBytes, russian: russian)}',
+                        style: terminalText(
+                          context,
+                          size: 10.5,
+                          color: mute,
+                          weight: 600,
+                          spacing: 0.2,
+                        ),
+                      ),
+                    ],
+                  ] else if (usedOnly) ...[
+                    const SizedBox(height: 7),
+                    Text(
+                      '${l.profileTrafficUsed} ${formatTrafficAmount(usedBytes, russian: russian)}',
+                      style: terminalText(
+                        context,
+                        size: 11,
+                        color: gold,
+                        weight: 700,
+                        spacing: 0.2,
+                      ),
+                    ),
                   ] else if (traffic != null) ...[
                     const SizedBox(height: 7),
                     Text(
@@ -255,6 +368,18 @@ class ProfileInstrument extends StatelessWidget {
                         size: 18,
                         color: gold,
                         weight: 700,
+                        spacing: 0.2,
+                      ),
+                    ),
+                  ] else ...[
+                    const SizedBox(height: 7),
+                    Text(
+                      l.profileTrafficNoData,
+                      style: terminalText(
+                        context,
+                        size: 10.5,
+                        color: mute,
+                        weight: 600,
                         spacing: 0.2,
                       ),
                     ),
@@ -288,20 +413,25 @@ class ProfileInstrument extends StatelessWidget {
                   const SizedBox(height: 9),
                   Row(
                     children: [
-                      if (updated != null && updated!.trim().isNotEmpty)
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 200),
+                      if (meta != null && meta.trim().isNotEmpty)
+                        Expanded(
                           child: Text(
-                            updated!.trim(),
+                            meta.trim(),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: mute,
+                              color: stale
+                                  ? (dark
+                                      ? AppBrand.flame
+                                      : AppBrand.mascotGoldDeep)
+                                  : mute,
                               fontSize: 11.5,
                             ),
                           ),
-                        ),
-                      const Spacer(),
+                        )
+                      else
+                        const Spacer(),
+                      const SizedBox(width: 8),
                       _Toolbar(
                         busy: refreshing,
                         refreshLabel: l.freeRefresh,

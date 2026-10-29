@@ -364,7 +364,12 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
   }
 
   Widget _catalogCard(ThemeData theme, AppL10n l, ShareCatalog catalog) {
-    final title = catalog.title.trim().isEmpty ? l.freeServers : catalog.title;
+    final manifest = catalog.manifest;
+    final fallbackTitle =
+        catalog.title.trim().isEmpty ? l.freeServers : catalog.title;
+    final title = catalog.titleIsCustom
+        ? fallbackTitle
+        : (manifest?.displayName ?? fallbackTitle);
     // Document order. The premium/general split moved YouTube, gaming and
     // India above the rest, so a line appeared to jump when a document came
     // back in a different order. The store already keeps the document order.
@@ -391,8 +396,11 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       announce: catalog.announce,
       supportUrl: catalog.supportUrl,
     );
-    final planeUrl = notice.planeUrl?.trim() ?? '';
-    final noticeBody = notice.text?.trim() ?? '';
+    final planeUrl = (manifest?.supportUrl ?? notice.planeUrl?.trim()) ?? '';
+    final noticeBody = manifest?.description ?? notice.text?.trim() ?? '';
+    final trafficUpdatedAt = manifest?.traffic?.updatedAt ??
+        DateTime.tryParse(
+            catalog.trafficUpdatedAt ?? catalog.lastUpdated ?? '');
 
     final selectedLabel = _selectedLabel();
     final russian = Localizations.localeOf(context).languageCode == 'ru';
@@ -420,8 +428,14 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
         keyHandle: '',
       ),
       parsedTraffic: parseSubscriptionTraffic(catalog.trafficMeta),
+      manifestTraffic: manifest?.traffic,
+      planName: manifest?.planName,
+      trafficUpdatedAt: trafficUpdatedAt,
+      updateIntervalHours: catalog.updateIntervalHours,
       updated: profileUpdatedLabel(
-        lastUpdated: catalog.trafficUpdatedAt ?? catalog.lastUpdated,
+        lastUpdated: trafficUpdatedAt?.toIso8601String() ??
+            catalog.trafficUpdatedAt ??
+            catalog.lastUpdated,
         russian: russian,
       ),
       selected: _catalogIsSelected(catalog),
@@ -433,9 +447,10 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
         for (final index in nodeIndexes) _nodeLine(l, index),
       ],
       selectedNodeTitle: selectedLabel,
-      telegramLabel: subscriptionPlaneIsTelegram(planeUrl)
-          ? l.freeTelegram
-          : l.settingsSupport,
+      telegramLabel: manifest?.supportLabel ??
+          (subscriptionPlaneIsTelegram(planeUrl)
+              ? l.freeTelegram
+              : l.settingsSupport),
       onTelegram:
           planeUrl.isEmpty ? null : () => openSubscriptionPlane(planeUrl),
       onRefresh: catalog.url == null || catalog.url!.isEmpty

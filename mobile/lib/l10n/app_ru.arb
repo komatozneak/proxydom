@@ -32,6 +32,10 @@
   "homeMetricSpeed": "Скорость",
   "homeMetricTraffic": "Трафик",
   "homeTrafficUnlimited": "БЕЗ ЛИМИТА",
+  "profileTrafficUsed": "использовано",
+  "profileTrafficRemaining": "осталось",
+  "profileTrafficNoData": "нет данных о трафике",
+  "profileTrafficStale": "устарело",
   "homeTrafficAmount": "{remaining} / {limit} ГБ",
   "@homeTrafficAmount": {
     "placeholders": {

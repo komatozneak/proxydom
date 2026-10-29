@@ -51,6 +51,10 @@
   "homeMetricTraffic": "Traffic",
   "@homeMetricTraffic": {},
   "homeTrafficUnlimited": "UNLIMITED",
+  "profileTrafficUsed": "used",
+  "profileTrafficRemaining": "remaining",
+  "profileTrafficNoData": "no traffic data",
+  "profileTrafficStale": "stale",
   "@homeTrafficUnlimited": {},
   "homeTrafficAmount": "{remaining} / {limit} GB",
   "@homeTrafficAmount": {
