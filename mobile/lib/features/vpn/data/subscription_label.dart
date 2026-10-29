@@ -42,13 +42,36 @@ String? decodeProfileTitle(String? header) {
   return prefixed ? null : raw;
 }
 
-/// First `# …` comment in a subscription body.
+/// First human-readable `# …` comment in a subscription body.
+///
+/// Known directive lines are not names. Without this, a body that starts with
+/// `#proxydom-profile: <base64>` would show the encoded card as its title.
 String? titleFromSubscriptionBody(String body) {
   for (final line in body.split(RegExp(r'\r?\n'))) {
     final text = line.trim();
     if (!text.startsWith('#') || text.startsWith('#?')) continue;
     final name = text.substring(1).trim();
-    if (name.isNotEmpty) return name;
+    if (name.isEmpty) continue;
+    final colon = name.indexOf(':');
+    if (colon > 0) {
+      final key = name.substring(0, colon).trim().toLowerCase();
+      final value = name.substring(colon + 1).trim();
+      if (key == 'profile-title') {
+        final decoded = decodeProfileTitle(value);
+        if (decoded != null && decoded.isNotEmpty) return decoded;
+        return value.isEmpty ? null : value;
+      }
+      if (const {
+        'proxydom-profile',
+        'subscription-userinfo',
+        'announce',
+        'announce-frame',
+        'support-url',
+      }.contains(key)) {
+        continue;
+      }
+    }
+    return name;
   }
   return null;
 }

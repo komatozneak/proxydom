@@ -105,6 +105,24 @@ class AppL10nRu extends AppL10n {
   String get homeTrafficUnlimited => 'БЕЗ ЛИМИТА';
 
   @override
+  String get profileTrafficRemaining => 'осталось';
+
+  @override
+  String get profileTrafficUsed => 'использовано';
+
+  @override
+  String get profileTrafficNoData => 'нет данных о лимите';
+
+  @override
+  String get profileTrafficStale => 'устарело';
+
+  @override
+  String get profileTrafficExpires => 'истекает';
+
+  @override
+  String get profileSourceLocal => 'локальный импорт';
+
+  @override
   String homeTrafficAmount(String remaining, String limit) {
     return '$remaining / $limit ГБ';
   }

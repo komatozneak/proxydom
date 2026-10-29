@@ -43,6 +43,9 @@ void main() {
       // window drag. Back is a normal footer button instead.
       expect(find.byIcon(AppIcons.back), findsOneWidget);
       expect(find.text('Назад'), findsOneWidget);
+      // Desktop has no camera to scan with; paste is the only input shortcut.
+      expect(find.byIcon(AppIcons.qrCode), findsNothing);
+      expect(find.byTooltip('QR'), findsNothing);
 
       await tester.ensureVisible(find.text('Назад'));
       await tester.tap(find.text('Назад'));

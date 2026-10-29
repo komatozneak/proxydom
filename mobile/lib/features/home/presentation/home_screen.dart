@@ -12,6 +12,7 @@ import '../../../core/diagnostics/product_log.dart';
 import '../../../core/diagnostics/ui_log.dart';
 import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
+import '../../../core/utils/format_utils.dart';
 import '../../../core/toasts/proxy_dom_toast.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/app_surface.dart';
@@ -1246,11 +1247,13 @@ class _MetricsCard extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Expanded(
-              child: _Metric(
-                label: l.homeMetricSpeed,
-                value: '↓ $down',
-                second: '↑ $up',
-              ),
+              child: windowsDesktop
+                  ? const _PingMetric()
+                  : _Metric(
+                      label: l.homeMetricSpeed,
+                      value: '↓ $down',
+                      second: '↑ $up',
+                    ),
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -1264,6 +1267,30 @@ class _MetricsCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _PingMetric extends ConsumerWidget {
+  const _PingMetric();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppL10n.of(context);
+    final russian = Localizations.localeOf(context).languageCode == 'ru';
+    final ms = ref.watch(
+      pingDelayMsProvider.select((value) => value.valueOrNull),
+    );
+    final text = formatPingMs(ms, russian: russian);
+    final semantic = ms == null
+        ? '${l.homeStatPing}: ${russian ? "нет данных" : "no data"}'
+        : '${l.homeStatPing}: $text';
+    return Semantics(
+      container: true,
+      label: semantic,
+      child: ExcludeSemantics(
+        child: _Metric(label: l.homeStatPing, value: text),
       ),
     );
   }

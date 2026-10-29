@@ -7,11 +7,15 @@ class SubscriptionTraffic {
     required this.upload,
     required this.download,
     required this.total,
+    this.expire,
   });
 
   final int upload;
   final int download;
   final int total;
+
+  /// Absolute end of the plan, from `expire`. Null when the header omitted it.
+  final DateTime? expire;
 
   /// `total <= 0` is the usual "no cap" signal in this header.
   bool get unlimited => total <= 0;
@@ -74,7 +78,8 @@ String? etagUnlessTrafficUnknown({
   return value;
 }
 
-/// Parses `upload=…; download=…; total=…`. Unknown or broken text is null.
+/// Parses `upload=…; download=…; total=…; expire=…`. Unknown or broken text
+/// is null; `expire` is seconds (or milliseconds when the value is large).
 SubscriptionTraffic? parseSubscriptionTraffic(String? header) {
   if (header == null) return null;
   final text = header.trim();
@@ -82,6 +87,7 @@ SubscriptionTraffic? parseSubscriptionTraffic(String? header) {
   int? upload;
   int? download;
   int? total;
+  DateTime? expire;
   var sawField = false;
   for (final part in text.split(';')) {
     final piece = part.trim();
@@ -100,6 +106,9 @@ SubscriptionTraffic? parseSubscriptionTraffic(String? header) {
     } else if (key == 'total') {
       total = value;
       sawField = true;
+    } else if (key == 'expire') {
+      expire = _expireDate(value);
+      sawField = true;
     }
   }
   if (!sawField) return null;
@@ -107,11 +116,22 @@ SubscriptionTraffic? parseSubscriptionTraffic(String? header) {
     upload: upload ?? 0,
     download: download ?? 0,
     total: total ?? 0,
+    expire: expire,
   );
 }
 
+DateTime? _expireDate(int value) {
+  if (value <= 0) return null;
+  final millis = value >= 100000000000 ? value : value * 1000;
+  return DateTime.fromMillisecondsSinceEpoch(millis, isUtc: true);
+}
+
+const _tib = 1024 * 1024 * 1024 * 1024;
 const _gib = 1024 * 1024 * 1024;
 const _mib = 1024 * 1024;
+const _mb = 1000 * 1000;
+const _gb = 1000 * 1000 * 1000;
+const _tb = 1000 * 1000 * 1000 * 1000;
 
 /// Home pin bands for the remainder. Above 20 GiB is green, 5–20 is yellow,
 /// below 5 is red. A missing header or an unlimited cap is not a band.
@@ -127,29 +147,59 @@ TrafficRemainderBand trafficRemainderBand(SubscriptionTraffic? traffic) {
 
 /// Home pin value. No header is `—`, no cap is `∞`.
 ///
-/// 10 GiB and above is a whole number. Below that, one decimal. Below 0.1 GiB
-/// the unit switches to MiB so a small remainder is not `0.0 GB`.
+/// Legacy `subscription-userinfo` comes from panels that count in GiB, so the
+/// default stays binary. A `proxydom-profile` manifest opts into the decimal
+/// units it documents.
 String formatSubscriptionTraffic(
   SubscriptionTraffic? traffic, {
   required bool russian,
+  bool decimal = false,
 }) {
   if (traffic == null) return '—';
   if (traffic.unlimited) return '∞';
-  return _formatBytes(traffic.remainingBytes, russian: russian);
+  return _formatBytes(
+    traffic.remainingBytes,
+    russian: russian,
+    decimal: decimal,
+  );
 }
 
-String _formatBytes(int bytes, {required bool russian}) {
+/// A byte amount for the traffic bar's used/total labels.
+String formatTrafficAmount(
+  int bytes, {
+  required bool russian,
+  bool decimal = false,
+}) {
+  return _formatBytes(bytes, russian: russian, decimal: decimal);
+}
+
+String _formatBytes(
+  int bytes, {
+  required bool russian,
+  required bool decimal,
+}) {
   final gb = russian ? 'ГБ' : 'GB';
+  final tb = russian ? 'ТБ' : 'TB';
   final mb = russian ? 'МБ' : 'MB';
-  if (bytes < _gib ~/ 10) {
-    final whole = (bytes / _mib).round();
-    return '$whole $mb';
+  if (bytes <= 0) return '0 $mb';
+  final tera = decimal ? _tb : _tib;
+  final giga = decimal ? _gb : _gib;
+  final mega = decimal ? _mb : _mib;
+  if (bytes >= tera) {
+    return _number(bytes / tera, tb, russian);
   }
-  final value = bytes / _gib;
-  if (value >= 10) {
-    return '${value.round()} $gb';
+  if (bytes >= giga) {
+    return _number(bytes / giga, gb, russian);
   }
-  final shown = value.toStringAsFixed(1);
+  if (bytes >= mega) {
+    return _number(bytes / mega, mb, russian);
+  }
+  return '0 $mb';
+}
+
+String _number(double value, String unit, bool russian) {
+  final digits = value >= 10 || value == value.roundToDouble() ? 0 : 1;
+  final shown = value.toStringAsFixed(digits);
   final text = russian ? shown.replaceAll('.', ',') : shown;
-  return '$text $gb';
+  return '$text $unit';
 }

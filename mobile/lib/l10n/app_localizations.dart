@@ -289,6 +289,42 @@ abstract class AppL10n {
   /// **'UNLIMITED'**
   String get homeTrafficUnlimited;
 
+  /// No description provided for @profileTrafficRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'remaining'**
+  String get profileTrafficRemaining;
+
+  /// No description provided for @profileTrafficUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'used'**
+  String get profileTrafficUsed;
+
+  /// No description provided for @profileTrafficNoData.
+  ///
+  /// In en, this message translates to:
+  /// **'no limit data'**
+  String get profileTrafficNoData;
+
+  /// No description provided for @profileTrafficStale.
+  ///
+  /// In en, this message translates to:
+  /// **'stale'**
+  String get profileTrafficStale;
+
+  /// No description provided for @profileTrafficExpires.
+  ///
+  /// In en, this message translates to:
+  /// **'expires'**
+  String get profileTrafficExpires;
+
+  /// No description provided for @profileSourceLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'local import'**
+  String get profileSourceLocal;
+
   /// No description provided for @homeTrafficAmount.
   ///
   /// In en, this message translates to:

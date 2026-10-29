@@ -26,7 +26,9 @@ import 'package:proxydom/core/widgets/window_caption_bar.dart';
 import 'package:proxydom/features/home/presentation/home_screen.dart';
 import 'package:proxydom/features/settings/presentation/settings_screen.dart';
 import 'package:proxydom/features/shell/presentation/main_shell.dart';
+import 'package:proxydom/features/vpn/data/profile_manifest.dart';
 import 'package:proxydom/features/vpn/data/subscription_label.dart';
+import 'package:proxydom/features/vpn/data/subscription_traffic.dart';
 import 'package:proxydom/features/vpn/presentation/locations_screen.dart';
 import 'package:proxydom/features/vpn/presentation/server_instrument.dart';
 import 'package:proxydom/features/vpn/presentation/server_instrument_parts.dart';
@@ -89,7 +91,9 @@ Widget _frame(
       children: [
         WindowCaptionBar(
           label: 'Прокси',
-          ink: brightness == Brightness.dark ? AppBrand.inkDark : AppBrand.inkLight,
+          ink: brightness == Brightness.dark
+              ? AppBrand.inkDark
+              : AppBrand.inkLight,
         ),
         Expanded(
           child: Row(
@@ -127,11 +131,11 @@ Widget _app(
       locale: const Locale('ru'),
       home: Builder(
           builder: (context) => _frame(
-            child,
-            context,
-            desktop: desktop,
-            brightness: brightness,
-          )),
+                child,
+                context,
+                desktop: desktop,
+                brightness: brightness,
+              )),
     ),
   );
 }
@@ -324,17 +328,29 @@ void main() {
             child: Padding(
               padding: const EdgeInsets.all(24),
               child: ProfileInstrument(
-                title: 'Теремок',
-                description: 'Значок справа ведёт в бота',
+                title: 'Мой профиль',
+                description: 'Поддержка и обновления',
                 facts: const [
-                  (text: '2aq93K0', accent: false),
                   (text: '15 ГБ из 100 ГБ', accent: true),
                 ],
-                updated: 'обновлено 04.10',
+                parsedTraffic: const SubscriptionTraffic(
+                  upload: 60 * 1000 * 1000 * 1000,
+                  download: 25 * 1000 * 1000 * 1000,
+                  total: 100 * 1000 * 1000 * 1000,
+                ),
+                manifestTraffic: const ProfileTraffic(
+                  upload: 60 * 1000 * 1000 * 1000,
+                  download: 25 * 1000 * 1000 * 1000,
+                  total: 100 * 1000 * 1000 * 1000,
+                ),
+                planName: '100 GB',
+                trafficUpdatedAt: DateTime.utc(2026, 10, 29, 9),
+                expiresAt: DateTime.utc(2026, 11, 29),
+                updated: 'обновлено 29.10',
                 selected: true,
                 selectedNodeTitle: 'Москва',
                 onNodeTap: _ignoreIndex,
-                telegramLabel: 'Telegram',
+                telegramLabel: 'Поддержка',
                 onTelegram: _ignore,
                 onRefresh: _ignore,
                 onShare: _ignore,
@@ -403,13 +419,26 @@ void _seedSavedProfile() {
     'hy2_import_v1': jsonEncode({
       'catalogs': [
         {
-          'id': 'teremok',
-          'title': 'Теремок',
-          'url': 'https://panel.proxydom.su/teremok',
-          'trafficMeta': 'upload=1; download=2; total=15000000000',
+          'id': 'profile',
+          'title': 'Мой профиль',
+          'url': 'https://panel.example.test/profile',
+          'trafficMeta':
+              'upload=5000000000; download=2500000000; total=20000000000',
           'lastUpdated': '2026-10-04T12:22:09Z',
-          'announce': 'Значок справа ведёт в бота',
-          'supportUrl': 'https://t.me/proxydom_bot',
+          'announce': 'Поддержка и обновления',
+          'supportUrl': 'https://t.me/example',
+          'manifest': {
+            'version': 1,
+            'displayName': 'Мой профиль',
+            'planName': '20 GB',
+            'traffic': {
+              'upload': 5000000000,
+              'download': 2500000000,
+              'total': 20000000000,
+              'updatedAt': '2026-10-29T09:00:00Z',
+              'expiresAt': '2026-11-29T00:00:00Z',
+            },
+          },
           'lines': [
             _savedLine('YouTube · без рекламы'),
             _savedLine('Индия · дешёвые подписки'),

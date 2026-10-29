@@ -319,10 +319,6 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
         focusNode: _fieldFocus,
         onChanged: _previewInput,
         onPaste: _pasteClipboard,
-        onScan: () {
-          UiLog.action('import', 'scan');
-          openFreeClientCapture(context);
-        },
         onClear: () {
           _controller.clear();
           _previewInput('');
@@ -788,7 +784,6 @@ class _WindowsAddScreen extends StatelessWidget {
     required this.focusNode,
     required this.onChanged,
     required this.onPaste,
-    required this.onScan,
     required this.onClear,
     required this.onBack,
     required this.onSave,
@@ -803,7 +798,6 @@ class _WindowsAddScreen extends StatelessWidget {
   final FocusNode focusNode;
   final ValueChanged<String> onChanged;
   final VoidCallback onPaste;
-  final VoidCallback onScan;
   final VoidCallback onClear;
   final VoidCallback onBack;
   final VoidCallback? onSave;
@@ -949,11 +943,6 @@ class _WindowsAddScreen extends StatelessWidget {
                       tooltip: l.freePaste,
                       onPressed: onPaste,
                       icon: const AppIcon(AppIcons.clipboard, size: 18),
-                    ),
-                    IconButton(
-                      tooltip: l.freeQr,
-                      onPressed: onScan,
-                      icon: const AppIcon(AppIcons.qrCode, size: 18),
                     ),
                     if (controller.text.isNotEmpty)
                       IconButton(

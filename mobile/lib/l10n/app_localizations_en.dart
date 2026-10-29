@@ -105,6 +105,24 @@ class AppL10nEn extends AppL10n {
   String get homeTrafficUnlimited => 'UNLIMITED';
 
   @override
+  String get profileTrafficRemaining => 'remaining';
+
+  @override
+  String get profileTrafficUsed => 'used';
+
+  @override
+  String get profileTrafficNoData => 'no limit data';
+
+  @override
+  String get profileTrafficStale => 'stale';
+
+  @override
+  String get profileTrafficExpires => 'expires';
+
+  @override
+  String get profileSourceLocal => 'local import';
+
+  @override
   String homeTrafficAmount(String remaining, String limit) {
     return '$remaining / $limit GB';
   }
