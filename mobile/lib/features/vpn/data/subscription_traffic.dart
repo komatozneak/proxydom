@@ -110,7 +110,9 @@ SubscriptionTraffic? parseSubscriptionTraffic(String? header) {
   );
 }
 
+const _tib = 1024 * 1024 * 1024 * 1024;
 const _gib = 1024 * 1024 * 1024;
+const _mib = 1024 * 1024;
 const _mb = 1000 * 1000;
 const _gb = 1000 * 1000 * 1000;
 const _tb = 1000 * 1000 * 1000 * 1000;
@@ -129,35 +131,52 @@ TrafficRemainderBand trafficRemainderBand(SubscriptionTraffic? traffic) {
 
 /// Home pin value. No header is `—`, no cap is `∞`.
 ///
-/// 10 GiB and above is a whole number. Below that, one decimal. Below 0.1 GiB
-/// the unit switches to MiB so a small remainder is not `0.0 GB`.
+/// Legacy `subscription-userinfo` comes from panels that count in GiB, so the
+/// default stays binary. A `proxydom-profile` manifest opts into the decimal
+/// units it documents.
 String formatSubscriptionTraffic(
   SubscriptionTraffic? traffic, {
   required bool russian,
+  bool decimal = false,
 }) {
   if (traffic == null) return '—';
   if (traffic.unlimited) return '∞';
-  return _formatBytes(traffic.remainingBytes, russian: russian);
+  return _formatBytes(
+    traffic.remainingBytes,
+    russian: russian,
+    decimal: decimal,
+  );
 }
 
 /// A byte amount for the traffic bar's used/total labels.
-String formatTrafficAmount(int bytes, {required bool russian}) {
-  return _formatBytes(bytes, russian: russian);
+String formatTrafficAmount(
+  int bytes, {
+  required bool russian,
+  bool decimal = false,
+}) {
+  return _formatBytes(bytes, russian: russian, decimal: decimal);
 }
 
-String _formatBytes(int bytes, {required bool russian}) {
+String _formatBytes(
+  int bytes, {
+  required bool russian,
+  required bool decimal,
+}) {
   final gb = russian ? 'ГБ' : 'GB';
   final tb = russian ? 'ТБ' : 'TB';
   final mb = russian ? 'МБ' : 'MB';
   if (bytes <= 0) return '0 $mb';
-  if (bytes >= _tb) {
-    return _number(bytes / _tb, tb, russian);
+  final tera = decimal ? _tb : _tib;
+  final giga = decimal ? _gb : _gib;
+  final mega = decimal ? _mb : _mib;
+  if (bytes >= tera) {
+    return _number(bytes / tera, tb, russian);
   }
-  if (bytes >= _gb) {
-    return _number(bytes / _gb, gb, russian);
+  if (bytes >= giga) {
+    return _number(bytes / giga, gb, russian);
   }
-  if (bytes >= _mb) {
-    return _number(bytes / _mb, mb, russian);
+  if (bytes >= mega) {
+    return _number(bytes / mega, mb, russian);
   }
   return '0 $mb';
 }

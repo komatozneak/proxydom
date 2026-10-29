@@ -157,15 +157,32 @@ class ProfileInstrument extends StatelessWidget {
     final watermark = unlimited
         ? '∞'
         : capped
-            ? formatTrafficAmount(remainingBytes!, russian: russian)
+            ? formatTrafficAmount(
+                remainingBytes!,
+                russian: russian,
+                decimal: manifest != null,
+              )
             : usedOnly
-                ? formatTrafficAmount(usedBytes, russian: russian)
+                ? formatTrafficAmount(
+                    usedBytes,
+                    russian: russian,
+                    decimal: manifest != null,
+                  )
                 : '—';
-    final usedLabel =
-        ratio == null ? null : formatTrafficAmount(usedBytes, russian: russian);
+    final usedLabel = ratio == null
+        ? null
+        : formatTrafficAmount(
+            usedBytes,
+            russian: russian,
+            decimal: manifest != null,
+          );
     final totalLabel = ratio == null
         ? null
-        : formatTrafficAmount(totalBytes!, russian: russian);
+        : formatTrafficAmount(
+            totalBytes!,
+            russian: russian,
+            decimal: manifest != null,
+          );
     final barColor = exhausted
         ? (dark ? AppBrand.inkDangerDark : AppBrand.inkDangerLight)
         : ratio != null && ratio >= 0.8
@@ -337,7 +354,7 @@ class ProfileInstrument extends StatelessWidget {
                     if (usedBytes > 0) ...[
                       const SizedBox(height: 4),
                       Text(
-                        '${l.profileTrafficUsed} ${formatTrafficAmount(usedBytes, russian: russian)}',
+                        '${l.profileTrafficUsed} ${formatTrafficAmount(usedBytes, russian: russian, decimal: manifest != null)}',
                         style: terminalText(
                           context,
                           size: 10.5,
@@ -350,7 +367,7 @@ class ProfileInstrument extends StatelessWidget {
                   ] else if (usedOnly) ...[
                     const SizedBox(height: 7),
                     Text(
-                      '${l.profileTrafficUsed} ${formatTrafficAmount(usedBytes, russian: russian)}',
+                      '${l.profileTrafficUsed} ${formatTrafficAmount(usedBytes, russian: russian, decimal: manifest != null)}',
                       style: terminalText(
                         context,
                         size: 11,

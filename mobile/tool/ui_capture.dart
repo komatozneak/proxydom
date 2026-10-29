@@ -26,6 +26,7 @@ import 'package:proxydom/core/widgets/window_caption_bar.dart';
 import 'package:proxydom/features/home/presentation/home_screen.dart';
 import 'package:proxydom/features/settings/presentation/settings_screen.dart';
 import 'package:proxydom/features/shell/presentation/main_shell.dart';
+import 'package:proxydom/features/vpn/data/profile_manifest.dart';
 import 'package:proxydom/features/vpn/data/subscription_label.dart';
 import 'package:proxydom/features/vpn/data/subscription_traffic.dart';
 import 'package:proxydom/features/vpn/presentation/locations_screen.dart';
@@ -333,6 +334,11 @@ void main() {
                   (text: '15 ГБ из 100 ГБ', accent: true),
                 ],
                 parsedTraffic: const SubscriptionTraffic(
+                  upload: 60 * 1000 * 1000 * 1000,
+                  download: 25 * 1000 * 1000 * 1000,
+                  total: 100 * 1000 * 1000 * 1000,
+                ),
+                manifestTraffic: const ProfileTraffic(
                   upload: 60 * 1000 * 1000 * 1000,
                   download: 25 * 1000 * 1000 * 1000,
                   total: 100 * 1000 * 1000 * 1000,
