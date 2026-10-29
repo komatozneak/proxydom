@@ -243,6 +243,46 @@ vless://00000000-0000-0000-0000-000000000002@e.example.invalid:443#synth-vless-b
     expect(saved.manifest, isNull);
   });
 
+  test('a fallback-url does not replace a readable primary document', () async {
+    const plain = '''
+hysteria2://x:x@a.example.invalid:443/?sni=a.example.invalid#one
+hysteria2://x:x@b.example.invalid:443/?sni=b.example.invalid#two
+hysteria2://x:x@c.example.invalid:443/?sni=c.example.invalid#three
+vless://00000000-0000-0000-0000-000000000001@d.example.invalid:443#four
+vless://00000000-0000-0000-0000-000000000002@e.example.invalid:443#five
+''';
+    final body = base64Encode(utf8.encode(plain));
+    hy2HttpClientFactory = () => _StaticClient(
+          status: HttpStatus.ok,
+          body: body,
+          headers: {
+            'subscription-userinfo':
+                'upload=0; download=111797992588; total=644245094400',
+            'profile-title': 'base64:RG9EbyBWUE4=',
+            'fallback-url': 'https://dead.example.invalid/v2/synthetic',
+          },
+        );
+    final store = Hy2ImportStore.instance;
+    await store.seedForTest([
+      ShareCatalog(
+        id: 'catalog-key',
+        title: 'Прокси Дом',
+        lines: const [
+          'hysteria2://x:x@old.example.invalid:443/?sni=old.example.invalid#YouTube',
+        ],
+        url: 'https://id.docdn.pro/v2/synthetic',
+        trafficMeta: 'upload=0; download=0; total=107374182400',
+      ),
+    ]);
+
+    final outcome = await store.refreshCatalog('catalog-key');
+    final saved = (await store.catalogs()).single;
+    expect(outcome.kind, ShareRefreshKind.updated);
+    expect(saved.url, 'https://id.docdn.pro/v2/synthetic');
+    expect(saved.lines, hasLength(5));
+    expect(saved.trafficMeta, contains('total=644245094400'));
+  });
+
   test('an unreadable 200 keeps the old lines and does not move the stamp',
       () async {
     const old = '2026-10-01T09:00:00Z';

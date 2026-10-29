@@ -651,8 +651,7 @@ class Hy2ImportStore {
         status: response.statusCode,
         decision: 'fetched',
       );
-      final redirect = response.headers.value('new-url') ??
-          response.headers.value('fallback-url');
+      final redirect = response.headers.value('new-url');
       final notice = subscriptionNotice(
         announceHeader: response.headers.value('announce'),
         supportHeader: response.headers.value('support-url'),
