@@ -421,7 +421,7 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       ),
       parsedTraffic: parseSubscriptionTraffic(catalog.trafficMeta),
       updated: profileUpdatedLabel(
-        lastUpdated: catalog.lastUpdated,
+        lastUpdated: catalog.trafficUpdatedAt ?? catalog.lastUpdated,
         russian: russian,
       ),
       selected: _catalogIsSelected(catalog),
