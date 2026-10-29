@@ -12,11 +12,6 @@ import 'server_instrument_parts.dart';
 
 const kProfileTrafficBarKey = ValueKey<String>('profile-traffic-bar');
 
-String _number(double value, {required bool russian}) {
-  final shown = value.toStringAsFixed(1);
-  return russian ? shown.replaceAll('.', ',') : shown;
-}
-
 bool _trafficIsStale(DateTime? at, int? intervalHours) {
   if (at == null) return false;
   final limitHours =
@@ -108,15 +103,10 @@ class ProfileInstrument extends StatelessWidget {
     final l = AppL10n.of(context);
     final gold = goldInk(context);
 
-    String? traffic;
-    final captions = <({String text, bool accent})>[];
-    for (final fact in facts) {
-      if (fact.accent && traffic == null) {
-        traffic = fact.text;
-      } else {
-        captions.add(fact);
-      }
-    }
+    final captions = <({String text, bool accent})>[
+      for (final fact in facts)
+        if (!fact.accent) fact,
+    ];
 
     // One neutral plate, not a brown card inside a dark one: the profile band
     // is lifted a few percent from the surface and the gold spine carries the
@@ -144,14 +134,9 @@ class ProfileInstrument extends StatelessWidget {
         (legacy != null && !legacy.unlimited ? legacy.total : null);
     final capped = !unlimited && totalBytes != null && totalBytes > 0;
     final exhausted = capped && usedBytes >= totalBytes;
-    final usedOnly = !unlimited && !capped && usedBytes > 0;
-    final ratio = capped ? (usedBytes / totalBytes).clamp(0.0, 1.0) : null;
-    final percent = ratio == null ? null : ratio * 100;
-    final percentLabel = percent == null
-        ? null
-        : percent < 10
-            ? _number(percent, russian: russian)
-            : percent.round().toString();
+    final usedRatio = capped ? (usedBytes / totalBytes).clamp(0.0, 1.0) : null;
+    final remainingRatio =
+        usedRatio == null ? null : (1.0 - usedRatio).clamp(0.0, 1.0);
     final remainingBytes =
         capped ? (totalBytes - usedBytes).clamp(0, totalBytes) : null;
     final watermark = unlimited
@@ -162,30 +147,10 @@ class ProfileInstrument extends StatelessWidget {
                 russian: russian,
                 decimal: manifest != null,
               )
-            : usedOnly
-                ? formatTrafficAmount(
-                    usedBytes,
-                    russian: russian,
-                    decimal: manifest != null,
-                  )
-                : '—';
-    final usedLabel = ratio == null
-        ? null
-        : formatTrafficAmount(
-            usedBytes,
-            russian: russian,
-            decimal: manifest != null,
-          );
-    final totalLabel = ratio == null
-        ? null
-        : formatTrafficAmount(
-            totalBytes!,
-            russian: russian,
-            decimal: manifest != null,
-          );
+            : '—';
     final barColor = exhausted
         ? (dark ? AppBrand.inkDangerDark : AppBrand.inkDangerLight)
-        : ratio != null && ratio >= 0.8
+        : remainingRatio != null && remainingRatio <= 0.2
             ? AppBrand.flame
             : gold;
     final stale = _trafficIsStale(trafficUpdatedAt, updateIntervalHours);
@@ -266,63 +231,67 @@ class ProfileInstrument extends StatelessWidget {
                     const SizedBox(height: 6),
                     _FactsLine(facts: captions, mute: mute),
                   ],
-                  if (ratio != null) ...[
+                  if (remainingRatio != null) ...[
                     const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            '${l.profileTrafficUsed} $usedLabel / $totalLabel',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: terminalText(
-                              context,
-                              size: 10.5,
-                              color: mute,
-                              weight: 600,
-                              spacing: 0.2,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '$percentLabel%',
-                          style: terminalText(
-                            context,
-                            size: 10.5,
-                            color: barColor,
-                            weight: 700,
-                            spacing: 0.4,
-                          ),
-                        ),
-                      ],
+                    Text(
+                      l.profileTrafficRemaining.toUpperCase(),
+                      style: terminalText(
+                        context,
+                        size: 9.5,
+                        color: mute,
+                        weight: 700,
+                        spacing: 1.4,
+                      ),
                     ),
                     const SizedBox(height: 6),
-                    ClipRRect(
-                      key: kProfileTrafficBarKey,
-                      borderRadius: BorderRadius.circular(99),
-                      child: SizedBox(
-                        height: 4,
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            ColoredBox(
-                              color: theme.colorScheme.onSurface
-                                  .withValues(alpha: 0.08),
+                    Semantics(
+                      label: '${l.profileTrafficRemaining}: $watermark',
+                      child: ClipRRect(
+                        key: kProfileTrafficBarKey,
+                        borderRadius: BorderRadius.circular(99),
+                        child: SizedBox(
+                          height: 5,
+                          child: TweenAnimationBuilder<double>(
+                            tween: Tween<double>(
+                              begin: 0,
+                              end: remainingRatio,
                             ),
-                            TweenAnimationBuilder<double>(
-                              tween: Tween<double>(begin: 0, end: ratio),
-                              duration: const Duration(milliseconds: 450),
-                              curve: Curves.easeOutCubic,
-                              builder: (context, value, child) {
-                                return FractionallySizedBox(
-                                  alignment: Alignment.centerLeft,
-                                  widthFactor: value,
-                                  child: ColoredBox(color: barColor),
-                                );
-                              },
-                            ),
-                          ],
+                            duration: const Duration(milliseconds: 450),
+                            curve: Curves.easeOutCubic,
+                            builder: (context, value, child) {
+                              return LayoutBuilder(
+                                builder: (context, constraints) {
+                                  return Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      ColoredBox(
+                                        color: theme.colorScheme.onSurface
+                                            .withValues(alpha: 0.08),
+                                      ),
+                                      Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: FractionallySizedBox(
+                                          widthFactor: value,
+                                          heightFactor: 1,
+                                          child: ColoredBox(color: barColor),
+                                        ),
+                                      ),
+                                      Positioned(
+                                        left: constraints.maxWidth * 0.2,
+                                        top: 0,
+                                        bottom: 0,
+                                        width: 1,
+                                        child: ColoredBox(
+                                          color: theme.colorScheme.onSurface
+                                              .withValues(alpha: 0.22),
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              );
+                            },
+                          ),
                         ),
                       ),
                     ),
@@ -349,43 +318,6 @@ class ProfileInstrument extends StatelessWidget {
                         color: gold,
                         weight: 700,
                         spacing: 1.2,
-                      ),
-                    ),
-                    if (usedBytes > 0) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        '${l.profileTrafficUsed} ${formatTrafficAmount(usedBytes, russian: russian, decimal: manifest != null)}',
-                        style: terminalText(
-                          context,
-                          size: 10.5,
-                          color: mute,
-                          weight: 600,
-                          spacing: 0.2,
-                        ),
-                      ),
-                    ],
-                  ] else if (usedOnly) ...[
-                    const SizedBox(height: 7),
-                    Text(
-                      '${l.profileTrafficUsed} ${formatTrafficAmount(usedBytes, russian: russian, decimal: manifest != null)}',
-                      style: terminalText(
-                        context,
-                        size: 11,
-                        color: gold,
-                        weight: 700,
-                        spacing: 0.2,
-                      ),
-                    ),
-                  ] else if (manifest == null && traffic != null) ...[
-                    const SizedBox(height: 7),
-                    Text(
-                      traffic,
-                      style: terminalText(
-                        context,
-                        size: 18,
-                        color: gold,
-                        weight: 700,
-                        spacing: 0.2,
                       ),
                     ),
                   ] else ...[

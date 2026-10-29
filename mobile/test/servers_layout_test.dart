@@ -282,8 +282,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(kProfileTrafficBarKey), findsOneWidget);
-    expect(find.text('использовано 10 ГБ / 20 ГБ'), findsOneWidget);
-    expect(find.text('50%'), findsOneWidget);
+    expect(find.text('10 ГБ'), findsOneWidget);
+    expect(find.text('ОСТАЛОСЬ'), findsOneWidget);
+    expect(find.text('50%'), findsNothing);
   });
 
   testWidgets('unlimited, unknown and used-only states are distinct',
@@ -307,7 +308,7 @@ void main() {
       _wrap(_instrument(facts: const [])),
     );
     await tester.pump();
-    expect(find.text('нет данных о трафике'), findsOneWidget);
+    expect(find.text('нет данных о лимите'), findsOneWidget);
     expect(find.byKey(kProfileTrafficBarKey), findsNothing);
 
     await tester.pumpWidget(
@@ -319,7 +320,7 @@ void main() {
       ),
     );
     await tester.pump();
-    expect(find.text('использовано 27 ГБ'), findsOneWidget);
+    expect(find.text('нет данных о лимите'), findsOneWidget);
     expect(find.byKey(kProfileTrafficBarKey), findsNothing);
   });
 
@@ -338,8 +339,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('973 ГБ'), findsOneWidget);
-    expect(find.text('использовано 27 ГБ / 1 ТБ'), findsOneWidget);
-    expect(find.text('2,7%'), findsOneWidget);
+    expect(find.text('ОСТАЛОСЬ'), findsOneWidget);
+    expect(find.text('2,7%'), findsNothing);
+    expect(find.textContaining('использовано'), findsNothing);
   });
 
   testWidgets('exhausted and stale profiles keep their facts', (tester) async {
@@ -356,7 +358,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('Трафик закончился'), findsOneWidget);
-    expect(find.text('100%'), findsOneWidget);
+    expect(find.text('100%'), findsNothing);
 
     await tester.pumpWidget(
       _wrap(
