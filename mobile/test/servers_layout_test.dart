@@ -239,6 +239,25 @@ void main() {
     expect(body.bottom, lessThan(nodes.top));
   });
 
+  testWidgets('the profile pass is detached from the node pool',
+      (tester) async {
+    await tester.pumpWidget(
+      _wrap(
+        Scaffold(
+          body: SingleChildScrollView(
+            child: _instrument(nodes: [_node('Москва')]),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final pass = tester.getRect(find.byKey(kProfilePassKey));
+    final pool = tester.getRect(find.byKey(kProfilePoolKey));
+    expect(pool.top, greaterThan(pass.bottom));
+    expect(pool.top - pass.bottom, greaterThanOrEqualTo(14));
+  });
+
   testWidgets('the page starts on the gutter its heading is on',
       (tester) async {
     tester.view
@@ -304,6 +323,3 @@ void main() {
     expect(find.byType(TextField), findsNothing);
   });
 }
-
-
-

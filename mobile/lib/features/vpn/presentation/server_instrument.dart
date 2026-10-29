@@ -9,16 +9,18 @@ import '../../../l10n/app_localizations.dart';
 import '../data/subscription_traffic.dart';
 import 'server_instrument_parts.dart';
 
+/// The profile pass and the node pool are separate plates, not one long card.
+const kProfilePassKey = ValueKey<String>('profile-pass');
+const kProfilePoolKey = ValueKey<String>('profile-pool');
+
 /// A bought profile, drawn as an instrument.
 ///
-/// The card was a coloured slab with three square buttons in one corner, a row
-/// of grey chips and a wall of small text under a title nobody read, and every
-/// node inside it was a further box. It now reads the way the home head reads:
-/// one name in the terminal's own voice, the facts as a single line of
-/// readings under it, the seller's note as a margin block, and the pool as ruled
-/// lines on one plate. What you can do to the profile sits on the right of its
-/// name, in rings rather than squares — quiet controls that do not outrank the
-/// thing they act on.
+/// The profile is a detached ticket pass: a warm paper tint, a gold spine, the
+/// remaining traffic as the largest reading on the page, and a punched stub
+/// carrying the update stamp. The node pool is a second plate with its own
+/// header; the two never dissolve into one long surface. What you can do to the
+/// profile sits on the right of its name, in rings rather than squares — quiet
+/// controls that do not outrank the thing they act on.
 class ProfileInstrument extends StatelessWidget {
   const ProfileInstrument({
     super.key,
@@ -50,7 +52,7 @@ class ProfileInstrument extends StatelessWidget {
   /// not one of these: it sits under the rings, not in this line.
   final List<({String text, bool accent})> facts;
 
-  /// «обновлено 04.10», already formatted. Drawn under the three rings.
+  /// «обновлено 04.10», already formatted. Drawn on the pass stub.
   final String? updated;
 
   final bool selected;
@@ -77,43 +79,83 @@ class ProfileInstrument extends StatelessWidget {
     final dark = theme.brightness == Brightness.dark;
     final mute = dark ? AppBrand.inkMutedDark : AppBrand.inkMutedLight;
     final l = AppL10n.of(context);
+    final gold = goldInk(context);
 
-    return AppSurface(
+    String? traffic;
+    final captions = <({String text, bool accent})>[];
+    for (final fact in facts) {
+      if (fact.accent && traffic == null) {
+        traffic = fact.text;
+      } else {
+        captions.add(fact);
+      }
+    }
+
+    // The profile is a pass, not a card header: tinted paper, a gold spine,
+    // a punched dashed rule and a stub with the update stamp. The node pool is
+    // a separate plate below it, so the quota and the servers no longer dissolve
+    // into one long surface.
+    final tint = Color.lerp(
+      theme.colorScheme.surface,
+      AppBrand.mascotGold,
+      selected ? (dark ? 0.10 : 0.07) : (dark ? 0.05 : 0.035),
+    )!;
+
+    final pass = AppSurface(
+      key: kProfilePassKey,
       clip: true,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      tint: tint,
+      child: Stack(
         children: [
+          Positioned(
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: 3,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: gold.withValues(alpha: selected ? 0.95 : 0.60),
+              ),
+            ),
+          ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 14, 13),
-            // The stamp used to ride in the fact line, hard against the
-            // traffic figure. It belongs to the rings: they are what produced
-            // it. The key and the traffic stay under the name, on the left.
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            padding: const EdgeInsets.fromLTRB(17, 15, 14, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleLarge,
-                      ),
-                      if (facts.isNotEmpty) ...[
-                        const SizedBox(height: 9),
-                        _FactsLine(facts: facts, mute: mute),
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  mainAxisSize: MainAxisSize.min,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            l.freeProfile.toUpperCase(),
+                            style: terminalText(
+                              context,
+                              size: 10,
+                              color: gold.withValues(alpha: 0.9),
+                              weight: 700,
+                              spacing: 2.2,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleLarge,
+                          ),
+                          if (captions.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            _FactsLine(facts: captions, mute: mute),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
                     _Toolbar(
                       busy: refreshing,
                       refreshLabel: l.freeRefresh,
@@ -123,144 +165,195 @@ class ProfileInstrument extends StatelessWidget {
                       deleteLabel: l.freeDelete,
                       onDelete: onDelete,
                     ),
-                    if (updated != null && updated!.trim().isNotEmpty) ...[
-                      const SizedBox(height: 8),
+                  ],
+                ),
+                if (traffic != null) ...[
+                  const SizedBox(height: 14),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Text(
+                          l.freeTrafficLeft.toUpperCase(),
+                          style: terminalText(
+                            context,
+                            size: 9.5,
+                            color: mute,
+                            weight: 700,
+                            spacing: 1.4,
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        traffic,
+                        style: terminalText(
+                          context,
+                          size: 30,
+                          color: gold,
+                          weight: 700,
+                          spacing: 0.6,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                if (description.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  LayoutBuilder(
+                    builder: (context, box) {
+                      final note = Text(
+                        description,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontSize: 13.5,
+                          height: 1.45,
+                          fontWeight: FontWeight.w600,
+                          color: theme.colorScheme.onSurface
+                              .withValues(alpha: 0.88),
+                        ),
+                      );
+                      final link = onTelegram == null
+                          ? null
+                          : ToolAction(
+                              icon: AppIcons.paperPlane,
+                              label: telegramLabel ?? l.freeTelegram,
+                              onTap: onTelegram,
+                              tone: AppActionTone.link,
+                              dense: true,
+                            );
+                      final side = box.hasBoundedWidth &&
+                          box.maxWidth >= 460 &&
+                          link != null;
+                      return _Block(
+                        child: side
+                            ? Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Expanded(child: note),
+                                  const SizedBox(width: 12),
+                                  link,
+                                ],
+                              )
+                            : Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  note,
+                                  if (link != null) ...[
+                                    const SizedBox(height: 12),
+                                    Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: link,
+                                    ),
+                                  ],
+                                ],
+                              ),
+                      );
+                    },
+                  ),
+                ],
+                const SizedBox(height: 14),
+                _Perforation(
+                  line: mute.withValues(alpha: 0.32),
+                  punch: gold.withValues(alpha: 0.75),
+                ),
+                const SizedBox(height: 9),
+                Row(
+                  children: [
+                    if (updated != null && updated!.trim().isNotEmpty)
                       Text(
                         updated!.trim(),
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: mute,
-                          fontSize: 12,
+                          fontSize: 11.5,
                         ),
                       ),
-                    ],
+                    const Spacer(),
+                    _TicketBars(color: gold.withValues(alpha: 0.55)),
                   ],
                 ),
               ],
             ),
           ),
-          if (description.isNotEmpty) ...[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 13),
-              child: LayoutBuilder(
-                builder: (context, box) {
-                  final note = Text(
-                    description,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontSize: 13.5,
-                      height: 1.45,
-                      fontWeight: FontWeight.w600,
-                      color:
-                          theme.colorScheme.onSurface.withValues(alpha: 0.88),
-                    ),
-                  );
-                  final link = onTelegram == null
-                      ? null
-                      : ToolAction(
-                          icon: AppIcons.paperPlane,
-                          label: telegramLabel ?? l.freeTelegram,
-                          onTap: onTelegram,
-                          tone: AppActionTone.link,
-                          dense: true,
-                        );
-                  // Beside the note while there is room, under it when there
-                  // is not. On a phone the row squeezed the seller's text into
-                  // a two-word column with the key taking the rest of the line,
-                  // which made the note look like a caption for the button.
-                  final side = box.hasBoundedWidth &&
-                      box.maxWidth >= 460 &&
-                      link != null;
-                  return _Block(
-                    child: side
-                        ? Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Expanded(child: note),
-                              const SizedBox(width: 12),
-                              link,
-                            ],
-                          )
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              note,
-                              if (link != null) ...[
-                                const SizedBox(height: 12),
-                                Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: link,
-                                ),
-                              ],
-                            ],
-                          ),
-                  );
-                },
-              ),
-            ),
-          ],
-          if (nodes.isNotEmpty) ...[
-            const _PlateRule(),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 11, 16, 9),
-              child: Row(
-                children: [
-                  Text(
-                    l.locationsNodes,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: mute,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${nodes.length}',
-                    style: terminalText(
-                      context,
-                      size: 10,
-                      color: goldInk(context),
-                      weight: 700,
-                      spacing: 1,
-                    ),
-                  ),
-                  if (selectedNodeTitle != null) ...[
-                    // One flexible child, not two. A Spacer and the name were
-                    // both flexible, so they split the slack down the middle
-                    // and the pair floated in the centre of the rule instead of
-                    // sitting on its right end.
-                    const Spacer(),
-                    _LiveNode(name: selectedNodeTitle!),
-                  ],
-                ],
-              ),
-            ),
-            // The lines touch the plate on both sides and are separated by
-            // printed rules: the card reads as one object with a pool in it,
-            // not as a stack of little cards.
-            Column(
-              children: [
-                for (var i = 0; i < nodes.length; i++) ...[
-                  if (i > 0) const NodeRule(),
-                  nodes[i],
-                ],
-              ],
-            ),
-            if (unsupportedNote != null && unsupportedNote!.trim().isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-                child: Text(
-                  unsupportedNote!,
-                  style: terminalText(
-                    context,
-                    size: 12,
-                    color: mute,
-                    weight: 500,
-                    spacing: 0.2,
-                  ),
-                ),
-              ),
-          ],
         ],
       ),
+    );
+
+    final pool = nodes.isEmpty
+        ? null
+        : AppSurface(
+            key: kProfilePoolKey,
+            clip: true,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const _PlateRule(),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 11, 16, 9),
+                  child: Row(
+                    children: [
+                      Text(
+                        l.locationsNodes,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: mute,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${nodes.length}',
+                        style: terminalText(
+                          context,
+                          size: 10,
+                          color: gold,
+                          weight: 700,
+                          spacing: 1,
+                        ),
+                      ),
+                      if (selectedNodeTitle != null) ...[
+                        const Spacer(),
+                        _LiveNode(name: selectedNodeTitle!),
+                      ],
+                    ],
+                  ),
+                ),
+                Column(
+                  children: [
+                    for (var i = 0; i < nodes.length; i++) ...[
+                      if (i > 0) const NodeRule(),
+                      nodes[i],
+                    ],
+                  ],
+                ),
+                if (unsupportedNote != null &&
+                    unsupportedNote!.trim().isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                    child: Text(
+                      unsupportedNote!,
+                      style: terminalText(
+                        context,
+                        size: 12,
+                        color: mute,
+                        weight: 500,
+                        spacing: 0.2,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        pass,
+        if (pool != null) ...[
+          const SizedBox(height: 14),
+          pool,
+        ],
+      ],
     );
   }
 }
@@ -583,4 +676,82 @@ String? _updatedLabel(String? raw, {required bool russian}) {
   final day = local.day.toString().padLeft(2, '0');
   final month = local.month.toString().padLeft(2, '0');
   return russian ? 'обновлено $day.$month' : 'updated $day.$month';
+}
+
+/// A punched ticket rule: two dots and a dashed tear edge.
+class _Perforation extends StatelessWidget {
+  const _Perforation({required this.line, required this.punch});
+
+  final Color line;
+  final Color punch;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        _punchDot(punch),
+        const SizedBox(width: 8),
+        Expanded(
+          child: SizedBox(
+            height: 1,
+            child: CustomPaint(painter: _DashedRulePainter(line)),
+          ),
+        ),
+        const SizedBox(width: 8),
+        _punchDot(punch),
+      ],
+    );
+  }
+
+  Widget _punchDot(Color color) => Container(
+        width: 5,
+        height: 5,
+        decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+      );
+}
+
+class _DashedRulePainter extends CustomPainter {
+  const _DashedRulePainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1;
+    var x = 0.0;
+    while (x < size.width) {
+      final end = (x + 5).clamp(0.0, size.width);
+      canvas.drawLine(Offset(x, 0.5), Offset(end, 0.5), paint);
+      x += 9;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedRulePainter oldDelegate) =>
+      oldDelegate.color != color;
+}
+
+/// A tiny barcode-like mark on the ticket stub. Decorative, not a real code.
+class _TicketBars extends StatelessWidget {
+  const _TicketBars({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    const widths = [1.5, 2.5, 1.0, 3.0, 1.5, 2.0, 1.0];
+    const heights = [7.0, 11.0, 6.0, 10.0, 8.0, 5.0, 9.0];
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        for (var i = 0; i < widths.length; i++) ...[
+          if (i > 0) const SizedBox(width: 2),
+          Container(width: widths[i], height: heights[i], color: color),
+        ],
+      ],
+    );
+  }
 }
