@@ -1699,8 +1699,6 @@ class ProxyDomVpnService : VpnService() {
                 }
             },
         ).also { it.start() }
-        // Home ping stays off: SOCKS CONNECT every 5s shared the Hy2 path with
-        // tabs. PathHealth continuous (below) is the liveness probe instead.
     }
 
     private fun startPathHealthWatch() {
@@ -1718,7 +1716,16 @@ class ProxyDomVpnService : VpnService() {
         pathHealth.startContinuous(
             adapter = watch.adapter,
             socksPort = watch.port,
-            listener = { result -> sessionEngine.notifyHealth(result) },
+            listener = { result ->
+                // One probe, two readers: the 5 s HTTP round trip that keeps the
+                // path honest is also the Home `ms`, so ping costs no extra
+                // connection on the Hy2 path. Logged because a Home number with
+                // no journal behind it cannot be checked in the field.
+                val sample = homePingSample(result)
+                NativeLog.d(TAG, "home ping sample=$sample health=$result")
+                VpnPingBroadcaster.emit(sample)
+                sessionEngine.notifyHealth(result)
+            },
             alive = {
                 isRunning &&
                     prefs().getBoolean(KEY_ACTIVE, false) &&
@@ -1734,6 +1741,10 @@ class ProxyDomVpnService : VpnService() {
 
     private fun stopPathHealthWatch() {
         pathHealth.stopContinuous()
+        // A session that is gone has no reading: Home shows `—`, never the last
+        // good ms. Clearing here, not in the traffic monitor, keeps a shade
+        // restyle from wiping a number the path watch is still producing.
+        VpnPingBroadcaster.clear()
     }
 
     private fun acquireVpnLocks() {
@@ -1802,14 +1813,9 @@ class ProxyDomVpnService : VpnService() {
     }
 
     private fun stopTrafficMonitor() {
-        stopPingMonitor()
         trafficMonitor?.stop()
         trafficMonitor = null
         VpnTrafficBroadcaster.clear()
-    }
-
-    private fun stopPingMonitor() {
-        VpnPingBroadcaster.clear()
     }
 
     override fun onRevoke() {
@@ -2194,7 +2200,7 @@ object VpnChannelRegistry {
                 }
             })
 
-        // EventChannel — path latency (ms) for Home ping (stub without libbox)
+        // EventChannel — path latency (ms) for Home ping (PathHealth probe)
         EventChannel(engine.dartExecutor.binaryMessenger, PING_EVENT_CHANNEL)
             .setStreamHandler(object : EventChannel.StreamHandler {
                 override fun onListen(arguments: Any?, events: EventChannel.EventSink) {
@@ -2406,6 +2412,19 @@ object VpnTrafficBroadcaster {
             }
         }
     }
+}
+
+/**
+ * Home `ms` for one path-health sample.
+ *
+ * `null` is a real answer, not a missing one: a degraded or dead path, a probe
+ * that never left the device, or an RTT outside [VpnPingMonitor.MIN_PLAUSIBLE_MS]
+ * .. [VpnPingMonitor.MAX_PLAUSIBLE_MS]. Home renders it as `—` instead of
+ * freezing on the last good number.
+ */
+internal fun homePingSample(result: PathHealth.HealthResult): Int? = when (result) {
+    is PathHealth.HealthResult.Ok -> VpnPingMonitor.clampDelayMs(result.rttMs)
+    else -> null
 }
 
 /**

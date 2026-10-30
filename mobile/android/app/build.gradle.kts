@@ -83,6 +83,13 @@ android {
         }
     }
 
+    // Unit tests run on the JVM: the Kotlin code logs through android.util.Log,
+    // which is a stub there. Default values keep the logger quiet instead of
+    // throwing, so a test can drive PathHealth's loop.
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
+
     buildTypes {
         getByName("release") {
             if (hasUsableReleaseKeystore) {

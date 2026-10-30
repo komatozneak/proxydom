@@ -599,6 +599,8 @@ class VpnController {
 /// Parses EventChannel `proxydom/vpn/ping` payloads.
 ///
 /// Explicit `delayMs: null` clears a stale RTT (native consecutive probe fail).
+/// The range matches [VpnPingMonitor] on the native side: a through-tunnel HTTP
+/// round trip cannot be faked locally, so only impossible values are dropped.
 @visibleForTesting
 int? parsePingEventMs(dynamic event) {
   if (event is Map) {
@@ -607,13 +609,13 @@ int? parsePingEventMs(dynamic event) {
     if (ms == null) return null;
     if (ms is num) {
       final v = ms.toInt();
-      if (v >= 30 && v <= 5000) return v;
+      if (v >= 5 && v <= 5000) return v;
     }
     return null;
   }
   if (event is num) {
     final v = event.toInt();
-    if (v >= 30 && v <= 5000) return v;
+    if (v >= 5 && v <= 5000) return v;
   }
   return null;
 }

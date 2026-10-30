@@ -11,8 +11,6 @@ import java.net.Socket
 import java.net.SocketTimeoutException
 import java.net.URI
 import java.nio.charset.StandardCharsets
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicInteger
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
 import javax.net.ssl.SSLContext
@@ -22,33 +20,39 @@ import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
 
 /**
- * Periodic path-latency probe for Home `ms`.
+ * Path probes for the tunnel, and the Home `ms` gate on top of them.
  *
- * When SOCKS is up: SOCKS5 CONNECT RTT to [PROBE_HOST]:443 (no TLS).
- * Fallback: direct TCP through TUN (no protect) when SOCKS is down.
+ * A bare SOCKS CONNECT is not a latency sample: the core acknowledges it as soon
+ * as the stream is open, not when the exit has dialled anything. On a node
+ * 130 ms away the reply comes back in ~10 ms, which is why Home read a ping
+ * three times better than the path. [TunnelHttpProbe] measures a real HTTP
+ * round trip on a kept-alive connection instead, and drops the connection when
+ * the path stops answering.
  *
  * Connect/Auto prove uses [socksConnectProbe] (SOCKS CONNECT to
  * [PROBE_HOST]:443, no HTTP). Cloudflare generate_204 hangs through VPS.
  *
- * After [FAIL_CLEAR_THRESHOLD] consecutive failures, emits `null` so Flutter
- * shows `— ms` instead of freezing on the last good sample.
+ * Home does not run its own loop here: [PathHealth] already probes the live
+ * path every five seconds, and the service forwards that RTT, so the ping
+ * shares one probe with the liveness check instead of opening a parallel one
+ * on the same Hy2 path.
  */
-class VpnPingMonitor(
-    @Suppress("UNUSED_PARAMETER") private val groupTag: String = GROUP_TAG,
-    /** Sample in ms, or null to clear Home ping. */
-    private val onSample: (Int?) -> Unit,
-) {
+class VpnPingMonitor private constructor() {
     companion object {
         private const val TAG = "VpnPingMonitor"
-        const val GROUP_TAG = "proxy"
-        const val MIN_PLAUSIBLE_MS = 30
+
+        /**
+         * The HTTP round trip cannot be faked locally — a status line proves
+         * the path — so the floor only rejects impossible values. It used to be
+         * 30 ms, when the sample was a CONNECT that had to prove it left the
+         * device; that also hid genuinely fast nodes.
+         */
+        const val MIN_PLAUSIBLE_MS = 5
         const val MAX_PLAUSIBLE_MS = 5000
-        const val PROBE_INTERVAL_MS = 5_000L
         const val PROBE_TIMEOUT_MS = 3_500
 
         /** Gate before Connected. One second, not a TLS trace. */
         const val CARRY_TIMEOUT_MS = 1_000
-        const val FAIL_CLEAR_THRESHOLD = 2
         const val PROBE_HOST = "1.1.1.1"
         const val PROBE_PORT = 443
         const val PROBE_HTTP_PORT = 80
@@ -85,47 +89,13 @@ class VpnPingMonitor(
             }.getOrDefault(false)
 
         /**
-         * SOCKS5 no-auth CONNECT RTT to [destHost]:[destPort] via [socksHost]:[socksPort].
-         * Returns elapsed ms on success, null on failure.
-         */
-        fun socks5ConnectRttMs(
-            socksHost: String = GvisorTun2Socks.SOCKS_HOST,
-            socksPort: Int = GvisorTun2Socks.SOCKS_PORT,
-            destHost: String = PROBE_HOST,
-            destPort: Int = PROBE_PORT,
-            timeoutMs: Int = PROBE_TIMEOUT_MS,
-        ): Long? =
-            runCatching {
-                Socket().use { socket ->
-                    socket.soTimeout = timeoutMs
-                    socket.connect(InetSocketAddress(socksHost, socksPort), timeoutMs)
-                    val out = DataOutputStream(socket.getOutputStream())
-                    val inp = DataInputStream(socket.getInputStream())
-
-                    socks5Greeting(out, inp)
-
-                    val addr = InetAddress.getByName(destHost).address
-                    require(addr.size == 4) { "IPv4 probe only" }
-
-                    val started = System.nanoTime()
-                    out.writeByte(0x05)
-                    out.writeByte(0x01)
-                    out.writeByte(0x00)
-                    out.writeByte(0x01)
-                    out.write(addr)
-                    out.writeShort(destPort)
-                    out.flush()
-
-                    socks5ReadConnectReply(inp)
-                    (System.nanoTime() - started) / 1_000_000L
-                }
-            }.getOrNull()
-
-        /**
          * SOCKS5 CONNECT to [PROBE_HOST]:443 — Connect/Auto gate.
          *
          * TCP handshake through the proxy only. HTTP/HTTPS generate_204 through
          * the VPS often never returns (Pixel: Read timed out, pages still load).
+         *
+         * Not a latency sample: the core acknowledges a CONNECT before the exit
+         * has dialled anything. Home uses [TunnelHttpProbe] instead.
          */
         fun socksConnectProbe(
             socksHost: String = GvisorTun2Socks.SOCKS_HOST,
@@ -636,7 +606,7 @@ class VpnPingMonitor(
             return ssl
         }
 
-        private fun socks5ConnectIpv4(
+        internal fun socks5ConnectIpv4(
             out: DataOutputStream,
             inp: DataInputStream,
             destHost: String,
@@ -712,7 +682,7 @@ class VpnPingMonitor(
             }
         }
 
-        private fun socks5Greeting(out: DataOutputStream, inp: DataInputStream) {
+        internal fun socks5Greeting(out: DataOutputStream, inp: DataInputStream) {
             out.write(byteArrayOf(0x05, 0x01, 0x00))
             out.flush()
             val ver = inp.readUnsignedByte()
@@ -723,7 +693,7 @@ class VpnPingMonitor(
         }
 
         /** SOCKS5 CONNECT with ATYP domain — proxy resolves DNS. */
-        private fun socks5ConnectDomain(
+        internal fun socks5ConnectDomain(
             out: DataOutputStream,
             inp: DataInputStream,
             host: String,
@@ -774,84 +744,5 @@ class VpnPingMonitor(
                 is Ok -> "code=$code"
                 is Fail -> reason
             }
-    }
-
-    private val running = AtomicBoolean(false)
-    private val consecutiveFails = AtomicInteger(0)
-    private var worker: Thread? = null
-
-    fun start() {
-        if (!running.compareAndSet(false, true)) return
-        consecutiveFails.set(0)
-        worker =
-            Thread(
-                {
-                    NativeLog.i(TAG, "ping monitor started (SOCKS CONNECT RTT, then TUN TCP)")
-                    while (running.get()) {
-                        probeOnce()
-                        var waited = 0L
-                        while (running.get() && waited < PROBE_INTERVAL_MS) {
-                            try {
-                                Thread.sleep(200)
-                            } catch (_: InterruptedException) {
-                                break
-                            }
-                            waited += 200
-                        }
-                    }
-                    NativeLog.i(TAG, "ping monitor stopped")
-                },
-                "proxydom-ping-monitor",
-            ).apply {
-                isDaemon = true
-                start()
-            }
-    }
-
-    fun stop() {
-        running.set(false)
-        worker?.interrupt()
-        worker = null
-        consecutiveFails.set(0)
-    }
-
-    private fun probeOnce() {
-        val sample = measureSample()
-        if (sample != null) {
-            consecutiveFails.set(0)
-            NativeLog.i(TAG, "ping sample path=${sample.path} ${sample.ms}ms")
-            runCatching { onSample(sample.ms) }
-                .onFailure { NativeLog.w(TAG, "onSample failed: ${it.message}") }
-            return
-        }
-
-        val fails = consecutiveFails.incrementAndGet()
-        NativeLog.i(TAG, "ping sample failed consecutive=$fails")
-        if (fails >= FAIL_CLEAR_THRESHOLD) {
-            NativeLog.i(TAG, "ping cleared after $fails consecutive failures")
-            runCatching { onSample(null) }
-                .onFailure { NativeLog.w(TAG, "onSample(null) failed: ${it.message}") }
-        }
-    }
-
-    private data class Sample(val ms: Int, val path: String)
-
-    private fun measureSample(): Sample? {
-        if (isSocksReachable()) {
-            val connectMs = socks5ConnectRttMs()
-            if (connectMs == null) {
-                NativeLog.i(TAG, "SOCKS CONNECT failed")
-            } else {
-                DiagnosticRing.event("debug", "net.path", "ok=true")
-                val clamped = clampDelayMs(connectMs) ?: return null
-                return Sample(clamped, "socks5")
-            }
-        } else {
-            NativeLog.i(TAG, "SOCKS unreachable — trying TUN TCP")
-        }
-
-        val tunMs = tcpConnectRttMs() ?: return null
-        val clamped = clampDelayMs(tunMs) ?: return null
-        return Sample(clamped, "tun-tcp")
     }
 }

@@ -4,6 +4,7 @@ import com.proxydom.app.NativeLog
 
 import android.os.SystemClock
 import com.proxydom.app.DiagnosticRing
+import com.proxydom.app.TunnelHttpProbe
 import com.proxydom.app.VpnPingMonitor
 import com.proxydom.app.XRAY_SOCKS_PROBE_ATTEMPTS
 import com.proxydom.app.XRAY_SOCKS_PROBE_RETRY_SLEEP_MS
@@ -14,12 +15,16 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Pre-connect prove + continuous path health (ADR 014).
+ * Pre-connect prove + continuous path health.
  *
  * One facade for triple-core: [CoreAdapter.XraySocks] / [CoreAdapter.HysteriaSocks]
  * use SOCKS CONNECT to 1.1.1.1:443; [CoreAdapter.TrustTunnel] uses the same
  * CONNECT (SOCKS on the port of the running core, else TUN-direct TCP).
  * Handshake is not a prove. PathIncompatible never swaps cores.
+ *
+ * The continuous cycle reports the HTTP round trip it measured, so Home `ms` is
+ * this probe and not a second one: [HealthResult.Ok] carries the sample, and
+ * [DEGRADED_THRESHOLD] misses clear it.
  */
 class PathHealth {
     enum class CoreAdapter {
@@ -47,6 +52,13 @@ class PathHealth {
     private val continuousRunning = AtomicBoolean(false)
     private var continuousThread: Thread? = null
     private val consecutiveFails = AtomicInteger(0)
+
+    /**
+     * Kept-alive HTTP connection the continuous probe samples on. Reopening it
+     * every five seconds paid the tunnel's stream setup on every sample.
+     */
+    @Volatile
+    private var httpProbe: TunnelHttpProbe? = null
 
     /**
      * Adapter-aware pre-prove. TT and Xray/Hy2 all require SOCKS/TUN CONNECT.
@@ -203,9 +215,12 @@ class PathHealth {
     }
 
     /**
-     * Continuous SOCKS CONNECT while the TUN is up. [ProxyDomVpnService] must
+     * Continuous path probe while the TUN is up. [ProxyDomVpnService] must
      * start this after ConnectedHealthy — otherwise a dead Hy2 path still
      * paints Nest connected (screen-off Doze).
+     *
+     * The first probe runs immediately: Home shows a number while the session
+     * is still settling, instead of an ellipsis for a whole interval.
      */
     fun startContinuous(
         adapter: CoreAdapter,
@@ -220,20 +235,16 @@ class PathHealth {
             continuousThread = Thread(
                 {
                     while (continuousRunning.get() && alive()) {
-                        try {
-                            Thread.sleep(CONTINUOUS_INTERVAL_MS)
-                        } catch (_: InterruptedException) {
-                            break
-                        }
-                        if (!continuousRunning.get() || !alive()) break
-                        val ok = runCatching {
+                        val rtt = runCatching {
                             VpnPingMonitor.tcpConnectRttMs(
                                 timeoutMs = CONTINUOUS_PROBE_TIMEOUT_MS,
-                            ) != null
-                        }.getOrDefault(false)
-                        if (ok) {
+                            )
+                        }.getOrNull()
+                        if (rtt != null) {
                             consecutiveFails.set(0)
-                            listener.onHealth(HealthResult.Ok(rttMs = 0, attempt = 0))
+                            listener.onHealth(
+                                HealthResult.Ok(rttMs = rtt, attempt = 0),
+                            )
                         } else {
                             val n = consecutiveFails.incrementAndGet()
                             val detail = "continuous TT http fail n=$n"
@@ -243,6 +254,7 @@ class PathHealth {
                                 listener.onHealth(HealthResult.Degraded(n, detail))
                             }
                         }
+                        pauseBetweenProbes()
                     }
                 },
                 "proxydom-path-health",
@@ -252,29 +264,20 @@ class PathHealth {
         }
         consecutiveFails.set(0)
         continuousRunning.set(true)
+        val probe = TunnelHttpProbe(socksPort = socksPort)
+        httpProbe = probe
         continuousThread = Thread(
             {
                 NativeLog.i(TAG, "continuous socks probe port=$socksPort")
                 while (continuousRunning.get() && alive()) {
-                    try {
-                        Thread.sleep(CONTINUOUS_INTERVAL_MS)
-                    } catch (_: InterruptedException) {
-                        break
-                    }
-                    if (!continuousRunning.get() || !alive()) break
-                    val ok = runCatching {
-                        if (!VpnPingMonitor.isSocksReachable(port = socksPort, timeoutMs = 800)) {
-                            false
-                        } else {
-                            VpnPingMonitor.socksConnectOk(
-                                socksPort = socksPort,
-                                timeoutMs = CONTINUOUS_PROBE_TIMEOUT_MS,
-                            )
-                        }
-                    }.getOrDefault(false)
-                    if (ok) {
+                    // One request on the kept-alive connection: a single round
+                    // trip, without paying the tunnel's stream setup each time.
+                    val rtt = probe.sample(CONTINUOUS_PROBE_TIMEOUT_MS)
+                    if (rtt != null) {
                         consecutiveFails.set(0)
-                        listener.onHealth(HealthResult.Ok(rttMs = 0, attempt = 0))
+                        listener.onHealth(
+                            HealthResult.Ok(rttMs = rtt, attempt = 0),
+                        )
                     } else {
                         val n = consecutiveFails.incrementAndGet()
                         val detail = continuousSocksFailDetail(n, socksPort)
@@ -284,6 +287,7 @@ class PathHealth {
                             listener.onHealth(HealthResult.Degraded(n, detail))
                         }
                     }
+                    pauseBetweenProbes()
                 }
             },
             "proxydom-path-health",
@@ -291,10 +295,28 @@ class PathHealth {
         continuousThread?.start()
     }
 
+    /**
+     * Wait one interval between probes, in slices: [stopContinuous] interrupts
+     * the thread and must not wait out the rest of five seconds.
+     */
+    private fun pauseBetweenProbes() {
+        var waited = 0L
+        while (continuousRunning.get() && waited < CONTINUOUS_INTERVAL_MS) {
+            try {
+                Thread.sleep(200)
+            } catch (_: InterruptedException) {
+                return
+            }
+            waited += 200
+        }
+    }
+
     fun stopContinuous() {
         continuousRunning.set(false)
         continuousThread?.interrupt()
         continuousThread = null
+        httpProbe?.close()
+        httpProbe = null
         consecutiveFails.set(0)
     }
 

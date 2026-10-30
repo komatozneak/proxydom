@@ -9,22 +9,19 @@ import org.junit.Test
 class VpnPingMonitorTest {
     @Test
     fun `clampDelayMs accepts plausible range`() {
-        assertEquals(30, VpnPingMonitor.clampDelayMs(30))
+        // 5 ms is the floor: an HTTP round trip through the tunnel cannot be
+        // faked locally, so only impossible values are rejected.
+        assertEquals(5, VpnPingMonitor.clampDelayMs(5))
         assertEquals(245, VpnPingMonitor.clampDelayMs(245))
         assertEquals(5000, VpnPingMonitor.clampDelayMs(5000))
     }
 
     @Test
-    fun `clampDelayMs rejects too fast and too slow`() {
-        assertNull(VpnPingMonitor.clampDelayMs(5))
-        assertNull(VpnPingMonitor.clampDelayMs(29))
+    fun `clampDelayMs rejects impossible samples`() {
+        assertNull(VpnPingMonitor.clampDelayMs(0))
+        assertNull(VpnPingMonitor.clampDelayMs(4))
         assertNull(VpnPingMonitor.clampDelayMs(5001))
         assertNull(VpnPingMonitor.clampDelayMs(12_000))
-    }
-
-    @Test
-    fun `fail clear threshold is two consecutive failures`() {
-        assertEquals(2, VpnPingMonitor.FAIL_CLEAR_THRESHOLD)
     }
 
     @Test
@@ -53,14 +50,10 @@ class VpnPingMonitorTest {
     }
 
     @Test
-    fun `socks5ConnectRttMs to dead socks returns null`() {
-        assertNull(
-            VpnPingMonitor.socks5ConnectRttMs(
-                socksHost = "127.0.0.1",
-                socksPort = 1,
-                timeoutMs = 200,
-            ),
-        )
+    fun `TunnelHttpProbe to dead socks has no sample`() {
+        TunnelHttpProbe(socksPort = 1).use { probe ->
+            assertNull(probe.sample(timeoutMs = 200))
+        }
     }
 
     @Test
