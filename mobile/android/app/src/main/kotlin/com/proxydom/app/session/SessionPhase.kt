@@ -1,7 +1,7 @@
 package com.proxydom.app.session
 
 /**
- * Session phases for [VpnSessionEngine] (ADR 014).
+ * Session phases for [VpnSessionEngine].
  * Legacy string status maps via [toLegacyStatus].
  */
 enum class SessionPhase {
@@ -47,6 +47,8 @@ enum class SessionReason {
     InvalidParams,
     /** Bound path cannot complete prove for this plan (after replan). */
     PathIncompatible,
+    /** The node's own TLS/WebSocket (or QUIC) dial never completed. */
+    NodeHandshake,
     Unknown,
     ;
 

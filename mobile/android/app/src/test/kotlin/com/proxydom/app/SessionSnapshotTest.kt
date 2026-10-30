@@ -11,7 +11,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Unit smoke for ADR 014 snapshot model (avoid org.json — not mocked on JVM).
+ * Unit smoke for snapshot model (avoid org.json — not mocked on JVM).
  */
 class SessionSnapshotTest {
     @Test
@@ -90,9 +90,37 @@ class SessionSnapshotTest {
     fun `session reason fromWire is case insensitive`() {
         assertEquals(SessionReason.EgressTimeout, SessionReason.fromWire("EgressTimeout"))
         assertEquals(SessionReason.EgressTimeout, SessionReason.fromWire("egresstimeout"))
+        assertEquals(SessionReason.NodeHandshake, SessionReason.fromWire("NodeHandshake"))
+        assertEquals(SessionReason.NodeHandshake, SessionReason.fromWire("nodehandshake"))
         assertEquals(SessionReason.None, SessionReason.fromWire(null))
         assertEquals(SessionReason.Unknown, SessionReason.fromWire("not-a-reason"))
         assertTrue(SessionReason.fromWire("UnderlyingBad") == SessionReason.UnderlyingBad)
+    }
+
+    /**
+     * The node's own dial failing and the exit not answering are different
+     * faults. Both used to publish EgressTimeout, which is why a dead TLS/WS
+     * front was diagnosed as a slow exit.
+     */
+    @Test
+    fun `a node handshake failure is not an egress timeout`() {
+        assertEquals(
+            SessionReason.NodeHandshake,
+            VpnSessionEngine.establishFailureReason(
+                "node handshake failed server=203.0.113.10:443 proto=tls/ws " +
+                    "tcp=ok reason=1.1.1.1:443=SocketTimeoutException=Read timed out",
+            ),
+        )
+        assertEquals(
+            SessionReason.EgressTimeout,
+            VpnSessionEngine.establishFailureReason(
+                "tunnel carried no response server=203.0.113.10:443 reason=...",
+            ),
+        )
+        assertEquals(
+            SessionReason.EgressTimeout,
+            VpnSessionEngine.establishFailureReason(null),
+        )
     }
 
     @Test

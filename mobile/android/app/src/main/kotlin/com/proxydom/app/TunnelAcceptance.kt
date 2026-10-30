@@ -14,15 +14,30 @@ data class HttpProbeSample(
 )
 
 /**
+ * `failStart` prefix for a node whose own transport handshake never finished.
+ *
+ * It is a prefix, not a sentence: the engine turns it into
+ * `SessionReason.NodeHandshake`, and Flutter turns it into "server not
+ * responding" instead of the generic error. Naming the node's own dial apart
+ * from the exit matters — `tcp=ok` only says the port accepted a connection.
+ */
+const val NODE_HANDSHAKE_FAILED_PREFIX = "node handshake failed"
+
+/**
  * Connected requires [carriesData]: a parsed HTTP status or a read exit
  * address. A finished CONNECT alone is not enough. A missing IP is not a
  * failed tunnel when some sample still answered.
+ *
+ * [nodeHandshakeFailed] is the other half of that rule: when the SOCKS CONNECT
+ * itself never completed, the engine had not finished dialling the node yet.
+ * That is not an exit timeout and must not be reported as one.
  */
 data class TunnelAcceptance(
     val carriesData: Boolean,
     val exitIp: String?,
     val target: String?,
     val detail: String,
+    val nodeHandshakeFailed: Boolean = false,
 )
 
 /**

@@ -50,6 +50,22 @@ SocksProbeFailure? parseSocksProbeFailure(String detail) {
   return SocksProbeFailure(nodeId: nodeId, host: host);
 }
 
+/// Native failStart prefix for a node whose own transport handshake never
+/// finished (mirrors `NODE_HANDSHAKE_FAILED_PREFIX` on the Kotlin side).
+const kNodeHandshakeFailedPrefix = 'node handshake failed';
+
+final RegExp _nodeHandshakeFailPattern = RegExp(
+  '^${RegExp.escape(kNodeHandshakeFailedPrefix)} server=(\\S+)',
+  caseSensitive: false,
+);
+
+/// Server from a `node handshake failed server=…` detail, or null.
+String? parseNodeHandshakeFailureServer(String detail) {
+  final match = _nodeHandshakeFailPattern.firstMatch(detail.trim());
+  final server = match?.group(1)?.trim() ?? '';
+  return server.isEmpty ? null : server;
+}
+
 /// Map native [getLastError] text to a structured [VpnError] for Home UI.
 VpnError vpnErrorFromNativeDetail(
   String? detail, {
@@ -63,6 +79,16 @@ VpnError vpnErrorFromNativeDetail(
     return VpnError(
       code: kVpnProbeFailedErrorCode,
       message: probe.nodeId,
+    );
+  }
+  // The node accepted TCP but never answered its own TLS/WebSocket (or QUIC)
+  // handshake. That is the server not responding, not an exit timeout: the
+  // same screen as a failed probe, with the address named.
+  final handshakeServer = parseNodeHandshakeFailureServer(detail);
+  if (handshakeServer != null) {
+    return VpnError(
+      code: kVpnProbeFailedErrorCode,
+      message: handshakeServer,
     );
   }
   if (detail.toLowerCase().contains('permission denied')) {
@@ -93,7 +119,7 @@ bool _isNodeAuthRefusal(String detail) {
   return lower.contains('authentication error') && lower.contains('405');
 }
 
-/// Map ADR 014 session Error / PathIncompatible to Home [VpnError].
+/// Map session Error / PathIncompatible to Home [VpnError].
 VpnError vpnErrorFromSession(
   VpnSessionSnapshot snap, {
   String fallbackMessage = 'Native VPN error',

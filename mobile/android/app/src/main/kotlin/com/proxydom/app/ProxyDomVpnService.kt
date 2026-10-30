@@ -1229,6 +1229,7 @@ class ProxyDomVpnService : VpnService() {
         if (!acceptCarryingTunnel(
                 socksPort = watch.port,
                 server = "$serverHost:$serverPort",
+                handshake = "tls/ws",
             )
         ) {
             return
@@ -1384,6 +1385,7 @@ class ProxyDomVpnService : VpnService() {
         if (!acceptCarryingTunnel(
                 socksPort = watch.port,
                 server = server,
+                handshake = "quic",
             )
         ) {
             return
@@ -1467,10 +1469,16 @@ class ProxyDomVpnService : VpnService() {
      * A parsed response must arrive before Connected. A finished CONNECT is
      * not that. An exit address already on the winning sample is kept; when
      * it is missing, the trace is read afterwards and does not hold the status.
+     *
+     * A CONNECT that never finished is the node's own handshake failing
+     * ([proveTunnel]'s first sample), and it is reported as such: calling it
+     * an egress timeout sent the user to the exit while the server's TLS/WS
+     * front had answered nothing.
      */
     private fun acceptCarryingTunnel(
         socksPort: Int,
         server: String,
+        handshake: String,
     ): Boolean {
         if (!awaitSocksPort(socksPort)) {
             failStart(
@@ -1481,10 +1489,19 @@ class ProxyDomVpnService : VpnService() {
         }
         val acceptance = VpnPingMonitor.proveTunnel(socksPort = socksPort)
         if (!acceptance.carriesData) {
-            failStart(
-                "tunnel carried no response server=$server reason=${acceptance.detail} " +
-                    "tcp=${tcpReachServer(server)} socks=$socksPort",
-            )
+            if (acceptance.nodeHandshakeFailed) {
+                failStart(
+                    "$NODE_HANDSHAKE_FAILED_PREFIX server=$server proto=$handshake " +
+                        "tcp=${tcpReachServer(server)} reason=${acceptance.detail} " +
+                        "socks=$socksPort budget_ms=${VpnPingMonitor.CARRY_TIMEOUT_MS}",
+                )
+            } else {
+                failStart(
+                    "tunnel carried no response server=$server " +
+                        "reason=${acceptance.detail} " +
+                        "tcp=${tcpReachServer(server)} socks=$socksPort",
+                )
+            }
             return false
         }
         val knownExit = acceptance.exitIp?.trim()?.takeIf { it.isNotEmpty() }

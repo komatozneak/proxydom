@@ -5,6 +5,10 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.net.InetAddress
+import java.net.ServerSocket
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.concurrent.thread
 
 class VpnPingMonitorTest {
     @Test
@@ -123,5 +127,45 @@ class VpnPingMonitorTest {
         assertTrue(result is VpnPingMonitor.SocksHttpsResult.Fail)
         assertFalse(result.isOk)
         assertTrue(result.detail.isNotBlank())
+    }
+
+    /**
+     * A node whose TLS/WebSocket dial never finishes keeps the SOCKS CONNECT
+     * open. The gate must call that a node handshake failure after one probe,
+     * not spend three target timeouts and report an exit timeout: v2ray's own
+     * websocket dial budget is 8 s, and the old 1 s gate killed it first.
+     */
+    @Test
+    fun `proveTunnel stops when the node CONNECT never completes`() {
+        val server = ServerSocket(0, 50, InetAddress.getByName("127.0.0.1"))
+        val accepted = AtomicInteger(0)
+        thread(isDaemon = true) {
+            while (true) {
+                val socket = try {
+                    server.accept()
+                } catch (_: Exception) {
+                    return@thread
+                }
+                accepted.incrementAndGet()
+                // Hold the socket: the SOCKS greeting gets no reply.
+                socket.use { Thread.sleep(2_000) }
+            }
+        }
+        val startedAt = System.nanoTime()
+        val result = VpnPingMonitor.proveTunnel(
+            socksHost = "127.0.0.1",
+            socksPort = server.localPort,
+            timeoutMs = 250,
+        )
+        val elapsedMs = (System.nanoTime() - startedAt) / 1_000_000
+        server.close()
+
+        assertFalse(result.carriesData)
+        assertTrue(result.nodeHandshakeFailed)
+        assertTrue(result.detail.contains("1.1.1.1:443"))
+        // The other targets would each open another WebSocket dial.
+        assertFalse(result.detail.contains("cp.cloudflare.com"))
+        assertTrue("elapsed=${elapsedMs}ms", elapsedMs < 1_500)
+        assertTrue("accepted=${accepted.get()}", accepted.get() == 1)
     }
 }

@@ -4,12 +4,13 @@ import com.proxydom.app.NativeLog
 
 import com.proxydom.app.DefaultNetworkMonitor
 import com.proxydom.app.DiagnosticRing
+import com.proxydom.app.NODE_HANDSHAKE_FAILED_PREFIX
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicLong
 
 /**
- * Sole VPN session owner (ADR 014): FSM + generation + serial start/stop.
+ * Sole VPN session owner: FSM + generation + serial start/stop.
  *
  * Host ([ProxyDomVpnService]) implements [Host] for TUN/core I/O; the engine
  * never blocks the main thread.
@@ -117,7 +118,7 @@ class VpnSessionEngine(
     }
 
     /**
-     * Enqueue stop on the **same** dispatcher as start (ADR 014).
+     * Enqueue stop on the **same** dispatcher as start.
      */
     fun enqueueStop(markInactive: Boolean = true): Long {
         val gen = generationClock.incrementAndGet()
@@ -246,14 +247,15 @@ class VpnSessionEngine(
                 snapshot.phase != SessionPhase.Error &&
                 !host.suppressEstablishError()
             ) {
+                val failure = establishFailureDetail(host.lastStartFailure())
                 publish(
                     SessionSnapshot(
                         phase = SessionPhase.Error,
                         generation = gen,
-                        reason = SessionReason.EgressTimeout,
+                        reason = establishFailureReason(failure),
                         candidateId = nodeIdFromParams(params),
                         candidateHost = hostFromParams(params),
-                        detail = establishFailureDetail(host.lastStartFailure()),
+                        detail = failure,
                     ),
                 )
                 host.teardownGeneration(gen)
@@ -458,6 +460,19 @@ class VpnSessionEngine(
             val trimmed = prior?.trim().orEmpty()
             return if (trimmed.isEmpty()) "establish returned false" else trimmed
         }
+
+        /**
+         * A node whose own transport handshake never finished is not an
+         * egress timeout: the session never reached the exit. The two used to
+         * share [SessionReason.EgressTimeout], which is why a dead TLS/WS
+         * front read as "the exit is slow".
+         */
+        fun establishFailureReason(detail: String?): SessionReason =
+            if (detail?.trimStart()?.startsWith(NODE_HANDSHAKE_FAILED_PREFIX) == true) {
+                SessionReason.NodeHandshake
+            } else {
+                SessionReason.EgressTimeout
+            }
 
         /** Shared generation clock (MethodChannel allocate + Engine enqueue). */
         private val generationClock = AtomicLong(0L)

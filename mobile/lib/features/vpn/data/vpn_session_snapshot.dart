@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 /// Typed VPN session snapshot from native EventChannel `proxydom/vpn/session`
-/// (ADR 014 — client Connect SoT).
+///.
 enum VpnSessionPhase {
   idle,
   binding,
@@ -28,6 +28,7 @@ enum VpnSessionReason {
   protectFail,
   invalidParams,
   pathIncompatible,
+  nodeHandshake,
   unknown,
 }
 
@@ -325,6 +326,8 @@ VpnSessionReason parseVpnSessionReason(String? raw) {
       return VpnSessionReason.invalidParams;
     case 'PathIncompatible':
       return VpnSessionReason.pathIncompatible;
+    case 'NodeHandshake':
+      return VpnSessionReason.nodeHandshake;
     case 'Unknown':
       return VpnSessionReason.unknown;
     default:

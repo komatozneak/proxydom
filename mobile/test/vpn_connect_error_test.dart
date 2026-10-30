@@ -47,6 +47,40 @@ void main() {
       expect(err.code, kVpnPathIncompatibleErrorCode);
     });
 
+    // The node's TCP port accepted the connection, but its TLS/WebSocket (or
+    // QUIC) handshake never answered. That is the server not responding, not
+    // an egress timeout: the exit was never reached.
+    test('maps a node handshake failure to server_probe_failed', () {
+      const detail =
+          'node handshake failed server=203.0.113.10:443 proto=tls/ws '
+          'tcp=ok reason=1.1.1.1:443=SocketTimeoutException=Read timed out '
+          'socks=10809 budget_ms=9000';
+      expect(
+        parseNodeHandshakeFailureServer(detail),
+        '203.0.113.10:443',
+      );
+      final err = vpnErrorFromNativeDetail(detail);
+      expect(err.code, kVpnProbeFailedErrorCode);
+      expect(err.message, '203.0.113.10:443');
+    });
+
+    test('a node handshake parser ignores unrelated details', () {
+      expect(parseNodeHandshakeFailureServer('tunnel carried no response'),
+          isNull);
+      expect(parseNodeHandshakeFailureServer(''), isNull);
+    });
+
+    test('parses the NodeHandshake session reason', () {
+      expect(
+        parseVpnSessionReason('NodeHandshake'),
+        VpnSessionReason.nodeHandshake,
+      );
+      expect(
+        parseVpnSessionReason('NodeHandshake').name,
+        'nodeHandshake',
+      );
+    });
+
     test('maps session PathIncompatible to path_incompatible', () {
       final err = vpnErrorFromSession(
         const VpnSessionSnapshot(

@@ -51,8 +51,26 @@ class VpnPingMonitor private constructor() {
         const val MAX_PLAUSIBLE_MS = 5000
         const val PROBE_TIMEOUT_MS = 3_500
 
-        /** Gate before Connected. One second, not a TLS trace. */
-        const val CARRY_TIMEOUT_MS = 1_000
+        /**
+         * Budget for the node's own transport handshake.
+         *
+         * v2ray-core's websocket dialer uses an 8 s `HandshakeTimeout`
+         * (`transport/internet/websocket/dialer.go`). The gate used to give a
+         * probe 1 s and the whole chain 3 s, so it killed the core while the
+         * engine was still inside its own, longer, dial budget: a slow TLS or
+         * WebSocket handshake could never pass, and a dead node was reported
+         * as an exit timeout. The gate must not be shorter than the thing it
+         * gates.
+         */
+        const val CARRY_TIMEOUT_MS = 9_000
+
+        /**
+         * Follow-up targets only run after the node's CONNECT already
+         * completed, so they check a different canary on the same tunnel
+         * rather than another node handshake. Kept at the old gate's budget so
+         * a blocked `1.1.1.1` cannot turn into a second 9 s wait.
+         */
+        const val CARRY_RETRY_TIMEOUT_MS = 1_000
         const val PROBE_HOST = "1.1.1.1"
         const val PROBE_PORT = 443
         const val PROBE_HTTP_PORT = 80
@@ -164,11 +182,16 @@ class VpnPingMonitor private constructor() {
         }
 
         /**
-         * Walk the three targets until one returns a parsed HTTP status or an
-         * exit address. A finished CONNECT is not that: FastOpen can complete
-         * it before the destination exists. No answer on one target tries the
-         * next. The timeout is the existing [CARRY_TIMEOUT_MS]; nothing new
-         * is added.
+         * Walk the targets until one returns a parsed HTTP status or an exit
+         * address. A finished CONNECT is not that: FastOpen can complete it
+         * before the destination exists.
+         *
+         * The first sample is also the node's own handshake. The core replies
+         * to a SOCKS CONNECT only after the VLESS outbound has dialled its
+         * transport (TLS + WebSocket), so a CONNECT that did not complete is
+         * the node, not the exit. It fails the session right there instead of
+         * opening two more WebSocket connections that spend the same dial
+         * budget again and turn an 8 s node failure into a 24 s hang.
          *
          * `ipv4.icanhazip.com` is not a target.
          */
@@ -180,17 +203,27 @@ class VpnPingMonitor private constructor() {
             val samples = ArrayList<HttpProbeSample>(3)
             samples.add(probeTraceLiteral(socksHost, socksPort, timeoutMs))
             if (samples.last().confirmsCarry()) return acceptTunnel(samples)
+            if (!samples.last().tcp) {
+                val first = samples.last()
+                return TunnelAcceptance(
+                    carriesData = false,
+                    exitIp = null,
+                    target = null,
+                    detail = "${first.target}=${first.detail}",
+                    nodeHandshakeFailed = true,
+                )
+            }
             samples.add(
                 probeNamedHttp(
                     socksHost, socksPort, "cp.cloudflare.com", 443,
-                    "/generate_204", tls = true, timeoutMs = timeoutMs,
+                    "/generate_204", tls = true, timeoutMs = CARRY_RETRY_TIMEOUT_MS,
                 ),
             )
             if (samples.last().confirmsCarry()) return acceptTunnel(samples)
             samples.add(
                 probeNamedHttp(
                     socksHost, socksPort, "www.gstatic.com", 80,
-                    "/generate_204", tls = false, timeoutMs = timeoutMs,
+                    "/generate_204", tls = false, timeoutMs = CARRY_RETRY_TIMEOUT_MS,
                 ),
             )
             return acceptTunnel(samples)
