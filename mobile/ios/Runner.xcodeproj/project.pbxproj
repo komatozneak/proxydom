@@ -14,6 +14,7 @@
 		A1B2C3D41F00000100PROXYDM /* ProxyDomVpnChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D41F00000200PROXYDM /* ProxyDomVpnChannel.swift */; };
 		A2E000000000000000000001 /* PacketTunnelProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2E000000000000000000010 /* PacketTunnelProvider.swift */; };
 		A2E000000000000000000002 /* Hy2TunnelEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2E000000000000000000011 /* Hy2TunnelEngine.swift */; };
+		A2E00000000000000000000A /* ShareTunnelEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2E00000000000000000001A /* ShareTunnelEngine.swift */; };
 		A2E000000000000000000003 /* ProxyDomVpnShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2E000000000000000000012 /* ProxyDomVpnShared.swift */; };
 		A2E000000000000000000007 /* ProxyDomVpnShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2E000000000000000000012 /* ProxyDomVpnShared.swift */; };
 		A2E000000000000000000008 /* TunnelPathMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2E000000000000000000017 /* TunnelPathMonitor.swift */; };
@@ -82,6 +83,7 @@
 		A2E000000000000000000010 /* PacketTunnelProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PacketTunnelProvider.swift; sourceTree = "<group>"; };
 		A2E000000000000000000011 /* Hy2TunnelEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Hy2TunnelEngine.swift; sourceTree = "<group>"; };
 		A2E000000000000000000012 /* ProxyDomVpnShared.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyDomVpnShared.swift; sourceTree = "<group>"; };
+		A2E00000000000000000001A /* ShareTunnelEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareTunnelEngine.swift; sourceTree = "<group>"; };
 		A2E000000000000000000017 /* TunnelPathMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TunnelPathMonitor.swift; sourceTree = "<group>"; };
 		A2E000000000000000000013 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A2E000000000000000000014 /* VpnTunnelProvider.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = VpnTunnelProvider.entitlements; sourceTree = "<group>"; };
@@ -170,6 +172,7 @@
 				A2E000000000000000000011 /* Hy2TunnelEngine.swift */,
 				A2E000000000000000000012 /* ProxyDomVpnShared.swift */,
 				A2E000000000000000000017 /* TunnelPathMonitor.swift */,
+				A2E00000000000000000001A /* ShareTunnelEngine.swift */,
 				A2E000000000000000000013 /* Info.plist */,
 				A2E000000000000000000014 /* VpnTunnelProvider.entitlements */,
 			);
@@ -395,6 +398,7 @@
 				A2E000000000000000000002 /* Hy2TunnelEngine.swift in Sources */,
 				A2E000000000000000000003 /* ProxyDomVpnShared.swift in Sources */,
 				A2E000000000000000000008 /* TunnelPathMonitor.swift in Sources */,
+				A2E00000000000000000000A /* ShareTunnelEngine.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
