@@ -242,6 +242,9 @@ class AppL10nEn extends AppL10n {
   String get homeStatPing => 'Ping';
 
   @override
+  String get homeStatPingPending => 'measuring';
+
+  @override
   String get homeLinkOnline => 'Connected';
 
   @override
@@ -255,9 +258,6 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get homeStatUpload => 'Upload';
-
-  @override
-  String get homeStatPlaceholder => '—';
 
   @override
   String get homeMoreMenu => 'More';

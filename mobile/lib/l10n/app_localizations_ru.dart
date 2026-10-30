@@ -243,6 +243,9 @@ class AppL10nRu extends AppL10n {
   String get homeStatPing => 'Пинг';
 
   @override
+  String get homeStatPingPending => 'измеряем';
+
+  @override
   String get homeLinkOnline => 'Подключено';
 
   @override
@@ -256,9 +259,6 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get homeStatUpload => 'Отправка';
-
-  @override
-  String get homeStatPlaceholder => '—';
 
   @override
   String get homeMoreMenu => 'Ещё';

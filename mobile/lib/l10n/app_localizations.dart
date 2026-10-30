@@ -547,6 +547,12 @@ abstract class AppL10n {
   /// **'Ping'**
   String get homeStatPing;
 
+  /// No description provided for @homeStatPingPending.
+  ///
+  /// In en, this message translates to:
+  /// **'measuring'**
+  String get homeStatPingPending;
+
   /// No description provided for @homeLinkOnline.
   ///
   /// In en, this message translates to:
@@ -576,12 +582,6 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Upload'**
   String get homeStatUpload;
-
-  /// No description provided for @homeStatPlaceholder.
-  ///
-  /// In en, this message translates to:
-  /// **'—'**
-  String get homeStatPlaceholder;
 
   /// No description provided for @homeMoreMenu.
   ///

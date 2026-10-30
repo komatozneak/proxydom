@@ -21,6 +21,7 @@ import '../../../core/widgets/proxydom_ground.dart';
 import '../../../core/widgets/connect_button.dart';
 import '../../../core/widgets/house_pulsar.dart';
 import '../../../core/widgets/signal_nest_hero.dart';
+import '../../../core/widgets/terminal_type.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../settings/data/installed_apps_channel.dart';
@@ -637,9 +638,6 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
         (nestSize * 0.5) / size.height - 0.5,
       );
 
-    final traffic = ref.watch(trafficStatsProvider).valueOrNull ??
-        const VpnTrafficStats.zero();
-
     return _FreeClientHome(
       nestSize: nestSize,
       charged: widget.charged,
@@ -649,8 +647,6 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
       serverSubtitle: widget.serverSubtitle,
       serverFlag: widget.serverFlag,
       trafficMeta: widget.trafficMeta,
-      speedDown: traffic.downlinkBps,
-      speedUp: traffic.uplinkBps,
       onNestTap: widget.onNestTap,
       onOpenLocations: widget.onOpenLocations,
       showVpnSettingsCta: showVpnSettingsCta,
@@ -671,8 +667,6 @@ class _FreeClientHome extends StatelessWidget {
     this.serverSubtitle,
     this.serverFlag,
     this.trafficMeta,
-    required this.speedDown,
-    required this.speedUp,
     required this.onNestTap,
     required this.onOpenLocations,
     required this.showVpnSettingsCta,
@@ -695,8 +689,6 @@ class _FreeClientHome extends StatelessWidget {
   /// The flag shown beside the server name in the terminal head.
   final String? serverFlag;
   final String? trafficMeta;
-  final int speedDown;
-  final int speedUp;
   final Future<void> Function() onNestTap;
   final VoidCallback onOpenLocations;
   final bool showVpnSettingsCta;
@@ -712,10 +704,14 @@ class _FreeClientHome extends StatelessWidget {
         serverTitle == 'Нет ссылки' ||
         serverTitle == 'No link';
     final parsedTraffic = parseSubscriptionTraffic(trafficMeta);
-    final traffic = formatSubscriptionTraffic(
-      parsedTraffic,
-      russian: Localizations.localeOf(context).languageCode == 'ru',
-    );
+    // No cap in the document is no number on Home: the strip prints the
+    // gauge only when the document actually stated one.
+    final traffic = parsedTraffic == null
+        ? null
+        : formatSubscriptionTraffic(
+            parsedTraffic,
+            russian: Localizations.localeOf(context).languageCode == 'ru',
+          );
     final current = status;
     final uptime =
         current is VpnConnected ? _formatUptime(current.connectedSince) : null;
@@ -956,14 +952,16 @@ class _FreeClientHome extends StatelessWidget {
                 child: FittedBox(fit: BoxFit.scaleDown, child: hero),
               ),
             ),
-            if (!empty) ...[
+            // The strip exists only when it has a reading: the clock and the
+            // ping belong to a live session, the gauge to a document with a
+            // cap. Otherwise Home keeps the house and nothing else.
+            if (!empty && (isConnected || traffic != null)) ...[
               const SizedBox(height: 6),
               MediaQuery.withClampedTextScaling(
                 maxScaleFactor: 1.4,
                 child: _MetricsCard(
-                  uptime: isConnected ? uptime : null,
-                  downBps: isConnected ? speedDown : 0,
-                  upBps: isConnected ? speedUp : 0,
+                  connected: isConnected,
+                  uptime: uptime,
                   traffic: traffic,
                   parsedTraffic: parsedTraffic,
                 ),
@@ -1183,21 +1181,29 @@ class _ServerChip extends StatelessWidget {
   }
 }
 
-/// Time, speed and the remaining traffic. Values that do not exist are "—";
-/// nothing is made up.
+/// The session readout under the house.
+///
+/// Every column on it owns a real value. While the tunnel is down the strip is
+/// the traffic gauge; while it is up the gauge is joined by the clock and the
+/// ping. An empty column is not drawn at all: a dash in a column read as a
+/// broken instrument, and three of them made a hard number look missing.
 class _MetricsCard extends StatelessWidget {
   const _MetricsCard({
+    required this.connected,
     required this.uptime,
-    required this.downBps,
-    required this.upBps,
     required this.traffic,
     required this.parsedTraffic,
   });
 
+  final bool connected;
+
+  /// Session clock. Present only while the tunnel is up.
   final String? uptime;
-  final int downBps;
-  final int upBps;
-  final String traffic;
+
+  /// Remaining traffic as the document states it, or null when the document
+  /// carries no cap. Null prints no column rather than an empty one.
+  final String? traffic;
+
   final SubscriptionTraffic? parsedTraffic;
 
   @override
@@ -1226,8 +1232,24 @@ class _MetricsCard extends StatelessWidget {
                 AppBrand.flame,
                 remaining / 0.3,
               )!;
-    final down = downBps > 0 ? VpnTrafficStats.formatSpeed(downBps) : '—';
-    final up = upBps > 0 ? VpnTrafficStats.formatSpeed(upBps) : '—';
+
+    final cells = <Widget>[
+      if (connected && uptime != null)
+        _Metric(
+          label: l.homeMetricTime,
+          value: uptime!,
+        ),
+      if (connected && homePingSupported) const _PingMetric(),
+      if (traffic != null)
+        _Metric(
+          label: l.homeMetricTraffic,
+          value: traffic!,
+          bar:
+              parsed == null || parsed.unlimited ? null : (remaining, barColor),
+        ),
+    ];
+    if (cells.isEmpty) return const SizedBox.shrink();
+
     return Material(
       color: theme.colorScheme.surface,
       shape: RoundedRectangleBorder(
@@ -1236,37 +1258,28 @@ class _MetricsCard extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: _Metric(
-                label: l.homeMetricTime,
-                value: uptime ?? '—',
+        child: cells.length == 1
+            // One column is the whole strip. The gauge keeps the width it
+            // measures; a lone readout sits in the middle of the plate.
+            ? Align(alignment: Alignment.center, child: cells.single)
+            : IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final (index, cell) in cells.indexed) ...[
+                      if (index > 0)
+                        VerticalDivider(
+                          width: 17,
+                          thickness: 1,
+                          indent: 1,
+                          endIndent: 1,
+                          color: line.withValues(alpha: 0.35),
+                        ),
+                      Expanded(child: cell),
+                    ],
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: windowsDesktop
-                  ? const _PingMetric()
-                  : _Metric(
-                      label: l.homeMetricSpeed,
-                      value: '↓ $down',
-                      second: '↑ $up',
-                    ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _Metric(
-                label: l.homeMetricTraffic,
-                value: traffic,
-                bar: parsed == null || parsed.unlimited
-                    ? null
-                    : (remaining, barColor),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -1282,71 +1295,86 @@ class _PingMetric extends ConsumerWidget {
     final ms = ref.watch(
       pingDelayMsProvider.select((value) => value.valueOrNull),
     );
-    final text = formatPingMs(ms, russian: russian);
-    final semantic = ms == null
-        ? '${l.homeStatPing}: ${russian ? "нет данных" : "no data"}'
-        : '${l.homeStatPing}: $text';
+    // The probe answers a few seconds after the tunnel comes up. An ellipsis
+    // is the instrument taking a reading; a dash was a number that failed.
+    final measured = ms != null;
+    final text = measured ? formatPingMs(ms, russian: russian) : '…';
+    final semantic =
+        '${l.homeStatPing}: ${measured ? text : l.homeStatPingPending}';
     return Semantics(
       container: true,
       label: semantic,
       child: ExcludeSemantics(
-        child: _Metric(label: l.homeStatPing, value: text),
+        child: _Metric(
+          label: l.homeStatPing,
+          value: text,
+          muted: !measured,
+        ),
       ),
     );
   }
 }
 
+/// One instrument column: a terminal micro-label and the reading under it.
+///
+/// The reading never ellipsises — it shrinks by a hair in a [FittedBox], so a
+/// 1.4× text setting cannot turn a clock into «00:12:0…».
 class _Metric extends StatelessWidget {
   const _Metric({
     required this.label,
     required this.value,
-    this.second,
+    this.muted = false,
     this.bar,
   });
 
   final String label;
   final String value;
-  final String? second;
+
+  /// A reading that is not a measurement yet (the ping is still being taken).
+  final bool muted;
+
+  /// The remaining share and its colour for the traffic gauge.
   final (double, Color)? bar;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final mono = theme.textTheme.titleMedium?.copyWith(
-      fontFamily: 'JetBrainsMono',
-      fontSize: 14,
-      fontWeight: FontWeight.w700,
-      fontFeatures: const [FontFeature.tabularFigures()],
-    );
+    final mute = theme.colorScheme.onSurfaceVariant;
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          label,
+          label.toUpperCase(),
           maxLines: 1,
+          textAlign: TextAlign.center,
           overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-            fontSize: 12,
+          style: terminalText(
+            context,
+            size: 10.5,
+            color: mute,
+            spacing: 1.15,
           ),
         ),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: mono,
-        ),
-        if (second != null)
-          Text(
-            second!,
+        const SizedBox(height: 3),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.center,
+          child: Text(
+            value,
             maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: mono?.copyWith(fontSize: 12),
+            textAlign: TextAlign.center,
+            style: terminalText(
+              context,
+              size: 15,
+              color: muted ? mute : theme.colorScheme.onSurface,
+              weight: 700,
+              spacing: 0.4,
+            ).copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
           ),
+        ),
         if (bar != null) ...[
-          const SizedBox(height: 4),
+          const SizedBox(height: 5),
           ClipRRect(
             borderRadius: BorderRadius.circular(3),
             child: SizedBox(
