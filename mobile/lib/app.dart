@@ -14,7 +14,10 @@ import 'core/updates/update_check_service.dart';
 import 'core/widgets/window_caption_bar.dart';
 import 'features/settings/application/locale_provider.dart';
 import 'features/settings/application/theme_mode_provider.dart';
+import 'features/vpn/data/hy2_import_store.dart';
+import 'features/vpn/data/vpn_controller.dart';
 import 'features/vpn/data/hy2_link_parser.dart';
+import 'features/vpn/data/share_link_parser.dart';
 import 'features/vpn/data/subscription_link_inbox.dart';
 import 'features/vpn/data/windows_tunnel.dart';
 import 'l10n/app_localizations.dart';
@@ -118,16 +121,56 @@ class _UpdateCheckHostState extends State<_UpdateCheckHost> {
   }
 
   void _openSubscription(Uri uri) {
-    final raw = uri.toString();
+    _handleLink(uri);
+  }
+
+  Future<void> _handleLink(Uri uri) async {
+    // `vmess://` carries base64 in the URI authority, and a Uri round trip
+    // lowercases a host: the payload changes, the key stops decoding, and the
+    // node is silently not added. The platform keeps the intent's own string,
+    // so it is preferred over anything reconstructed here.
+    final delivered = await VpnController.instance.takeRawLink();
+    final raw = (delivered == null || delivered.isEmpty)
+        ? uri.toString()
+        : delivered;
     if (raw == _lastLink) return;
+    // Two kinds of link arrive here: a document address from the bot's QR, and
+    // a bare server key from another app's "share" sheet. The second one used
+    // to be dropped on the floor — the manifest could route it, but this
+    // handler only asked whether it was a document and gave up when it was not.
+    var subscription = true;
     try {
-      if (subscriptionDocumentTarget(raw) == null) return;
+      subscription = subscriptionDocumentTarget(raw) != null;
     } on FormatException {
+      subscription = false;
+    }
+    if (!subscription && !isShareLinkLine(raw)) return;
+    _lastLink = raw;
+    if (!subscription) {
+      // A single key handed over by the OS is a finished decision: the person
+      // already chose this node by tapping "Открыть в Прокси Дом". Sending them
+      // to the import screen only to press "Сохранить" added a second, empty
+      // step — and a deep link that arrives while the app is already running
+      // never reached the import screen at all, so the key looked ignored.
+      _addKeyInBackground(raw);
       return;
     }
-    _lastLink = raw;
     SubscriptionLinkInbox.offer(raw);
     AppRouter.config.go('/import');
+  }
+
+  Future<void> _addKeyInBackground(String raw) async {
+    try {
+      final links = await Hy2ImportStore.instance.saveInput(raw);
+      if (!mounted || links.isEmpty) return;
+      SubscriptionLinkInbox.offer(raw);
+      AppRouter.config.go('/home');
+    } on Object {
+      // A key the store refuses still belongs on the import screen, where the
+      // reason is shown next to the field.
+      SubscriptionLinkInbox.offer(raw);
+      AppRouter.config.go('/import');
+    }
   }
 
   @override
@@ -140,7 +183,7 @@ class _UpdateCheckHostState extends State<_UpdateCheckHost> {
   Widget build(BuildContext context) => widget.child;
 }
 
-/// Closing the window disconnects. Minimizing does not (ADR 029).
+/// Closing the window disconnects. Minimizing does not.
 class _WindowsExit extends StatefulWidget {
   const _WindowsExit({required this.child});
 

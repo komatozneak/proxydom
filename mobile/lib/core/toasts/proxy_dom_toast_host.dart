@@ -75,19 +75,23 @@ class _ProxyDomToastHostState extends State<ProxyDomToastHost>
   Widget build(BuildContext context) {
     final toast = _shown;
     if (toast == null) return widget.child;
-    // A window has a corner for this and a phone has a bottom edge: the same
-    // alert drawn full width across a 1160px window is the phone's slab with
-    // more of it, and it covers the keys of the page it is answering.
+    // A window has a corner for this and a phone has a top edge. The phone
+    // used to draw the alert along the bottom, in the same band as the big
+    // action button of the page that raised it: the plate covered "Сохранить",
+    // looked like part of it, and swallowed the press. Action buttons live at
+    // the bottom of every screen here, so the alert now drops from under the
+    // status bar and can never share their band.
     final corner = windowsDesktop && MediaQuery.sizeOf(context).width >= 720;
-    // A phone alert sits above the gesture bar, not under it.
-    final safe = corner ? 0.0 : MediaQuery.paddingOf(context).bottom;
-    final bottom = (corner ? kToastCornerInset : 12 + safe) + toast.bottomInset;
+    final safeTop = MediaQuery.paddingOf(context).top;
+    final bottom = corner ? kToastCornerInset + toast.bottomInset : null;
+    final top = corner ? null : safeTop + 12;
     return Stack(
       children: [
         widget.child,
         Positioned(
           right: corner ? kToastCornerInset : 16,
           left: corner ? null : 16,
+          top: top,
           width: corner ? kToastCornerWidth : null,
           bottom: bottom,
           child: AnimatedBuilder(
@@ -100,8 +104,11 @@ class _ProxyDomToastHostState extends State<ProxyDomToastHost>
                   opacity: v,
                   child: FractionalTranslation(
                     // From the edge the alert lives on: the corner one comes
-                    // in sideways, the phone one rises.
-                    translation: Offset(corner ? 0.35 * (1 - v) : 0, 1.0 - v),
+                    // in sideways, the phone one drops from the top.
+                    translation: Offset(
+                      corner ? 0.35 * (1 - v) : 0,
+                      corner ? 0 : -1.0 + v,
+                    ),
                     child: child,
                   ),
                 ),
@@ -109,8 +116,14 @@ class _ProxyDomToastHostState extends State<ProxyDomToastHost>
             },
             child: Align(
               alignment:
-                  corner ? Alignment.centerRight : Alignment.bottomCenter,
-              child: _Plate(toast: toast, corner: corner),
+                  corner ? Alignment.centerRight : Alignment.topCenter,
+              // A phone alert carries no control of its own, so it must not be
+              // able to eat a tap meant for the page. A window keeps its close
+              // button, which needs the pointer.
+              child: IgnorePointer(
+                ignoring: !corner,
+                child: _Plate(toast: toast, corner: corner),
+              ),
             ),
           ),
         ),
@@ -210,13 +223,19 @@ class _Plate extends StatelessWidget {
             if (corner)
               Padding(
                 padding: const EdgeInsets.only(right: 8, top: 8, bottom: 8),
-                child: AppRingButton(
-                  icon: AppIcons.x,
-                  color: mute,
-                  onPressed: ProxyDomToasts.instance.dismiss,
-                  tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
-                  size: 30,
-                  iconSize: 14,
+                // The row stretches its children. Without Center the 30px ring
+                // is stretched to the full row height, and its press highlight
+                // paints as a grey rectangle instead of a circle.
+                child: Center(
+                  child: AppRingButton(
+                    icon: AppIcons.x,
+                    color: mute,
+                    onPressed: ProxyDomToasts.instance.dismiss,
+                    tooltip:
+                        MaterialLocalizations.of(context).closeButtonTooltip,
+                    size: 30,
+                    iconSize: 14,
+                  ),
                 ),
               ),
           ],

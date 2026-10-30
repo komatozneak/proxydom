@@ -16,7 +16,7 @@ bool get _isIosSplit => !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
 bool get _isAndroidNative =>
     !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
-/// Bridge between Flutter UI and Android VpnService (Hysteria2, ADR 018).
+/// Bridge between Flutter UI and Android VpnService.
 ///
 /// Uses [MethodChannel] `proxydom/vpn` for commands and [EventChannel]
 /// `proxydom/vpn/status` for live status updates from native code.
@@ -46,7 +46,7 @@ class VpnController {
   /// Pipe closed or the controller binary is missing. Not a live connect.
   bool get windowsBrokerCooling => WindowsTunnel.instance.brokerCooling;
 
-  /// One share line through the Windows broker (ADR 031).
+  /// One share line through the Windows broker.
   ///
   /// Games reach their servers over UDP to bare addresses that change, so no
   /// domain rule can keep them off the tunnel and no IP list survives a patch.
@@ -138,7 +138,7 @@ class VpnController {
     });
   }
 
-  /// Start Hysteria2 core (ADR 015). Native proves via local SOCKS, not QUIC-up.
+  /// Start Hysteria2 core. Native proves via local SOCKS, not QUIC-up.
   ///
   /// [sessionId] is the ShareSessionLog id for this attempt. The native layer
   /// stamps it on every line so a report can be read as one timeline instead of
@@ -169,24 +169,46 @@ class VpnController {
     }
   }
 
-  /// Start the in-process VLESS core (v2ray-core, same gomobile runtime as
-  /// Hy2). Android calls this for an imported line the dial gate admitted
-  /// (ADR 035). [configJson] has secrets; it is not logged.
+  /// Start the in-process share core (v2ray-core, same gomobile runtime as
+  /// Hy2). Android calls this for an imported line the dial gate admitted.
+  /// [configJson] has secrets; it is not logged.
+  ///
+  /// The link the OS delivered, exactly as delivered, or null.
+  ///
+  /// A `vmess://` key puts base64 in the URI authority, and a round trip through
+  /// [Uri] lowercases a host — which silently changes the payload, so the key
+  /// arrives broken. The platform keeps the raw string; this asks for it once.
+  Future<String?> takeRawLink() async {
+    try {
+      return await _methodChannel.invokeMethod<String>('takeRawLink');
+    } on Object {
+      return null;
+    }
+  }
+
+  /// [scheme] is the protocol the document was built for, and it only labels
+  /// the session: the core itself is chosen by `vpnCore`, which stays `vless`
+  /// because that is the one share engine this build links. A VMess line
+  /// therefore starts the same core and reports "VMESS", which is what the
+  /// person selected.
   ///
   /// Android app exclusions use the same package list as Hysteria2. Site
-  /// suffixes stay out of this start: VLESS does not apply them, and
+  /// suffixes stay out of this start: the share core does not apply them, and
   /// [SplitTunnelPrefs.markApplied] would hide that the site draft is still
   /// pending.
   Future<bool> startVless(
     String configJson, {
     String? displayLabel,
     String? sessionId,
+    String? scheme,
   }) async {
     try {
       final disallowedApps = _isIosSplit
           ? const <String>[]
           : ((await SplitTunnelPrefs.loadDisallowedPackages()).toList()
             ..sort());
+      final outboundType =
+          (scheme ?? '').trim().isEmpty ? 'vless' : scheme!.trim();
       final paramsJson = jsonEncode({
         'schemaVersion': 2,
         'vpnCore': 'vless',
@@ -194,7 +216,7 @@ class VpnController {
         'displayLabel': (displayLabel?.trim().isNotEmpty == true)
             ? displayLabel!.trim()
             : kVpnBrandSessionName,
-        'outboundType': 'vless',
+        'outboundType': outboundType,
         'vlessConfig': configJson,
         if (disallowedApps.isNotEmpty) 'disallowedApplications': disallowedApps,
       });

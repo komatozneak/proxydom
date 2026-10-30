@@ -66,7 +66,8 @@ void main() {
     await _letItGo(tester);
   });
 
-  testWidgets('a phone puts the alert along its bottom edge', (tester) async {
+  testWidgets('a phone drops the alert under the status bar, clear of the action bar',
+      (tester) async {
     await _pump(tester, desktop: false);
 
     showProxyDomToast('Обновлено: 5');
@@ -76,6 +77,29 @@ void main() {
     final plate = tester.getRect(_plate);
     expect(plate.width, closeTo(_phone.width - 32, 1));
     expect(plate.left, closeTo(16, 1));
+    // The top edge, not the bottom one. Every screen here puts its primary
+    // button at the bottom, and an alert drawn in that band covered the button,
+    // looked like part of it, and swallowed the press.
+    expect(plate.top, lessThan(_phone.height / 3));
+    expect(_phone.height - plate.bottom, greaterThan(_phone.height / 2));
+    await _letItGo(tester);
+  });
+
+  testWidgets('a phone alert cannot eat a tap meant for the page', (
+    tester,
+  ) async {
+    await _pump(tester, desktop: false);
+    showProxyDomToast('Обновлено: 5');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    final ignore = tester.widget<IgnorePointer>(
+      find.ancestor(
+        of: _plate,
+        matching: find.byType(IgnorePointer),
+      ).first,
+    );
+    expect(ignore.ignoring, isTrue);
     await _letItGo(tester);
   });
 
@@ -88,6 +112,13 @@ void main() {
     await tester.pump(const Duration(milliseconds: 250));
     // A pointer invites a way out of a thing that is only in the way.
     expect(find.byType(AppRingButton), findsOneWidget);
+    // The plate's row stretches its children. The ring must stay round, or
+    // its press highlight paints as a grey rectangle instead of a circle.
+    expect(tester.getSize(find.byType(AppRingButton)), const Size(30, 30));
+    await tester.tap(find.byType(AppRingButton));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 220));
+    expect(find.text('Обновлено: 5'), findsNothing);
     await _letItGo(tester);
 
     await _pump(tester, desktop: false);

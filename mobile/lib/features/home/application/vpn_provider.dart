@@ -366,7 +366,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
     );
   }
 
-  /// Poll native while UI is connecting. Never force-stops (ADR 014 / 015).
+  /// Poll native while UI is connecting. Never force-stops.
   void _armConnectingPoll() {
     // Windows connect waits on the broker. The Android 18s poll paints
     // connect_timeout while that call is still the owner of the session.
@@ -1142,7 +1142,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
       if (await _abortStaleConnect(gen)) return;
       state = const VpnConnecting(progress: 0.5);
 
-      // ADR 026: pasted profile only. The owner catalog is not dialed.
+      //: pasted profile only. The owner catalog is not dialed.
         var imported = await Hy2ImportStore.instance.selected();
         if (await _abortStaleConnect(gen)) return;
         if (imported != null && isUnspecifiedShareHost(imported.endpoint)) {
@@ -1207,22 +1207,23 @@ class VpnNotifier extends Notifier<VpnStatus> {
           'apps': blocked.length,
         });
         final profile = imported.hy2?.profile;
-        // ADR 035: an imported document may carry VLESS beside Hysteria2.
-        // The catalog never does. Android builds the in-process v2ray-core
-        // document here; Windows hands the raw URI to the broker, which
-        // starts the same MIT core. iOS stays closed, so canDialScheme
-        // refuses vless there and the share_unsupported path remains.
+        // An imported document may carry any of the v2ray-core family beside
+        // Hysteria2. The catalog never does. Android builds the in-process
+        // document here; Windows hands the raw URI to the broker, which starts
+        // the same MIT core. iOS stays closed, so canDialScheme refuses the
+        // family there and the share_unsupported path remains.
         // buildShareSocksConfig is the authority for what the engine can
         // describe: Reality and XHTTP return null and do not start.
-        final vlessConfig = profile == null && canDialScheme(imported.scheme)
+        final shareConfig = profile == null && canDialScheme(imported.scheme)
             ? buildShareSocksConfig(imported)
             : null;
+
         var started = false;
         SessionTrace.mark('config', {
           'scheme': imported.scheme,
-          if (profile == null) 'core': vlessConfig == null ? 'none' : 'vless',
+          if (profile == null) 'core': shareConfig == null ? 'none' : 'share',
         });
-        if (profile != null || vlessConfig != null) {
+        if (profile != null || shareConfig != null) {
           final dial = _dialGen == 0 ? ++_dialGen : _dialGen;
           _handshakeHost = imported.endpoint;
           _nativeGenFloor = _lastNativeGen;
@@ -1235,9 +1236,10 @@ class VpnNotifier extends Notifier<VpnStatus> {
                       sessionId: _sid,
                     )
                   : await VpnController.instance.startVless(
-                      vlessConfig!,
+                      shareConfig!,
                       displayLabel: shown.title,
                       sessionId: _sid,
+                      scheme: imported.scheme,
                     );
           started = raw && _dialGen == dial;
         } else {

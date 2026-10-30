@@ -10,6 +10,7 @@ import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/app_surface.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../vpn/data/subscription_link_inbox.dart';
 import '../data/onboarding_prefs.dart';
 
 /// Connect-card copy: iOS must not mention Android VPN permission.
@@ -77,17 +78,25 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   Future<void> _finish({bool openImport = false}) async {
+    // A key shared into the app before the welcome screens were done is held in
+    // the inbox; the redirect sent it to onboarding, so this is the only place
+    // left that can hand it to the import screen. Without this the person
+    // finished onboarding on an empty Home and the key was never shown.
+    final pendingLink = SubscriptionLinkInbox.hasPending;
     UiLog.action(
       'onboarding',
       'finish',
-      extra: {'route': openImport ? '/import' : '/home'},
+      extra: {
+        'route': openImport || pendingLink ? '/import' : '/home',
+        if (pendingLink) 'pending_link': true,
+      },
     );
     await OnboardingPrefs.markWelcomeSeen();
     AppRouter.welcomeSeenCache = true;
     if (!mounted) return;
     // Same push as Home, so «Добавить» has a back path to the house.
     context.go('/home');
-    if (!openImport) return;
+    if (!openImport && !pendingLink) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       AppRouter.config.push('/import');
     });

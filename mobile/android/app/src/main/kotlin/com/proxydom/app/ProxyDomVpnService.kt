@@ -54,10 +54,10 @@ internal fun isForeignVpnTransport(
 ): Boolean = isVpn && ownerUid != myUid
 
 /**
- * Android VpnService, Hysteria2-only (ADR 018):
+ * Android VpnService, Hysteria2-only:
  * VpnService TUN → hy2bind startTun + SOCKS prove on :10808.
  *
- * ADR 020: product opts out of Always-on (`SUPPORTS_ALWAYS_ON=false`).
+ *: product opts out of Always-on (`SUPPORTS_ALWAYS_ON=false`).
  * Sticky restore / QS persist / foreign Always-on conflict / lockdown leftover
  * routing stay — they are not product Always-on promotion.
  */
@@ -77,7 +77,7 @@ class ProxyDomVpnService : VpnService() {
         /** Session payload schema from Flutter VpnServiceConfig / VpnController. */
         const val SESSION_SCHEMA_VERSION = 2
 
-        /** paramsJson["vpnCore"] — Hysteria2 only (ADR 018). */
+        /** paramsJson["vpnCore"] — Hysteria2 only. */
         const val VPN_CORE_HYSTERIA = "hysteria"
 
         const val PREFS_NAME = "proxydom_vpn_session"
@@ -1915,6 +1915,9 @@ object VpnChannelRegistry {
         MethodChannel(engine.dartExecutor.binaryMessenger, METHOD_CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
+                    "takeRawLink" -> {
+                        result.success(MainActivity.takeRawLink())
+                    }
                     "startAuto" -> {
                         NativeLog.sessionId = call.argument<String>("sessionId")
                         val rows = call.argument<List<*>>("candidatesJson")

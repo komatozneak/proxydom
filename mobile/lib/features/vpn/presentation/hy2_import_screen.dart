@@ -250,6 +250,10 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
   /// person can act. If nothing in the draft can dial, the key was dead before
   /// they got here and step 2 said so.
   Future<void> _save() async {
+    // A second press while the first is in flight used to start a second save
+    // over the same draft. The button is disabled while busy, but the keyboard
+    // and a double tap can both reach this method before the frame redraws.
+    if (_busy) return;
     UiLog.action('import', 'save', extra: {'connect': true});
     setState(() {
       _busy = true;
@@ -281,14 +285,12 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
       if (!mounted) return;
       UiLog.action('import', 'save', result: 'bad', reason: error.code);
       setState(() {
-        _busy = false;
         _error = error.code;
       });
     } on FormatException {
       if (!mounted) return;
       UiLog.action('import', 'save', result: 'bad');
       setState(() {
-        _busy = false;
         _error = 'bad';
       });
     } catch (error) {
@@ -300,9 +302,15 @@ class _Hy2ImportScreenState extends ConsumerState<Hy2ImportScreen> {
         reason: error.runtimeType.toString(),
       );
       setState(() {
-        _busy = false;
         _error = 'bad';
       });
+    } finally {
+      // The button must come back even when the save ended without a
+      // navigation — a no-op `go`, an early return, or an exception the
+      // handlers do not name. Leaving `_busy` true is a screen whose only
+      // action is permanently dead while its button still looks enabled,
+      // which is exactly how it read on a phone.
+      if (mounted && _busy) setState(() => _busy = false);
     }
   }
 

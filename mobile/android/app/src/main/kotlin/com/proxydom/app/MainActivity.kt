@@ -19,6 +19,17 @@ class MainActivity : FlutterFragmentActivity() {
         private const val REQUEST_VPN_PERMISSION = 1001
         private const val REQUEST_POST_NOTIFICATIONS = 1002
         private const val REQUEST_INTERNET = 1003
+
+        /** Last intent data string, kept exactly as the OS delivered it. */
+        @Volatile
+        private var rawLink: String? = null
+
+        /** Hands the raw link to Dart once; a second call returns null. */
+        fun takeRawLink(): String? {
+            val value = rawLink
+            rawLink = null
+            return value
+        }
     }
 
     @Volatile
@@ -43,6 +54,7 @@ class MainActivity : FlutterFragmentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleTileIntent(intent)
+        rememberRawLink(intent)
     }
 
     /**
@@ -76,6 +88,22 @@ class MainActivity : FlutterFragmentActivity() {
         // Android 15+: FlutterActivity is not a ComponentActivity; FragmentActivity is.
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        rememberRawLink(intent)
+    }
+
+    /**
+     * The Intent's own string, not a round trip through `Uri`.
+     *
+     * A `vmess://` key carries base64 in its authority. Parsing that as a URI
+     * lowercases the host, which changes the payload: the key that arrives in
+     * Dart no longer decodes, and the node is silently not added. The raw string
+     * is the only faithful copy, so it is captured here and handed over once.
+     */
+    private fun rememberRawLink(intent: Intent?) {
+        val data = intent?.dataString
+        if (data.isNullOrEmpty()) return
+        if (data.startsWith("http://") || data.startsWith("https://")) return
+        rawLink = data
     }
 
     private fun hasInternetPermission(): Boolean =
