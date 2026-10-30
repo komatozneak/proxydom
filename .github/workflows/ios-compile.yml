@@ -1,0 +1,77 @@
+name: iOS Compile Check
+
+# Compiles the app and the tunnel provider for iOS without any Apple account.
+#
+# The TestFlight workflow needs a signing certificate, and a signing failure
+# says nothing about whether the Swift compiles: the archive never starts. This
+# job builds the framework and runs `flutter build ios --no-codesign`, which
+# type-checks and links every Swift file that ships in the app, using only the
+# macOS runner. It uploads nothing and needs no secrets.
+
+on:
+  workflow_dispatch:
+
+env:
+  FLUTTER_VERSION: "3.35.1"
+  HYSTERIA_TAG: "v2.13.0"
+  GO_VERSION: "1.25.x"
+
+jobs:
+  compile:
+    name: Build iOS without signing
+    runs-on: macos-15
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+          lfs: true
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: "26.3"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: mobile/android/hysteria-bind/go.sum
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: License guard
+        working-directory: mobile/android/hysteria-bind
+        run: go test -count=1 -run 'TestLicenseGuard$' .
+
+      - name: Build Hy2bind.xcframework
+        working-directory: mobile/android/hysteria-bind
+        run: |
+          export PATH="$(go env GOPATH)/bin:$PATH"
+          bash build-ios.sh
+        env:
+          HYSTERIA_TAG: ${{ env.HYSTERIA_TAG }}
+
+      - name: Flutter pub get
+        working-directory: mobile
+        run: flutter pub get
+
+      - name: Build iOS app and extension (no code signing)
+        working-directory: mobile
+        run: flutter build ios --debug --no-codesign
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-compile-log
+          path: |
+            mobile/build/ios/**/*.log
+            mobile/ios/Pods/Target Support Files/**/*.log
+          if-no-files-found: ignore
+          retention-days: 7
