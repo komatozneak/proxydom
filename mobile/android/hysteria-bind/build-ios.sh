@@ -32,7 +32,12 @@ go test -count=1 -run 'TestLicenseGuard$' .
 gomobile init >/dev/null 2>&1 || true
 
 # ios + simulator fat xcframework. Do not commit the binary.
-gomobile bind -v -target=ios -iosversion=15.0 \
+#
+# `netgo` is not a preference: iOS has no `libresolv` to resolve `res_9_ninit`,
+# `res_9_nsearch` and `res_9_nclose`, which is what the cgo resolver compiles
+# down to. With the default resolver the extension links and then fails at link
+# time with three undefined symbols, so the pure Go resolver is selected here.
+gomobile bind -v -target=ios -iosversion=15.0 -tags netgo \
   -o "$OUT_DIR/Hy2bind.xcframework" .
 
 echo "Wrote $OUT_DIR/Hy2bind.xcframework"
