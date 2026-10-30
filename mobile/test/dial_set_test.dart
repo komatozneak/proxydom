@@ -29,10 +29,10 @@ void main() {
     expect(kParkedSchemes, {'wireguard', 'amneziawg', 'vpn'});
   });
 
-  test('VLESS is admitted on Android and Windows, refused on iOS', () {
+  test('VLESS is admitted wherever the in-process core runs', () {
     expect(canDialSchemeOn(DialTarget.android, 'vless'), isTrue);
     expect(canDialSchemeOn(DialTarget.windows, 'vless'), isTrue);
-    expect(canDialSchemeOn(DialTarget.ios, 'vless'), isFalse);
+    expect(canDialSchemeOn(DialTarget.ios, 'vless'), isTrue);
     expect(canDialSchemeOn(DialTarget.other, 'vless'), isFalse);
     expect(windowsDialScheme('vless'), isTrue);
     expect(windowsDialScheme('hysteria2'), isTrue);
@@ -49,7 +49,7 @@ void main() {
           reason: scheme);
       expect(canDialSchemeOn(DialTarget.windows, scheme), isTrue,
           reason: scheme);
-      expect(canDialSchemeOn(DialTarget.ios, scheme), isFalse, reason: scheme);
+      expect(canDialSchemeOn(DialTarget.ios, scheme), isTrue, reason: scheme);
       expect(canDialSchemeOn(DialTarget.other, scheme), isFalse,
           reason: scheme);
       expect(windowsDialScheme(scheme), isTrue, reason: scheme);
@@ -62,7 +62,7 @@ void main() {
     expect(link.endpoint, '1.2.3.4:1080');
     expect(canDialLinkOn(DialTarget.android, link), isTrue);
     expect(canDialLinkOn(DialTarget.windows, link), isTrue);
-    expect(canDialLinkOn(DialTarget.ios, link), isFalse);
+    expect(canDialLinkOn(DialTarget.ios, link), isTrue);
   });
 
   test('a vmess key is admitted and a wireguard key is not', () {
@@ -71,7 +71,7 @@ void main() {
     );
     expect(canDialLinkOn(DialTarget.android, vmess), isTrue);
     expect(canDialLinkOn(DialTarget.windows, vmess), isTrue);
-    expect(canDialLinkOn(DialTarget.ios, vmess), isFalse);
+    expect(canDialLinkOn(DialTarget.ios, vmess), isTrue);
     for (final parked in [
       'wireguard://key@1.2.3.4:51820',
       'amneziawg://key@1.2.3.4:51820',
@@ -84,12 +84,12 @@ void main() {
 
   test('case and surrounding whitespace do not decide the gate', () {
     expect(canDialSchemeOn(DialTarget.android, ' VLESS '), isTrue);
-    expect(canDialSchemeOn(DialTarget.ios, ' Vless '), isFalse);
+    expect(canDialSchemeOn(DialTarget.ios, ' Vless '), isTrue);
     expect(canDialSchemeOn(DialTarget.windows, ' HY2 '), isTrue);
     expect(canDialSchemeOn(DialTarget.android, ' Trojan '), isTrue);
     expect(canDialSchemeOn(DialTarget.android, ' VMESS '), isTrue);
     expect(canDialSchemeOn(DialTarget.android, ' SS '), isTrue);
-    expect(canDialSchemeOn(DialTarget.ios, ' Trojan '), isFalse);
+    expect(canDialSchemeOn(DialTarget.ios, ' Trojan '), isTrue);
     expect(canDialSchemeOn(DialTarget.android, ' WireGuard '), isFalse);
   });
 
@@ -114,7 +114,7 @@ void main() {
     final link = parseShareLink(raw);
     expect(canDialLinkOn(DialTarget.android, link), isTrue);
     expect(canDialLinkOn(DialTarget.windows, link), isTrue);
-    expect(canDialLinkOn(DialTarget.ios, link), isFalse);
+    expect(canDialLinkOn(DialTarget.ios, link), isTrue);
     expect(canDialLinkOn(DialTarget.other, link), isFalse);
 
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
@@ -125,7 +125,7 @@ void main() {
     expect(canDialLink(link), isTrue);
 
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
-    expect(canDialLink(link), isFalse);
+    expect(canDialLink(link), isTrue);
   });
 
   // gRPC and HTTPUpgrade are dialers the in-process core registers, so a line
@@ -139,7 +139,7 @@ void main() {
     expect(canDialSchemeOn(DialTarget.windows, link.scheme), isTrue);
     expect(canDialLinkOn(DialTarget.windows, link), isTrue);
     expect(canDialLinkOn(DialTarget.android, link), isTrue);
-    expect(canDialLinkOn(DialTarget.ios, link), isFalse);
+    expect(canDialLinkOn(DialTarget.ios, link), isTrue);
   });
 
   // XHTTP is the one that arrived with Xray only. Nothing in this build can

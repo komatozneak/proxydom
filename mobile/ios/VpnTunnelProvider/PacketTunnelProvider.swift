@@ -1,12 +1,16 @@
 import Foundation
 import NetworkExtension
 
-/// Packet Tunnel Provider — Hysteria2 dataplane (ADR 018 / 019).
+/// Packet Tunnel Provider.
 ///
-/// Honest Connected = tunnel settings applied **and** Hy2 egress started.
-/// Without `Hy2bind.xcframework`, start fails closed (never fake Connected).
+/// Two engines share one provider: Hysteria2 (`Hy2TunnelEngine`) and the
+/// v2ray-core family (`ShareTunnelEngine`), chosen by the `vpnCore` field the
+/// Dart side already writes into the start document. Both report Connected only
+/// after their dataplane is up, so a core that started and carried nothing is
+/// never shown as working.
 final class PacketTunnelProvider: NEPacketTunnelProvider {
   private var engine: Hy2TunnelEngine?
+  private var shareEngine: ShareTunnelEngine?
   /// Captured at startTunnel — late stop must not clobber a newer session.
   private var sessionGeneration: Int = 0
 
@@ -34,6 +38,50 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
 
     let hy2 = Hy2TunnelEngine()
     engine = hy2
+
+    if PacketTunnelProvider.isShareSession(paramsJson) {
+      // The v2ray family rides the same framework but needs the userspace
+      // packet tun: iOS has no TUN fd, so the fd-based start cannot run here.
+      let share = ShareTunnelEngine()
+      shareEngine = share
+      engine = nil
+      share.start(
+        provider: self,
+        paramsJson: paramsJson
+      ) { [weak self] error in
+        guard let self else { return }
+        guard self.shareEngine === share else {
+          ProxyDomVpnShared.appendNativeLog(
+            "PacketTunnel.startCompletion stale gen=\(self.sessionGeneration)"
+          )
+          completionHandler(
+            error ?? NSError(
+              domain: "su.proxydom.app.vpn",
+              code: 6,
+              userInfo: [NSLocalizedDescriptionKey: "share start cancelled"]
+            )
+          )
+          return
+        }
+        if let error {
+          let nsError = error as NSError
+          self.finishStart(
+            errorCode: nsError.code,
+            message: error.localizedDescription,
+            completionHandler: completionHandler
+          )
+          return
+        }
+        ProxyDomVpnShared.appendNativeLog(
+          "PacketTunnel.connected kind=share gen=\(self.sessionGeneration)"
+        )
+        ProxyDomVpnShared.setStatus("connected", generation: self.sessionGeneration)
+        ProxyDomVpnShared.setLastError(nil, generation: self.sessionGeneration)
+        completionHandler(nil)
+      }
+      return
+    }
+
     hy2.start(
       provider: self,
       paramsJson: paramsJson
@@ -90,6 +138,8 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     )
     engine?.stop()
     engine = nil
+    shareEngine?.stop()
+    shareEngine = nil
     ProxyDomVpnShared.setStatus("idle", generation: sessionGeneration)
     ProxyDomVpnShared.setLastError(nil, generation: sessionGeneration)
     completionHandler()
@@ -113,6 +163,24 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     completionHandler(nil)
   }
 
+  /// Whether the start document asks for the v2ray-core family.
+  ///
+  /// `vpnCore` is the field Dart has always written; `vlessConfig` is the
+  /// document itself. Requiring both keeps a Hysteria2 start from being handed
+  /// to an engine that would only find an empty config.
+  private static func isShareSession(_ paramsJson: String) -> Bool {
+    guard
+      let data = paramsJson.data(using: .utf8),
+      let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+      let core = root["vpnCore"] as? String,
+      core == "vless",
+      let document = root["vlessConfig"] as? String
+    else {
+      return false
+    }
+    return !document.isEmpty
+  }
+
   private func finishStart(
     errorCode: Int,
     message: String,
@@ -124,6 +192,8 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     NSLog("[ProxyDom] PacketTunnelProvider start failed: %@", message)
     engine?.stop()
     engine = nil
+    shareEngine?.stop()
+    shareEngine = nil
     ProxyDomVpnShared.setStatus("idle", generation: sessionGeneration)
     ProxyDomVpnShared.setLastError(message, generation: sessionGeneration)
     completionHandler(

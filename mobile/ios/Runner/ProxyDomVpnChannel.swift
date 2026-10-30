@@ -526,13 +526,36 @@ enum ProxyDomVpnChannel {
   private static func hostFromParams(_ paramsJson: String) -> String? {
     guard
       let data = paramsJson.data(using: .utf8),
-      let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-      let server = obj["hysteriaServer"] as? String
+      let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
     else {
       return nil
     }
-    let host = server.split(separator: ":", maxSplits: 1).first.map(String.init)
-    return host?.isEmpty == false ? host : nil
+    if let server = obj["hysteriaServer"] as? String {
+      let host = server.split(separator: ":", maxSplits: 1).first.map(String.init)
+      if let host, !host.isEmpty { return host }
+    }
+    // A share key has no `hysteriaServer`: the node address lives inside the
+    // v2ray document, and that is what the system VPN dialog should name.
+    guard
+      let document = obj["vlessConfig"] as? String,
+      let documentData = document.data(using: .utf8),
+      let root = (try? JSONSerialization.jsonObject(with: documentData)) as? [String: Any],
+      let outbounds = root["outbounds"] as? [[String: Any]],
+      let settings = outbounds.first?["settings"] as? [String: Any]
+    else {
+      return nil
+    }
+    if let vnext = settings["vnext"] as? [[String: Any]],
+       let address = vnext.first?["address"] as? String,
+       !address.isEmpty {
+      return address
+    }
+    if let servers = settings["servers"] as? [[String: Any]],
+       let address = servers.first?["address"] as? String,
+       !address.isEmpty {
+      return address
+    }
+    return nil
   }
 
   fileprivate static func mapNEVPNStatus(_ status: NEVPNStatus) -> String {

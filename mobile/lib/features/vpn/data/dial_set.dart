@@ -73,15 +73,17 @@ const kParkedSchemes = <String>{'wireguard', 'amneziawg', 'vpn'};
 
 /// Whether [scheme] may start a system tunnel on [target].
 ///
-/// Hysteria2 on every OS. The v2ray-core family on Android and Windows only:
-/// those are the two platforms that link the core, and iOS has no engine for
-/// them yet. An iOS build keeps the neutral badge rather than offering a start
-/// that would fail at the process boundary.
+/// Hysteria2 on every OS. The v2ray-core family on Android, Windows and iOS:
+/// all three link the core — on iOS it arrives inside the same
+/// `Hy2bind.xcframework` that carries Hysteria2 — and each has a dataplane for
+/// it (VpnService fd, broker engine, packet-flow userspace stack).
 bool canDialSchemeOn(DialTarget target, String scheme) {
   final name = scheme.trim().toLowerCase();
   if (_hysteriaSchemes.contains(name)) return true;
   if (_v2raySchemes.contains(name)) {
-    return target == DialTarget.android || target == DialTarget.windows;
+    return target == DialTarget.android ||
+        target == DialTarget.windows ||
+        target == DialTarget.ios;
   }
   return false;
 }
