@@ -10,6 +10,14 @@ name: iOS Compile Check
 
 on:
   workflow_dispatch:
+  # `workflow_dispatch` only exists once the file is on the default branch, so a
+  # feature branch triggers it by touching what it checks.
+  push:
+    paths:
+      - ".github/workflows/ios-compile.yml"
+      - "mobile/ios/**"
+      - "mobile/android/hysteria-bind/**"
+      - "mobile/lib/**"
 
 env:
   FLUTTER_VERSION: "3.35.1"
