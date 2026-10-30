@@ -75,7 +75,7 @@ jobs:
         run: |
           # minSdk enforced via androidComponents.finalizeDsl (Flutter tooling
           # rewrites a literal `minSdk` back to flutter.minSdkVersion).
-          # ADR 018: Hy2 bind / VpnService requires 26.
+          # minSdk 26 is a hard requirement: Hy2 bind / VpnService needs it.
           if grep -q "requiredMinSdk = ${{ env.MIN_SDK }}" android/app/build.gradle.kts \
             && grep -q "finalizeDsl" android/app/build.gradle.kts; then
             echo "minSdk enforcement OK (finalizeDsl -> ${{ env.MIN_SDK }})"
@@ -128,7 +128,7 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: mobile/android/hysteria-bind/go.sum
-      # Verbose so a known violation prints its warning; ADR 036.
+      # Verbose so a known violation prints its warning.
       - name: License guard and third-party notices
         working-directory: mobile/android/hysteria-bind
         run: go test -count=1 -v -run 'TestLicenseGuard|TestLicenseClassifier|TestThirdPartyNotices' .

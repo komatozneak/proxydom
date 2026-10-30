@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'share_link_parser.dart';
 
-/// Local SOCKS port for the in-process VLESS engine (v2ray-core, MIT).
+/// Local SOCKS port for the in-process share engine (v2ray-core, MIT).
 /// Not Hy2's :10808.
 const shareSocksPort = 10809;
 
@@ -56,15 +56,50 @@ Map<String, Object?>? _outbound(ParsedShareLink link) {
   switch (link.scheme) {
     case 'vless':
       return _vless(link);
-    case 'trojan':
-      return _trojan(link);
     case 'vmess':
       return _vmess(link);
+    case 'trojan':
+      return _trojan(link);
     case 'ss':
       return _shadowsocks(link);
+    case 'socks5':
+      return _socks(link);
     default:
       return null;
   }
+}
+
+/// SOCKS5 is a bare outbound: no transport, no TLS, no stream settings.
+///
+/// A credential is optional — a server that takes none is dialled with
+/// `noauth`, and the engine has no third mode. The password can be empty even
+/// when a user is present, which is why both fields are written from the same
+/// split rather than from a "has auth" test.
+Map<String, Object?>? _socks(ParsedShareLink link) {
+  final uri = Uri.parse(link.raw);
+  final host = uri.host.trim();
+  if (host.isEmpty) return null;
+  final port = uri.hasPort ? uri.port : 1080;
+  final server = <String, Object?>{
+    'address': host,
+    'port': port,
+  };
+  if (uri.userInfo.isNotEmpty) {
+    final userinfo = Uri.decodeComponent(uri.userInfo);
+    final colon = userinfo.indexOf(':');
+    server['users'] = [
+      {
+        'user': colon < 0 ? userinfo : userinfo.substring(0, colon),
+        'pass': colon < 0 ? '' : userinfo.substring(colon + 1),
+      },
+    ];
+  }
+  return {
+    'protocol': 'socks',
+    'settings': {
+      'servers': [server],
+    },
+  };
 }
 
 Map<String, Object?>? _vless(ParsedShareLink link) {
@@ -146,6 +181,15 @@ Map<String, Object?>? _vmess(ParsedShareLink link) {
     {
       'path': '${decoded['path'] ?? ''}',
       'host': '${decoded['host'] ?? ''}',
+      // VMess spells the skip-verify switch inside its JSON blob, not in a
+      // query: `allowInsecure` is a boolean there, and `verify_cert: false` is
+      // the other name clients write. Without it a node whose own key says so
+      // could never be dialled against a self-signed endpoint.
+      if (decoded['allowInsecure'] == true ||
+          decoded['allowInsecure'] == 1 ||
+          decoded['allowInsecure'] == '1' ||
+          decoded['verify_cert'] == false)
+        'allowInsecure': '1',
     },
     network: network,
     security: security,
@@ -225,12 +269,19 @@ Map<String, Object?>? _shadowsocks(ParsedShareLink link) {
   };
 }
 
-/// Transports `engineTransport` expresses in `hy2bind_engine_load.go`.
+/// Transports `shareStreamConfig` expresses in `hy2bind_engine_load.go`.
 ///
-/// Everything else — `grpc`, `quic`, `httpupgrade`, `xhttp`, `splithttp` — is
-/// refused, because the loader answers `unsupported transport` and the start
-/// fails after the UI has already offered the line as active.
-const _engineTransports = {'tcp', 'ws', 'websocket', 'kcp'};
+/// Everything else — `quic`, `splithttp`/`xhttp`, or a name this core does not
+/// register — is refused, because the loader answers `unsupported transport`
+/// and the start fails after the UI has already offered the line as active.
+const _engineTransports = {
+  'tcp',
+  'ws',
+  'websocket',
+  'kcp',
+  'grpc',
+  'httpupgrade',
+};
 
 /// Securities `shareStreamConfig` expresses in `hy2bind_engine_load.go`.
 ///
@@ -294,6 +345,21 @@ Map<String, Object?>? _stream(
     stream['wsSettings'] = {
       'path': (q['path'] ?? '/').isEmpty ? '/' : q['path'],
       if ((q['host'] ?? '').isNotEmpty) 'headers': {'Host': q['host']},
+    };
+  }
+  // gRPC carries its own path as a service name, and the core will not guess
+  // one: a line without `serviceName` is dialable only against a server that
+  // listens on the empty service, so the link's own word is what travels.
+  if (normalized == 'grpc') {
+    stream['grpcSettings'] = {
+      if ((q['serviceName'] ?? '').isNotEmpty) 'serviceName': q['serviceName'],
+      if (q['mode'] == 'multi') 'multiMode': true,
+    };
+  }
+  if (normalized == 'httpupgrade') {
+    stream['httpupgradeSettings'] = {
+      'path': (q['path'] ?? '/').isEmpty ? '/' : q['path'],
+      if ((q['host'] ?? '').isNotEmpty) 'host': q['host'],
     };
   }
   if (normalized == 'kcp') {

@@ -57,6 +57,36 @@ void main() {
     expect(outbound['settings'].toString().contains('vnext'), isFalse);
   });
 
+  // SOCKS5 is a bare hop: the loader sets SenderSettings only when the document
+  // carries a stream, so an invented one would make the core offer a TLS
+  // handshake to a socket that speaks SOCKS.
+  test('socks5 is a bare outbound with no stream', () {
+    final json = buildShareSocksConfig(
+      parseShareLink('socks5://alice:s3cret@203.0.113.10:1080#s'),
+    );
+    final decoded = jsonDecode(json!) as Map<String, dynamic>;
+    final outbound = (decoded['outbounds'] as List).first as Map;
+    expect(outbound['protocol'], 'socks');
+    expect(outbound.containsKey('streamSettings'), isFalse);
+    final servers = (outbound['settings'] as Map)['servers'] as List;
+    final server = servers.first as Map;
+    expect(server['address'], '203.0.113.10');
+    expect(server['port'], 1080);
+    final users = server['users'] as List;
+    expect((users.first as Map)['user'], 'alice');
+    expect((users.first as Map)['pass'], 's3cret');
+  });
+
+  test('a socks5 key with no credential writes no users', () {
+    final json = buildShareSocksConfig(parseShareLink('socks5://1.2.3.4'));
+    final decoded = jsonDecode(json!) as Map<String, dynamic>;
+    final settings =
+        ((decoded['outbounds'] as List).first as Map)['settings'] as Map;
+    final server = (settings['servers'] as List).first as Map;
+    expect(server['port'], 1080);
+    expect(server.containsKey('users'), isFalse);
+  });
+
   test('allowInsecure=1 is copied into tls settings', () {
     const raw =
         'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:8444'
@@ -137,13 +167,7 @@ void main() {
   // The loader accepts only tcp, websocket and mkcp. Offering anything else as
   // active means the user taps the line and the start fails with no name.
   test('transports the loader cannot express are refused', () {
-    for (final transport in const [
-      'grpc',
-      'quic',
-      'httpupgrade',
-      'xhttp',
-      'splithttp',
-    ]) {
+    for (final transport in const ['quic', 'xhttp', 'splithttp']) {
       final raw =
           'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
           '?security=tls&sni=a.example&type=$transport#T';
@@ -153,6 +177,34 @@ void main() {
         reason: 'type=$transport must not reach the loader',
       );
     }
+  });
+
+  // gRPC keeps its path in `serviceName` and the core will not invent one: an
+  // empty name is a real server shape, so the link's word is what travels.
+  test('grpc carries its service name', () {
+    const raw =
+        'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
+        '?security=tls&type=grpc&serviceName=grpcsvc&sni=front.example#G';
+    final json = buildShareSocksConfig(parseShareLink(raw));
+    final decoded = jsonDecode(json!) as Map<String, dynamic>;
+    final stream =
+        ((decoded['outbounds'] as List).first as Map)['streamSettings'] as Map;
+    expect(stream['network'], 'grpc');
+    expect((stream['grpcSettings'] as Map)['serviceName'], 'grpcsvc');
+  });
+
+  test('httpupgrade carries path and host', () {
+    const raw =
+        'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
+        '?security=tls&type=httpupgrade&path=%2Fup&host=cdn.example#U';
+    final json = buildShareSocksConfig(parseShareLink(raw));
+    final decoded = jsonDecode(json!) as Map<String, dynamic>;
+    final stream =
+        ((decoded['outbounds'] as List).first as Map)['streamSettings'] as Map;
+    expect(stream['network'], 'httpupgrade');
+    final upgrade = stream['httpupgradeSettings'] as Map;
+    expect(upgrade['path'], '/up');
+    expect(upgrade['host'], 'cdn.example');
   });
 
   // shareStreamConfig() rejects every security except none and tls.
@@ -280,7 +332,7 @@ void main() {
     }
     // Refusals stay refusals however they are capitalised: folding must not
     // widen the allowlist.
-    for (final written in const ['GRPC', 'Grpc', 'XHTTP', 'QUIC']) {
+    for (final written in const ['XHTTP', 'Quic', 'SPLITHTPP']) {
       expect(
         buildShareSocksConfig(parseShareLink(link(type: written, security: 'tls'))),
         isNull,

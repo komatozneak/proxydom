@@ -2,6 +2,7 @@
 
 #include <cctype>
 #include <cstdio>
+#include <cstring>
 #include <sstream>
 
 namespace {
@@ -86,8 +87,7 @@ bool extract_string_field(const std::string& json,
                           const std::string& key,
                           std::string& value,
                           bool& present) {
-  const std::string pattern = "\"" + key + "\"";
-  const auto at = json.find(pattern);
+  const std::string pattern = "\"" + key + "\"";  const auto at = json.find(pattern);
   if (at == std::string::npos) {
     present = false;
     return true;
@@ -389,6 +389,221 @@ bool apply_port_spec(const std::string& raw, ShareLine& out, std::string& error)
   return true;
 }
 
+// Standard and URL-safe alphabets, padding optional. A vmess key is written by
+// a dozen generators and not all of them pad; refusing the unpadded form would
+// drop the most common one in the wild.
+std::string base64_decode_bytes(const std::string& in) {
+  static const char kAlphabet[] =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  std::string out;
+  out.reserve(in.size() * 3 / 4);
+  int buffer = 0;
+  int bits = 0;
+  for (char c : in) {
+    if (c == '=' || c == '\r' || c == '\n' || c == ' ' || c == '\t') continue;
+    int value = -1;
+    if (c == '-') {
+      value = 62;
+    } else if (c == '_') {
+      value = 63;
+    } else {
+      const char* found = std::strchr(kAlphabet, c);
+      if (found != nullptr) value = static_cast<int>(found - kAlphabet);
+    }
+    if (value < 0) return {};
+    buffer = (buffer << 6) | value;
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      out.push_back(static_cast<char>((buffer >> bits) & 0xFF));
+    }
+  }
+  return out;
+}
+
+// Splits `host:port`, or `[v6]:port`. The caller reads the IPv6 case as an error
+// on purpose: the engine takes an IPv4 literal.
+bool split_host_port(const std::string& text, std::string& host, std::string& port_token) {
+  host.clear();
+  port_token.clear();
+  if (!text.empty() && text[0] == '[') {
+    const auto bracket = text.find(']');
+    if (bracket == std::string::npos) return false;
+    host = text.substr(1, bracket - 1);
+    if (bracket + 1 < text.size() && text[bracket + 1] == ':') {
+      port_token = text.substr(bracket + 2);
+    }
+    return true;
+  }
+  const auto colon = text.rfind(':');
+  if (colon == std::string::npos) {
+    host = text;
+  } else {
+    host = text.substr(0, colon);
+    port_token = text.substr(colon + 1);
+  }
+  return true;
+}
+
+// vmess carries its fields in a base64 JSON object instead of userinfo and
+// query. The port is a number in the original format and a string in some
+// generators, so both are accepted.
+bool read_vmess_port(const std::string& json, int& port) {
+  std::int64_t number = 0;
+  bool present = false;
+  if (extract_int_field(json, "port", number, present) && present && number >= 1 && number <= 65535) {
+    port = static_cast<int>(number);
+    return true;
+  }
+  std::string text;
+  if (!extract_string_field(json, "port", text, present) || !present) return false;
+  return port_number(trim_copy(text), port);
+}
+
+/// Reads a JSON switch the way VMess keys write it.
+///
+/// The same field arrives as `true`, `"true"`, `1` or `"1"` depending on the
+/// client that produced the key, and `verify_cert: false` is the other spelling
+/// of the same request. A string-only reader missed every boolean form, so a
+/// key that asked to skip verification was dialled with it on.
+bool read_vmess_skip_verify(const std::string& json) {
+  auto truthy = [&](const char* key, bool& present) {
+    const std::string pattern = std::string("\"") + key + "\"";
+    present = false;
+    const auto at = json.find(pattern);
+    if (at == std::string::npos) return false;
+    auto colon = json.find(':', at + pattern.size());
+    if (colon == std::string::npos) return false;
+    auto i = colon + 1;
+    while (i < json.size() && std::isspace(static_cast<unsigned char>(json[i]))) ++i;
+    present = true;
+    if (i >= json.size()) return false;
+    if (json.compare(i, 4, "true") == 0) return true;
+    if (json[i] == '"') ++i;
+    return i < json.size() && json[i] == '1';
+  };
+  bool present = false;
+  if (truthy("allowInsecure", present) && present) return true;
+  bool verify_present = false;
+  const bool verify = truthy("verify_cert", verify_present);
+  if (verify_present && !verify) return true;
+  return false;
+}
+
+bool parse_vmess_share(const std::string& payload, ShareLine& out, std::string& error) {
+  const std::string json = base64_decode_bytes(payload);
+  if (json.empty() || json.find('{') == std::string::npos) {
+    error = "vmess";
+    return false;
+  }
+  std::string host;
+  bool present = false;
+  if (!extract_string_field(json, "add", host, present) || !present || host.empty()) {
+    error = "host";
+    return false;
+  }
+  int port = 443;
+  if (!read_vmess_port(json, port)) {
+    error = "port";
+    return false;
+  }
+  std::string id;
+  if (!extract_string_field(json, "id", id, present) || !present || id.empty()) {
+    error = "auth";
+    return false;
+  }
+  out = ShareLine{};
+  out.scheme = "vmess";
+  out.host = host;
+  out.port = port;
+  out.uuid = id;
+  std::string net;
+  extract_string_field(json, "net", net, present);
+  out.network = present ? lower_copy(trim_copy(net)) : std::string();
+  if (out.network.empty()) out.network = "tcp";
+  std::string cipher;
+  extract_string_field(json, "scy", cipher, present);
+  out.method = present ? lower_copy(trim_copy(cipher)) : std::string();
+  std::string tls;
+  extract_string_field(json, "tls", tls, present);
+  out.security = (present && lower_copy(trim_copy(tls)) == "tls") ? "tls" : "none";
+  std::string sni;
+  extract_string_field(json, "sni", sni, present);
+  out.sni = trim_copy(sni);
+  if (out.sni.empty()) out.sni = host;
+  std::string ws_host;
+  extract_string_field(json, "host", ws_host, present);
+  out.ws_host = trim_copy(ws_host);
+  std::string path;
+  extract_string_field(json, "path", path, present);
+  out.path = trim_copy(path);
+  std::string alpn;
+  extract_string_field(json, "alpn", alpn, present);
+  out.alpn = trim_copy(alpn);
+  out.insecure = read_vmess_skip_verify(json);
+  return true;
+}
+
+// Shadowsocks has two spellings: SIP002 `ss://base64(method:pass)@host:port`,
+// and the legacy whole-body base64 that decodes to the same thing. Both end up
+// as a cipher and a password for a stream the core carries itself.
+bool parse_ss_share(const std::string& rest, ShareLine& out, std::string& error) {
+  std::string body = rest;
+  std::string query;
+  const auto qmark = body.find('?');
+  if (qmark != std::string::npos) {
+    query = body.substr(qmark + 1);
+    body = body.substr(0, qmark);
+  }
+  const auto slash = body.find('/');
+  if (slash != std::string::npos) body = body.substr(0, slash);
+  std::string credentials;
+  std::string hostport;
+  const auto at = body.rfind('@');
+  if (at != std::string::npos) {
+    credentials = percent_decode(body.substr(0, at));
+    hostport = body.substr(at + 1);
+  } else {
+    const std::string decoded = base64_decode_bytes(body);
+    const auto dat = decoded.rfind('@');
+    if (dat == std::string::npos) {
+      error = "ss";
+      return false;
+    }
+    credentials = decoded.substr(0, dat);
+    hostport = decoded.substr(dat + 1);
+  }
+  if (credentials.find(':') == std::string::npos) {
+    const std::string decoded = base64_decode_bytes(credentials);
+    if (decoded.find(':') != std::string::npos) credentials = decoded;
+  }
+  const auto colon = credentials.find(':');
+  if (colon == std::string::npos || colon == 0) {
+    error = "ss";
+    return false;
+  }
+  std::string host;
+  std::string port_token;
+  if (!split_host_port(hostport, host, port_token) || host.empty()) {
+    error = "host";
+    return false;
+  }
+  out = ShareLine{};
+  out.scheme = "ss";
+  out.host = host;
+  out.method = lower_copy(credentials.substr(0, colon));
+  out.password = credentials.substr(colon + 1);
+  out.security = "none";
+  out.network = lower_copy(query_value(query, "type"));
+  if (out.network.empty()) out.network = lower_copy(query_value(query, "net"));
+  if (out.network.empty()) out.network = "tcp";
+  out.path = query_value(query, "path");
+  out.ws_host = query_value(query, "host");
+  out.alpn = query_value(query, "alpn");
+  if (port_token.empty()) port_token = "8388";
+  return apply_port_spec(port_token, out, error);
+}
+
 }  // namespace
 
 bool parse_share_line(const std::string& raw, ShareLine& out, std::string& error) {
@@ -403,7 +618,15 @@ bool parse_share_line(const std::string& raw, ShareLine& out, std::string& error
   }
   std::string scheme = lower_copy(text.substr(0, scheme_end));
   if (scheme == "hy2") scheme = "hysteria2";
-  if (scheme != "hysteria2" && scheme != "vless") {
+  if (scheme == "wg") scheme = "wireguard";
+  if (scheme == "awg") scheme = "amneziawg";
+  // The Windows broker carries the same five outbounds as the Android builder,
+  // because one Go loader serves them both. A scheme outside this set is still
+  // refused by name: this is the gate that keeps a line the engine cannot
+  // describe from reaching a process that would fail it after "connecting".
+  const bool socks = scheme == "socks5" || scheme == "socks";
+  if (scheme != "hysteria2" && scheme != "vless" && scheme != "vmess" &&
+      scheme != "trojan" && scheme != "ss" && !socks) {
     error = "scheme";
     return false;
   }
@@ -414,13 +637,26 @@ bool parse_share_line(const std::string& raw, ShareLine& out, std::string& error
     fragment = percent_decode(rest.substr(hash + 1));
     rest = rest.substr(0, hash);
   }
+  // vmess and Shadowsocks do not follow the `userinfo@host:port?query` shape:
+  // vmess is one base64 JSON blob, and Shadowsocks hides its credentials in
+  // base64 too. Both are read by their own parser rather than bent into the
+  // generic path, which would have to guess which half of the string is which.
+  if (scheme == "vmess") {
+    const auto q = rest.find('?');
+    return parse_vmess_share(q == std::string::npos ? rest : rest.substr(0, q), out, error);
+  }
+  if (scheme == "ss") {
+    return parse_ss_share(rest, out, error);
+  }
   const auto at = rest.find('@');
-  if (at == std::string::npos) {
+  // A SOCKS5 server that takes no credential writes no `@`, and a key without
+  // one is valid: the core offers `noauth`.
+  if (at == std::string::npos && !socks) {
     error = "auth";
     return false;
   }
-  const std::string user = percent_decode(rest.substr(0, at));
-  std::string hostport = rest.substr(at + 1);
+  const std::string user = at == std::string::npos ? std::string() : percent_decode(rest.substr(0, at));
+  std::string hostport = at == std::string::npos ? rest : rest.substr(at + 1);
   std::string query;
   const auto q = hostport.find('?');
   if (q != std::string::npos) {
@@ -429,24 +665,9 @@ bool parse_share_line(const std::string& raw, ShareLine& out, std::string& error
   }
   std::string host;
   std::string port_token;
-  if (!hostport.empty() && hostport[0] == '[') {
-    const auto bracket = hostport.find(']');
-    if (bracket == std::string::npos) {
-      error = "host";
-      return false;
-    }
-    host = hostport.substr(1, bracket - 1);
-    if (bracket + 1 < hostport.size() && hostport[bracket + 1] == ':') {
-      port_token = hostport.substr(bracket + 2);
-    }
-  } else {
-    const auto colon = hostport.rfind(':');
-    if (colon == std::string::npos) {
-      host = hostport;
-    } else {
-      host = hostport.substr(0, colon);
-      port_token = hostport.substr(colon + 1);
-    }
+  if (!split_host_port(hostport, host, port_token)) {
+    error = "host";
+    return false;
   }
   if (host.empty()) {
     error = "host";
@@ -471,6 +692,9 @@ bool parse_share_line(const std::string& raw, ShareLine& out, std::string& error
   std::string port_spec = port_token;
   const std::string mport = query_value(query, "mport");
   if (!mport.empty()) port_spec = mport;
+  // SOCKS5's registered port is 1080; 443 belongs to none of its neighbours.
+  // A key that names no port means the protocol default, not TLS.
+  if (socks && port_spec.empty()) port_spec = "1080";
   if (!apply_port_spec(port_spec, out, error)) return false;
   const std::string hop = query_value(query, "mportHopInt");
   if (!hop.empty() && hop.find_first_not_of("0123456789") == std::string::npos) {
@@ -491,6 +715,46 @@ bool parse_share_line(const std::string& raw, ShareLine& out, std::string& error
     }
     out.obfs = query_value(query, "obfs");
     out.obfs_password = query_value(query, "obfs-password");
+  } else if (socks) {
+    // A SOCKS5 key is `user:pass@host:port`, and both halves are optional.
+    // The URI's userinfo is percent-decoded above, so a password with `@` or
+    // `:` in it survives only as much as the writer encoded it.
+    const auto colon = user.find(':');
+    if (colon != std::string::npos) {
+      out.username = user.substr(0, colon);
+      out.password = user.substr(colon + 1);
+    } else {
+      out.username = user;
+    }
+  } else if (scheme == "trojan") {
+    out.password = user;
+    if (out.password.empty()) {
+      error = "auth";
+      return false;
+    }
+    out.flow = query_value(query, "flow");
+    out.security = lower_copy(query_value(query, "security"));
+    out.fingerprint = query_value(query, "fp");
+    out.network = lower_copy(query_value(query, "type"));
+    if (out.network.empty()) out.network = lower_copy(query_value(query, "net"));
+    if (out.network.empty()) out.network = "tcp";
+    out.path = query_value(query, "path");
+    out.ws_host = query_value(query, "host");
+    out.alpn = query_value(query, "alpn");
+    const std::string header_type = lower_copy(query_value(query, "headerType"));
+    if (!header_type.empty() && header_type != "none") {
+      error = "transport";
+      return false;
+    }
+    if (out.network == "kcp" || out.network == "mkcp") {
+      out.kcp_seed = query_value(query, "seed");
+      if (out.kcp_seed.empty()) out.kcp_seed = query_value(query, "path");
+      if (out.kcp_seed == "/") out.kcp_seed.clear();
+    }
+    // gRPC carries its path as a service name; an empty one is a real server
+    // shape, so it travels as written rather than being defaulted here.
+    out.service_name = query_value(query, "serviceName");
+    if (out.security.empty()) out.security = "tls";
   } else {
     out.uuid = user;
     if (out.uuid.empty()) {
@@ -530,6 +794,9 @@ bool parse_share_line(const std::string& raw, ShareLine& out, std::string& error
       if (out.kcp_seed.empty()) out.kcp_seed = query_value(query, "path");
       if (out.kcp_seed == "/") out.kcp_seed.clear();
     }
+    // gRPC carries its path as a service name; an empty one is a real server
+    // shape, so it travels as written rather than being defaulted here.
+    out.service_name = query_value(query, "serviceName");
     if (out.security.empty()) out.security = "tls";
     if (out.security == "reality" && out.public_key.empty()) {
       error = "reality";
@@ -607,7 +874,8 @@ std::string json_string_array(const std::vector<std::string>& values) {
 std::string engine_outbound(const ShareLine& line, const std::string& server_ip) {
   if (server_ip.empty() || server_ip.find(':') != std::string::npos) return {};
   std::ostringstream outbound;
-  if (line.scheme == "hysteria2") {
+  const std::string scheme = line.scheme == "hy2" ? "hysteria2" : line.scheme;
+  if (scheme == "hysteria2") {
     outbound << "{\"type\":\"hysteria2\",\"server\":\"" << json_escape(server_ip) << "\",\"server_port\":" << line.port;
     if (!line.server_ports.empty()) {
       outbound << ",\"server_ports\":\"" << json_escape(line.server_ports) << "\"";
@@ -621,30 +889,66 @@ std::string engine_outbound(const ShareLine& line, const std::string& server_ip)
       outbound << ",\"obfs\":\"salamander\",\"obfs_password\":\"" << json_escape(line.obfs_password) << "\"";
     }
     outbound << "}";
-  } else {
-    outbound << "{\"type\":\"vless\",\"server\":\"" << json_escape(server_ip) << "\",\"server_port\":" << line.port
-             << ",\"uuid\":\"" << json_escape(line.uuid) << "\"";
-    if (!line.flow.empty()) outbound << ",\"flow\":\"" << json_escape(line.flow) << "\"";
-    outbound << ",\"sni\":\"" << json_escape(line.sni) << "\",\"insecure\":" << (line.insecure ? "true" : "false")
-             << ",\"security\":\"" << json_escape(line.security) << "\""
-             << ",\"network\":\"" << json_escape(line.network) << "\"";
-    if (!line.fingerprint.empty()) {
-      outbound << ",\"fingerprint\":\"" << json_escape(line.fingerprint) << "\"";
+    return outbound.str();
+  }
+  if (scheme == "socks5" || scheme == "socks") {
+    // Bare hop: no stream, no TLS, and no credential unless the key carried one.
+    outbound << "{\"type\":\"socks5\",\"server\":\"" << json_escape(server_ip) << "\",\"server_port\":" << line.port;
+    if (!line.username.empty() || !line.password.empty()) {
+      outbound << ",\"username\":\"" << json_escape(line.username) << "\",\"password\":\""
+               << json_escape(line.password) << "\"";
     }
-    if (!line.kcp_seed.empty()) {
-      outbound << ",\"kcp_seed\":\"" << json_escape(line.kcp_seed) << "\"";
-    }
-    // Without these a vless:// over WebSocket cannot be described at all, and
-    // the row that needs them is exactly the one subscriptions hand out.
+    outbound << "}";
+    return outbound.str();
+  }
+  if (scheme == "ss") {
+    outbound << "{\"type\":\"ss\",\"server\":\"" << json_escape(server_ip) << "\",\"server_port\":" << line.port
+             << ",\"method\":\"" << json_escape(line.method) << "\",\"password\":\"" << json_escape(line.password)
+             << "\",\"network\":\"" << json_escape(line.network.empty() ? "tcp" : line.network) << "\"";
     if (!line.path.empty()) outbound << ",\"path\":\"" << json_escape(line.path) << "\"";
     if (!line.ws_host.empty()) outbound << ",\"host\":\"" << json_escape(line.ws_host) << "\"";
     if (!line.alpn.empty()) outbound << ",\"alpn\":\"" << json_escape(line.alpn) << "\"";
-    if (line.security == "reality") {
-      outbound << ",\"public_key\":\"" << json_escape(line.public_key) << "\",\"short_id\":\""
-               << json_escape(line.short_id) << "\"";
-    }
     outbound << "}";
+    return outbound.str();
   }
+  // VLESS, VMess and Trojan share the transport block. The type is the whole
+  // difference: one engine builds each outbound from the same fields the Dart
+  // builder writes.
+  const std::string type = scheme == "vmess" ? "vmess" : (scheme == "trojan" ? "trojan" : "vless");
+  outbound << "{\"type\":\"" << type << "\",\"server\":\"" << json_escape(server_ip) << "\",\"server_port\":"
+           << line.port;
+  if (type == "vless" || type == "vmess") {
+    outbound << ",\"uuid\":\"" << json_escape(line.uuid) << "\"";
+  }
+  if (type != "vless") {
+    outbound << ",\"password\":\"" << json_escape(line.password) << "\"";
+  }
+  if (type == "vmess" && !line.method.empty()) {
+    outbound << ",\"method\":\"" << json_escape(line.method) << "\"";
+  }
+  if (!line.flow.empty()) outbound << ",\"flow\":\"" << json_escape(line.flow) << "\"";
+  outbound << ",\"sni\":\"" << json_escape(line.sni) << "\",\"insecure\":" << (line.insecure ? "true" : "false")
+           << ",\"security\":\"" << json_escape(line.security) << "\""
+           << ",\"network\":\"" << json_escape(line.network) << "\"";
+  if (!line.fingerprint.empty()) {
+    outbound << ",\"fingerprint\":\"" << json_escape(line.fingerprint) << "\"";
+  }
+  if (!line.kcp_seed.empty()) {
+    outbound << ",\"kcp_seed\":\"" << json_escape(line.kcp_seed) << "\"";
+  }
+  if (!line.service_name.empty()) {
+    outbound << ",\"service_name\":\"" << json_escape(line.service_name) << "\"";
+  }
+  // Without these a vless:// over WebSocket cannot be described at all, and
+  // the row that needs them is exactly the one subscriptions hand out.
+  if (!line.path.empty()) outbound << ",\"path\":\"" << json_escape(line.path) << "\"";
+  if (!line.ws_host.empty()) outbound << ",\"host\":\"" << json_escape(line.ws_host) << "\"";
+  if (!line.alpn.empty()) outbound << ",\"alpn\":\"" << json_escape(line.alpn) << "\"";
+  if (line.security == "reality") {
+    outbound << ",\"public_key\":\"" << json_escape(line.public_key) << "\",\"short_id\":\""
+             << json_escape(line.short_id) << "\"";
+  }
+  outbound << "}";
   return outbound.str();
 }
 

@@ -1,5 +1,5 @@
 # Fails when the MSI payload carries a binary nobody has reviewed, or a binary
-# that embeds a GPL Go module under any file name (ADR 036).
+# that embeds a GPL Go module under any file name.
 #
 #   pwsh -File check-payload-licenses.ps1 [-Payload <dir>]
 #
@@ -34,7 +34,7 @@ $Allowed = @{
     # Sole non-OSI license in the payload. Owner decision 2026-10-06: keep it.
     # WireGuard LLC Prebuilt Binaries License — redistribution of the unmodified
     # DLL is allowed beside software that only calls wintun.h. Not copyleft, and
-    # it does not require publishing source. See ADR 036.
+    # it does not require publishing source. See.
     "wintun.dll"                                = "Wintun Prebuilt Binaries License (WireGuard LLC)"
     "proxydom-engine.exe"                       = "Proxy Dom tunnel engine, own code; notices in THIRD-PARTY-NOTICES.md"
 }
@@ -109,7 +109,7 @@ foreach ($file in Get-ChildItem -LiteralPath $root -Recurse -File | Sort-Object 
             Write-Host "::warning title=License guard::$msg"
         }
     } elseif ($marker) {
-        Write-Host "FAIL $relative embeds $marker (GPL Go module, ADR 036)"
+        Write-Host "FAIL $relative embeds $marker"
         $failures++
     } elseif (-not $license) {
         Write-Host "FAIL $relative is not on the reviewed list in check-payload-licenses.ps1"

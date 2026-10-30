@@ -172,21 +172,25 @@ func TestThisLoaderAdmitsNoSecurityDartWouldRefuse(t *testing.T) {
 
 // The words that must stay refused, on both sides. A refusal here is what keeps
 // an imported line from being offered as active and then failing at the dial.
+//
+// gRPC and HTTPUpgrade moved to the dialable side: this core registers both
+// dialers, so refusing them would hide a line that works. What stays refused is
+// what has no dialer at all — QUIC, XHTTP and the Xray-only split-http.
 func TestParkedTransportsAndSecuritiesStayRefused(t *testing.T) {
-	for _, word := range []string{"grpc", "quic", "httpupgrade", "xhttp", "splithttp"} {
+	for _, word := range []string{"quic", "xhttp", "splithttp"} {
 		if TransportDialable(word) {
 			t.Fatalf("transport %q must stay refused: v2ray-core has no dialer for it", word)
 		}
 	}
 	for _, word := range []string{"reality", "xtls"} {
 		if SecurityDialable(word) {
-			t.Fatalf("security %q must stay refused: it arrived with xray-core (ADR 036)", word)
+			t.Fatalf("security %q must stay refused: it arrived with xray-core", word)
 		}
 	}
 	// And Dart has to refuse them too, or the Windows path would hand the raw
 	// URI to a broker that cannot carry it.
 	transports, securities, _ := dartEngineDialSets(t)
-	for _, word := range []string{"grpc", "quic", "httpupgrade", "xhttp", "splithttp"} {
+	for _, word := range []string{"quic", "xhttp", "splithttp"} {
 		if transports[word] {
 			t.Fatalf("dart admits transport %q, which the engine cannot dial", word)
 		}

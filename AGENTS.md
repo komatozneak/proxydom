@@ -48,15 +48,19 @@ cd android/hysteria-bind && go test ./...
 
 - **Ключ узла** — `hy2://` и `hysteria2://`, включая `obfs=salamander` и
   port hopping. Единственный транспорт для узлов.
-- **Импорт** — Hysteria2 на всех ОС и VLESS там, где движок его набирает:
-  Android и Windows. Движок один — in-process `v2fly/v2ray-core` v5.54.2 (MIT)
-  внутри `hy2bind`. Reality и XHTTP он не описывает, такие строки остаются
-  неактивными. iOS движка VLESS не имеет.
+- **Импорт** — Hysteria2 на всех ОС и вся семья `v2fly/v2ray-core` там, где
+  движок её набирает: Android и Windows. Это VLESS, VMess, Trojan, Shadowsocks
+  и SOCKS5. Движок один — in-process `v2fly/v2ray-core` v5.54.2 (MIT) внутри
+  `hy2bind`, и на Windows тот же исходник становится `proxydom-engine.exe`.
+  Reality и XHTTP он не описывает, такие строки остаются неактивными. iOS
+  движка этой семьи не имеет и остаётся на Hysteria2.
 
-Trojan, Shadowsocks, VMess — вне продукта: парсер их читает, dial gate не
-пускает. Смешанный документ импортируется целиком и не удаляется; строки,
+`wireguard://`, `amneziawg://` и `vpn://` парсер опознаёт, считает и называет,
+но не запускает: в `hy2bind` нет userspace-WireGuard, а `vpn://` — контейнер, а
+не диалер. Смешанный документ импортируется целиком и не удаляется; строки,
 которые платформа не умеет запустить, показываются с нейтральным бейджем, а не
 с ошибкой. Источник правды — `mobile/lib/features/vpn/data/dial_set.dart`.
+Разбор INCY, из которого этот набор вырос, — `docs/parity/incy-intake-parity.md`.
 
 ## 3. Стек
 
@@ -111,7 +115,17 @@ desktop/    Windows: service/ (C++) + installer/ (MSI)
   permissive: MIT, BSD, ISC, Apache-2.0, MPL-2.0. Это не «без обязательств»:
   MIT, BSD и Apache требуют сохранить копирайт-нотисы, и они лежат в
   `mobile/assets/legal/THIRD-PARTY-NOTICES.md`.
-- **`libbox`, `sing-box`, `xray-core` не вендорить.** Внутри GPL-3.0.
+- **`libbox`, `sing-box` не вендорить.** Внутри GPL-3.0, см. пункт выше.
+- **`xray-core` не вендорить, и это проверено на практике.** Сам пакет —
+  MPL-2.0 (в его `LICENSE`), но его сборочный граф тянет GPL-3.0 и LGPL:
+  `sagernet/sing` приходит из `transport/internet` (импорт
+  `sing/common/control` в `system_dialer.go`), `sagernet/sing-shadowsocks` —
+  из `infra/conf`, `juju/ratelimit` (LGPL) — через `xtls/reality`. Проверено
+  2026-10-30 командой `go mod why` на v1.260327.0; `TestLicenseGuard` валит
+  такую сборку. Поэтому Reality и XHTTP в клиенте не запускаются: их умеет
+  только этот движок, а его граф не проходит §6. Переход возможен лишь если
+  GPL/LGPL-части будут вырезаны из графа (форк или build-теги), а это отдельное
+  решение, а не правка парсера.
 - **`com.android.vending.BILLING` не добавлять.** Платежей в приложении нет.
 - **Секреты и ключи серверов не отправлять на сервер.** Утилита локальная.
 
@@ -124,5 +138,5 @@ Conventional Commits. Один коммит — одно откатываемо�
 ## 8. Чего в этом репозитории нет
 
 Не искать и не добавлять: бэкенда FastAPI, Terraform, Ansible, лендинга,
-каталога узлов, Telegram-бота, биллинга, ADR, wiki. Всё это живёт в закрытом
+каталога узлов, Telegram-бота, биллинга, wiki. Всё это живёт в закрытом
 репозитории. Если задача требует правку бэкенда — она не для этого репозитория.

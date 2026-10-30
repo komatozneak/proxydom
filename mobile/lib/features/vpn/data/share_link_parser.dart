@@ -12,7 +12,11 @@ class ParsedShareLink {
     this.hy2,
   });
 
-  /// `hysteria2`, `vless`, `vmess`, `trojan`, or `ss`.
+  /// `hysteria2`, `vless`, `vmess`, `trojan`, `ss`, or `socks5`.
+  ///
+  /// Wider than this: a scheme the parser knows but no engine here can dial
+  /// becomes a [ShareLineSkip] on the way in, not a silent drop. The two sets
+  /// live in `dial_set.dart`.
   final String scheme;
   final String name;
 
@@ -24,6 +28,18 @@ class ParsedShareLink {
   bool get isHysteria2 => hy2 != null;
 }
 
+/// Schemes recognised as a server key, whether or not this build can start it.
+///
+/// A scheme outside this list is not a key at all — a note, a path, a banner
+/// line — and is skipped without being counted. A scheme inside it that the
+/// dialect cannot describe is counted and reported, which is the difference
+/// between "this document had three keys and one is unsupported" and "this
+/// document had three keys".
+///
+/// `http://` and `https://` are deliberately absent. They are subscription
+/// document addresses here (see [subscriptionDocumentTarget]), and INCY's
+/// `http://user:pass@host` proxy key would have been indistinguishable from one
+/// until after the document was fetched.
 const _schemes = <String>[
   'hysteria2://',
   'hy2://',
@@ -31,6 +47,13 @@ const _schemes = <String>[
   'vmess://',
   'trojan://',
   'ss://',
+  'socks5://',
+  'socks://',
+  'wireguard://',
+  'wg://',
+  'amneziawg://',
+  'awg://',
+  'vpn://',
 ];
 
 bool isShareLinkLine(String raw) {
@@ -114,6 +137,19 @@ ParsedShareLink parseShareLink(String raw) {
   if (lower.startsWith('trojan://')) return _parseUserHost('trojan', text);
   if (lower.startsWith('vmess://')) return _parseVmess(text);
   if (lower.startsWith('ss://')) return _parseSs(text);
+  if (lower.startsWith('socks5://') || lower.startsWith('socks://')) {
+    return _parseSocks(text);
+  }
+  // Read, counted, and refused by name. These are real keys that this build has
+  // no engine for; throwing keeps the count honest instead of making the line
+  // look like prose and vanishing. `dial_set.dart` is where the refusals live.
+  if (lower.startsWith('wireguard://') || lower.startsWith('wg://')) {
+    throw const FormatException('wireguard');
+  }
+  if (lower.startsWith('amneziawg://') || lower.startsWith('awg://')) {
+    throw const FormatException('amneziawg');
+  }
+  if (lower.startsWith('vpn://')) throw const FormatException('vpn');
   throw const FormatException('unsupported scheme');
 }
 
@@ -126,6 +162,26 @@ ParsedShareLink _parseUserHost(String scheme, String text) {
   final fragment = decodedShareFragment(text);
   return ParsedShareLink(
     scheme: scheme,
+    name: fragment.isEmpty ? host : fragment,
+    endpoint: '$host:$port',
+    raw: text,
+  );
+}
+
+/// `socks5://user:pass@host:port#name` and the `socks://` spelling of it.
+///
+/// Userinfo is optional: a SOCKS5 server that takes no credential is a valid
+/// key, and the engine dials it with `noauth`. The default port is 1080, which
+/// is the protocol's registered one; 443 belongs to neither SOCKS nor the
+/// transports above.
+ParsedShareLink _parseSocks(String text) {
+  final uri = Uri.parse(text);
+  final host = uri.host.trim();
+  if (host.isEmpty) throw const FormatException('missing host');
+  final port = uri.hasPort ? uri.port : 1080;
+  final fragment = decodedShareFragment(text);
+  return ParsedShareLink(
+    scheme: 'socks5',
     name: fragment.isEmpty ? host : fragment,
     endpoint: '$host:$port',
     raw: text,

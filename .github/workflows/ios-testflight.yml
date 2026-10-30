@@ -85,7 +85,7 @@ jobs:
           cache: true
 
       # The committed graph. build-ios.sh runs the guard again after go mod tidy,
-      # which is the graph the xcframework is actually built from (ADR 036).
+      # which is the graph the xcframework is actually built from.
       - name: License guard
         working-directory: mobile/android/hysteria-bind
         run: go test -count=1 -run 'TestLicenseGuard$' .

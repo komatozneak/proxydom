@@ -23,7 +23,7 @@ String maskTunnelIpv4(String text) {
 }
 
 final _shareSecret = RegExp(
-  r'(hysteria2|hy2|vless|trojan|ss|vmess)://[^@\s/]+@',
+  r'(hysteria2|hy2|vless|trojan|ss|vmess|socks5|socks)://[^@\s/]+@',
   caseSensitive: false,
 );
 

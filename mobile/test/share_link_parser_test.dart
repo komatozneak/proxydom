@@ -22,6 +22,48 @@ hysteria2://user:pass@203.0.113.12:443/?sni=c.example#Charlie
     expect(links[2].hy2?.profile.sni, 'c.example');
   });
 
+  // The intake side of the parity with INCY: a SOCKS5 key is a key, and one
+  // without a credential is still a key. The default port is the protocol's
+  // registered one, not the TLS port the other schemes fall back to.
+  test('parses socks5 keys, with and without a credential', () {
+    const body = '''
+socks5://alice:s3cret@203.0.113.40:1080#Socks
+socks://203.0.113.41#Anon
+''';
+    final links = parseShareSubscription(body);
+    expect(links.map((e) => e.scheme).toList(), ['socks5', 'socks5']);
+    expect(links[0].endpoint, '203.0.113.40:1080');
+    expect(links[0].name, 'Socks');
+    expect(links[1].endpoint, '203.0.113.41:1080');
+    expect(links[1].name, 'Anon');
+    expect(links[0].isHysteria2, isFalse);
+  });
+
+  // Read, counted, and refused by name. Dropping them silently made a document
+  // of three keys look like a document of one, with nothing said about the two.
+  test('a wireguard or vpn key is counted and refused, not ignored', () {
+    const body = '''
+wireguard://cHJpdmF0ZQ==@203.0.113.50:51820#Wg
+amneziawg://Y29uZmln@203.0.113.51:51820#Awg
+vpn://ZG9jdW1lbnQ=#Doc
+hysteria2://user:pass@203.0.113.52:443/?sni=a.example#Good
+''';
+    final report = inspectShareSubscription(body);
+    expect(report.links.map((e) => e.name), ['Good']);
+    expect(
+      report.skipped.map((skip) => skip.reason).toList(),
+      ['wireguard', 'amneziawg', 'vpn'],
+    );
+  });
+
+  test('an http address stays a subscription, not a proxy key', () {
+    // INCY reads `http://user:pass@host` as an HTTP proxy key. Here the same
+    // shape is a document address, and guessing between the two before the
+    // fetch would make every provider URL ambiguous.
+    expect(isShareLinkLine('http://user:pass@203.0.113.60:8080'), isFalse);
+    expect(parseShareSubscription('http://user:pass@203.0.113.60:8080'), isEmpty);
+  });
+
   test('parses vmess base64 json and legacy ss blob', () {
     final vmess = base64Encode(
       utf8.encode(

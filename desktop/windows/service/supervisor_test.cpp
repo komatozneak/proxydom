@@ -635,7 +635,10 @@ void test_an_unknown_word_is_still_a_core_exit() {
 void test_a_parked_protocol_is_refused_by_name_before_the_core() {
   Harness harness;
   ConnectRequest parked;
-  parked.uri = "trojan://secret@edge.example:443?sni=edge.example";
+  // Trojan is carried now. WireGuard is the shape that is still read and
+  // refused: the parser names it so the person is told the protocol, not a
+  // generic service fault.
+  parked.uri = "wireguard://cHJpdmF0ZQ==@edge.example:51820?sni=edge.example";
   expect(harness.supervisor.begin_connect().accepted, "parked begin");
   const auto snap = harness.supervisor.run_connect(parked, harness.cancel);
   expect(snap.code == TunnelCode::SchemeUnsupported, "a parked protocol is named as a scheme");
@@ -1603,7 +1606,7 @@ void test_an_unattributable_row_is_reported_once() {
   expect(!any_total, "and no total is invented from bytes that cannot be attributed");
 }
 
-// ADR 034. The pipe is a channel, not a lease. Only a lost client is allowed
+//. The pipe is a channel, not a lease. Only a lost client is allowed
 // to leave the tunnel up; every other reason must still stop it, so a later
 // edit cannot quietly turn another teardown path into a keep-alive.
 void test_only_a_lost_client_keeps_the_tunnel() {

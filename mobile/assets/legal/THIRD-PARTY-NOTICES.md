@@ -56,6 +56,8 @@ run in `mobile/android/hysteria-bind`:
 | `golang.org/x/time` | v0.15.0 | BSD-3-Clause | Copyright 2009 The Go Authors. |
 | `golang.zx2c4.com/wintun` | v0.0.0-20230126152724-0fa3db229ce2 | MIT | see license text |
 | `golang.zx2c4.com/wireguard` | v0.0.0-20260522210424-ecfc5a8d5446 | MIT | see license text |
+| `google.golang.org/genproto/googleapis/rpc` | v0.0.0-20260526163538-3dc84a4a5aaa | Apache-2.0 | see license text |
+| `google.golang.org/grpc` | v1.83.2 | Apache-2.0 | Copyright 2014 gRPC authors. |
 | `google.golang.org/protobuf` | v1.36.12 | BSD-3-Clause | Copyright (c) 2018 The Go Authors. All rights reserved. |
 | `gopkg.in/yaml.v3` | v3.0.1 | Apache-2.0 AND MIT | Copyright (c) 2006-2010 Kirill Simonov<br>Copyright (c) 2006-2011 Kirill Simonov<br>Copyright (c) 2011-2019 Canonical Ltd<br>Copyright 2011-2016 Canonical Ltd. |
 | `gvisor.dev/gvisor` | v0.0.0-20260701204157-69c2d17aea96 | Apache-2.0 AND BSD-3-Clause AND MIT | see license text |
@@ -249,7 +251,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### `github.com/google/btree/LICENSE`
 
-The same text applies to `github.com/riobard/go-bloom/LICENSE`, `github.com/v2fly/ss-bloomring/LICENSE`.
+The same text applies to `github.com/riobard/go-bloom/LICENSE`, `github.com/v2fly/ss-bloomring/LICENSE`, `google.golang.org/genproto/googleapis/rpc/LICENSE`, `google.golang.org/grpc/LICENSE`.
 
 ```text
                                  Apache License
@@ -1726,6 +1728,24 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+```
+
+### `google.golang.org/grpc/NOTICE.txt`
+
+```text
+Copyright 2014 gRPC authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 ```
 
 ### `google.golang.org/protobuf/LICENSE`

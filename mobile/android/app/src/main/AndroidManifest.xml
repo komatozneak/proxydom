@@ -74,6 +74,24 @@
                 <data android:scheme="teremok" android:host="import"/>
                 <data android:scheme="teremok" android:host="sub"/>
             </intent-filter>
+            <!-- Server keys shared from another app or tapped in a chat. Without
+                 this filter the only way in is copy-paste: the OS has no handler
+                 for `vless://` and the link lands in a browser that cannot open
+                 it. Only schemes this build can actually start are registered;
+                 a key it would have to refuse is not an intake path.
+                 `ss` and `socks5` have no host, so the filter matches any. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="hysteria2"/>
+                <data android:scheme="hy2"/>
+                <data android:scheme="vless"/>
+                <data android:scheme="vmess"/>
+                <data android:scheme="trojan"/>
+                <data android:scheme="ss"/>
+                <data android:scheme="socks5"/>
+            </intent-filter>
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE_PREFERENCES"/>
             </intent-filter>

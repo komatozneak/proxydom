@@ -66,7 +66,7 @@ func TestVLESSBuildsAShareDocument(t *testing.T) {
 	if refusal := cfg.shareRefusal(); refusal != "" {
 		t.Fatalf("a dialable line was refused as %q", refusal)
 	}
-	doc, err := cfg.vlessStartJSON()
+	doc, err := cfg.shareStartJSON()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +112,7 @@ func TestVLESSBuildsKCPSeed(t *testing.T) {
 	if refusal := cfg.shareRefusal(); refusal != "" {
 		t.Fatalf("a dialable kcp line was refused as %q", refusal)
 	}
-	doc, err := cfg.vlessStartJSON()
+	doc, err := cfg.shareStartJSON()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +129,7 @@ func TestVLESSBuildsKCPSeed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	bareDoc, err := bare.vlessStartJSON()
+	bareDoc, err := bare.shareStartJSON()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -190,7 +190,7 @@ func TestVLESSStatusReportsRoutingWithoutDNSHijack(t *testing.T) {
 }
 
 func TestVLESSTransportIsRefusedBeforeTheCoreStarts(t *testing.T) {
-	for _, network := range []string{"grpc", "xhttp", "quic", "httpupgrade"} {
+	for _, network := range []string{"quic", "xhttp", "splithttp"} {
 		cfg, err := parseEngineConfig([]byte(`{"outbound":{"type":"vless","server":"203.0.113.11","server_port":443,"uuid":"u","network":"` + network + `"}}`))
 		if err != nil {
 			t.Fatal(err)
@@ -201,7 +201,29 @@ func TestVLESSTransportIsRefusedBeforeTheCoreStarts(t *testing.T) {
 	}
 }
 
-// Reality arrived with xray-core, which is GPL and is not linked (ADR 036).
+// gRPC and HTTPUpgrade are dialers this core registers, so the same document
+// that used to be refused must now reach the core instead of stopping at the
+// process boundary.
+func TestShareEngineCarriesGRPCAndHTTPUpgrade(t *testing.T) {
+	for _, network := range []string{"grpc", "httpupgrade"} {
+		cfg, err := parseEngineConfig([]byte(`{"socks_listen":"127.0.0.1:18099","outbound":{"type":"vless","server":"203.0.113.11","server_port":443,"uuid":"11111111-1111-1111-1111-111111111111","network":"` + network + `","security":"tls","path":"/up","host":"cdn.example","method":"grpc-svc"}}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := cfg.shareRefusal(); got != "" {
+			t.Fatalf("%s: refusal = %q", network, got)
+		}
+		doc, err := cfg.shareStartJSON()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(doc), `"network":"`+network+`"`) {
+			t.Fatalf("%s did not reach the document: %s", network, doc)
+		}
+	}
+}
+
+// Reality arrived with xray-core, which is GPL and is not linked.
 func TestVLESSRealityIsRefused(t *testing.T) {
 	cfg, err := parseEngineConfig([]byte(`{"outbound":{"type":"vless","server":"203.0.113.11","server_port":443,"uuid":"u","security":"reality","public_key":"k"}}`))
 	if err != nil {
@@ -220,7 +242,7 @@ func TestVLESSSaysNothingMeansTCPOverTLS(t *testing.T) {
 	if cfg.Outbound.networkName() != "tcp" || cfg.Outbound.securityName() != "tls" {
 		t.Fatalf("defaults = %s/%s", cfg.Outbound.networkName(), cfg.Outbound.securityName())
 	}
-	doc, err := cfg.vlessStartJSON()
+	doc, err := cfg.shareStartJSON()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -234,7 +256,7 @@ func TestVLESSNeedsAUUID(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := cfg.vlessStartJSON(); err == nil {
+	if _, err := cfg.shareStartJSON(); err == nil {
 		t.Fatal("a vless line without a uuid was accepted")
 	}
 }
@@ -251,8 +273,107 @@ func TestHy2StartRefusesAVLESSDocument(t *testing.T) {
 	}
 }
 
-func TestOtherSchemesAreStillRefused(t *testing.T) {
-	for _, kind := range []string{"vmess", "trojan", "ss", "shadowsocks", ""} {
+// One in-process core serves five outbounds. A scheme it can describe is built
+// here; anything else is refused before a core starts, with the name the broker
+// turns into a caption.
+func TestShareEngineCarriesTheV2RayFamily(t *testing.T) {
+	cases := []struct {
+		name string
+		doc  string
+		want []string
+	}{
+		{
+			name: "vmess",
+			doc:  `{"type":"vmess","server":"203.0.113.12","server_port":443,"uuid":"11111111-2222-3333-4444-555555555555","security":"tls","sni":"cdn.example","network":"ws","path":"/vm"}`,
+			want: []string{`"protocol":"vmess"`, `"11111111-2222-3333-4444-555555555555"`, `"security":"auto"`, `"network":"ws"`, `"path":"/vm"`},
+		},
+		{
+			name: "trojan",
+			doc:  `{"type":"trojan","server":"203.0.113.13","server_port":443,"password":"pa+ss","sni":"cdn.example"}`,
+			want: []string{`"protocol":"trojan"`, `"pa+ss"`, `"tlsSettings"`},
+		},
+		{
+			name: "shadowsocks",
+			doc:  `{"type":"ss","server":"203.0.113.14","server_port":8388,"method":"chacha20-ietf-poly1305","password":"ss-pass"}`,
+			want: []string{`"protocol":"shadowsocks"`, `"method":"chacha20-ietf-poly1305"`, `"ss-pass"`, `"security":"none"`},
+		},
+		{
+			name: "socks5 without a credential",
+			doc:  `{"type":"socks5","server":"203.0.113.15","server_port":1080}`,
+			want: []string{`"protocol":"socks"`, `"address":"203.0.113.15"`, `"port":1080`},
+		},
+		{
+			name: "socks5 with a credential",
+			doc:  `{"type":"socks","server":"203.0.113.15","server_port":1080,"username":"alice","password":"s3cret"}`,
+			want: []string{`"protocol":"socks"`, `"user":"alice"`, `"pass":"s3cret"`},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg, err := parseEngineConfig([]byte(`{"socks_listen":"127.0.0.1:18099","outbound":` + tc.doc + `}`))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if cfg.rejectTransport() {
+				t.Fatalf("%s was refused by the engine dispatch", tc.name)
+			}
+			if refusal := cfg.shareRefusal(); refusal != "" {
+				t.Fatalf("%s: refusal = %q", tc.name, refusal)
+			}
+			doc, err := cfg.shareStartJSON()
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, want := range tc.want {
+				if !strings.Contains(string(doc), want) {
+					t.Fatalf("%s: document missing %s: %s", tc.name, want, doc)
+				}
+			}
+		})
+	}
+}
+
+// A SOCKS5 line has no transport and no TLS. Asking the loader about them would
+// be a question about layers the protocol does not have, and the default `tls`
+// would make a working socket look like a refused cipher.
+func TestSocksNeedsNoTransportOrTLS(t *testing.T) {
+	cfg, err := parseEngineConfig([]byte(`{"outbound":{"type":"socks5","server":"203.0.113.15","server_port":1080,"network":"quic","security":"reality"}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := cfg.shareRefusal(); got != "" {
+		t.Fatalf("socks was refused as %q", got)
+	}
+	doc, err := cfg.shareStartJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(doc), "streamSettings") {
+		t.Fatalf("socks grew a stream block: %s", doc)
+	}
+}
+
+// Each outbound names the credential it cannot work without, and refuses before
+// a core starts rather than failing after the UI has said "connecting".
+func TestShareEngineRefusesAMissingCredential(t *testing.T) {
+	for _, tc := range []struct{ kind, body string }{
+		{"vless", `{"type":"vless","server":"203.0.113.11","server_port":443}`},
+		{"vmess", `{"type":"vmess","server":"203.0.113.11","server_port":443}`},
+		{"trojan", `{"type":"trojan","server":"203.0.113.11","server_port":443}`},
+		{"shadowsocks", `{"type":"ss","server":"203.0.113.11","server_port":8388,"password":"p"}`},
+	} {
+		cfg, err := parseEngineConfig([]byte(`{"outbound":` + tc.body + `}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := cfg.shareStartJSON(); err == nil {
+			t.Fatalf("%s without a credential was accepted", tc.kind)
+		}
+	}
+}
+
+func TestUnknownSchemesAreStillRefused(t *testing.T) {
+	for _, kind := range []string{"wireguard", "amneziawg", "hysteria3", ""} {
 		cfg, err := parseEngineConfig([]byte(`{"outbound":{"type":"` + kind + `","server":"203.0.113.11","server_port":443}}`))
 		if err != nil {
 			t.Fatal(err)

@@ -37,7 +37,7 @@ jobs:
         run: ./test-sign.ps1
 
   # CI has no staged payload; the self-test plants the binaries the check must
-  # reject. build-msi.ps1 runs the same check on the real payload (ADR 036).
+  # reject. build-msi.ps1 runs the same check on the real payload.
   payload-licenses:
     name: MSI payload license check
     runs-on: windows-latest

@@ -48,7 +48,7 @@ go get -tool "golang.org/x/mobile/cmd/gobind@${GOBIND_VERSION}"
 go mod tidy
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# tidy can pull a module the committed go.mod did not have. ADR 036: do not
+# tidy can pull a module the committed go.mod did not have.: do not
 # bind an archive until the guard has read that graph. build-ios.sh has always
 # done this and this script did not, which was tolerable while the archive was
 # built by hand and became a real hole once CI started producing it.

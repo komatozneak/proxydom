@@ -1,4 +1,4 @@
-# iOS entitlements (ADR 019)
+# iOS entitlements
 
 | Target | Bundle ID | Entitlements file |
 | --- | --- | --- |

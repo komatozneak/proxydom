@@ -62,7 +62,7 @@ int main() {
   return disconnect_stops_a_session_no_window_owns();
 }
 
-// ADR 034. The tunnel outlives the window, so a session started by a window
+//. The tunnel outlives the window, so a session started by a window
 // that has since closed must still be stoppable. The command carries
 // generation 0 on purpose: the stopping side does not know which generation
 // it is stopping, and the broker skips its check for that case.

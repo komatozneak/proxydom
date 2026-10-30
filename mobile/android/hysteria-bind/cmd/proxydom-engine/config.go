@@ -56,6 +56,12 @@ type outboundConfig struct {
 	Fingerprint  string `json:"fingerprint"`
 	PublicKey    string `json:"public_key"`
 	ShortID      string `json:"short_id"`
+	// Username and Method belong to the two outbounds that need them beside a
+	// password: SOCKS5 takes a user, Shadowsocks takes a cipher name. The
+	// broker writes one flat document for every protocol, so the field is
+	// present for all of them and read only by the one it applies to.
+	Username string `json:"username"`
+	Method   string `json:"method"`
 	// Transport of a VLESS line. Without these a vless:// over WebSocket or
 	// gRPC cannot be described at all, and the row that needs them is exactly
 	// the one subscriptions hand out.
@@ -69,6 +75,10 @@ type outboundConfig struct {
 	// the core; without it here a kcp line dialled a server that was expecting
 	// obfuscation, and failed as a generic core exit.
 	KCPSeed string `json:"kcp_seed"`
+	// ServiceName is the gRPC path. Empty means the server's empty service,
+	// which is what many providers serve; the link's own word travels when it
+	// has one.
+	ServiceName string `json:"service_name"`
 }
 
 // networkName is the transport the core will be asked for. Empty means the
@@ -118,15 +128,38 @@ type engineKind int
 
 const (
 	engineHy2 engineKind = iota
-	engineVless
+	// engineShare is the in-process v2ray-core. One engine carries every
+	// outbound the share loader can describe, so adding a protocol here is a
+	// line in [engineConfig.shareOutbound], not a third start call.
+	engineShare
 )
+
+// shareScheme normalises the broker's `outbound.type` for the share engine.
+// Empty means the field was not written, which is not a scheme.
+func (c engineConfig) shareScheme() string {
+	switch strings.ToLower(strings.TrimSpace(c.Outbound.Type)) {
+	case "ss":
+		return "shadowsocks"
+	case "socks5":
+		return "socks"
+	default:
+		return strings.ToLower(strings.TrimSpace(c.Outbound.Type))
+	}
+}
+
+// socksOutbound reports whether this document has no transport and no TLS at
+// all. SOCKS5 is a bare hop: asking the loader about `tls` for it would be a
+// question about a layer the protocol does not have.
+func (c engineConfig) socksOutbound() bool {
+	return c.shareScheme() == "socks"
+}
 
 func (c engineConfig) kind() (engineKind, bool) {
 	switch strings.ToLower(strings.TrimSpace(c.Outbound.Type)) {
 	case "hysteria2", "hy2":
 		return engineHy2, true
-	case "vless":
-		return engineVless, true
+	case "vless", "vmess", "trojan", "ss", "shadowsocks", "socks", "socks5":
+		return engineShare, true
 	default:
 		return engineHy2, false
 	}
@@ -147,6 +180,9 @@ func (c engineConfig) rejectTransport() bool {
 // recognises these exact words and reports them as the refusal they are; a
 // name it does not recognise stays a plain core exit, which is honest.
 func (c engineConfig) shareRefusal() string {
+	if c.socksOutbound() {
+		return ""
+	}
 	if !hy2bind.TransportDialable(c.Outbound.networkName()) {
 		return "transport_unsupported"
 	}
@@ -220,32 +256,178 @@ func (c engineConfig) hy2StartJSON() ([]byte, error) {
 	return json.Marshal(body)
 }
 
-// vlessStartJSON is the document hy2bind.StartShare accepts.
+// shareStartJSON is the document hy2bind.StartShare accepts.
 //
 // It is the same shape the Android client builds in
 // mobile/lib/features/vpn/data/engine_share_config.dart, so one loader serves
-// both platforms and the two cannot describe a line differently. The uuid
-// stays in the document the core reads and is not returned as a log line.
-func (c engineConfig) vlessStartJSON() ([]byte, error) {
-	if c.Outbound.Server == "" || c.Outbound.ServerPort <= 0 || c.Outbound.UUID == "" {
-		return nil, fmt.Errorf("vless start failed")
+// both platforms and the two cannot describe a line differently. Credentials
+// stay in the document the core reads and are not returned as a log line.
+func (c engineConfig) shareStartJSON() ([]byte, error) {
+	if c.Outbound.Server == "" || c.Outbound.ServerPort <= 0 {
+		return nil, fmt.Errorf("share start failed")
 	}
 	// The core listens where the broker already told it to. A second constant
 	// here would drift from socks_listen and the tunnel would be pointed at a
 	// port nothing is on.
 	_, portText, err := net.SplitHostPort(c.SocksListen)
 	if err != nil {
-		return nil, fmt.Errorf("vless start failed")
+		return nil, fmt.Errorf("share start failed")
 	}
 	port, err := strconv.Atoi(portText)
 	if err != nil || port <= 0 || port > 65535 {
-		return nil, fmt.Errorf("vless start failed")
+		return nil, fmt.Errorf("share start failed")
+	}
+	outbound, err := c.shareOutbound()
+	if err != nil {
+		return nil, err
 	}
 
-	user := map[string]any{"id": c.Outbound.UUID, "encryption": "none"}
-	if c.Outbound.Flow != "" {
-		user["flow"] = c.Outbound.Flow
+	doc := map[string]any{
+		"log": map[string]any{"loglevel": "warning"},
+		"inbounds": []any{map[string]any{
+			"listen":   "127.0.0.1",
+			"port":     port,
+			"protocol": "socks",
+			"settings": map[string]any{"udp": true, "auth": "noauth"},
+			"tag":      "socks-in",
+		}},
+		"outbounds": []any{
+			outbound,
+			map[string]any{"protocol": "freedom", "tag": "direct"},
+		},
+		// Private ranges stay off the tunnel. The broker's capture routes
+		// already exclude the LAN; this keeps the core from sending them out
+		// even if a rule is added later.
+		"routing": map[string]any{
+			"domainStrategy": "AsIs",
+			"rules": []any{map[string]any{
+				"type":        "field",
+				"ip":          []string{"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "127.0.0.0/8"},
+				"outboundTag": "direct",
+			}},
+		},
 	}
+	// The TUN dialer in front of this core reads these fields; v2ray itself
+	// ignores unknown top-level keys. One policy document, two engines.
+	if len(c.DirectDomains) > 0 {
+		doc["direct_domain_suffixes"] = c.DirectDomains
+	}
+	if len(c.ForceProxyDomains) > 0 {
+		doc["force_proxy_domains"] = c.ForceProxyDomains
+	}
+	doc["udp_mode"] = c.udpMode()
+	return json.Marshal(doc)
+}
+
+// shareOutbound is the one outbound object, per protocol.
+//
+// Every branch mirrors a builder in engine_share_config.dart field for field.
+// A protocol added on one side only would describe the same line two ways
+// depending on the platform, which is the drift this function exists to stop.
+func (c engineConfig) shareOutbound() (map[string]any, error) {
+	var outbound map[string]any
+	switch c.shareScheme() {
+	case "vless":
+		if c.Outbound.UUID == "" {
+			return nil, fmt.Errorf("share start failed")
+		}
+		user := map[string]any{"id": c.Outbound.UUID, "encryption": "none"}
+		if c.Outbound.Flow != "" {
+			user["flow"] = c.Outbound.Flow
+		}
+		outbound = map[string]any{
+			"protocol": "vless",
+			"settings": map[string]any{
+				"vnext": []any{map[string]any{
+					"address": c.Outbound.Server,
+					"port":    c.Outbound.ServerPort,
+					"users":   []any{user},
+				}},
+			},
+			"streamSettings": c.shareStream(),
+		}
+	case "vmess":
+		if c.Outbound.UUID == "" {
+			return nil, fmt.Errorf("share start failed")
+		}
+		security := strings.ToLower(strings.TrimSpace(c.Outbound.Method))
+		if security == "" {
+			security = "auto"
+		}
+		outbound = map[string]any{
+			"protocol": "vmess",
+			"settings": map[string]any{
+				"vnext": []any{map[string]any{
+					"address": c.Outbound.Server,
+					"port":    c.Outbound.ServerPort,
+					"users":   []any{map[string]any{"id": c.Outbound.UUID, "security": security}},
+				}},
+			},
+			"streamSettings": c.shareStream(),
+		}
+	case "trojan":
+		if c.Outbound.Password == "" {
+			return nil, fmt.Errorf("share start failed")
+		}
+		outbound = map[string]any{
+			"protocol": "trojan",
+			"settings": map[string]any{
+				"servers": []any{map[string]any{
+					"address":  c.Outbound.Server,
+					"port":     c.Outbound.ServerPort,
+					"password": c.Outbound.Password,
+				}},
+			},
+			"streamSettings": c.shareStream(),
+		}
+	case "shadowsocks":
+		if c.Outbound.Password == "" || c.Outbound.Method == "" {
+			return nil, fmt.Errorf("share start failed")
+		}
+		// Shadowsocks carries its own AEAD; the builder on Android passes
+		// `security: none`, and the loader refuses a cipher it does not have
+		// long before a dial.
+		stream := c.shareStream()
+		stream["security"] = "none"
+		delete(stream, "tlsSettings")
+		outbound = map[string]any{
+			"protocol": "shadowsocks",
+			"settings": map[string]any{
+				"servers": []any{map[string]any{
+					"address":  c.Outbound.Server,
+					"port":     c.Outbound.ServerPort,
+					"method":   c.Outbound.Method,
+					"password": c.Outbound.Password,
+				}},
+			},
+			"streamSettings": stream,
+		}
+	case "socks":
+		// No stream block at all: SOCKS5 is a bare hop, and the loader leaves
+		// SenderSettings unset for an outbound without one.
+		server := map[string]any{
+			"address": c.Outbound.Server,
+			"port":    c.Outbound.ServerPort,
+		}
+		if c.Outbound.Username != "" || c.Outbound.Password != "" {
+			server["users"] = []any{map[string]any{
+				"user": c.Outbound.Username,
+				"pass": c.Outbound.Password,
+			}}
+		}
+		outbound = map[string]any{
+			"protocol": "socks",
+			"settings": map[string]any{"servers": []any{server}},
+		}
+	default:
+		return nil, fmt.Errorf("share start failed")
+	}
+	outbound["tag"] = "proxy"
+	return outbound, nil
+}
+
+// shareStream is the transport and TLS block every protocol but SOCKS5 uses.
+func (c engineConfig) shareStream() map[string]any {
 	stream := map[string]any{
 		"network":  c.Outbound.networkName(),
 		"security": c.Outbound.securityName(),
@@ -278,53 +460,36 @@ func (c engineConfig) vlessStartJSON() ([]byte, error) {
 			stream["kcpSettings"] = map[string]any{"seed": seed}
 		}
 	}
+	if c.Outbound.networkName() == "grpc" {
+		grpc := map[string]any{}
+		if name := strings.TrimSpace(c.Outbound.ServiceName); name != "" {
+			grpc["serviceName"] = name
+		}
+		stream["grpcSettings"] = grpc
+	}
+	if c.Outbound.networkName() == "httpupgrade" {
+		upgrade := map[string]any{}
+		if c.Outbound.Path != "" {
+			upgrade["path"] = c.Outbound.Path
+		}
+		if c.Outbound.Host != "" {
+			upgrade["host"] = c.Outbound.Host
+		}
+		stream["httpupgradeSettings"] = upgrade
+	}
+	return stream
+}
 
-	doc := map[string]any{
-		"log": map[string]any{"loglevel": "warning"},
-		"inbounds": []any{map[string]any{
-			"listen":   "127.0.0.1",
-			"port":     port,
-			"protocol": "socks",
-			"settings": map[string]any{"udp": true, "auth": "noauth"},
-			"tag":      "socks-in",
-		}},
-		"outbounds": []any{
-			map[string]any{
-				"protocol": "vless",
-				"tag":      "proxy",
-				"settings": map[string]any{
-					"vnext": []any{map[string]any{
-						"address": c.Outbound.Server,
-						"port":    c.Outbound.ServerPort,
-						"users":   []any{user},
-					}},
-				},
-				"streamSettings": stream,
-			},
-			map[string]any{"protocol": "freedom", "tag": "direct"},
-		},
-		// Private ranges stay off the tunnel. The broker's capture routes
-		// already exclude the LAN; this keeps the core from sending them out
-		// even if a rule is added later.
-		"routing": map[string]any{
-			"domainStrategy": "AsIs",
-			"rules": []any{map[string]any{
-				"type":        "field",
-				"ip":          []string{"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "127.0.0.0/8"},
-				"outboundTag": "direct",
-			}},
-		},
+// echoesSecret reports whether a core error quotes a credential from this
+// document. The broker journal is a log, and a uuid or password in it is a leak
+// with a line number next to it.
+func (c engineConfig) echoesSecret(msg string) bool {
+	for _, secret := range []string{c.Outbound.UUID, c.Outbound.Password, c.Outbound.Username} {
+		if secret != "" && strings.Contains(msg, secret) {
+			return true
+		}
 	}
-	// The TUN dialer in front of this core reads these fields; v2ray itself
-	// ignores unknown top-level keys. One policy document, two engines.
-	if len(c.DirectDomains) > 0 {
-		doc["direct_domain_suffixes"] = c.DirectDomains
-	}
-	if len(c.ForceProxyDomains) > 0 {
-		doc["force_proxy_domains"] = c.ForceProxyDomains
-	}
-	doc["udp_mode"] = c.udpMode()
-	return json.Marshal(doc)
+	return false
 }
 
 // statusLine names what reached the process. It has counts, not domain names

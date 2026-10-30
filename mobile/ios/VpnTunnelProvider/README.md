@@ -34,7 +34,7 @@ Until the xcframework exists, Xcode/CI cannot finish the VpnTunnelProvider link.
 
 `setTunnelNetworkSettings` (default IPv4 route, DNS 1.1.1.1/8.8.8.8, `tunnelRemoteAddress` = Hy2 node IP) **and** `Hy2bind.Start` **and** `StartPacketTun` **and** `packetFlow` pump. Not SOCKS-only.
 
-**Sites split (ADR 025):** Flutter sends exact custom then catalog host groups.
+**Sites split:** Flutter sends exact custom then catalog host groups.
 They are resolved at tunnel start to prioritized IPv4 `/32` and IPv6 `/128`
 **`excludedRoutes`** (after reserved Hy2 endpoint + API master excludes).
 **Never** put `direct_domain_suffixes` into `Hy2bindStart` on iOS. Reconnect

@@ -22,6 +22,13 @@ void main() {
     }
   });
 
+  test('the parked set is only what no engine here can dial', () {
+    // Named rather than inferred: a scheme that gains an engine has to leave
+    // this set in the same commit, or the badge keeps saying "unsupported" for
+    // a line that starts.
+    expect(kParkedSchemes, {'wireguard', 'amneziawg', 'vpn'});
+  });
+
   test('VLESS is admitted on Android and Windows, refused on iOS', () {
     expect(canDialSchemeOn(DialTarget.android, 'vless'), isTrue);
     expect(canDialSchemeOn(DialTarget.windows, 'vless'), isTrue);
@@ -32,13 +39,58 @@ void main() {
     expect(windowsDialScheme('hy2'), isTrue);
   });
 
+  // One in-process core carries the whole v2ray family. A protocol the engine
+  // builds a document for and the gate still refuses is the least useful kind
+  // of gap: the key imports, the row looks active, and the start is what fails.
+  test('VMess, Trojan, Shadowsocks and SOCKS5 follow the core, not the scheme',
+      () {
+    for (final scheme in ['vmess', 'trojan', 'ss', 'socks5', 'socks']) {
+      expect(canDialSchemeOn(DialTarget.android, scheme), isTrue,
+          reason: scheme);
+      expect(canDialSchemeOn(DialTarget.windows, scheme), isTrue,
+          reason: scheme);
+      expect(canDialSchemeOn(DialTarget.ios, scheme), isFalse, reason: scheme);
+      expect(canDialSchemeOn(DialTarget.other, scheme), isFalse,
+          reason: scheme);
+      expect(windowsDialScheme(scheme), isTrue, reason: scheme);
+    }
+  });
+
+  test('a socks5 key reaches the engine builder', () {
+    final link = parseShareLink('socks5://1.2.3.4:1080#S');
+    expect(link.scheme, 'socks5');
+    expect(link.endpoint, '1.2.3.4:1080');
+    expect(canDialLinkOn(DialTarget.android, link), isTrue);
+    expect(canDialLinkOn(DialTarget.windows, link), isTrue);
+    expect(canDialLinkOn(DialTarget.ios, link), isFalse);
+  });
+
+  test('a vmess key is admitted and a wireguard key is not', () {
+    final vmess = parseShareLink(
+      'vmess://eyJhZGQiOiIxLjIuMy40IiwicG9ydCI6NDQzLCJpZCI6InUifQ==',
+    );
+    expect(canDialLinkOn(DialTarget.android, vmess), isTrue);
+    expect(canDialLinkOn(DialTarget.windows, vmess), isTrue);
+    expect(canDialLinkOn(DialTarget.ios, vmess), isFalse);
+    for (final parked in [
+      'wireguard://key@1.2.3.4:51820',
+      'amneziawg://key@1.2.3.4:51820',
+      'vpn://doc',
+    ]) {
+      expect(() => parseShareLink(parked), throwsFormatException,
+          reason: parked);
+    }
+  });
+
   test('case and surrounding whitespace do not decide the gate', () {
     expect(canDialSchemeOn(DialTarget.android, ' VLESS '), isTrue);
     expect(canDialSchemeOn(DialTarget.ios, ' Vless '), isFalse);
     expect(canDialSchemeOn(DialTarget.windows, ' HY2 '), isTrue);
-    expect(canDialSchemeOn(DialTarget.android, ' Trojan '), isFalse);
-    expect(canDialSchemeOn(DialTarget.android, ' VMESS '), isFalse);
-    expect(canDialSchemeOn(DialTarget.android, ' SS '), isFalse);
+    expect(canDialSchemeOn(DialTarget.android, ' Trojan '), isTrue);
+    expect(canDialSchemeOn(DialTarget.android, ' VMESS '), isTrue);
+    expect(canDialSchemeOn(DialTarget.android, ' SS '), isTrue);
+    expect(canDialSchemeOn(DialTarget.ios, ' Trojan '), isFalse);
+    expect(canDialSchemeOn(DialTarget.android, ' WireGuard '), isFalse);
   });
 
   test('a vless Reality line does not pass canDialLink on Android', () {
@@ -76,13 +128,26 @@ void main() {
     expect(canDialLink(link), isFalse);
   });
 
-  // A transport the engine cannot describe stays inactive on Windows too. The
-  // broker parses gRPC and XHTTP happily; the core that carries VLESS cannot
-  // dial them, and a line that taps and times out is worse than a neutral badge.
-  test('a vless gRPC line stays inactive on Windows', () {
+  // gRPC and HTTPUpgrade are dialers the in-process core registers, so a line
+  // that carries them is a working line: refusing it would hide a node the
+  // engine can start.
+  test('a vless gRPC line is dialable where the core runs', () {
     const raw =
         'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
         '?security=tls&type=grpc&serviceName=grpc&sni=front.example#G';
+    final link = parseShareLink(raw);
+    expect(canDialSchemeOn(DialTarget.windows, link.scheme), isTrue);
+    expect(canDialLinkOn(DialTarget.windows, link), isTrue);
+    expect(canDialLinkOn(DialTarget.android, link), isTrue);
+    expect(canDialLinkOn(DialTarget.ios, link), isFalse);
+  });
+
+  // XHTTP is the one that arrived with Xray only. Nothing in this build can
+  // dial it, so the line stays a neutral badge instead of a failed start.
+  test('a vless XHTTP line stays inactive', () {
+    const raw =
+        'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
+        '?security=tls&type=xhttp&path=%2Fx&sni=front.example#X';
     final link = parseShareLink(raw);
     expect(canDialSchemeOn(DialTarget.windows, link.scheme), isTrue);
     expect(canDialLinkOn(DialTarget.windows, link), isFalse);

@@ -127,12 +127,13 @@ void main() {
     debugDefaultTargetPlatformOverride = TargetPlatform.windows;
     try {
       await _pumpImport(tester);
-      // gRPC is a transport the core that carries VLESS cannot dial. The line
-      // is refused as a line, not as a scheme — VLESS itself now runs here.
+      // XHTTP is the transport only Xray has. The line is refused as a line,
+      // not as a scheme — VLESS itself runs here, and so do gRPC and
+      // HTTPUpgrade, which this core does carry.
       await tester.enterText(
         find.byType(TextField),
         'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
-        '?security=tls&type=grpc&serviceName=grpc#A',
+        '?security=tls&type=xhttp&path=%2Fx#A',
       );
       await tester.pump();
 
@@ -195,7 +196,10 @@ void main() {
     }
   });
 
-  testWidgets('a lone parked key is refused on Android', (tester) async {
+  // Trojan used to be a parked scheme: it imported and could never start. The
+  // in-process core carries it now, so a lone key is a usable node, not a row
+  // with a neutral badge.
+  testWidgets('a lone trojan key is dialable on Android', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     try {
       await _pumpImport(tester);
@@ -209,9 +213,9 @@ void main() {
         find.text(
           'Не удалось добавить узел: этот протокол не запускается на этом устройстве.',
         ),
-        findsOneWidget,
+        findsNothing,
       );
-      expect(_saveEnabled(tester), isFalse);
+      expect(_saveEnabled(tester), isTrue);
     } finally {
       debugDefaultTargetPlatformOverride = null;
     }

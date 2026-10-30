@@ -47,7 +47,7 @@ func main() {
 		os.Exit(1)
 	}
 	kind, _ := cfg.kind()
-	if kind == engineVless {
+	if kind == engineShare {
 		if refusal := cfg.shareRefusal(); refusal != "" {
 			// Same mechanism, and deliberately before a core is started: the
 			// person is told which part of their line is unsupported instead of
@@ -55,17 +55,17 @@ func main() {
 			log.Printf("error %s", refusal)
 			os.Exit(1)
 		}
-		start, err := cfg.vlessStartJSON()
+		start, err := cfg.shareStartJSON()
 		if err != nil {
-			log.Printf("vless start failed")
+			log.Printf("share start failed")
 			os.Exit(1)
 		}
 		if msg := hy2bind.StartShare(string(start)); msg != "" {
-			// The core's error can echo the uuid. The broker log must not.
-			if strings.Contains(msg, cfg.Outbound.UUID) || cfg.Outbound.UUID == "" {
-				log.Printf("vless start failed")
+			// The core's error can echo a credential. The broker log must not.
+			if cfg.echoesSecret(msg) {
+				log.Printf("share start failed")
 			} else {
-				log.Printf("vless start failed: %s", msg)
+				log.Printf("share start failed: %s", msg)
 			}
 			os.Exit(1)
 		}
@@ -116,7 +116,7 @@ func startTUN(cfg engineConfig) error {
 	// read loop starts, because neither survives a proxy swap.
 	kind, _ := cfg.kind()
 	msg := ""
-	if kind == engineVless {
+	if kind == engineShare {
 		msg = hy2bind.StartShareTunStack()
 	} else {
 		msg = hy2bind.StartTunStack()

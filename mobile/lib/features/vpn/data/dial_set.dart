@@ -1,18 +1,21 @@
-/// The Imported-Document Dial Set (ADR 035).
+/// The Imported-Document Dial Set.
 ///
 /// Two dial sets exist and must not be confused:
 ///
 /// * **Catalog Dial Set** — the nodes the catalog and the bot serve. Those are
-///   Hysteria2 only (ADR 018) and are not decided here.
+///   Hysteria2 only and are not decided here.
 /// * **Imported-Document Dial Set** — lines the person pasted, or pulled from a
 ///   foreign HTTPS document. This file is the single authority for what may
 ///   start there, per platform.
 ///
-/// The parser stays wider than this set (ADR 033 §3, ADR 035 §5): Trojan,
-/// Shadowsocks, and VMess are still read and still kept in the document, they
-/// simply cannot start. VLESS is admitted only where the engine can describe
-/// the line. Reality and XHTTP are not in v2ray-core (ADR 036), so
-/// [canDialLinkOn] refuses them even where the scheme itself is allowed.
+/// The parser stays wider than this set: a key this build cannot carry is still
+/// read, still counted, and still kept in the document; it simply cannot start.
+/// Admitted here are Hysteria2 on every OS and the five the in-process
+/// `v2fly/v2ray-core` (MIT) outbound builder can describe — VLESS, VMess,
+/// Trojan, Shadowsocks and SOCKS5 — on the platforms where that core runs.
+/// Reality and XHTTP are not in that core, so [canDialLinkOn] refuses them even
+/// where the scheme itself is allowed; [kParkedSchemes] names the rest by
+/// protocol.
 library;
 
 import 'package:flutter/foundation.dart';
@@ -42,28 +45,42 @@ DialTarget get dialTarget {
 }
 
 /// Hysteria2, including `obfs=salamander` and port hopping — options of the
-/// protocol, not separate protocols (ADR 033 §5).
+/// protocol, not separate protocols.
 const _hysteriaSchemes = <String>{'hysteria2', 'hy2'};
 
-/// VLESS. Reality is not a separate scheme; [canDialLinkOn] refuses it.
-const _vlessSchemes = <String>{'vless'};
+/// Everything the in-process v2ray-core outbound builder can describe.
+///
+/// One list, because one engine serves all five on both platforms: Android runs
+/// it in-process inside hy2bind, and the Windows broker starts the same core as
+/// its tunnel engine. `socks` is accepted beside `socks5` so a line written
+/// either way reaches the same gate.
+const _v2raySchemes = <String>{
+  'vless',
+  'vmess',
+  'trojan',
+  'ss',
+  'socks5',
+  'socks',
+};
 
-/// Schemes the parser reads but no platform may start (ADR 035 §5).
-const kParkedSchemes = <String>{'vmess', 'trojan', 'ss'};
+/// Keys this build reads but never starts.
+///
+/// WireGuard and AmneziaWG need a userspace tunnel the v2ray-core outbound
+/// builder has no way to express, and `vpn://` is a container that expands to
+/// another key rather than a dialer of its own. Naming them keeps the badge
+/// honest: the row says which protocol it is, instead of looking unsupported.
+const kParkedSchemes = <String>{'wireguard', 'amneziawg', 'vpn'};
 
 /// Whether [scheme] may start a system tunnel on [target].
 ///
-/// Hysteria2 on every OS. VLESS on Android and Windows: Android runs
-/// v2ray-core in-process inside hy2bind, and the Windows broker starts the same
-/// MIT core as its tunnel engine. Both are the engine from ADR 035/036.
-///
-/// iOS has no VLESS engine and stays false. That is the only platform left, and
-/// it comes off with its own engine, in its own task — not in this file ahead
-/// of it.
+/// Hysteria2 on every OS. The v2ray-core family on Android and Windows only:
+/// those are the two platforms that link the core, and iOS has no engine for
+/// them yet. An iOS build keeps the neutral badge rather than offering a start
+/// that would fail at the process boundary.
 bool canDialSchemeOn(DialTarget target, String scheme) {
   final name = scheme.trim().toLowerCase();
   if (_hysteriaSchemes.contains(name)) return true;
-  if (_vlessSchemes.contains(name)) {
+  if (_v2raySchemes.contains(name)) {
     return target == DialTarget.android || target == DialTarget.windows;
   }
   return false;
@@ -72,10 +89,8 @@ bool canDialSchemeOn(DialTarget target, String scheme) {
 /// Whether [scheme] may start on the platform this build is running on.
 bool canDialScheme(String scheme) => canDialSchemeOn(dialTarget, scheme);
 
-/// The Windows broker's answer. Moved here from `ios_store_gates.dart` so the
-/// gate has one home. The broker parses the raw URI itself; this mirrors the
-/// Flutter gate so the two cannot drift. Today that answer is Hysteria2 and
-/// VLESS over TCP or WebSocket.
+/// The Windows broker's answer. The broker parses the raw URI itself; this
+/// mirrors the Flutter gate so the two cannot drift.
 bool windowsDialScheme(String scheme) =>
     canDialSchemeOn(DialTarget.windows, scheme);
 

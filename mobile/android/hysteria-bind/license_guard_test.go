@@ -27,7 +27,7 @@ type reviewedLicense struct {
 // forbidden license or an additional restriction found in the module's files.
 var reviewedLicenses = map[string]reviewedLicense{}
 
-// licenseGuardTargets are the builds that ship hy2bind (ADR 036). gomobile
+// licenseGuardTargets are the builds that ship hy2bind. gomobile
 // links its own bind runtime next to the package, so those packages are
 // walked as well: they end up in the AAR and the xcframework.
 var licenseGuardTargets = []struct {
@@ -79,7 +79,7 @@ var allowedRules = []licenseRule{
 }
 
 // restrictionMarkers are terms layered on top of a license. Their presence
-// fails the module even when the base license is allowed (ADR 036 §1).
+// fails the module even when the base license is allowed.
 var restrictionMarkers = []string{
 	"no derivative work may use the name",
 	"non-commercial",
@@ -198,7 +198,8 @@ func judgeModule(path string, files []licenseFile) (classes, problems []string) 
 	}
 	if r, ok := reviewedLicenses[path]; ok {
 		if !allowedLicenses[r.spdx] {
-			return classes, []string{fmt.Sprintf("reviewedLicenses names %s, which ADR 036 does not allow", r.spdx)}
+			return classes, []string{fmt.Sprintf(
+				"reviewedLicenses names %s, which this build does not allow", r.spdx)}
 		}
 		return []string{r.spdx}, nil
 	}

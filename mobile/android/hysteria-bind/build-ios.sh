@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build Hy2bind.xcframework for iOS Packet Tunnel (ADR 019).
+# Build Hy2bind.xcframework for iOS Packet Tunnel.
 # Run on macOS with Go + Xcode + gomobile. Pin matches Android build-aar.sh.
 #
 #   HYSTERIA_TAG=v2.13.0 bash build-ios.sh
@@ -25,7 +25,7 @@ fi
 go get "github.com/apernet/hysteria/core/v2@${HYSTERIA_TAG}"
 go get -tool golang.org/x/mobile/cmd/gobind
 go mod tidy
-# tidy can pull a module the committed go.mod did not have. ADR 036: do not
+# tidy can pull a module the committed go.mod did not have.: do not
 # bind an xcframework until the guard has read that graph. A known violation
 # warns and the test still passes; copyleft without an entry stops the build.
 go test -count=1 -run 'TestLicenseGuard$' .

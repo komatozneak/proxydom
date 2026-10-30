@@ -25,6 +25,8 @@ import (
 	vmess "github.com/v2fly/v2ray-core/v5/proxy/vmess"
 	vmessout "github.com/v2fly/v2ray-core/v5/proxy/vmess/outbound"
 	"github.com/v2fly/v2ray-core/v5/transport/internet"
+	"github.com/v2fly/v2ray-core/v5/transport/internet/grpc"
+	"github.com/v2fly/v2ray-core/v5/transport/internet/httpupgrade"
 	"github.com/v2fly/v2ray-core/v5/transport/internet/kcp"
 	"github.com/v2fly/v2ray-core/v5/transport/internet/tls"
 	utls "github.com/v2fly/v2ray-core/v5/transport/internet/tls/utls"
@@ -72,6 +74,10 @@ type shareOutbound struct {
 			Port     int    `json:"port"`
 			Password string `json:"password"`
 			Method   string `json:"method"`
+			Users    []struct {
+				User string `json:"user"`
+				Pass string `json:"pass"`
+			} `json:"users"`
 		} `json:"servers"`
 	} `json:"settings"`
 	Stream *shareStream `json:"streamSettings"`
@@ -100,6 +106,14 @@ type shareStream struct {
 		Path    string            `json:"path"`
 		Headers map[string]string `json:"headers"`
 	} `json:"wsSettings"`
+	GRPC *struct {
+		ServiceName string `json:"serviceName"`
+		MultiMode   bool   `json:"multiMode"`
+	} `json:"grpcSettings"`
+	HTTPUpgrade *struct {
+		Path string `json:"path"`
+		Host string `json:"host"`
+	} `json:"httpupgradeSettings"`
 	KCP *struct {
 		Seed string `json:"seed"`
 	} `json:"kcpSettings"`
@@ -226,6 +240,26 @@ func shareProxy(item shareOutbound) (*anypb.Any, error) {
 				}),
 			}},
 		}}}), nil
+	case "socks":
+		// SOCKS5 outbound. No credential is a valid server: the account is empty
+		// and the core offers `noauth`. A user with an empty password is valid
+		// too, and the account keeps the empty string rather than inventing one.
+		if len(item.Settings.Servers) == 0 {
+			return nil, fmt.Errorf("socks server missing")
+		}
+		server := item.Settings.Servers[0]
+		account := &socks.Account{}
+		if len(server.Users) > 0 {
+			account.Username = server.Users[0].User
+			account.Password = server.Users[0].Pass
+		}
+		return serial.ToTypedMessage(&socks.ClientConfig{Server: []*protocol.ServerEndpoint{{
+			Address: net.NewIPOrDomain(net.ParseAddress(server.Address)),
+			Port:    uint32(server.Port),
+			User: []*protocol.User{{
+				Account: serial.ToTypedMessage(account),
+			}},
+		}}}), nil
 	default:
 		return nil, fmt.Errorf("unsupported outbound %q", item.Protocol)
 	}
@@ -299,6 +333,10 @@ func engineTransport(network string) (string, error) {
 		return "websocket", nil
 	case "kcp", "mkcp":
 		return "mkcp", nil
+	case "grpc":
+		return "grpc", nil
+	case "httpupgrade":
+		return "httpupgrade", nil
 	default:
 		return "", fmt.Errorf("unsupported transport %q", network)
 	}
@@ -352,6 +390,28 @@ func shareStreamConfig(stream *shareStream) (*internet.StreamConfig, error) {
 		cfg.TransportSettings = []*internet.TransportConfig{{
 			ProtocolName: "websocket",
 			Settings:     ws,
+		}}
+	}
+	if network == "grpc" {
+		grpcCfg := &grpc.Config{}
+		if stream.GRPC != nil {
+			grpcCfg.ServiceName = stream.GRPC.ServiceName
+			grpcCfg.Host = stream.GRPC.ServiceName
+		}
+		cfg.TransportSettings = []*internet.TransportConfig{{
+			ProtocolName: "grpc",
+			Settings:     serial.ToTypedMessage(grpcCfg),
+		}}
+	}
+	if network == "httpupgrade" {
+		upgradeCfg := &httpupgrade.Config{}
+		if stream.HTTPUpgrade != nil {
+			upgradeCfg.Path = stream.HTTPUpgrade.Path
+			upgradeCfg.Host = stream.HTTPUpgrade.Host
+		}
+		cfg.TransportSettings = []*internet.TransportConfig{{
+			ProtocolName: "httpupgrade",
+			Settings:     serial.ToTypedMessage(upgradeCfg),
 		}}
 	}
 	switch stream.Security {

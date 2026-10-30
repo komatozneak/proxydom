@@ -1,4 +1,4 @@
-# Visible per-machine MSI for Прокси Дом (ADR 023 / ADR 029).
+# Visible per-machine MSI for Прокси Дом.
 # Humans get the Russian WiX wizard. Pass -Quiet only for CI.
 #
 # -Version is mandatory on purpose. It used to carry a literal default, the

@@ -64,8 +64,10 @@ func TestWindowsEngineConfiguresTheTunBeforeTheShareStackReads(t *testing.T) {
 			open, assign, share)
 	}
 	// The choice has to be made by the scheme, or a VLESS session binds the Hy2
-	// dialer and a Hy2 session binds a SOCKS port nothing is listening on.
-	if !strings.Contains(src, "kind == engineVless") {
+	// dialer and a Hy2 session binds a SOCKS port nothing is listening on. The
+	// share engine carries the whole v2ray family now, so the marker is the
+	// engine rather than the one protocol that used to be the only member.
+	if !strings.Contains(src, "kind == engineShare") {
 		t.Fatal("the engine no longer picks its tun stack by the scheme it started")
 	}
 }

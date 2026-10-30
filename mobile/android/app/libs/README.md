@@ -4,7 +4,7 @@ The APK links only `hysteria-client.aar`, built by `mobile/android/hysteria-bind
 
 `libXray.aar` was removed. Every `libgojni.so` inside it contained
 `github.com/sagernet/sing` and `github.com/sagernet/sing-shadowsocks`
-(GPL-3.0-or-later, ADR 036). Do not download it and do not put it on the Gradle
+. Do not download it and do not put it on the Gradle
 classpath. `mobile/android/app/libs/*.aar` is gitignored. The one AAR still
 tracked, `trusttunnel-client-android.aar`, is not on the Gradle classpath.
 

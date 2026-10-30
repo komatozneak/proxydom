@@ -118,7 +118,7 @@ int main() {
 
   ShareLine line;
   error.clear();
-  expect(!parse_share_line("trojan://pass@host:443", line, error), "reject trojan");
+  expect(!parse_share_line("vpn://container@host:443", line, error), "reject a container as a key");
   expect(!parse_share_line("vless://uuid@[2001:db8::1]:443", line, error), "reject ipv6 host");
 
   const std::string hy2 =
@@ -324,6 +324,38 @@ int main() {
   const auto kcp_config = build_engine_config(kcp, "203.0.113.11", {}, {}, "proxy_all", 0, "");
   expect(kcp_config.find("\"kcp_seed\":\"obfuscate-me\"") != std::string::npos, "the kcp seed reaches the engine");
 
+  // gRPC and HTTPUpgrade are dialers the in-process core registers. A line that
+  // carries them must reach the engine with the settings the core needs, not
+  // stop at the broker as an unknown transport.
+  ShareLine grpc;
+  error.clear();
+  expect(parse_share_line(
+             "vless://11111111-2222-3333-4444-555555555555@edge.example:443"
+             "?security=tls&type=grpc&serviceName=grpcsvc&sni=front.example",
+             grpc, error),
+         "parse a grpc vless line");
+  expect(grpc.service_name == "grpcsvc", "the grpc service name is read");
+  const auto grpc_config = build_engine_config(grpc, "203.0.113.11", {}, {}, "proxy_all", 0, "");
+  expect(grpc_config.find("\"network\":\"grpc\"") != std::string::npos,
+         "grpc reaches the engine as its own transport");
+  expect(grpc_config.find("\"service_name\":\"grpcsvc\"") != std::string::npos,
+         "the grpc service name reaches the engine");
+
+  ShareLine upgrade;
+  error.clear();
+  expect(parse_share_line(
+             "vless://11111111-2222-3333-4444-555555555555@edge.example:443"
+             "?security=tls&type=httpupgrade&path=%2Fup&host=cdn.example&sni=front.example",
+             upgrade, error),
+         "parse an httpupgrade vless line");
+  const auto upgrade_config = build_engine_config(upgrade, "203.0.113.11", {}, {}, "proxy_all", 0, "");
+  expect(upgrade_config.find("\"network\":\"httpupgrade\"") != std::string::npos,
+         "httpupgrade reaches the engine as its own transport");
+  expect(upgrade_config.find("\"path\":\"/up\"") != std::string::npos,
+         "the httpupgrade path reaches the engine");
+  expect(upgrade_config.find("\"host\":\"cdn.example\"") != std::string::npos,
+         "the httpupgrade host reaches the engine");
+
   // A line with no protocol in it is malformed, which is not the same complaint
   // as a protocol we do not carry. Blaming the protocol would send the person
   // looking for the wrong thing.
@@ -333,8 +365,80 @@ int main() {
   expect(error == "profile", "a malformed line is not a scheme complaint");
   ShareLine parked;
   error.clear();
-  expect(!parse_share_line("trojan://pass@host:443", parked, error), "trojan is refused");
+  expect(!parse_share_line("wireguard://key@host:51820", parked, error), "wireguard is refused");
   expect(error == "scheme", "a parked protocol is named as a scheme complaint");
+  error.clear();
+  expect(!parse_share_line("vpn://BASE64DOCUMENT", parked, error), "a vpn container is refused by name");
+  expect(error == "scheme", "a container is not a dialer");
+
+  // One Go loader serves Android and Windows, so the broker parses the same four
+  // extra schemes the Dart builder writes. A protocol missing here would work on
+  // a phone and fail on the desktop with no reason given.
+  ShareLine vmess;
+  error.clear();
+  const std::string vmess_uri =
+      "vmess://eyJ2IjoiMiIsInBzIjoidm0iLCJhZGQiOiJlZGdlLmV4YW1wbGUiLCJwb3J0IjoiNDQzIiwiaWQiOiIxMTEx"
+      "MTExMS0yMjIyLTMzMzMtNDQ0NC01NTU1NTU1NTU1NTUiLCJuZXQiOiJ3cyIsInBhdGgiOiIvdm0iLCJob3N0IjoiY2Ru"
+      "LmV4YW1wbGUiLCJ0bHMiOiJ0bHMiLCJzbmkiOiJzbmkuZXhhbXBsZSIsInNjeSI6ImFlcy0xMjgtZ2NtIn0=";
+  expect(parse_share_line(vmess_uri, vmess, error), "parse a vmess key");
+  expect(vmess.host == "edge.example", "vmess address comes out of the json");
+  expect(vmess.port == 443, "vmess port comes out of a string field");
+  expect(vmess.uuid == "11111111-2222-3333-4444-555555555555", "vmess uuid");
+  expect(vmess.network == "ws" && vmess.path == "/vm" && vmess.ws_host == "cdn.example", "vmess transport");
+  expect(vmess.sni == "sni.example", "vmess sni");
+  expect(vmess.method == "aes-128-gcm", "vmess cipher");
+  const auto vmess_config = build_engine_config(vmess, "203.0.113.12", {}, {}, "proxy_all", 0, "");
+  expect(vmess_config.find("\"type\":\"vmess\"") != std::string::npos, "vmess is named for the engine");
+  expect(vmess_config.find("\"uuid\":\"11111111-2222-3333-4444-555555555555\"") != std::string::npos,
+         "vmess uuid reaches the engine");
+  expect(vmess_config.find("\"method\":\"aes-128-gcm\"") != std::string::npos, "vmess cipher reaches the engine");
+  expect(vmess_config.find("\"security\":\"tls\"") != std::string::npos, "vmess tls");
+
+  ShareLine trojan;
+  error.clear();
+  expect(parse_share_line("trojan://pa%2Bss@edge.example:8443?security=tls&sni=front.example&type=ws&path=%2Ft",
+                          trojan, error),
+         "parse a trojan key");
+  expect(trojan.password == "pa+ss", "trojan password is percent-decoded");
+  expect(trojan.port == 8443, "trojan port");
+  expect(trojan.network == "ws" && trojan.path == "/t", "trojan transport");
+  const auto trojan_config = build_engine_config(trojan, "203.0.113.13", {}, {}, "proxy_all", 0, "");
+  expect(trojan_config.find("\"type\":\"trojan\"") != std::string::npos, "trojan is named for the engine");
+  expect(trojan_config.find("\"password\":\"pa+ss\"") != std::string::npos, "trojan password reaches the engine");
+
+  ShareLine ss;
+  error.clear();
+  expect(parse_share_line("ss://YWVzLTI1Ni1nY206cGFzcw==@1.2.3.4:8388#Node", ss, error),
+         "parse a SIP002 shadowsocks key");
+  expect(ss.method == "aes-256-gcm", "shadowsocks cipher");
+  expect(ss.password == "pass", "shadowsocks password");
+  expect(ss.port == 8388, "shadowsocks port");
+  const auto ss_config = build_engine_config(ss, "203.0.113.14", {}, {}, "proxy_all", 0, "");
+  expect(ss_config.find("\"type\":\"ss\"") != std::string::npos, "shadowsocks is named for the engine");
+  expect(ss_config.find("\"method\":\"aes-256-gcm\"") != std::string::npos, "the cipher reaches the engine");
+  // The legacy spelling puts the whole `method:pass@host:port` in base64.
+  ShareLine legacy_ss;
+  error.clear();
+  expect(parse_share_line("ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTpwd0AxLjIuMy40OjgzODg=", legacy_ss, error),
+         "parse a legacy shadowsocks key");
+  expect(legacy_ss.host == "1.2.3.4" && legacy_ss.port == 8388, "the legacy key still yields an address");
+  expect(legacy_ss.method == "chacha20-ietf-poly1305" && legacy_ss.password == "pw", "the legacy key yields a cipher");
+
+  ShareLine socks;
+  error.clear();
+  expect(parse_share_line("socks5://alice:s3cret@1.2.3.4:1080#S", socks, error), "parse a socks5 key");
+  expect(socks.username == "alice" && socks.password == "s3cret", "socks5 credential");
+  const auto socks_config = build_engine_config(socks, "203.0.113.15", {}, {}, "proxy_all", 0, "");
+  expect(socks_config.find("\"type\":\"socks5\"") != std::string::npos, "socks5 is named for the engine");
+  expect(socks_config.find("\"username\":\"alice\"") != std::string::npos, "socks5 user reaches the engine");
+  expect(socks_config.find("\"streamSettings\"") == std::string::npos, "socks5 has no stream block");
+  // No credential is a valid key: the core offers noauth.
+  ShareLine anon_socks;
+  error.clear();
+  expect(parse_share_line("socks://1.2.3.4", anon_socks, error), "a socks key without auth parses");
+  expect(anon_socks.port == 1080, "socks defaults to its registered port");
+  const auto anon_config = build_engine_config(anon_socks, "203.0.113.15", {}, {}, "proxy_all", 0, "");
+  expect(anon_config.find("\"username\"") == std::string::npos, "no invented credential");
 
   const auto restored = state_event_v2(7, "idle", "", "", true);
   expect(restored.find("\"cleanup_verified\":true") != std::string::npos, "verified idle flag");

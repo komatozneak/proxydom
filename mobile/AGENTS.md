@@ -2,9 +2,8 @@
 
 Rules for AI agents working in `mobile/`. Complements root `AGENTS.md`.
 
-> Decision records (ADR numbers) referenced below live in a private design log and
-> are not published here. Every rule is stated in full, so nothing in this file
-> requires them — treat a bare ADR number as provenance, not as something to look up.
+Every rule here is stated in full. There is no separate decision log to consult:
+the reason a rule exists is in the rule itself or next to the code it governs.
 
 ## Name
 
@@ -17,12 +16,12 @@ iOS bundle id is **`su.proxydom.app`** (extension `su.proxydom.app.VpnTunnelProv
 
 ## Dial set
 
-**Two sets exist and must not be mixed (ADR 035). Only the second is in this repo:**
+**Two sets exist and must not be mixed. Only the second is in this repo:**
 
-- **The catalog is not in this repo.** Nodes the bot's catalog serves are **Hysteria2 only** (ADR 018, ADR 033), `hy2://` and `hysteria2://` including `obfs=salamander` and port hop. The client is a local configurator and never receives them: `VpnNode`, the model of `GET /api/v1/vpn/nodes`, was removed with the account era, so nothing here reads a catalog.
-- **Imported-document dial set** — lines the user pastes or pulls from a foreign HTTPS document: **Hysteria2 on every OS, and VLESS where the engine can carry the line.** That is Android and Windows, and it is one engine: in-process `v2fly/v2ray-core` v5.54.2 (MIT) inside hy2bind on Android, the same core inside `proxydom-engine.exe` on Windows; ADR 036 is why it is not `xray-core`. Reality and XHTTP are not describable, so those lines stay inactive. iOS has no VLESS engine and its gate stays closed until its own task. `lib/features/vpn/data/dial_set.dart` is the single authority.
+- **The catalog is not in this repo.** Nodes the bot's catalog serves are **Hysteria2 only**, `hy2://` and `hysteria2://` including `obfs=salamander` and port hop. The client is a local configurator and never receives them: `VpnNode`, the model of `GET /api/v1/vpn/nodes`, was removed with the account era, so nothing here reads a catalog.
+- **Imported-document dial set** — lines the user pastes or pulls from a foreign HTTPS document: **Hysteria2 on every OS, and the whole `v2fly/v2ray-core` family where the engine can carry the line.** That is VLESS, VMess, Trojan, Shadowsocks and SOCKS5 on Android and Windows, and it is one engine: in-process `v2fly/v2ray-core` v5.54.2 (MIT) inside hy2bind on Android, the same core inside `proxydom-engine.exe` on Windows. Reality and XHTTP are not describable, so those lines stay inactive. iOS has no engine for that family and its gate stays closed until its own task. `lib/features/vpn/data/dial_set.dart` is the single authority.
 
-Trojan, Shadowsocks, and VMess stay out of the product: the parser reads them, the dial gate does not admit them (ADR 033 §3, ADR 035 §5). A mixed document imports whole and is never deleted. A line this platform cannot start is a neutral badge, not an error.
+`wireguard://`, `amneziawg://` and `vpn://` are recognised, counted and named, but never dialled: hy2bind has no userspace WireGuard, and `vpn://` is a container rather than a dialer. A mixed document imports whole and is never deleted. A line this platform cannot start is a neutral badge, not an error. The INCY analysis this set grew out of is `docs/parity/incy-intake-parity.md`.
 
 `libXray.aar` was removed because it embeds `sagernet/sing` (GPL-3.0); do not fetch it back. `libbox` is sing-box and must not be vendored. hev stays dormant — do not call it from the active connect path. GPL-3.0 and AGPL-3.0 cannot enter the client build at all: §10 forbids extra restrictions on the rights granted and §12 forbids distributing an incompatible work, and the App Store terms are exactly such restrictions — which is why the licence boundary is about distribution, not about price. `dial_set.dart` is the authority for what may run.
 
@@ -62,9 +61,9 @@ Do **not** bulk-generate AI PNGs without commercial license + owner go (Visual A
 ## Stack
 
 - Flutter + Riverpod + go_router + Dio
-- VPN core: Hysteria2 / hy2bind (ADR 018), MethodChannel `proxydom/vpn`
+- VPN core: Hysteria2 / hy2bind, MethodChannel `proxydom/vpn`
 - minSdk **26** (hard requirement — do not roll back)
-- Billing: **Platega hosted on Android** (ADR 017); Play Billing не используется.
+- Billing: **Platega hosted on Android**; Play Billing не используется.
   **iOS-сборка — чистая утилита, оплаты нет вообще**: ни Platega, ни каталога,
   ни Premium/квот/бота-кассира. Так требует App Review Guideline 5.4: VPN-приложение
   в App Store продаёт только организация, и сборка не должна выглядеть сервисом.

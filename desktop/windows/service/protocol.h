@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-// Share-line to the Windows engine config (ADR 029, amended for the
+// Share-line to the Windows engine config (, amended for the
 // proxydom-engine process). No Win32 types in this header.
 
 constexpr std::uint32_t kFrameMaxBody = 65536;
@@ -29,6 +29,12 @@ struct ShareLine {
   std::string host;
   std::string password;
   std::string uuid;
+  // SOCKS5 user. The password field above carries its other half, because the
+  // engine takes the pair together and nothing else on this struct uses both.
+  std::string username;
+  // Shadowsocks cipher. vmess reuses the field for its `scy` security setting,
+  // which is also a name the core looks up rather than a flag.
+  std::string method;
   std::string obfs;
   std::string obfs_password;
   std::string sni;
@@ -52,6 +58,9 @@ struct ShareLine {
   // kcp obfuscation seed. A kcp line without it dials a server that is
   // expecting obfuscation, which fails as a generic core exit.
   std::string kcp_seed;
+  // gRPC service name. Empty means the server's empty service, which is legal
+  // and common; the link's own word travels when it carries one.
+  std::string service_name;
   int port = 443;
   bool insecure = false;
 };

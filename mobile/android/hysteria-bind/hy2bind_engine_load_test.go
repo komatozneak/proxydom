@@ -51,8 +51,15 @@ func TestEngineTransportNormalizesWebSocket(t *testing.T) {
 	if err != nil || name != "websocket" {
 		t.Fatalf("ws -> %q %v", name, err)
 	}
-	if _, err := engineTransport("grpc"); err == nil {
-		t.Fatal("grpc must be refused")
+	// gRPC and HTTPUpgrade are dialers this core registers; the transport that
+	// has no dialer here is QUIC, and it is the one that must stay refused.
+	for _, word := range []string{"grpc", "httpupgrade"} {
+		if _, err := engineTransport(word); err != nil {
+			t.Fatalf("%s must be dialable now: %v", word, err)
+		}
+	}
+	if _, err := engineTransport("quic"); err == nil {
+		t.Fatal("quic must stay refused")
 	}
 }
 
