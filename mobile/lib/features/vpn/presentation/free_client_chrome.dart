@@ -1087,12 +1087,29 @@ Future<bool> confirmImportedDelete(
         ),
         actions: [
           TextButton(
+            autofocus: true,
             onPressed: () => Navigator.of(dialogContext).pop(false),
             child: Text(l.cancel),
           ),
-          TextButton(
+          TextButton.icon(
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: Text(l.freeDelete),
+            style: TextButton.styleFrom(
+              foregroundColor: AppBrand.actionClay,
+              backgroundColor: AppBrand.actionClay.withValues(alpha: 0.12),
+              side: BorderSide(
+                color: AppBrand.actionClay.withValues(alpha: 0.35),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            icon: const AppIcon(
+              AppIcons.trash,
+              size: 16,
+              color: AppBrand.actionClay,
+            ),
+            label: Text(l.freeDelete),
           ),
         ],
       );

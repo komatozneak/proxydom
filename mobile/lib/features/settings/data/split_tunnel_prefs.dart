@@ -12,6 +12,7 @@ class SplitTunnelSite {
     required this.enabled,
     this.label = '',
     this.subtitle = '',
+    this.players = const [],
   });
 
   final String id;
@@ -19,6 +20,11 @@ class SplitTunnelSite {
   final bool enabled;
   final String label;
   final String subtitle;
+
+  /// Player and player-CDN hosts embedded by this site. They travel with the
+  /// site: adding [domain] to the direct list without its players is what left
+  /// video players asking for the VPN to be turned off.
+  final List<String> players;
 
   bool get isPreset => id.startsWith('preset_');
 
@@ -28,6 +34,7 @@ class SplitTunnelSite {
     bool? enabled,
     String? label,
     String? subtitle,
+    List<String>? players,
   }) {
     return SplitTunnelSite(
       id: id ?? this.id,
@@ -35,6 +42,7 @@ class SplitTunnelSite {
       enabled: enabled ?? this.enabled,
       label: label ?? this.label,
       subtitle: subtitle ?? this.subtitle,
+      players: players ?? this.players,
     );
   }
 
@@ -44,6 +52,7 @@ class SplitTunnelSite {
         'enabled': enabled,
         'label': label,
         'subtitle': subtitle,
+        'players': players,
       };
 
   factory SplitTunnelSite.fromJson(Map<String, dynamic> json) {
@@ -53,6 +62,11 @@ class SplitTunnelSite {
       enabled: json['enabled'] as bool? ?? true,
       label: '${json['label'] ?? ''}',
       subtitle: '${json['subtitle'] ?? ''}',
+      players: (json['players'] as List?)
+              ?.map((value) => '$value')
+              .where((value) => value.isNotEmpty)
+              .toList() ??
+          const [],
     );
   }
 }
@@ -86,30 +100,45 @@ class DomainNormalizeErr extends DomainNormalizeResult {
 final _ipv4 = RegExp(r'^(\d{1,3}\.){3}\d{1,3}$');
 final _ipv6ish = RegExp(r'^[0-9a-fA-F:]+$');
 final _hostLabel = RegExp(r'^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$');
+final _schemePrefix = RegExp(r'^([a-z][a-z0-9+.-]*)://');
 
-/// Trim, lowercase, strip trailing dot; reject schemes/paths/IPs/wildcards.
+/// Trim, lowercase, strip trailing dot and a leading `www.`.
+///
+/// The field says `example.com`, but people paste the address bar:
+/// `https://www.example.com/path?q=1#top`. A site is its host, so the scheme,
+/// path, query, fragment and port are dropped. Only http(s) links are accepted;
+/// other schemes are not a web address.
 DomainNormalizeResult normalizeSplitTunnelDomain(String raw) {
   var s = raw.trim().toLowerCase();
   if (s.isEmpty) {
     return const DomainNormalizeErr(DomainNormalizeErrorKind.empty);
   }
-  if (s.contains('://') || s.startsWith('http:') || s.startsWith('https:')) {
-    return const DomainNormalizeErr(DomainNormalizeErrorKind.scheme);
+  if (RegExp(r'\s').hasMatch(s)) {
+    return const DomainNormalizeErr(DomainNormalizeErrorKind.empty);
   }
-  if (s.contains('/') ||
-      s.contains('?') ||
-      s.contains('#') ||
-      s.contains(':')) {
-    return const DomainNormalizeErr(DomainNormalizeErrorKind.pathOrPort);
+  final scheme = _schemePrefix.firstMatch(s);
+  if (scheme != null) {
+    final name = scheme.group(1)!;
+    if (name != 'http' && name != 'https') {
+      return const DomainNormalizeErr(DomainNormalizeErrorKind.scheme);
+    }
   }
-  if (s.contains('*')) {
-    return const DomainNormalizeErr(DomainNormalizeErrorKind.wildcard);
+  final host = _siteHostFromInput(s);
+  if (host == null) {
+    return const DomainNormalizeErr(DomainNormalizeErrorKind.empty);
   }
+  s = host;
   if (s.endsWith('.')) {
     s = s.substring(0, s.length - 1);
   }
+  if (s.startsWith('www.')) {
+    s = s.substring(4);
+  }
   if (s.isEmpty) {
     return const DomainNormalizeErr(DomainNormalizeErrorKind.empty);
+  }
+  if (s.contains('*')) {
+    return const DomainNormalizeErr(DomainNormalizeErrorKind.wildcard);
   }
   if (_ipv4.hasMatch(s) || (s.contains(':') && _ipv6ish.hasMatch(s))) {
     return const DomainNormalizeErr(DomainNormalizeErrorKind.ipLiteral);
@@ -127,6 +156,47 @@ DomainNormalizeResult normalizeSplitTunnelDomain(String raw) {
     }
   }
   return DomainNormalizeOk(s);
+}
+
+/// Upper bound on player hosts stored with one site.
+const int kMaxSplitTunnelPlayers = 8;
+
+/// Normalizes player hosts and drops the site itself and its subdomains.
+List<String> normalizeSplitTunnelPlayers(
+  String siteDomain,
+  Iterable<String> raw,
+) {
+  final site = normalizeSplitTunnelDomain(siteDomain);
+  final owner =
+      site is DomainNormalizeOk ? site.domain : siteDomain.trim().toLowerCase();
+  if (owner.isEmpty) return const [];
+  final out = <String>{};
+  for (final value in raw) {
+    final result = normalizeSplitTunnelDomain(value);
+    if (result is! DomainNormalizeOk) continue;
+    final domain = result.domain;
+    if (domain == owner || domain.endsWith('.$owner')) continue;
+    out.add(domain);
+    if (out.length >= kMaxSplitTunnelPlayers) break;
+  }
+  return out.toList()..sort();
+}
+
+/// Host from a bare domain, a domain with a path, or an http(s) URL.
+String? _siteHostFromInput(String text) {
+  final Uri? uri;
+  if (_schemePrefix.hasMatch(text)) {
+    uri = Uri.tryParse(text);
+  } else if (text.startsWith('//')) {
+    uri = Uri.tryParse('http:$text');
+  } else {
+    // A bare `example.com/path` is still a link a person may paste.
+    uri = Uri.tryParse('http://$text');
+  }
+  if (uri == null || uri.host.isEmpty || uri.userInfo.isNotEmpty) {
+    return null;
+  }
+  return uri.host;
 }
 
 String _newSiteId() {
@@ -221,7 +291,7 @@ class SplitTunnelPrefs {
     await prefs.setBool(_osnovnyeV2DefaultsKey, true);
   }
 
-  /// One-shot: add MAX sites (ADR 025). Same stickiness as v2.
+  /// One-shot: add MAX sites. Same stickiness as v2.
   static Future<void> _applyV3OsnovnyeDefaultsIfNeeded(
     SharedPreferences prefs,
   ) async {
@@ -457,6 +527,11 @@ class SplitTunnelPrefs {
           .whereType<Map>()
           .map((e) => SplitTunnelSite.fromJson(Map<String, dynamic>.from(e)))
           .where((s) => s.id.isNotEmpty && s.domain.isNotEmpty)
+          .map(
+            (s) => s.copyWith(
+              players: normalizeSplitTunnelPlayers(s.domain, s.players),
+            ),
+          )
           .toList();
     } catch (_) {
       return const [];
@@ -476,6 +551,7 @@ class SplitTunnelPrefs {
     required String domain,
     String label = '',
     bool enabled = true,
+    List<String> players = const [],
   }) async {
     final normalized = normalizeSplitTunnelDomain(domain);
     if (normalized is! DomainNormalizeOk) return normalized;
@@ -488,6 +564,7 @@ class SplitTunnelPrefs {
       domain: normalized.domain,
       label: label.trim(),
       enabled: enabled,
+      players: normalizeSplitTunnelPlayers(normalized.domain, players),
     );
     await saveSites([...sites, next]);
     return normalized;
@@ -504,7 +581,10 @@ class SplitTunnelPrefs {
       return false;
     }
     final copy = [...sites];
-    copy[idx] = site.copyWith(domain: normalized.domain);
+    copy[idx] = site.copyWith(
+      domain: normalized.domain,
+      players: normalizeSplitTunnelPlayers(normalized.domain, site.players),
+    );
     await saveSites(copy);
     return true;
   }
@@ -520,6 +600,7 @@ class SplitTunnelPrefs {
     final out = <String>{};
     for (final s in sites.where((s) => s.enabled && !s.isPreset)) {
       out.add(s.domain);
+      out.addAll(s.players);
       final aliases = kSplitTunnelDomainAliases[s.domain];
       if (aliases != null) out.addAll(aliases);
     }
@@ -539,6 +620,7 @@ class SplitTunnelPrefs {
       final d = s.domain.trim().toLowerCase();
       if (d.isEmpty) continue;
       out.add(d);
+      out.addAll(s.players);
     }
     return out.toList()..sort();
   }
@@ -691,7 +773,7 @@ const kOsnovnyeV2Ids = <String>{
   'gosuslugi',
 };
 
-/// Category ids shipped in osnovnye v3 (MAX — ADR 025).
+/// Category ids shipped in osnovnye v3.
 const kOsnovnyeV3Ids = <String>{
   'max',
 };

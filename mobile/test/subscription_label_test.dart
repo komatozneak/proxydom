@@ -35,6 +35,31 @@ hysteria2://user:pass@45.91.248.91:443/?sni=hy2-us.teremokconnect.online#США 
     expect(usa.subtitle, 'Сервисы, нейросети, сайты');
   });
 
+  test('a country tag becomes the flag and leaves the name', () {
+    ParsedShareLink link(String remark) => parseShareLink(
+          'hysteria2://user:pass@31.59.193.35:443/?sni=example.test'
+          '#${Uri.encodeComponent(remark)}',
+        );
+
+    final de = labelForShareLink(link('DE DoDoVPN | Hysteria'));
+    expect(de.title, 'DoDoVPN | Hysteria');
+    expect(de.flag, '🇩🇪');
+    expect(de.tile, PoolTile.flag);
+
+    final nl = labelForShareLink(link('NL DoDoVPN | Hysteria | TikTok'));
+    expect(nl.title, 'DoDoVPN | Hysteria | TikTok');
+    expect(nl.flag, '🇳🇱');
+
+    final emoji = labelForShareLink(link('🇷🇺 Москва'));
+    expect(emoji.title, 'Москва');
+    expect(emoji.flag, '🇷🇺');
+
+    // `WS` is the transport on this line, not Samoa.
+    final websocket = labelForShareLink(link('DE DoDoVPN | WS | Резерв'));
+    expect(websocket.title, 'DoDoVPN | WS | Резерв');
+    expect(websocket.flag, '🇩🇪');
+  });
+
   test('a manifest line is not used as the profile name', () {
     const body = '''
 #proxydom-profile: eyJ2ZXJzaW9uIjoxfQ

@@ -1135,12 +1135,6 @@ abstract class AppL10n {
   /// **'Listed sites use your usual connection, not the protected one. Everything else still goes through Proxy Dom.'**
   String get splitTunnelSitesLead;
 
-  /// No description provided for @splitTunnelSitesIosNote.
-  ///
-  /// In en, this message translates to:
-  /// **'On iPhone only exact hostnames leave the VPN (not all subdomains). Whole apps cannot leave the tunnel.'**
-  String get splitTunnelSitesIosNote;
-
   /// No description provided for @splitTunnelCustomSection.
   ///
   /// In en, this message translates to:
@@ -1201,6 +1195,30 @@ abstract class AppL10n {
   /// **'Remove this site from the list?'**
   String get splitTunnelDeleteConfirm;
 
+  /// No description provided for @splitTunnelEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get splitTunnelEdit;
+
+  /// No description provided for @splitTunnelEditDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get splitTunnelEditDone;
+
+  /// No description provided for @splitTunnelPlayersFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Players found: {count}'**
+  String splitTunnelPlayersFound(int count);
+
+  /// No description provided for @splitTunnelPlayersCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Players: {count}'**
+  String splitTunnelPlayersCount(int count);
+
   /// No description provided for @splitTunnelEmptyTitle.
   ///
   /// In en, this message translates to:
@@ -1230,12 +1248,6 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Latin addresses only'**
   String get splitTunnelNonAsciiUnsupported;
-
-  /// No description provided for @splitTunnelDomainLatinHelper.
-  ///
-  /// In en, this message translates to:
-  /// **'Latin addresses only'**
-  String get splitTunnelDomainLatinHelper;
 
   /// No description provided for @splitTunnelPendingTitle.
   ///
@@ -3100,7 +3112,7 @@ abstract class AppL10n {
   /// No description provided for @freeDeleteServerBody.
   ///
   /// In en, this message translates to:
-  /// **'The link is deleted from this phone.'**
+  /// **'The link is deleted from this device.'**
   String get freeDeleteServerBody;
 
   /// No description provided for @freeDeleteCatalogTitle.
@@ -3112,7 +3124,7 @@ abstract class AppL10n {
   /// No description provided for @freeDeleteCatalogBody.
   ///
   /// In en, this message translates to:
-  /// **'Every server in the list is deleted from this phone.'**
+  /// **'Every server in the list is deleted from this device.'**
   String get freeDeleteCatalogBody;
 
   /// No description provided for @freeRefresh.

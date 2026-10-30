@@ -577,10 +577,6 @@ class AppL10nRu extends AppL10n {
       'Сайты из списка открываются обычным интернетом, не через защиту. Остальное — через Прокси Дом.';
 
   @override
-  String get splitTunnelSitesIosNote =>
-      'На iPhone из VPN выходит только точный hostname (не все поддомены). Целое приложение вытащить нельзя.';
-
-  @override
   String get splitTunnelCustomSection => 'Мои сайты';
 
   @override
@@ -613,6 +609,22 @@ class AppL10nRu extends AppL10n {
   String get splitTunnelDeleteConfirm => 'Удалить сайт из списка?';
 
   @override
+  String get splitTunnelEdit => 'Редактировать';
+
+  @override
+  String get splitTunnelEditDone => 'Готово';
+
+  @override
+  String splitTunnelPlayersFound(int count) {
+    return 'Плееры найдены: $count';
+  }
+
+  @override
+  String splitTunnelPlayersCount(int count) {
+    return 'Плееров: $count';
+  }
+
+  @override
   String get splitTunnelEmptyTitle => 'Нет своих сайтов';
 
   @override
@@ -627,9 +639,6 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get splitTunnelNonAsciiUnsupported => 'Только латинские адреса';
-
-  @override
-  String get splitTunnelDomainLatinHelper => 'Только латинские адреса';
 
   @override
   String get splitTunnelPendingTitle => 'Изменения не применены';
@@ -1648,14 +1657,14 @@ class AppL10nRu extends AppL10n {
   String get freeDeleteServerTitle => 'Удалить этот сервер?';
 
   @override
-  String get freeDeleteServerBody => 'Ссылка сотрётся с этого телефона.';
+  String get freeDeleteServerBody => 'Ссылка сотрётся с этого устройства.';
 
   @override
   String get freeDeleteCatalogTitle => 'Удалить этот список?';
 
   @override
   String get freeDeleteCatalogBody =>
-      'Все серверы из списка сотрутся с этого телефона.';
+      'Все серверы из списка сотрутся с этого устройства.';
 
   @override
   String get freeRefresh => 'Обновить';

@@ -14,6 +14,7 @@ import 'core/diagnostics/diagnostics_service.dart';
 import 'core/diagnostics/tunnel_log_prefs.dart';
 import 'core/internet_permission.dart';
 import 'core/router.dart';
+import 'features/settings/data/browser_bridge.dart';
 import 'features/vpn/data/windows_tunnel.dart';
 
 void main() async {
@@ -77,6 +78,9 @@ void main() async {
       child: const ProxyDomApp(),
     ),
   );
+
+  // Browser extension bridge. Loopback only; no-op outside Windows.
+  unawaited(BrowserBridge.instance.start());
 
   // Bind after the first frame. The utility does not discover an owner API.
   unawaited(_bindUnderlyingAfterFirstFrame(internetOk: internetOk));

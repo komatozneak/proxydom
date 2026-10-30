@@ -327,8 +327,28 @@ class AppTheme {
       brightness: brightness,
       colorScheme: scheme,
       scaffoldBackgroundColor: bg,
-      fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
+      fontFamily: 'Onest',
+      fontFamilyFallback: const ['Inter'],
       iconTheme: IconThemeData(color: onSurface, size: 24),
+      scrollbarTheme: ScrollbarThemeData(
+        // The platform scrollbar is a wide grey slab that reads as chrome from
+        // another app. A thin house-gold pill fades in only while scrolling and
+        // sits just inside the edge instead of cutting the content.
+        thickness: const WidgetStatePropertyAll(4),
+        radius: const Radius.circular(2),
+        crossAxisMargin: 3,
+        mainAxisMargin: 6,
+        thumbVisibility: const WidgetStatePropertyAll(false),
+        trackVisibility: const WidgetStatePropertyAll(false),
+        interactive: true,
+        thumbColor: WidgetStateProperty.resolveWith((states) {
+          final active = states.contains(WidgetState.hovered) ||
+              states.contains(WidgetState.dragged);
+          final base =
+              isDark ? AppBrand.mascotGoldLit : AppBrand.mascotGoldDeep;
+          return base.withValues(alpha: active ? 0.78 : 0.42);
+        }),
+      ),
       textTheme: _buildTextTheme(scheme),
       appBarTheme: AppBarTheme(
         backgroundColor: bg,
@@ -337,7 +357,8 @@ class AppTheme {
         scrolledUnderElevation: 0,
         centerTitle: false,
         titleTextStyle: TextStyle(
-          fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
+          fontFamily: 'Onest',
+          fontFamilyFallback: const ['Inter'],
           color: onSurface,
           fontSize: 28,
           fontWeight: FontWeight.w800,
@@ -378,7 +399,8 @@ class AppTheme {
           // it every button label silently falls back to the platform font and
           // the app ends up with two typefaces on one screen.
           textStyle: const TextStyle(
-            fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
+            fontFamily: 'Onest',
+            fontFamilyFallback: const ['Inter'],
             fontSize: 16,
             fontWeight: FontWeight.w700,
             letterSpacing: -0.2,
@@ -391,7 +413,8 @@ class AppTheme {
           shape: const StadiumBorder(),
           side: BorderSide(color: line, width: 1),
           textStyle: const TextStyle(
-            fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
+            fontFamily: 'Onest',
+            fontFamilyFallback: const ['Inter'],
             fontSize: 15,
             fontWeight: FontWeight.w600,
             letterSpacing: -0.1,
@@ -404,7 +427,8 @@ class AppTheme {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           shape: const StadiumBorder(),
           textStyle: const TextStyle(
-            fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
+            fontFamily: 'Onest',
+            fontFamilyFallback: const ['Inter'],
             fontSize: 15,
             fontWeight: FontWeight.w600,
           ),
@@ -490,77 +514,89 @@ class AppTheme {
   static TextTheme _buildTextTheme(ColorScheme scheme) {
     return TextTheme(
       displayLarge: TextStyle(
-        fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
+        fontFamily: 'Onest',
+        fontFamilyFallback: const ['Inter'],
         fontSize: 32,
         fontWeight: FontWeight.w800,
         letterSpacing: -0.5,
         color: scheme.onSurface,
       ),
       displayMedium: TextStyle(
-        fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
+        fontFamily: 'Onest',
+        fontFamilyFallback: const ['Inter'],
         fontSize: 28,
         fontWeight: FontWeight.w800,
         color: scheme.onSurface,
       ),
       headlineLarge: TextStyle(
-        fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
+        fontFamily: 'Onest',
+        fontFamilyFallback: const ['Inter'],
         fontSize: 24,
         fontWeight: FontWeight.w700,
         color: scheme.onSurface,
       ),
       headlineMedium: TextStyle(
-        fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
+        fontFamily: 'Onest',
+        fontFamilyFallback: const ['Inter'],
         fontSize: 20,
         fontWeight: FontWeight.w700,
         color: scheme.onSurface,
       ),
       titleLarge: TextStyle(
-        fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
+        fontFamily: 'Onest',
+        fontFamilyFallback: const ['Inter'],
         fontSize: 18,
         fontWeight: FontWeight.w700,
         color: scheme.onSurface,
       ),
       titleMedium: TextStyle(
-        fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
+        fontFamily: 'Onest',
+        fontFamilyFallback: const ['Inter'],
         fontSize: 16,
         fontWeight: FontWeight.w700,
         color: scheme.onSurface,
       ),
       bodyLarge: TextStyle(
-        fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
+        fontFamily: 'Onest',
+        fontFamilyFallback: const ['Inter'],
         fontSize: 16,
         fontWeight: FontWeight.w400,
         color: scheme.onSurface,
         height: 1.45,
       ),
       bodyMedium: TextStyle(
-        fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
+        fontFamily: 'Onest',
+        fontFamilyFallback: const ['Inter'],
         fontSize: 14,
         fontWeight: FontWeight.w400,
         color: scheme.onSurfaceVariant,
         height: 1.4,
       ),
       bodySmall: TextStyle(
-        fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
+        fontFamily: 'Onest',
+        fontFamilyFallback: const ['Inter'],
         fontSize: 12,
         fontWeight: FontWeight.w400,
         color: scheme.onSurfaceVariant,
         height: 1.4,
       ),
       labelLarge: TextStyle(
-        fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
+        fontFamily: 'Onest',
+        fontFamilyFallback: const ['Inter'],
         fontSize: 14,
         fontWeight: FontWeight.w600,
         color: scheme.onSurface,
       ),
       labelMedium: TextStyle(
-        fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
+        fontFamily: 'Onest',
+        fontFamilyFallback: const ['Inter'],
         fontSize: 13,
         fontWeight: FontWeight.w600,
         color: scheme.onSurface,
       ),
       labelSmall: TextStyle(
-        fontFamily: 'Onest', fontFamilyFallback: const ['Inter'],
+        fontFamily: 'Onest',
+        fontFamilyFallback: const ['Inter'],
         fontSize: 12,
         fontWeight: FontWeight.w600,
         color: scheme.onSurfaceVariant,

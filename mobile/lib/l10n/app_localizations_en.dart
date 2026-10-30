@@ -576,10 +576,6 @@ class AppL10nEn extends AppL10n {
       'Listed sites use your usual connection, not the protected one. Everything else still goes through Proxy Dom.';
 
   @override
-  String get splitTunnelSitesIosNote =>
-      'On iPhone only exact hostnames leave the VPN (not all subdomains). Whole apps cannot leave the tunnel.';
-
-  @override
   String get splitTunnelCustomSection => 'My sites';
 
   @override
@@ -612,6 +608,22 @@ class AppL10nEn extends AppL10n {
   String get splitTunnelDeleteConfirm => 'Remove this site from the list?';
 
   @override
+  String get splitTunnelEdit => 'Edit';
+
+  @override
+  String get splitTunnelEditDone => 'Done';
+
+  @override
+  String splitTunnelPlayersFound(int count) {
+    return 'Players found: $count';
+  }
+
+  @override
+  String splitTunnelPlayersCount(int count) {
+    return 'Players: $count';
+  }
+
+  @override
   String get splitTunnelEmptyTitle => 'No custom sites';
 
   @override
@@ -627,9 +639,6 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get splitTunnelNonAsciiUnsupported => 'Latin addresses only';
-
-  @override
-  String get splitTunnelDomainLatinHelper => 'Latin addresses only';
 
   @override
   String get splitTunnelPendingTitle => 'Changes not applied yet';
@@ -1642,14 +1651,14 @@ class AppL10nEn extends AppL10n {
   String get freeDeleteServerTitle => 'Remove this server?';
 
   @override
-  String get freeDeleteServerBody => 'The link is deleted from this phone.';
+  String get freeDeleteServerBody => 'The link is deleted from this device.';
 
   @override
   String get freeDeleteCatalogTitle => 'Remove this list?';
 
   @override
   String get freeDeleteCatalogBody =>
-      'Every server in the list is deleted from this phone.';
+      'Every server in the list is deleted from this device.';
 
   @override
   String get freeRefresh => 'Refresh';

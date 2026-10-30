@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../../../core/utils/country_flags.dart';
 import 'hy2_link_parser.dart';
 import 'node_display.dart';
 import 'share_link_parser.dart';
@@ -78,14 +79,19 @@ String? titleFromSubscriptionBody(String body) {
 
 PoolServerLabel labelForShareLink(ParsedShareLink link) {
   final split = _splitRemark(_remark(link));
-  final tile = _tileForTitle(split.$1);
+  // A provider's country tag is a location, not a name: `DE DoDoVPN` draws
+  // the German flag and the line is read as `DoDoVPN`. The tag wins over the
+  // host table because the provider knows the exit node it sold.
+  final tag = countryTagFrom(split.$1);
+  final title = tag?.title ?? split.$1;
+  final tile = _tileForTitle(title);
   final host = link.endpoint.split(':').first;
   final place = placeForKnownHost(host);
   return PoolServerLabel(
-    title: split.$1,
+    title: title,
     subtitle: split.$2,
     tile: tile,
-    flag: tile == PoolTile.flag ? (place?.flag ?? '') : '',
+    flag: tile == PoolTile.flag ? (tag?.flagEmoji ?? place?.flag ?? '') : '',
   );
 }
 

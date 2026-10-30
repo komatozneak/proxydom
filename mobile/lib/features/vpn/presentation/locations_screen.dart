@@ -11,6 +11,7 @@ import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
 import '../../../core/toasts/proxy_dom_toast.dart';
 import '../../../core/widgets/app_icon.dart';
+import '../../../core/widgets/scroll_edge_fade.dart';
 
 import '../../../core/widgets/terminal_type.dart';
 import '../../../l10n/app_localizations.dart';
@@ -382,7 +383,8 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
         final link = _imported[index];
         final label = labelForShareLink(link);
         final hay =
-            '${label.title} ${link.endpoint} ${link.scheme}'.toLowerCase();
+            '${label.title} ${link.name} ${link.endpoint} ${link.scheme}'
+                .toLowerCase();
         if (!hay.contains(query)) continue;
       }
       nodeIndexes.add(index);
@@ -505,7 +507,8 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
         _imported.any((link) {
           final label = labelForShareLink(link);
           final hay =
-              '${label.title} ${link.endpoint} ${link.scheme}'.toLowerCase();
+              '${label.title} ${link.name} ${link.endpoint} ${link.scheme}'
+                  .toLowerCase();
           return hay.contains(query);
         });
     final body = _catalogs.isNotEmpty
@@ -535,14 +538,18 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
                           ),
                         ),
                       )
-                    : ListView(
-                        padding: const EdgeInsets.only(top: 2),
-                        children: [
-                          for (var i = 0; i < _catalogs.length; i++) ...[
-                            if (i > 0) const SizedBox(height: 12),
-                            _catalogCard(theme, l, _catalogs[i]),
+                    : ScrollEdgeFade(
+                        child: ListView(
+                          // A gutter for the scrollbar: the platform thumb
+                          // must sit beside the cards, not cut their edge.
+                          padding: const EdgeInsets.only(top: 2, right: 12),
+                          children: [
+                            for (var i = 0; i < _catalogs.length; i++) ...[
+                              if (i > 0) const SizedBox(height: 12),
+                              _catalogCard(theme, l, _catalogs[i]),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
               ),
             ],
@@ -562,42 +569,49 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
               Expanded(
                 child: filtered.isEmpty
                     ? const Center(child: FreeClientEmptyState())
-                    : ListView.separated(
-                        padding: EdgeInsets.zero,
-                        itemCount: filtered.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (context, i) {
-                          final index = filtered[i];
-                          final link = _imported[index];
-                          final selected = _selectedId == '$index';
-                          final schemeBlocked = !canDialLink(link);
-                          return ImportedProfileCard(
-                            name: link.name,
-                            scheme: link.scheme,
-                            endpoint: link.endpoint,
-                            // The same label the pool lines are drawn from, so
-                            // a pasted key and a node out of a list look like
-                            // the same kind of thing wherever they are shown.
-                            label: labelForShareLink(link),
-                            selected: selected,
-                            connected: selected && connected,
-                            dialable: !schemeBlocked,
-                            onDelete: () => _removeImported(index),
-                            onTap: () async {
-                              if (schemeBlocked) {
-                                UiLog.action(
-                                  'locations',
-                                  'pick',
-                                  result: 'blocked',
-                                  reason: 'scheme',
-                                  extra: {'scheme': link.scheme},
+                    : ScrollEdgeFade(
+                        child: ListView.separated(
+                          padding: const EdgeInsets.only(right: 12),
+                          itemCount: filtered.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 10),
+                          itemBuilder: (context, i) {
+                            final index = filtered[i];
+                            final link = _imported[index];
+                            final selected = _selectedId == '$index';
+                            final schemeBlocked = !canDialLink(link);
+                            return ImportedProfileCard(
+                              name: link.name,
+                              scheme: link.scheme,
+                              endpoint: link.endpoint,
+                              // The same label the pool lines are drawn from,
+                              // so a pasted key and a node out of a list look
+                              // like the same kind of thing wherever they are
+                              // shown.
+                              label: labelForShareLink(link),
+                              selected: selected,
+                              connected: selected && connected,
+                              dialable: !schemeBlocked,
+                              onDelete: () => _removeImported(index),
+                              onTap: () async {
+                                if (schemeBlocked) {
+                                  UiLog.action(
+                                    'locations',
+                                    'pick',
+                                    result: 'blocked',
+                                    reason: 'scheme',
+                                    extra: {'scheme': link.scheme},
+                                  );
+                                  return;
+                                }
+                                await _chooseImported(
+                                  index,
+                                  scheme: link.scheme,
                                 );
-                                return;
-                              }
-                              await _chooseImported(index, scheme: link.scheme);
-                            },
-                          );
-                        },
+                              },
+                            );
+                          },
+                        ),
                       ),
               ),
             ],

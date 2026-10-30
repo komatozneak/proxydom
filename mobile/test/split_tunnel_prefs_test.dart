@@ -18,17 +18,47 @@ void main() {
       expect((r as DomainNormalizeOk).domain, 'example.com');
     });
 
-    test('rejects scheme/path/ip/wildcard/single-label/non-ascii', () {
+    test('accepts full web links and stores the site host', () {
+      final link =
+          normalizeSplitTunnelDomain('https://www.mirabreakingbad.com/');
+      expect(link, isA<DomainNormalizeOk>());
+      expect((link as DomainNormalizeOk).domain, 'mirabreakingbad.com');
       expect(
-        normalizeSplitTunnelDomain('https://example.com'),
+        (normalizeSplitTunnelDomain('http://Example.com/path?q=1#top')
+                as DomainNormalizeOk)
+            .domain,
+        'example.com',
+      );
+      expect(
+        (normalizeSplitTunnelDomain('example.com/path') as DomainNormalizeOk)
+            .domain,
+        'example.com',
+      );
+      expect(
+        (normalizeSplitTunnelDomain('https://api.example.com/')
+                as DomainNormalizeOk)
+            .domain,
+        'api.example.com',
+      );
+      expect(
+        (normalizeSplitTunnelDomain('www.example.com') as DomainNormalizeOk)
+            .domain,
+        'example.com',
+      );
+    });
+
+    test('rejects non-web schemes, IPs, wildcards, single labels, non-ascii',
+        () {
+      expect(
+        normalizeSplitTunnelDomain('ftp://example.com'),
         isA<DomainNormalizeErr>(),
       );
       expect(
-        normalizeSplitTunnelDomain('example.com/path'),
+        normalizeSplitTunnelDomain('https://'),
         isA<DomainNormalizeErr>(),
       );
       expect(
-        normalizeSplitTunnelDomain('1.2.3.4'),
+        normalizeSplitTunnelDomain('https://1.2.3.4/'),
         isA<DomainNormalizeErr>(),
       );
       expect(
@@ -42,6 +72,71 @@ void main() {
       expect(
         normalizeSplitTunnelDomain('сайт.рф'),
         isA<DomainNormalizeErr>(),
+      );
+      expect(
+        normalizeSplitTunnelDomain('https://user:pass@example.com/'),
+        isA<DomainNormalizeErr>(),
+      );
+      expect(
+        normalizeSplitTunnelDomain('https://[2001:db8::1]/'),
+        isA<DomainNormalizeErr>(),
+      );
+      expect(
+        normalizeSplitTunnelDomain('https://example.com/path with space'),
+        isA<DomainNormalizeErr>(),
+      );
+      expect(
+        normalizeSplitTunnelDomain('https://example.com:bad'),
+        isA<DomainNormalizeErr>(),
+      );
+    });
+  });
+
+  group('add site', () {
+    test('a pasted URL is saved as its bare host', () async {
+      final result = await SplitTunnelPrefs.addSite(
+        domain: 'https://www.mirabreakingbad.com/',
+        label: 'Mira',
+      );
+      expect(result, isA<DomainNormalizeOk>());
+      final sites = await SplitTunnelPrefs.loadSites();
+      expect(sites.single.domain, 'mirabreakingbad.com');
+      expect(sites.single.label, 'Mira');
+      expect(
+        await SplitTunnelPrefs.enabledDomainSuffixes(),
+        contains('mirabreakingbad.com'),
+      );
+    });
+
+    test('player hosts are saved and routed with the site', () async {
+      final result = await SplitTunnelPrefs.addSite(
+        domain: 'https://www.mirabreakingbad.com/',
+        players: [
+          'videoroll.net',
+          'https://player.example.com/embed',
+          'mirabreakingbad.com',
+          'www.mirabreakingbad.com',
+          'bad host',
+          'videoroll.net',
+        ],
+      );
+      expect(result, isA<DomainNormalizeOk>());
+      final sites = await SplitTunnelPrefs.loadSites();
+      expect(sites.single.players, ['player.example.com', 'videoroll.net']);
+
+      final suffixes = await SplitTunnelPrefs.enabledDomainSuffixes();
+      expect(
+        suffixes,
+        containsAll([
+          'mirabreakingbad.com',
+          'player.example.com',
+          'videoroll.net',
+        ]),
+      );
+      final ios = await SplitTunnelPrefs.enabledIosCustomResolutionHosts();
+      expect(
+        ios,
+        containsAll(['mirabreakingbad.com', 'player.example.com']),
       );
     });
   });
@@ -338,7 +433,8 @@ void main() {
       expect(await SplitTunnelPrefs.loadDisallowedPackages(), isEmpty);
     });
 
-    test('v2 seed adds VK/Ozon/WB without restoring user-off v1 taxi', () async {
+    test('v2 seed adds VK/Ozon/WB without restoring user-off v1 taxi',
+        () async {
       SharedPreferences.setMockInitialValues({
         'split_tunnel_seeded_bypass_v1': true,
       });
@@ -412,8 +508,7 @@ void main() {
 
   group('iOS exact resolution hosts', () {
     test('RuTube/Avito/MAX expand iosResolutionHosts', () async {
-      final hosts =
-          await SplitTunnelPrefs.enabledIosCatalogResolutionHosts();
+      final hosts = await SplitTunnelPrefs.enabledIosCatalogResolutionHosts();
       expect(hosts, contains('static.rutube.ru'));
       expect(hosts, contains('api.avito.ru'));
       expect(hosts, contains('ws-api.max.ru'));

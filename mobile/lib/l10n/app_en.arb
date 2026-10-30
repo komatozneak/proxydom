@@ -356,8 +356,6 @@
   "@splitTunnelBundledInfoClose": {},
   "splitTunnelSitesLead": "Listed sites use your usual connection, not the protected one. Everything else still goes through Proxy Dom.",
   "@splitTunnelSitesLead": {},
-  "splitTunnelSitesIosNote": "On iPhone only exact hostnames leave the VPN (not all subdomains). Whole apps cannot leave the tunnel.",
-  "@splitTunnelSitesIosNote": {},
   "splitTunnelCustomSection": "My sites",
   "@splitTunnelCustomSection": {},
   "splitTunnelCustomCount": "{count}",
@@ -384,6 +382,26 @@
   "@splitTunnelDelete": {},
   "splitTunnelDeleteConfirm": "Remove this site from the list?",
   "@splitTunnelDeleteConfirm": {},
+  "splitTunnelEdit": "Edit",
+  "@splitTunnelEdit": {},
+  "splitTunnelEditDone": "Done",
+  "@splitTunnelEditDone": {},
+  "splitTunnelPlayersFound": "Players found: {count}",
+  "@splitTunnelPlayersFound": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "splitTunnelPlayersCount": "Players: {count}",
+  "@splitTunnelPlayersCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "splitTunnelEmptyTitle": "No custom sites",
   "@splitTunnelEmptyTitle": {},
   "splitTunnelEmptyBody": "Add an exact hostname — only that address skips the VPN, not its subdomains.",
@@ -394,8 +412,6 @@
   "@splitTunnelDuplicateDomain": {},
   "splitTunnelNonAsciiUnsupported": "Latin addresses only",
   "@splitTunnelNonAsciiUnsupported": {},
-  "splitTunnelDomainLatinHelper": "Latin addresses only",
-  "@splitTunnelDomainLatinHelper": {},
   "splitTunnelPendingTitle": "Changes not applied yet",
   "@splitTunnelPendingTitle": {},
   "splitTunnelPendingBody": "Changes apply after reconnecting",
@@ -852,9 +868,9 @@
   "locationsKeyHandle": "key",
   "freeDelete": "Remove",
   "freeDeleteServerTitle": "Remove this server?",
-  "freeDeleteServerBody": "The link is deleted from this phone.",
+  "freeDeleteServerBody": "The link is deleted from this device.",
   "freeDeleteCatalogTitle": "Remove this list?",
-  "freeDeleteCatalogBody": "Every server in the list is deleted from this phone.",
+  "freeDeleteCatalogBody": "Every server in the list is deleted from this device.",
   "freeRefresh": "Refresh",
   "freeRefreshDone": "Updated: {count}",
   "@freeRefreshDone": {

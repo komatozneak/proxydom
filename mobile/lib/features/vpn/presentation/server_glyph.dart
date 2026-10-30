@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/theme.dart';
+import '../../../core/utils/country_flags.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../data/subscription_label.dart';
 
@@ -19,17 +20,11 @@ class ServerGlyph extends StatelessWidget {
   final PoolServerLabel label;
   final double size;
 
-  /// Regional indicator pairs to an ISO-3166 code: 🇷🇺 is U+1F1F7 U+1F1FA,
-  /// which is 26 letters each. Anything else is not a flag.
-  static String? isoFromFlag(String flag) {
-    if (flag.runes.length != 2) return null;
-    final runes = flag.runes.toList();
-    const base = 0x1F1E6;
-    if (runes[0] < base || runes[0] > base + 25) return null;
-    if (runes[1] < base || runes[1] > base + 25) return null;
-    return '${String.fromCharCode(runes[0] - base + 97)}'
-        '${String.fromCharCode(runes[1] - base + 97)}';
-  }
+  /// A flag value to an ISO-3166 asset key: either an emoji pair (`🇷🇺`, two
+  /// regional indicators of 26 letters each) or a two-letter code (`ru`,
+  /// `uk` → `gb`). Anything else is not a country, and the caller draws a
+  /// globe instead of an empty tile.
+  static String? isoFromFlag(String flag) => countryCodeForFlagValue(flag);
 
   @override
   Widget build(BuildContext context) {

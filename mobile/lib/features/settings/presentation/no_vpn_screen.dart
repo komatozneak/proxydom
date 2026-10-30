@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import '../../../core/diagnostics/ui_log.dart';
 import '../../../core/ios_store_gates.dart';
 import '../../../core/theme.dart';
 import '../../../core/toasts/proxy_dom_toast.dart';
+import '../../../core/widgets/app_action_button.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/app_switch.dart';
 
@@ -15,7 +17,9 @@ import '../../../l10n/app_localizations.dart';
 import '../../home/application/vpn_provider.dart';
 import '../../home/application/vpn_status.dart';
 import '../../vpn/data/vpn_controller.dart';
+import '../data/browser_bridge.dart';
 import '../data/installed_apps_channel.dart';
+import '../data/site_player_discovery.dart';
 import '../data/split_tunnel_prefs.dart';
 
 /// Огонь IA: Приложения (default) | Сайты, under «Что работает без VPN?».
@@ -33,13 +37,19 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
   TabController? _tabs;
   final _search = TextEditingController();
   String _query = '';
+  StreamSubscription<void>? _bridgeChanges;
 
   bool _loading = true;
   bool _pending = false;
   bool _reconnecting = false;
   bool _lockdownOn = false;
 
-  /// Apps tab is Android-only (ADR 025, ADR 029).
+  /// Domains already looked at in this screen session. A page that has no
+  /// players (or refuses the request) is not fetched again on every rebuild.
+  final Set<String> _autoTried = <String>{};
+  bool _autoRunning = false;
+
+  /// Apps tab is Android-only.
   bool get _sitesOnly => sitesOnlySplit;
 
   List<SplitTunnelSite> _sites = const [];
@@ -55,11 +65,15 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
     _search.addListener(() {
       setState(() => _query = _search.text.trim().toLowerCase());
     });
+    _bridgeChanges = BrowserBridge.instance.changes.listen((_) {
+      if (mounted) unawaited(_reload());
+    });
     _reload();
   }
 
   @override
   void dispose() {
+    _bridgeChanges?.cancel();
     _tabs?.dispose();
     _search.dispose();
     super.dispose();
@@ -92,6 +106,7 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
       _lockdownOn = lockdown == VpnLockdownState.enabled;
       _loading = false;
     });
+    unawaited(_autoDiscoverPlayers());
   }
 
   Future<void> _afterMutation() async {
@@ -107,6 +122,56 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
       _disallowed = disallowed;
       _pending = pending;
     });
+    unawaited(_autoDiscoverPlayers());
+  }
+
+  /// Attaches embedded player hosts without a button or a second gesture.
+  ///
+  /// Runs after the sites paint, once per domain per screen session. It is
+  /// deliberately silent when a page has nothing to find: a normal user should
+  /// never have to know that discovery exists.
+  Future<void> _autoDiscoverPlayers() async {
+    if (_autoRunning) return;
+    final targets = _sites
+        .where(
+          (s) =>
+              s.enabled && s.players.isEmpty && !_autoTried.contains(s.domain),
+        )
+        .toList();
+    if (targets.isEmpty) return;
+    _autoRunning = true;
+    var found = 0;
+    try {
+      for (final site in targets) {
+        _autoTried.add(site.domain);
+        final players = await SitePlayerDiscovery.discover(site.domain);
+        if (players.isEmpty) continue;
+        final merged = normalizeSplitTunnelPlayers(site.domain, [
+          ...site.players,
+          ...players,
+        ]);
+        if (merged.length == site.players.length) continue;
+        final saved = await SplitTunnelPrefs.updateSite(
+          site.copyWith(players: merged),
+        );
+        if (saved) found += merged.length - site.players.length;
+      }
+      if (!mounted || found == 0) return;
+      await _afterMutation();
+      if (!mounted) return;
+      UiLog.action(
+        'no_vpn',
+        'auto_players',
+        result: 'ok',
+        extra: {'count': found},
+      );
+      showProxyDomToast(
+        AppL10n.of(context).splitTunnelPlayersFound(found),
+        tone: ToastTone.success,
+      );
+    } finally {
+      _autoRunning = false;
+    }
   }
 
   Future<void> _reconnect() async {
@@ -209,19 +274,19 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
                     ),
                   ),
                 if (_pending)
-                  Material(
-                    // tertiaryContainer is not set in AppTheme, so it falls
-                    // back to `tertiary`: near-black in light, near-white in
-                    // dark. bodySmall keeps onSurface, which is the same ink
-                    // colour — the sentence was invisible in both themes and
-                    // the strip looked like an empty band with a stray button.
-                    // A surface token keeps the text on onSurfaceVariant.
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 10,
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: theme.colorScheme.outline.withValues(
+                            alpha: 0.55,
+                          ),
+                        ),
                       ),
+                      padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
                       child: Row(
                         children: [
                           Expanded(
@@ -229,16 +294,14 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
                               l.splitTunnelPendingBody,
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: theme.colorScheme.onSurfaceVariant,
+                                height: 1.3,
                               ),
                             ),
                           ),
-                          FilledButton(
-                            onPressed: _reconnecting ? null : _reconnect,
-                            child: Text(
-                              _reconnecting
-                                  ? l.splitTunnelReconnectInProgress
-                                  : l.splitTunnelReconnect,
-                            ),
+                          const SizedBox(width: 10),
+                          _ReconnectKey(
+                            reconnecting: _reconnecting,
+                            onPressed: _reconnect,
                           ),
                         ],
                       ),
@@ -248,7 +311,6 @@ class _NoVpnScreenState extends ConsumerState<NoVpnScreen>
                   child: _sitesOnly
                       ? _SitesTab(
                           sites: _filteredSites,
-                          showIosNote: true,
                           onToggleSite: (site, enabled) async {
                             UiLog.action(
                               'no_vpn',
@@ -558,25 +620,34 @@ class _AppIconAvatar extends StatelessWidget {
   }
 }
 
-class _SitesTab extends StatelessWidget {
+class _SitesTab extends StatefulWidget {
   const _SitesTab({
     required this.sites,
     required this.onToggleSite,
     required this.onDeleteSite,
     required this.onAddSite,
-    this.showIosNote = false,
   });
 
   final List<SplitTunnelSite> sites;
   final Future<void> Function(SplitTunnelSite site, bool enabled) onToggleSite;
   final Future<void> Function(SplitTunnelSite site) onDeleteSite;
   final VoidCallback onAddSite;
-  final bool showIosNote;
+
+  @override
+  State<_SitesTab> createState() => _SitesTabState();
+}
+
+class _SitesTabState extends State<_SitesTab> {
+  /// Swipe-to-delete looked the same as scrolling and left no undo. The pencil
+  /// makes deletion a mode: nothing on a row can delete a site until the person
+  /// has asked for the X, and the X still goes through the confirm dialog.
+  bool _editing = false;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l = AppL10n.of(context);
+    final sites = widget.sites;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -589,15 +660,6 @@ class _SitesTab extends StatelessWidget {
             color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
-        if (showIosNote) ...[
-          const SizedBox(height: 8),
-          Text(
-            l.splitTunnelSitesIosNote,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
         const SizedBox(height: 16),
         Row(
           children: [
@@ -611,6 +673,15 @@ class _SitesTab extends StatelessWidget {
               style: theme.textTheme.labelLarge?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
+            ),
+            const SizedBox(width: 8),
+            AppRingButton(
+              icon: _editing ? AppIcons.check : AppIcons.pencil,
+              color: theme.colorScheme.primary,
+              size: 36,
+              iconSize: 18,
+              tooltip: _editing ? l.splitTunnelEditDone : l.splitTunnelEdit,
+              onPressed: () => setState(() => _editing = !_editing),
             ),
           ],
         ),
@@ -627,30 +698,90 @@ class _SitesTab extends StatelessWidget {
           )
         else
           for (final site in sites)
-            Dismissible(
+            Row(
               key: ValueKey(site.id),
-              direction: DismissDirection.endToStart,
-              onDismissed: (_) => onDeleteSite(site),
-              background: Container(
-                alignment: Alignment.centerRight,
-                padding: const EdgeInsets.only(right: 16),
-                color: theme.colorScheme.errorContainer,
-                child: Text(l.splitTunnelDelete),
-              ),
-              child: _AllowRow(
-                title: site.label.isNotEmpty ? site.label : site.domain,
-                subtitle: site.label.isNotEmpty ? site.domain : null,
-                value: site.enabled,
-                onChanged: (v) => onToggleSite(site, v),
-              ),
+              children: [
+                Expanded(
+                  child: _AllowRow(
+                    title: site.label.isNotEmpty ? site.label : site.domain,
+                    subtitle: site.label.isNotEmpty
+                        ? site.domain
+                        : (site.players.isEmpty
+                            ? null
+                            : l.splitTunnelPlayersCount(site.players.length)),
+                    value: site.enabled,
+                    onChanged: (v) => widget.onToggleSite(site, v),
+                  ),
+                ),
+                if (_editing)
+                  AppRingButton(
+                    icon: AppIcons.x,
+                    color: theme.colorScheme.error,
+                    size: 36,
+                    iconSize: 16,
+                    tooltip: l.splitTunnelDelete,
+                    onPressed: () => widget.onDeleteSite(site),
+                  ),
+              ],
             ),
         const SizedBox(height: 12),
         OutlinedButton.icon(
-          onPressed: onAddSite,
+          onPressed: widget.onAddSite,
           icon: const AppIcon(AppIcons.plus),
           label: Text(l.splitTunnelAddSite),
         ),
       ],
+    );
+  }
+}
+
+class _ReconnectKey extends StatelessWidget {
+  const _ReconnectKey({
+    required this.reconnecting,
+    required this.onPressed,
+  });
+
+  final bool reconnecting;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    final l = AppL10n.of(context);
+    final ink = dark ? AppBrand.inkGoldDark : AppBrand.inkGoldLight;
+    final wash = AppBrand.mascotGold.withValues(alpha: dark ? 0.16 : 0.10);
+    return TextButton.icon(
+      onPressed: reconnecting ? null : onPressed,
+      style: TextButton.styleFrom(
+        foregroundColor: ink,
+        backgroundColor: wash,
+        disabledForegroundColor: ink.withValues(alpha: 0.55),
+        disabledBackgroundColor: wash,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        minimumSize: const Size(0, 34),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        shape: const StadiumBorder(),
+        side: BorderSide(
+          color: AppBrand.mascotGold.withValues(alpha: 0.35),
+        ),
+        textStyle: const TextStyle(
+          fontSize: 12.5,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      icon: reconnecting
+          ? SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(strokeWidth: 2, color: ink),
+            )
+          : AppIcon(AppIcons.refresh, size: 15, color: ink),
+      label: Text(
+        reconnecting
+            ? l.splitTunnelReconnectInProgress
+            : l.splitTunnelReconnect,
+      ),
     );
   }
 }
@@ -681,17 +812,40 @@ class _AddSiteSheetState extends State<_AddSiteSheet> {
       _saving = true;
       _error = null;
     });
+    final normalized = normalizeSplitTunnelDomain(_domain.text);
+    if (normalized is! DomainNormalizeOk) {
+      _fail(normalized as DomainNormalizeErr, l);
+      return;
+    }
+    // The player lives on another host. Read the page now, while the person is
+    // still on this sheet, so the site and its player are one saved thing.
+    final players = await SitePlayerDiscovery.discover(normalized.domain);
     final result = await SplitTunnelPrefs.addSite(
-      domain: _domain.text,
+      domain: normalized.domain,
       label: _label.text,
+      players: players,
     );
     if (!mounted) return;
     if (result is DomainNormalizeOk) {
-      UiLog.action('no_vpn', 'add_site', result: 'ok');
+      UiLog.action(
+        'no_vpn',
+        'add_site',
+        result: 'ok',
+        extra: {'players': players.length},
+      );
+      if (players.isNotEmpty) {
+        showProxyDomToast(
+          l.splitTunnelPlayersFound(players.length),
+          tone: ToastTone.success,
+        );
+      }
       Navigator.pop(context, true);
       return;
     }
-    final err = result as DomainNormalizeErr;
+    _fail(result as DomainNormalizeErr, l);
+  }
+
+  void _fail(DomainNormalizeErr err, AppL10n l) {
     UiLog.action('no_vpn', 'add_site', result: 'bad', reason: err.kind.name);
     setState(() {
       _saving = false;
@@ -729,7 +883,6 @@ class _AddSiteSheetState extends State<_AddSiteSheet> {
             decoration: InputDecoration(
               labelText: l.splitTunnelDomainLabel,
               hintText: l.splitTunnelDomainHint,
-              helperText: l.splitTunnelDomainLatinHelper,
               errorText: _error,
             ),
             onSubmitted: (_) => _save(),
@@ -737,7 +890,13 @@ class _AddSiteSheetState extends State<_AddSiteSheet> {
           const SizedBox(height: 16),
           FilledButton(
             onPressed: _saving ? null : _save,
-            child: Text(l.splitTunnelSave),
+            child: _saving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Text(l.splitTunnelSave),
           ),
         ],
       ),
