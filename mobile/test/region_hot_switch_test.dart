@@ -9,7 +9,7 @@ void main() {
       expect(
         regionPickUsesBusyOverlay(
           VpnConnected(
-            serverName: 'YouTube',
+            serverName: 'Медиа',
             protocol: 'HYSTERIA2',
             connectedSince: DateTime.utc(2026, 9, 16),
           ),

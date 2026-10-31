@@ -11,7 +11,7 @@ import '../../../../l10n/app_localizations.dart';
 import '../../application/vpn_provider.dart';
 import '../../application/vpn_status.dart';
 
-/// Auto Connecting flag hop (Free LV→US, Premium + gaming/YouTube).
+/// Auto Connecting flag hop (country flags, then category tiles).
 const Duration kAutoFlagCycleDuration = Duration(milliseconds: 750);
 
 /// Server pill: region left | session column right. Tappable → Locations.

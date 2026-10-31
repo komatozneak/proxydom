@@ -626,7 +626,7 @@ class _FactsLine extends StatelessWidget {
   }
 }
 
-/// «АКТИВЕН ● YOUTUBE» on the right end of the pool rule.
+/// «АКТИВЕН ● МЕДИА» on the right end of the pool rule.
 ///
 /// Labelled, not implied: a bare name beside a count reads as one word run
 /// together.

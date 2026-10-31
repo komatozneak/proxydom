@@ -222,8 +222,7 @@ String? englishTitleForProduct(String raw) {
 NodePlace? canonicalPlaceForProductLabel(String raw) {
   final t = stripTierRole(raw).trim().toLowerCase();
   if (t.isEmpty) return null;
-  if (t.contains('youtube') ||
-      t.contains('медиа') ||
+  if (t.contains('медиа') ||
       t.contains('media') ||
       t.contains('video') ||
       t.contains('stream')) {
@@ -242,9 +241,7 @@ NodePlace? canonicalPlaceForProductLabel(String raw) {
       t.contains('office')) {
     return kWorkNodePlace;
   }
-  if (t.contains('резерв') ||
-      t.contains('backup') ||
-      t.contains('запасн')) {
+  if (t.contains('резерв') || t.contains('backup') || t.contains('запасн')) {
     return kBackupNodePlace;
   }
   if (t.contains('сша') ||
@@ -289,8 +286,7 @@ String sanitizeHomeLabel(String raw) {
 String flagForProductLabel(String label) {
   final t = label.trim().toLowerCase();
   if (t.isEmpty) return kFlagGlobe;
-  if (t.contains('youtube') ||
-      t.contains('медиа') ||
+  if (t.contains('медиа') ||
       t.contains('media') ||
       t.contains('video') ||
       t.contains('stream')) {
@@ -309,9 +305,7 @@ String flagForProductLabel(String label) {
       t.contains('office')) {
     return kFlagWork;
   }
-  if (t.contains('резерв') ||
-      t.contains('backup') ||
-      t.contains('запасн')) {
+  if (t.contains('резерв') || t.contains('backup') || t.contains('запасн')) {
     return kFlagBackup;
   }
   if (t.contains('индия') || t.contains('india')) return kFlagIndia;

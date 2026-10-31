@@ -112,8 +112,7 @@ String _remark(ParsedShareLink link) {
 
 PoolTile _tileForTitle(String title) {
   final lower = title.toLowerCase();
-  if (lower.contains('youtube') ||
-      lower.contains('медиа') ||
+  if (lower.contains('медиа') ||
       lower.contains('media') ||
       lower.contains('video') ||
       lower.contains('stream')) {

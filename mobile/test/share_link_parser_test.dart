@@ -22,7 +22,7 @@ hysteria2://user:pass@203.0.113.12:443/?sni=c.example#Charlie
     expect(links[2].hy2?.profile.sni, 'c.example');
   });
 
-  // The intake side of the parity with INCY: a SOCKS5 key is a key, and one
+  // The intake side of the parity with the standard intake: a SOCKS5 key is a key, and one
   // without a credential is still a key. The default port is the protocol's
   // registered one, not the TLS port the other schemes fall back to.
   test('parses socks5 keys, with and without a credential', () {
@@ -57,7 +57,7 @@ hysteria2://user:pass@203.0.113.52:443/?sni=a.example#Good
   });
 
   test('an http address stays a subscription, not a proxy key', () {
-    // INCY reads `http://user:pass@host` as an HTTP proxy key. Here the same
+    // The standard intake reads `http://user:pass@host` as an HTTP proxy key. Here the same
     // shape is a document address, and guessing between the two before the
     // fetch would make every provider URL ambiguous.
     expect(isShareLinkLine('http://user:pass@203.0.113.60:8080'), isFalse);
@@ -109,7 +109,7 @@ hysteria2://user:pass@203.0.113.52:443/?sni=a.example#Good
     expect(isPendingSubscriptionUrl(url), isTrue);
     expect(parseShareSubscription(url), isEmpty);
     const body = '''
-# Teremok VPN
+# CompanyNet Gateway
 hysteria2://user:pass@203.0.113.12:443/?sni=c.example#Charlie
 ''';
     expect(isPendingSubscriptionUrl(body), isFalse);

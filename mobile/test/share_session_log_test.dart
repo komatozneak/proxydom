@@ -20,7 +20,7 @@ void main() {
 
   test('hysteria obfs password is only marked set', () {
     const raw =
-        'hysteria2://standHy2pass@95.182.81.27:20002?sni=stand.teremok.test'
+        'hysteria2://standHy2pass@95.182.81.27:20002?sni=stand.company-net.test'
         '&insecure=1&obfs=salamander&obfs-password=standObfsPass#hy2-obfs';
     final fields = ShareSessionLog.fieldsFor(parseShareLink(raw));
     expect(fields['obfs'], 'salamander');

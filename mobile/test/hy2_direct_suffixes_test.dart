@@ -25,11 +25,11 @@ void main() {
     expect(
       normalizeRouteSuffixes([
         'vk.com',
-        ' YouTube.com ',
+        ' Example.org ',
         'example.com',
         'example.com',
       ]),
-      ['example.com', 'vk.com', 'youtube.com'],
+      ['example.com', 'example.org', 'vk.com'],
     );
   });
 

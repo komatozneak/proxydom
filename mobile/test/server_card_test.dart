@@ -163,7 +163,7 @@ void main() {
     await tester.pumpWidget(
       _wrap(
         const ServerCard(
-          title: 'YouTube',
+          title: 'Медиа',
           subtitle: '',
           flagEmoji: 'media',
           selectionIsAuto: true,
@@ -173,7 +173,7 @@ void main() {
           vpnProvider.overrideWith(
             () => _FixedVpnNotifier(
               VpnConnected(
-                serverName: 'YouTube',
+                serverName: 'Медиа',
                 protocol: 'hysteria2',
                 connectedSince: DateTime.now(),
               ),

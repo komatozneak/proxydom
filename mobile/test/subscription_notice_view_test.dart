@@ -14,7 +14,7 @@ void main() {
           body: SubscriptionNoticeView(
             text:
                 'Для перехода в бота нажмите на значок правее\n🔑 sdc91quy Active',
-            planeUrl: 'https://t.me/vpn_teremok_bot',
+            planeUrl: 'https://t.me/company_net_support',
             frame: true,
           ),
         ),
@@ -60,7 +60,7 @@ void main() {
         home: const Scaffold(
           body: SubscriptionNoticeView(
             text: 'Значок справа ведёт в бота',
-            planeUrl: 'https://t.me/vpn_teremok_bot',
+            planeUrl: 'https://t.me/company_net_support',
             frame: true,
             showPlane: false,
           ),
@@ -80,7 +80,7 @@ void main() {
         theme: AppTheme.light,
         home: Scaffold(
           body: CatalogProfileChrome(
-            title: const Text('Teremok'),
+            title: const Text('CompanyNet'),
             share: const Icon(Icons.share),
             refresh: const Icon(Icons.refresh),
             plane: const Icon(Icons.send),

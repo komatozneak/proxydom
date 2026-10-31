@@ -25,10 +25,10 @@ void main() {
     final message = tunnelConnect(
       uri: 'hy2://secret@cdn.example:443',
       directDomains: ['steamserver.net'],
-      forceProxyDomains: ['youtube.com', 'bad host'],
+      forceProxyDomains: ['example.org', 'bad host'],
       udpDirect: true,
     );
-    expect(message['force_proxy_domains'], ['youtube.com']);
+    expect(message['force_proxy_domains'], ['example.org']);
     expect(message['udp_direct'], 1);
 
     final off = tunnelConnect(

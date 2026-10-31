@@ -48,7 +48,7 @@ void main() {
         home: const Scaffold(
           body: Row(
             children: [
-              LocationFlagIcon(flag: 'youtube', size: 48),
+              LocationFlagIcon(flag: 'media', size: 48),
               LocationFlagIcon(flag: 'gaming', size: 48),
             ],
           ),

@@ -7,7 +7,7 @@ import 'package:proxydom/features/vpn/data/share_link_parser.dart';
 void main() {
   const stand =
       'hysteria2://standHy2pass@95.182.81.27:20001'
-      '?sni=stand.teremok.test&insecure=1#hy2';
+      '?sni=stand.company-net.test&insecure=1#hy2';
 
   test('local lines paint before a refresh that never finishes', () async {
     final link = parseShareLink(stand);

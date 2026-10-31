@@ -177,7 +177,7 @@ void main() {
             requestOptions: opts,
             type: DioExceptionType.connectionError,
             error: const SocketException(
-              'Failed host lookup: api.teremokconnect.online',
+              'Failed host lookup: api.company-net.ru',
             ),
           ),
         ),

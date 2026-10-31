@@ -53,7 +53,6 @@ class SitePlayerDiscovery {
     'vk.com/video',
     'ok.ru/video',
     'rutube',
-    'youtube',
     'vimeo',
     'dailymotion',
     'cdn',

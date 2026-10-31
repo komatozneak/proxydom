@@ -53,7 +53,7 @@ void _seedProfile() {
             _profileLink,
             _line('Индия'),
             _line('Игровой'),
-            _line('YouTube'),
+            _line('Медиа'),
           ],
         },
       ],
@@ -119,7 +119,7 @@ ProfileInstrument _instrument({
     updated: updated,
     selected: false,
     onNodeTap: (_) {},
-    selectedNodeTitle: 'YouTube',
+    selectedNodeTitle: 'Медиа',
     telegramLabel: 'Поддержка',
     onTelegram: () {},
     onRefresh: () {},
@@ -134,7 +134,7 @@ NodeLine _node(String title, {bool selected = false}) {
     label: PoolServerLabel(
       title: title,
       subtitle: 'низкий пинг',
-      tile: title.contains('YouTube') ? PoolTile.media : PoolTile.flag,
+      tile: title.contains('Медиа') ? PoolTile.media : PoolTile.flag,
       flag: '',
     ),
     endpoint: 'eu1.proxydom.su:443',
@@ -228,7 +228,7 @@ void main() {
       _wrap(
         _instrument(
           nodes: [
-            _node('YouTube', selected: true),
+            _node('Медиа', selected: true),
             _node('Индия'),
             _node('Игровой'),
             _node('США'),
@@ -239,7 +239,7 @@ void main() {
     await tester.pump();
 
     // The active line is named in the header and again in the pool.
-    expect(find.text('YouTube'), findsWidgets);
+    expect(find.text('Медиа'), findsWidgets);
     expect(find.text('США'), findsOneWidget);
     // One rule between two lines, and none around them: the rows used to be
     // four cards inside the card.

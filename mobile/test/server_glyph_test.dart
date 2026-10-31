@@ -12,7 +12,7 @@ Widget _glyph(String flag) {
     home: Scaffold(
       body: ServerGlyph(
         label: PoolServerLabel(
-          title: 'DoDoVPN',
+          title: 'CompanyNet',
           subtitle: '',
           tile: PoolTile.flag,
           flag: flag,

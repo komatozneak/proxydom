@@ -93,10 +93,10 @@ void main() {
     // key pasted by hand, which is what the tunnel was actually running.
     const document = ShareCatalog(
       id: 'doc',
-      title: 'Teremok',
+      title: 'CompanyNet',
       url: 'https://sub.proxydom.su/2aq93K0svSy2IRUj',
       lines: [
-        'hysteria2://pw@203.0.113.1:443#YouTube',
+        'hysteria2://pw@203.0.113.1:443#Медиа',
         'hysteria2://pw@203.0.113.2:443#Индия',
         'hysteria2://pw@203.0.113.3:443#Игровой',
         'hysteria2://pw@203.0.113.4:443#США',
@@ -149,7 +149,7 @@ void main() {
     expect(
       const ShareCatalog(
         id: 'doc',
-        title: 'Teremok',
+        title: 'CompanyNet',
         lines: ['hysteria2://secret@10.0.0.1:443#A'],
         url: 'https://sub.example.org/hs4gGfjG',
       ).subscriptionKey,

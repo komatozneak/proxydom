@@ -16,11 +16,11 @@ void main() {
 
   test('markers add the paper plane and the frame', () {
     final notice = composeKeyDescription(
-      '{{frame}}Привет {{plane:https://t.me/vpn_teremok_bot}}{{/frame}}',
+      '{{frame}}Привет {{plane:https://t.me/company_net_support}}{{/frame}}',
     );
     expect(notice.text, 'Привет');
     expect(notice.frame, isTrue);
-    expect(notice.planeUrl, 'https://t.me/vpn_teremok_bot');
+    expect(notice.planeUrl, 'https://t.me/company_net_support');
     expect(subscriptionPlaneIsTelegram(notice.planeUrl!), isTrue);
   });
 
@@ -44,25 +44,25 @@ void main() {
     final encoded = 'base64:${base64Encode(utf8.encode(text))}';
     final notice = subscriptionNotice(
       body: '''
-#support-url: https://t.me/vpn_teremok_bot
+#support-url: https://t.me/company_net_support
 #announce: $encoded
 $_link
 ''',
     );
     expect(notice.text, text);
-    expect(notice.planeUrl, 'https://t.me/vpn_teremok_bot');
+    expect(notice.planeUrl, 'https://t.me/company_net_support');
     expect(notice.frame, isTrue);
     expect(notice.text!.length, lessThanOrEqualTo(subscriptionAnnounceLimit));
   });
 
   test('a header wins over the same comment in the body', () {
     final notice = subscriptionNotice(
-      supportHeader: 'https://t.me/vpn_teremok_bot',
+      supportHeader: 'https://t.me/company_net_support',
       announceHeader: 'base64:${base64Encode(utf8.encode('Из заголовка'))}',
       body: '#announce: из тела\n#support-url: https://example.com\n$_link',
     );
     expect(notice.text, 'Из заголовка');
-    expect(notice.planeUrl, 'https://t.me/vpn_teremok_bot');
+    expect(notice.planeUrl, 'https://t.me/company_net_support');
   });
 
   test('a non-http plane is dropped', () {
@@ -81,13 +81,13 @@ $_link
     const text = 'Для перехода в бота нажмите на значок правее';
     final encoded = 'base64:${base64Encode(utf8.encode(text))}';
     await Hy2ImportStore.instance.saveInput('''
-#support-url: https://t.me/vpn_teremok_bot
+#support-url: https://t.me/company_net_support
 #announce: $encoded
 $_link
 ''');
     final catalog = (await Hy2ImportStore.instance.catalogs()).single;
     expect(catalog.announce, text);
-    expect(catalog.supportUrl, 'https://t.me/vpn_teremok_bot');
+    expect(catalog.supportUrl, 'https://t.me/company_net_support');
     expect(catalog.announceFrame, isTrue);
   });
 
@@ -99,10 +99,10 @@ $_link
         'catalogs': [
           {
             'id': 'old',
-            'title': 'Teremok',
+            'title': 'CompanyNet',
             'lines': [_link],
             'announce': 'base64:${base64Encode(utf8.encode('Старый текст'))}',
-            'supportUrl': 'https://t.me/vpn_teremok_bot',
+            'supportUrl': 'https://t.me/company_net_support',
           },
         ],
       }),
@@ -122,7 +122,7 @@ $_link
     server.listen((request) async {
       request.response.headers
         ..set('announce', 'base64:${base64Encode(utf8.encode(text))}')
-        ..set('support-url', 'https://t.me/vpn_teremok_bot');
+        ..set('support-url', 'https://t.me/company_net_support');
       request.response.writeln(_link);
       await request.response.close();
     });
@@ -130,7 +130,7 @@ $_link
         .saveInput('http://127.0.0.1:${server.port}/sub');
     final catalog = (await Hy2ImportStore.instance.catalogs()).single;
     expect(catalog.announce, text);
-    expect(catalog.supportUrl, 'https://t.me/vpn_teremok_bot');
+    expect(catalog.supportUrl, 'https://t.me/company_net_support');
     expect(catalog.announceFrame, isTrue);
   });
 

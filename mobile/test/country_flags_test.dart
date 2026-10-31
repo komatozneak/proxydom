@@ -4,53 +4,53 @@ import 'package:proxydom/core/utils/country_flags.dart';
 void main() {
   group('countryTagFrom', () {
     test('takes an uppercase ISO code off the front', () {
-      final tag = countryTagFrom('DE DoDoVPN | Hysteria');
+      final tag = countryTagFrom('DE CompanyNet | Hysteria');
       expect(tag?.code, 'de');
-      expect(tag?.title, 'DoDoVPN | Hysteria');
+      expect(tag?.title, 'CompanyNet | Hysteria');
       expect(tag?.flagEmoji, '🇩🇪');
     });
 
     test('takes a lowercase code too', () {
-      final tag = countryTagFrom('de DoDoVPN | Hysteria | YouTube');
+      final tag = countryTagFrom('de CompanyNet | Hysteria | Медиа');
       expect(tag?.code, 'de');
-      expect(tag?.title, 'DoDoVPN | Hysteria | YouTube');
+      expect(tag?.title, 'CompanyNet | Hysteria | Медиа');
     });
 
     test('a protocol in the middle is not a country', () {
-      final tag = countryTagFrom('DE DoDoVPN | WS | Резерв');
+      final tag = countryTagFrom('DE CompanyNet | WS | Резерв');
       expect(tag?.code, 'de');
-      expect(tag?.title, 'DoDoVPN | WS | Резерв');
-      expect(countryTagFrom('DoDoVPN | WS | Резерв'), isNull);
+      expect(tag?.title, 'CompanyNet | WS | Резерв');
+      expect(countryTagFrom('CompanyNet | WS | Резерв'), isNull);
     });
 
     test('takes brackets and dashes as separators', () {
-      expect(countryTagFrom('[DE] DoDoVPN')?.title, 'DoDoVPN');
-      expect(countryTagFrom('(NL) DoDoVPN')?.title, 'DoDoVPN');
-      expect(countryTagFrom('DE-DoDoVPN')?.title, 'DoDoVPN');
-      expect(countryTagFrom('DE: DoDoVPN')?.title, 'DoDoVPN');
-      expect(countryTagFrom('DE_DoDoVPN')?.title, 'DoDoVPN');
+      expect(countryTagFrom('[DE] CompanyNet')?.title, 'CompanyNet');
+      expect(countryTagFrom('(NL) CompanyNet')?.title, 'CompanyNet');
+      expect(countryTagFrom('DE-CompanyNet')?.title, 'CompanyNet');
+      expect(countryTagFrom('DE: CompanyNet')?.title, 'CompanyNet');
+      expect(countryTagFrom('DE_CompanyNet')?.title, 'CompanyNet');
     });
 
     test('takes a flag emoji, alone or before a code', () {
-      final emoji = countryTagFrom('🇩🇪 DoDoVPN');
+      final emoji = countryTagFrom('🇩🇪 CompanyNet');
       expect(emoji?.code, 'de');
-      expect(emoji?.title, 'DoDoVPN');
+      expect(emoji?.title, 'CompanyNet');
 
-      final both = countryTagFrom('🇩🇪 DE DoDoVPN');
+      final both = countryTagFrom('🇩🇪 DE CompanyNet');
       expect(both?.code, 'de');
-      expect(both?.title, 'DoDoVPN');
+      expect(both?.title, 'CompanyNet');
     });
 
     test('keeps a name that only looks like a code', () {
       expect(countryTagFrom('DEDoVPN'), isNull);
       expect(countryTagFrom('Test Server'), isNull);
-      expect(countryTagFrom('XX DoDoVPN'), isNull);
-      expect(countryTagFrom('DoDoVPN | Hysteria'), isNull);
+      expect(countryTagFrom('XX CompanyNet'), isNull);
+      expect(countryTagFrom('CompanyNet | Hysteria'), isNull);
       expect(countryTagFrom('No lag server'), isNull);
       expect(countryTagFrom('In stock'), isNull);
       expect(countryTagFrom('It works'), isNull);
-      expect(countryTagFrom('De DoDoVPN'), isNull);
-      expect(countryTagFrom('de doDoVPN'), isNull);
+      expect(countryTagFrom('De CompanyNet'), isNull);
+      expect(countryTagFrom('de companyNet'), isNull);
     });
 
     test('accepts the aliases providers use', () {
@@ -78,7 +78,7 @@ void main() {
 
     test('anything that is not a country is not a flag', () {
       expect(countryCodeForFlagValue('🌍'), isNull);
-      expect(countryCodeForFlagValue('youtube'), isNull);
+      expect(countryCodeForFlagValue('media'), isNull);
       expect(countryCodeForFlagValue('gaming'), isNull);
       expect(countryCodeForFlagValue('xx'), isNull);
     });
