@@ -110,6 +110,7 @@ func StartShare(configJSON string) string {
 	// for both engines: the TUN dialer decides, v2ray only carries the flow.
 	clearSplitState()
 	applyShareSplitPolicy(configJSON)
+	setSocksUpstreams(configJSON)
 	prepareCoreLog(configJSON)
 	registerEngineProtector()
 	lastProtectErr.Store("")
@@ -205,7 +206,12 @@ func (protectedSystemDialer) Dial(
 	dest vnet.Destination,
 	_ *internet.SocketConfig,
 ) (net.Conn, error) {
-	return engineOutboundDial(ctx, dest.Network.SystemString(), dest.NetAddr())
+	network, addr := dest.Network.SystemString(), dest.NetAddr()
+	conn, err := engineOutboundDial(ctx, network, addr)
+	if err != nil {
+		return nil, err
+	}
+	return wrapSocksUpstream(conn, network, addr), nil
 }
 
 // StartShareTun pumps VpnService TUN to the local share SOCKS inbound.
