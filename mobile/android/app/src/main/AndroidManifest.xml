@@ -115,7 +115,7 @@
             <intent-filter>
                 <action android:name="android.net.VpnService"/>
             </intent-filter>
-            <!-- ADR 020: Ogon-style opt-out — grey Always-on / lockdown for Proxy Dom. -->
+            <!-- Ogon-style opt-out — grey Always-on / lockdown for Proxy Dom. -->
             <meta-data
                 android:name="android.net.VpnService.SUPPORTS_ALWAYS_ON"
                 android:value="false"/>

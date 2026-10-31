@@ -8,7 +8,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 /**
  * Official apernet/hysteria client via our gomobile AAR (`hy2bind`).
  *
- * Sole dataplane (ADR 018). TUN is [startTun] inside hy2bind.
+ * Sole dataplane. TUN is [startTun] inside hy2bind.
  *
  * Fails closed when `libs/hysteria-client.aar` is not bundled — never soft-pass
  * "QUIC up". SOCKS prove stays in [ProxyDomVpnService]. [ProtectGuard.protect]

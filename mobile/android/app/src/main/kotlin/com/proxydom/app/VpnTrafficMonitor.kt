@@ -9,7 +9,7 @@ import java.util.Locale
 /**
  * Home / shade ↓↑ from tunnel payload counters, not `/proc/net/dev`.
  *
- * libbox CommandClient is gone (ADR 005 / 018). A stub that always emitted
+ * libbox CommandClient is gone. A stub that always emitted
  * zeros made a live VpnService look dead after screen lock.
  */
 class VpnTrafficMonitor(

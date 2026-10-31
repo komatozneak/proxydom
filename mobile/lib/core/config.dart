@@ -14,7 +14,7 @@
 class AppConfig {
   AppConfig._();
 
-  /// Prefer Ogon-parity `/v2` control plane (ADR 009). Legacy `/api/v1` fallback
+  /// Prefer Ogon-parity `/v2` control plane. Legacy `/api/v1` fallback
   /// via [useV2Api]=false for one release if needed.
   static const bool useV2Api = bool.fromEnvironment(
     'USE_V2_API',
@@ -24,7 +24,7 @@ class AppConfig {
   /// Production API origin (scheme + host + port), no path.
   static const String vpsApiOrigin = 'https://api.proxydom.su';
 
-  /// Production backend — `/v2` (ADR 009) or legacy `/api/v1`.
+  /// Production backend — `/v2` or legacy `/api/v1`.
   static const String vpsBaseUrl =
       useV2Api ? '$vpsApiOrigin/v2' : '$vpsApiOrigin/api/v1';
 

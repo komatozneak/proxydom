@@ -4,7 +4,7 @@ import NetworkExtension
 import UIKit
 
 /// iOS side of MethodChannel `proxydom/vpn` (same name as Android).
-/// Starts `NETunnelProviderManager` → Packet Tunnel appex (ADR 019).
+/// Starts `NETunnelProviderManager` → Packet Tunnel appex.
 private final class TunnelHealthOnce {
   var done = false
   let result: FlutterResult

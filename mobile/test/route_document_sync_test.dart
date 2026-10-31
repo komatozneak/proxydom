@@ -56,7 +56,7 @@ void main() {
     expect(decideDocumentSync(status: 503), DocumentSyncDecision.keep);
   });
 
-  test('import dial follows the link, not the scheme name (ADR 035)', () {
+  test('import dial follows the link, not the scheme name', () {
     final vless = parseShareLink(
       'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
       '?security=tls&type=ws&path=%2Fws#A',

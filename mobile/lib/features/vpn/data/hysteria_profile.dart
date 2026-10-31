@@ -1,4 +1,4 @@
-/// Hysteria2 client profile (ADR 015). SOCKS prove on [socksListen].
+/// Hysteria2 client profile. SOCKS prove on [socksListen].
 ///
 /// Built from an `hy2://` / `hysteria2://` link by `Hy2LinkParser` and handed to
 /// `VpnController.startHysteria`. This file is what remains of `vpn_config.dart`:

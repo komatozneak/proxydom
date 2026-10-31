@@ -32,13 +32,13 @@ class WindowsConnectResult {
   final bool cleanupVerified;
 }
 
-/// Unprivileged window side of the Windows broker v3 contract (ADR 031).
+/// Unprivileged window side of the Windows broker v3 contract.
 ///
 /// Flutter never opens the LocalSystem named pipe. The sibling native
 /// controller owns Windows IPC and exchanges newline-delimited JSON over its
 /// standard streams. The controller is a channel, not a lease: closing the
 /// window closes the channel and the service keeps the tunnel, so this side
-/// asks for the live state with `hello` on every attach (ADR 034).
+/// asks for the live state with `hello` on every attach.
 class WindowsTunnel {
   WindowsTunnel._();
 

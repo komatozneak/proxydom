@@ -35,10 +35,10 @@ fun fastestCandidate(
 ): Pair<SocksProbeCandidate, Long>? =
     successful.minByOrNull { it.second }
 
-/** Hy2 core switch (ADR 018): exact string `"hysteria"` only. */
+/** Hy2 core switch: exact string `"hysteria"` only. */
 internal fun isHysteriaCore(params: Map<String, Any?>): Boolean =
     params["vpnCore"] == ProxyDomVpnService.VPN_CORE_HYSTERIA
 
-/** Pasted non-Hy2 profile. Same gomobile runtime as Hy2 (ADR 026). */
+/** Pasted non-Hy2 profile. Same gomobile runtime as Hy2. */
 internal fun isVlessShareCore(params: Map<String, Any?>): Boolean =
     params["vpnCore"] == "vless"

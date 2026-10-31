@@ -107,7 +107,7 @@ void main() {
     });
   });
 
-  test('Settings does not ship a kill-switch tile (ADR 020)', () {
+  test('Settings does not ship a kill-switch tile', () {
     final settings = File(
       'lib/features/settings/presentation/settings_screen.dart',
     ).readAsStringSync();
