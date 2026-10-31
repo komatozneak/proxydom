@@ -201,8 +201,10 @@ class VpnController {
     String? displayLabel,
     String? sessionId,
     String? scheme,
+    String? endpoint,
   }) async {
     try {
+      final server = shareServerOf(endpoint);
       final disallowedApps = _isIosSplit
           ? const <String>[]
           : ((await SplitTunnelPrefs.loadDisallowedPackages()).toList()
@@ -218,6 +220,11 @@ class VpnController {
             : kVpnBrandSessionName,
         'outboundType': outboundType,
         'vlessConfig': configJson,
+        // The node, for the route bypass and the reach probe. Native code used
+        // to scrape it out of the document, which has a different shape per
+        // engine and carries the secrets; the endpoint is already known here.
+        if (server != null) 'shareServerHost': server.host,
+        if (server != null) 'shareServerPort': server.port,
         if (disallowedApps.isNotEmpty) 'disallowedApplications': disallowedApps,
       });
       final result = await _methodChannel.invokeMethod<bool>(

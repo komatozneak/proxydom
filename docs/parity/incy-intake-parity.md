@@ -199,9 +199,17 @@ cmake --build build-check --target protocol_test supervisor_test share_config
 
 ## 5. Что осталось для полного паритета
 
+Reality больше не в этом списке: её клиентская половина реализована отдельным
+permissive-движком (`mobile/android/hysteria-bind/share_reality.go`) на uTLS и
+VLESS, без `xray-core`. Движок проверен живым прогоном против Xray 26.3.27
+(Reality + VLESS, TCP и UDP) и встроен в Android, Windows и iOS. XTLS Vision —
+второй слой фрейминга поверх VLESS — пока не реализован, поэтому строки с
+`flow=xtls-rprx-vision` остаются неактивными; это отдельная работа, не
+лицензионный блокер.
+
 | Что | Почему не здесь | Оценка |
 |---|---|---|
-| Reality + XHTTP | переход `hy2bind` с `v2fly/v2ray-core` на `XTLS/Xray-core` (MPL-2.0): другой набор пакетов, REALITY и XHTTP только там | большая |
+| XHTTP | нужен клиентский фрейминг XHTTP (сессии, upload/download, padding); ни `v2ray-core`, ни REALITY-движок его не несут | большая |
 | WireGuard / AmneziaWG | новый outbound: `wireguard-go` (MIT) + netstack (Apache-2.0), ~400–600 строк Go + gomobile | средняя |
 | SSTP / OpenConnect | готовых permissive-библиотек на Go нет | большая |
 | Полный JSON-импорт | нужен загрузчик, описывающий больше, чем пять outbound'ов | средняя |
@@ -211,5 +219,5 @@ cmake --build build-check --target protocol_test supervisor_test share_config
 `LICENSE` — MPL-2.0, но сборочный граф тянет `sagernet/sing` (GPL-3.0) через
 `transport/internet`, `sagernet/sing-shadowsocks` (GPL-3.0) через `infra/conf` и
 `juju/ratelimit` (LGPL) через `xtls/reality`. Это ловится `go mod why` и валится
-`TestLicenseGuard`. Пока эти части не вырезаны из графа, Reality и XHTTP в
-клиенте не появятся.
+`TestLicenseGuard`. Reality этого графа не требует; для XHTTP проще сделать
+свой permissive-клиент, чем ввозить весь граф.

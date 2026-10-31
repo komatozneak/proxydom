@@ -4,6 +4,7 @@ go 1.26.3
 
 require (
 	github.com/apernet/hysteria/core/v2 v2.13.0
+	github.com/refraction-networking/utls v1.8.2
 	github.com/v2fly/v2ray-core/v5 v5.54.2
 	github.com/xjasonlyu/tun2socks/v2 v2.7.0
 	go.uber.org/zap v1.28.0
@@ -29,7 +30,6 @@ require (
 	github.com/pires/go-proxyproto v0.15.0 // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/quic-go/quic-go v0.61.0 // indirect
-	github.com/refraction-networking/utls v1.8.2 // indirect
 	github.com/riobard/go-bloom v0.0.0-20200614022211-cdc8013cb5b3 // indirect
 	github.com/seiflotfy/cuckoofilter v0.0.0-20240715131351-a2f2c23f1771 // indirect
 	github.com/stretchr/objx v0.5.3 // indirect

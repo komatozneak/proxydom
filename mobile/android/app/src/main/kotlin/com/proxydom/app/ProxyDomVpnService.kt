@@ -1184,10 +1184,7 @@ class ProxyDomVpnService : VpnService() {
         }
         builder.addDnsServer("1.1.1.1")
         builder.addDnsServer("8.8.8.8")
-        val server = Regex(""""address"\s*:\s*"([^"]+)"\s*,\s*"port"\s*:\s*(\d+)""")
-            .find(configJson)
-        val serverHost = server?.groupValues?.getOrNull(1).orEmpty()
-        val serverPort = server?.groupValues?.getOrNull(2)?.toIntOrNull() ?: 0
+        val (serverHost, serverPort) = shareServerOf(params)
         applyBypassRoutes(builder, serverHost, params)
         applyDisallowedApplications(builder, params)
         currentStatus = "connecting"

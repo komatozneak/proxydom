@@ -1212,8 +1212,9 @@ class VpnNotifier extends Notifier<VpnStatus> {
         // document here; Windows hands the raw URI to the broker, which starts
         // the same MIT core. iOS stays closed, so canDialScheme refuses the
         // family there and the share_unsupported path remains.
-        // buildShareSocksConfig is the authority for what the engine can
-        // describe: Reality and XHTTP return null and do not start.
+        // buildShareSocksConfig is the authority for what either share engine
+        // can describe: the v2ray family and REALITY produce a document, XHTTP
+        // and an unexpressible transport return null and do not start.
         final shareConfig = profile == null && canDialScheme(imported.scheme)
             ? buildShareSocksConfig(imported)
             : null;
@@ -1221,7 +1222,10 @@ class VpnNotifier extends Notifier<VpnStatus> {
         var started = false;
         SessionTrace.mark('config', {
           'scheme': imported.scheme,
-          if (profile == null) 'core': shareConfig == null ? 'none' : 'share',
+          if (profile == null)
+            'core': shareConfig == null
+                ? 'none'
+                : (isRealityLink(imported) ? 'reality' : 'share'),
         });
         if (profile != null || shareConfig != null) {
           final dial = _dialGen == 0 ? ++_dialGen : _dialGen;
@@ -1240,6 +1244,7 @@ class VpnNotifier extends Notifier<VpnStatus> {
                       displayLabel: shown.title,
                       sessionId: _sid,
                       scheme: imported.scheme,
+                      endpoint: imported.endpoint,
                     );
           started = raw && _dialGen == dial;
         } else {

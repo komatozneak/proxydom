@@ -269,7 +269,22 @@ struct ShareStartConfig {
       let document = params["vlessConfig"] as? String,
       !document.isEmpty,
       let documentData = document.data(using: .utf8),
-      let documentRoot = (try? JSONSerialization.jsonObject(with: documentData)) as? [String: Any],
+      let documentRoot = (try? JSONSerialization.jsonObject(with: documentData)) as? [String: Any]
+    else {
+      return nil
+    }
+    if (documentRoot["engine"] as? String) == "reality" {
+      // The REALITY document has no v2ray outbounds: the server is a top-level
+      // field. NetworkExtension still needs a non-empty tunnelRemoteAddress,
+      // and that address never reaches the engine.
+      guard let host = documentRoot["server"] as? String, !host.isEmpty else {
+        return nil
+      }
+      self.document = document
+      self.remoteHost = host
+      return
+    }
+    guard
       let outbounds = documentRoot["outbounds"] as? [[String: Any]],
       let first = outbounds.first,
       let settings = first["settings"] as? [String: Any],

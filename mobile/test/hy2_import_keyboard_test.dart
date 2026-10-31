@@ -221,9 +221,9 @@ void main() {
     }
   });
 
-  testWidgets('a lone vless Reality key stays inactive on Android', (
-    tester,
-  ) async {
+  // REALITY has its own permissive engine now, so the key is a usable node
+  // rather than a row the add screen refuses.
+  testWidgets('a lone vless Reality key is dialable on Android', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     try {
       await _pumpImport(tester);
@@ -238,15 +238,15 @@ void main() {
         find.text(
           'Не удалось добавить узел: этот протокол не запускается на этом устройстве.',
         ),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         find.text(
           'Подключение недоступно (протокол не поддерживается клиентом).',
         ),
-        findsOneWidget,
+        findsNothing,
       );
-      expect(_saveEnabled(tester), isFalse);
+      expect(_saveEnabled(tester), isTrue);
     } finally {
       debugDefaultTargetPlatformOverride = null;
     }

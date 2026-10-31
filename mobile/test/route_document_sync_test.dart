@@ -83,16 +83,15 @@ void main() {
       shareImportDial([vless], fromDocument: true),
       ShareImportDial.dialable,
     );
-    // Reality is the vless scheme and still cannot start: the engine cannot
-    // describe it, so a lone paste is refused and a document of only those
-    // lines is kept.
+    // Reality has its own engine, so the vless scheme is enough for a lone
+    // paste and for a document made only of those lines.
     expect(
       shareImportDial([reality], fromDocument: false),
-      ShareImportDial.singleUnsupported,
+      ShareImportDial.dialable,
     );
     expect(
       shareImportDial([reality], fromDocument: true),
-      ShareImportDial.noneDialable,
+      ShareImportDial.dialable,
     );
     expect(
       shareImportDial([trojan], fromDocument: false),
@@ -136,14 +135,27 @@ void main() {
       shareImportDial([hy2, vless], fromDocument: true),
       ShareImportDial.dialable,
     );
-    // The gate is still per link, not per scheme: a transport the core cannot
-    // dial stays out on Windows exactly as it does on Android.
+    // The REALITY engine is the same on Windows as on Android.
     expect(
       shareImportDial([reality], fromDocument: false),
-      ShareImportDial.singleUnsupported,
+      ShareImportDial.dialable,
     );
     expect(
       shareImportDial([reality], fromDocument: true),
+      ShareImportDial.dialable,
+    );
+    // The gate is still per link, not per scheme: a vless line over XHTTP has
+    // no engine, so it stays out although its scheme is admitted.
+    final xhttp = parseShareLink(
+      'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
+      '?security=tls&type=xhttp&path=%2Fx#X',
+    );
+    expect(
+      shareImportDial([xhttp], fromDocument: false),
+      ShareImportDial.singleUnsupported,
+    );
+    expect(
+      shareImportDial([xhttp], fromDocument: true),
       ShareImportDial.noneDialable,
     );
   });

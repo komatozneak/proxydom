@@ -223,9 +223,42 @@ func TestShareEngineCarriesGRPCAndHTTPUpgrade(t *testing.T) {
 	}
 }
 
-// Reality arrived with xray-core, which is GPL and is not linked.
-func TestVLESSRealityIsRefused(t *testing.T) {
-	cfg, err := parseEngineConfig([]byte(`{"outbound":{"type":"vless","server":"203.0.113.11","server_port":443,"uuid":"u","security":"reality","public_key":"k"}}`))
+// REALITY is a second share engine, not a v2ray stream setting. The Windows
+// document names the engine and carries the handshake fields.
+func TestVLESSRealityUsesTheRealityEngine(t *testing.T) {
+	cfg, err := parseEngineConfig([]byte(`{"socks_listen":"127.0.0.1:18099","outbound":{"type":"vless","server":"203.0.113.11","server_port":443,"uuid":"11111111-2222-3333-4444-555555555555","security":"reality","public_key":"pub","short_id":"a1b2","sni":"cover.example","fingerprint":"chrome"}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := cfg.shareRefusal(); got != "" {
+		t.Fatalf("refusal = %q", got)
+	}
+	doc, err := cfg.shareStartJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`"engine":"reality"`, `"public_key":"pub"`, `"short_id":"a1b2"`, `"sni":"cover.example"`, `"socks_listen":"127.0.0.1:18099"`} {
+		if !strings.Contains(string(doc), want) {
+			t.Fatalf("document missing %s: %s", want, doc)
+		}
+	}
+}
+
+// The REALITY engine currently speaks TCP. A ws/gRPC line must be refused by
+// name instead of failing after the TLS handshake.
+func TestVLESSRealityRefusesANonTCPTransport(t *testing.T) {
+	cfg, err := parseEngineConfig([]byte(`{"outbound":{"type":"vless","server":"203.0.113.11","server_port":443,"uuid":"11111111-2222-3333-4444-555555555555","security":"reality","public_key":"pub","network":"ws"}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := cfg.shareRefusal(); got != "transport_unsupported" {
+		t.Fatalf("refusal = %q, want transport_unsupported", got)
+	}
+}
+
+// XTLS Vision is a second framing layer the permissive engine does not carry.
+func TestVLESSRealityRefusesVision(t *testing.T) {
+	cfg, err := parseEngineConfig([]byte(`{"outbound":{"type":"vless","server":"203.0.113.11","server_port":443,"uuid":"11111111-2222-3333-4444-555555555555","security":"reality","public_key":"pub","flow":"xtls-rprx-vision"}}`))
 	if err != nil {
 		t.Fatal(err)
 	}

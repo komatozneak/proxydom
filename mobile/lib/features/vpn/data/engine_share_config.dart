@@ -2,20 +2,32 @@ import 'dart:convert';
 
 import 'share_link_parser.dart';
 
-/// Local SOCKS port for the in-process share engine (v2ray-core, MIT).
-/// Not Hy2's :10808.
+/// Local SOCKS port for the share engines. Not Hy2's :10808.
+///
+/// The v2ray core and the REALITY engine use the same port: StartShare stops
+/// one before it starts the other, so one number is all the path watch and the
+/// TUN pump ever need.
 const shareSocksPort = 10809;
 
 /// JSON for `hy2bind.StartShare`. Returns null for Hysteria2 or a link we
 /// cannot describe. Callers must not log the result: it contains secrets.
 ///
-/// "Cannot describe" means the loader would reject the document. The engine is
-/// v2ray-core, which has no Reality engine and no `xhttp` dialer, and
-/// `hy2bind_engine_load.go` is strict about both transport and security (see
-/// [_engineTransports] and [_engineSecurities]). Returning null keeps the
-/// failure explicit instead of handing over a document the loader will reject.
+/// Two share cores exist behind this one entry point:
+///
+/// * REALITY + VLESS, carried by the permissive engine in
+///   `hy2bind/share_reality.go`. The document names itself with
+///   `"engine":"reality"`.
+/// * the v2ray-core family, which is the document the loader in
+///   `hy2bind_engine_load.go` reads.
+///
+/// "Cannot describe" means neither engine can start the line. The v2ray
+/// loader is strict about transport and security (see [_engineTransports] and
+/// [_engineSecurities]); the REALITY engine currently carries TCP only.
+/// Returning null keeps the failure explicit instead of handing over a
+/// document the loader will reject.
 String? buildShareSocksConfig(ParsedShareLink link) {
   if (link.isHysteria2) return null;
+  if (isRealityLink(link)) return buildRealityConfig(link);
   final outbound = _outbound(link);
   if (outbound == null) return null;
   outbound['tag'] = 'proxy';
@@ -51,6 +63,69 @@ String? buildShareSocksConfig(ParsedShareLink link) {
     },
   });
 }
+
+/// Whether [link] is a VLESS line with the REALITY security layer.
+///
+/// `security=reality` is the written form; a bare `pbk` (the server's public
+/// key) is what some generators emit instead, and either one means the same
+/// handshake.
+bool isRealityLink(ParsedShareLink link) {
+  if (link.scheme != 'vless') return false;
+  final q = Uri.tryParse(link.raw)?.queryParameters;
+  if (q == null) return false;
+  return (q['security'] ?? '').trim().toLowerCase() == 'reality' ||
+      (q['pbk'] ?? '').trim().isNotEmpty;
+}
+
+/// JSON for the permissive REALITY + VLESS engine.
+///
+/// The engine keeps the link's UUID, public key, short id and SNI in memory and
+/// never writes them to a log. It has no Xray-core dependency: the handshake is
+/// the client half of the public REALITY protocol, carried over uTLS.
+String? buildRealityConfig(ParsedShareLink link) {
+  final uri = Uri.tryParse(link.raw);
+  if (uri == null) return null;
+  final host = uri.host.trim();
+  if (host.isEmpty || uri.userInfo.isEmpty) return null;
+  final q = uri.queryParameters;
+  final publicKey = (q['pbk'] ?? '').trim();
+  if (publicKey.isEmpty) return null;
+  final network = (q['type'] ?? q['net'] ?? 'tcp').trim().toLowerCase();
+  // TCP only. WebSocket and gRPC put another framing layer above this stream;
+  // until that layer exists the line stays inactive instead of failing after
+  // the TLS handshake.
+  if (network.isNotEmpty && network != 'tcp') return null;
+  final uuid = Uri.decodeComponent(uri.userInfo);
+  if (uuid.isEmpty) return null;
+  // A server's short ids are whole bytes, at most eight of them. Anything else
+  // matches no server, so the line is inactive rather than a certain failure.
+  final sid = (q['sid'] ?? '').trim();
+  if (sid.length.isOdd || sid.length > 16 || !_hex.hasMatch(sid)) return null;
+  final sni = (q['sni'] ?? q['peer'] ?? host).trim();
+  final flow = (q['flow'] ?? '').trim();
+  // XTLS Vision adds a second framing layer above VLESS, and a Vision user is
+  // refused without it. The engine carries plain VLESS only.
+  if (flow.isNotEmpty && flow != 'none') return null;
+  // `allowInsecure` is not forwarded: the certificate check is what proves the
+  // peer holds the node's key, so the engine always performs it.
+  return jsonEncode({
+    'engine': 'reality',
+    'server': host,
+    'port': uri.hasPort ? uri.port : 443,
+    'uuid': uuid,
+    'public_key': publicKey,
+    'short_id': sid,
+    'sni': sni,
+    'fingerprint': (q['fp'] ?? '').trim(),
+    'network': 'tcp',
+    // `Uri` decodes `%2F` in the query, so the list arrives as the wire
+    // spelling the engine can use directly.
+    'alpn': _alpnList(q['alpn']),
+    'socks_listen': '127.0.0.1:$shareSocksPort',
+  });
+}
+
+final _hex = RegExp(r'^[0-9a-fA-F]*$');
 
 Map<String, Object?>? _outbound(ParsedShareLink link) {
   switch (link.scheme) {
@@ -285,7 +360,8 @@ const _engineTransports = {
 
 /// Securities `shareStreamConfig` expresses in `hy2bind_engine_load.go`.
 ///
-/// `reality` and `xtls` are refused there, so they are refused here.
+/// A REALITY line never reaches this table: [buildShareSocksConfig] hands it to
+/// the REALITY engine first. `xtls` has no engine at all.
 const _engineSecurities = {'none', 'tls'};
 
 Map<String, Object?>? _stream(

@@ -183,6 +183,17 @@ func (c engineConfig) shareRefusal() string {
 	if c.socksOutbound() {
 		return ""
 	}
+	// The REALITY engine carries its own stream framing and currently speaks
+	// TCP only. A WebSocket or gRPC REALITY line would otherwise pass the
+	// generic table and fail after the TLS handshake. SOCKS5 has no TLS layer
+	// at all, so the word `reality` on such a line is not this branch's.
+	if c.shareScheme() == "vless" && c.Outbound.securityName() == "reality" && c.Outbound.networkName() != "tcp" {
+		return "transport_unsupported"
+	}
+	if c.shareScheme() == "vless" && c.Outbound.securityName() == "reality" &&
+		c.Outbound.Flow != "" && !strings.EqualFold(c.Outbound.Flow, "none") {
+		return "security_unsupported"
+	}
 	if !hy2bind.TransportDialable(c.Outbound.networkName()) {
 		return "transport_unsupported"
 	}
@@ -266,6 +277,13 @@ func (c engineConfig) shareStartJSON() ([]byte, error) {
 	if c.Outbound.Server == "" || c.Outbound.ServerPort <= 0 {
 		return nil, fmt.Errorf("share start failed")
 	}
+	// REALITY is not a v2ray-core stream setting. It is a second share engine
+	// with its own SOCKS inbound, selected by the document's `engine` field.
+	// Only VLESS carries it; a SOCKS5 outbound that happens to spell
+	// `security:reality` is still a bare socket and goes through shareOutbound.
+	if c.shareScheme() == "vless" && c.Outbound.securityName() == "reality" {
+		return c.realityStartJSON()
+	}
 	// The core listens where the broker already told it to. A second constant
 	// here would drift from socks_listen and the tunnel would be pointed at a
 	// port nothing is on.
@@ -309,6 +327,43 @@ func (c engineConfig) shareStartJSON() ([]byte, error) {
 	}
 	// The TUN dialer in front of this core reads these fields; v2ray itself
 	// ignores unknown top-level keys. One policy document, two engines.
+	if len(c.DirectDomains) > 0 {
+		doc["direct_domain_suffixes"] = c.DirectDomains
+	}
+	if len(c.ForceProxyDomains) > 0 {
+		doc["force_proxy_domains"] = c.ForceProxyDomains
+	}
+	doc["udp_mode"] = c.udpMode()
+	return json.Marshal(doc)
+}
+
+// realityStartJSON is the document hy2bind's REALITY engine reads.
+//
+// It is not a v2ray document: no inbounds, outbounds or routing. The engine
+// owns a SOCKS5 listener and the TUN pump dials it exactly as it dials the
+// v2ray share core. The split policy is still carried, because the classifier
+// in front of both engines is the same one.
+func (c engineConfig) realityStartJSON() ([]byte, error) {
+	if c.Outbound.UUID == "" || c.Outbound.PublicKey == "" {
+		return nil, fmt.Errorf("share start failed")
+	}
+	if c.Outbound.networkName() != "tcp" {
+		return nil, fmt.Errorf("share start failed")
+	}
+	doc := map[string]any{
+		"engine":       "reality",
+		"server":       c.Outbound.Server,
+		"port":         c.Outbound.ServerPort,
+		"uuid":         c.Outbound.UUID,
+		"public_key":   c.Outbound.PublicKey,
+		"short_id":     c.Outbound.ShortID,
+		"sni":          c.Outbound.SNI,
+		"fingerprint":  c.Outbound.Fingerprint,
+		"flow":         c.Outbound.Flow,
+		"network":      "tcp",
+		"alpn":         c.Outbound.alpnList(),
+		"socks_listen": c.SocksListen,
+	}
 	if len(c.DirectDomains) > 0 {
 		doc["direct_domain_suffixes"] = c.DirectDomains
 	}

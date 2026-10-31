@@ -153,7 +153,10 @@ func TestThisLoaderAdmitsNoTransportDartWouldRefuse(t *testing.T) {
 func TestThisLoaderAdmitsNoSecurityDartWouldRefuse(t *testing.T) {
 	_, securities, _ := dartEngineDialSets(t)
 
-	candidates := []string{"", "none", "tls", "reality", "xtls", "tls13", "reality2"}
+	// `reality` is deliberately not in this cross-check: it is not a v2ray
+	// security, it has a second engine and a second Dart builder. The pair is
+	// covered by TestRealitySecurityIsCarried below.
+	candidates := []string{"", "none", "tls", "xtls", "tls13", "reality2"}
 	for _, word := range candidates {
 		if !SecurityDialable(word) {
 			continue
@@ -182,22 +185,35 @@ func TestParkedTransportsAndSecuritiesStayRefused(t *testing.T) {
 			t.Fatalf("transport %q must stay refused: v2ray-core has no dialer for it", word)
 		}
 	}
-	for _, word := range []string{"reality", "xtls"} {
+	for _, word := range []string{"xtls"} {
 		if SecurityDialable(word) {
-			t.Fatalf("security %q must stay refused: it arrived with xray-core", word)
+			t.Fatalf("security %q must stay refused: no engine negotiates it", word)
 		}
 	}
 	// And Dart has to refuse them too, or the Windows path would hand the raw
-	// URI to a broker that cannot carry it.
+	// URI to a broker that cannot carry it. `reality` is absent here: it is
+	// carried by the REALITY engine, not by the v2ray sets this helper reads.
 	transports, securities, _ := dartEngineDialSets(t)
 	for _, word := range []string{"quic", "xhttp", "splithttp"} {
 		if transports[word] {
 			t.Fatalf("dart admits transport %q, which the engine cannot dial", word)
 		}
 	}
-	for _, word := range []string{"reality", "xtls"} {
+	for _, word := range []string{"xtls"} {
 		if securities[word] {
 			t.Fatalf("dart admits security %q, which the engine cannot negotiate", word)
 		}
+	}
+}
+
+// REALITY is a second engine, so its security word is dialable even though the
+// v2ray set does not contain it. The Dart side has a matching builder; this
+// guards the Go half of that pair.
+func TestRealitySecurityIsCarried(t *testing.T) {
+	if !SecurityDialable("reality") {
+		t.Fatal("the Windows engine would refuse a REALITY line before starting the second engine")
+	}
+	if !SecurityDialable("REALITY") {
+		t.Fatal("security names are folded before the table is consulted")
 	}
 }

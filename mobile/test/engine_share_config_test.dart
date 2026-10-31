@@ -5,14 +5,59 @@ import 'package:proxydom/features/vpn/data/share_link_parser.dart';
 import 'package:proxydom/features/vpn/data/engine_share_config.dart';
 
 void main() {
-  test('vless reality link is refused by the parked engine', () {
-    // v2ray-core has no Reality engine, so the builder must not hand the loader
-    // a document it will reject.
+  test('vless reality link is handed to the reality engine', () {
     const raw =
         'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
         '?security=reality&sni=www.example.com&pbk=PUBLIC&sid=ab&fp=chrome#Alpha';
     final link = parseShareLink(raw);
-    expect(buildShareSocksConfig(link), isNull);
+    final json = buildShareSocksConfig(link);
+    expect(json, isNotNull);
+    final decoded = jsonDecode(json!) as Map<String, dynamic>;
+    expect(decoded['engine'], 'reality');
+    expect(decoded['server'], '203.0.113.10');
+    expect(decoded['port'], 443);
+    expect(decoded['uuid'], '11111111-1111-1111-1111-111111111111');
+    expect(decoded['public_key'], 'PUBLIC');
+    expect(decoded['short_id'], 'ab');
+    expect(decoded['sni'], 'www.example.com');
+    expect(decoded['fingerprint'], 'chrome');
+    // The same inbound as the v2ray core: only one share engine runs at once.
+    expect(decoded['socks_listen'], '127.0.0.1:$shareSocksPort');
+    expect(decoded.containsKey('outbounds'), isFalse);
+    expect(isRealityLink(link), isTrue);
+  });
+
+  test('reality never forwards allowInsecure', () {
+    // The certificate check is what proves the peer holds the node's key;
+    // skipping it would hand the UUID to whoever terminates TLS.
+    const raw =
+        'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
+        '?security=reality&pbk=PUBLIC&sid=ab&allowInsecure=1#Alpha';
+    final decoded = jsonDecode(buildShareSocksConfig(parseShareLink(raw))!)
+        as Map<String, dynamic>;
+    expect(decoded.containsKey('allow_insecure'), isFalse);
+  });
+
+  test('reality with an odd-length short id is inactive', () {
+    // Short ids are whole bytes; an odd one matches no server.
+    const odd =
+        'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
+        '?security=reality&pbk=PUBLIC&sid=abc#Odd';
+    expect(buildShareSocksConfig(parseShareLink(odd)), isNull);
+  });
+
+  test('reality over a transport the engine does not carry stays inactive', () {
+    const raw =
+        'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
+        '?security=reality&pbk=PUBLIC&type=ws&path=%2Fws#Alpha';
+    expect(buildShareSocksConfig(parseShareLink(raw)), isNull);
+  });
+
+  test('reality with XTLS Vision stays inactive until Vision is carried', () {
+    const raw =
+        'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
+        '?security=reality&pbk=PUBLIC&flow=xtls-rprx-vision#Vision';
+    expect(buildShareSocksConfig(parseShareLink(raw)), isNull);
   });
 
   test('vless xhttp link is refused by the parked engine', () {
@@ -207,9 +252,10 @@ void main() {
     expect(upgrade['host'], 'cdn.example');
   });
 
-  // shareStreamConfig() rejects every security except none and tls.
-  test('securities the loader cannot express are refused', () {
-    for (final security in const ['xtls', 'reality']) {
+  // shareStreamConfig() rejects every security except none and tls; REALITY
+  // has its own engine, but only when the link actually carries a public key.
+  test('securities the engine cannot express are refused', () {
+    for (final security in const ['xtls']) {
       final raw =
           'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
           '?security=$security&sni=a.example#S';
@@ -219,6 +265,10 @@ void main() {
         reason: 'security=$security must not reach the loader',
       );
     }
+    const noKey =
+        'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
+        '?security=reality&sni=a.example#S';
+    expect(buildShareSocksConfig(parseShareLink(noKey)), isNull);
   });
 
   // The loader has no tcpSettings, so HTTP obfuscation cannot be expressed.
@@ -339,11 +389,24 @@ void main() {
         reason: 'type=$written must stay refused',
       );
     }
-    for (final written in const ['REALITY', 'Reality', 'XTLS', 'Xtls']) {
+    for (final written in const ['XTLS', 'Xtls']) {
       expect(
         buildShareSocksConfig(parseShareLink(link(security: written))),
         isNull,
         reason: 'security=$written must stay refused',
+      );
+    }
+    // REALITY is not refused any more, but the word alone is not enough: the
+    // engine needs `pbk`, and the folded check must still find it.
+    for (final written in const ['REALITY', 'Reality']) {
+      const raw =
+          'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
+          '?sni=a.example&pbk=PUBLIC&security=REALITY#R';
+      final json = buildShareSocksConfig(parseShareLink(raw));
+      expect(json, isNotNull, reason: 'security=$written must reach REALITY');
+      expect(
+        (jsonDecode(json!) as Map<String, dynamic>)['engine'],
+        'reality',
       );
     }
   });

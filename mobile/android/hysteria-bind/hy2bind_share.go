@@ -97,6 +97,15 @@ func StartShare(configJSON string) string {
 	if configJSON == "" {
 		return "empty share config"
 	}
+	// The REALITY engine is a second share core, not a v2ray document: it
+	// carries a VLESS stream over a handshake v2ray-core does not implement.
+	// The document names itself, so the same StartShare entry point serves
+	// Android, iOS and the Windows engine.
+	if isRealityDocument(configJSON) {
+		return startRealityShare(configJSON)
+	}
+	// A v2ray start takes the share slot back from a previous REALITY session.
+	stopRealityShare()
 	// The VLESS document carries the same site policy as the Hy2 start
 	// document. Applying it here, before the core starts, keeps one classifier
 	// for both engines: the TUN dialer decides, v2ray only carries the flow.
@@ -141,6 +150,7 @@ func StartShare(configJSON string) string {
 }
 
 func stopShare() {
+	stopRealityShare()
 	shareMu.Lock()
 	inst := shareInst
 	shareInst = nil
@@ -159,6 +169,10 @@ func stopShare() {
 }
 
 func shareRunning() bool {
+	return v2ShareRunning() || realityRunning()
+}
+
+func v2ShareRunning() bool {
 	shareMu.Lock()
 	defer shareMu.Unlock()
 	return shareInst != nil

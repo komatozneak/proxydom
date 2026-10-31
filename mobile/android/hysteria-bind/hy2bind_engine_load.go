@@ -93,10 +93,10 @@ type shareTLS struct {
 }
 
 type shareStream struct {
-	Network  string `json:"network"`
-	Security string `json:"security"`
+	Network  string    `json:"network"`
+	Security string    `json:"security"`
 	TLS      *shareTLS `json:"tlsSettings"`
-	Reality *struct {
+	Reality  *struct {
 		ServerName  string `json:"serverName"`
 		PublicKey   string `json:"publicKey"`
 		ShortID     string `json:"shortId"`
@@ -353,12 +353,16 @@ func TransportDialable(network string) bool {
 	return err == nil
 }
 
-// SecurityDialable reports whether the in-process core can negotiate
-// [security]. Reality is not in this core: it arrived with xray-core, which is
-// GPL and is not linked (ADR 036).
+// SecurityDialable reports whether a share engine can negotiate [security].
+//
+// `reality` is not a v2ray-core security: it is carried by the permissive
+// REALITY engine in share_reality.go, which the Windows engine selects before
+// it builds a v2ray document. Keeping it in this table is what lets the broker
+// refuse an unsupported transport before starting a core instead of failing
+// after the TLS attempt.
 func SecurityDialable(security string) bool {
 	switch strings.ToLower(strings.TrimSpace(security)) {
-	case "", "none", "tls":
+	case "", "none", "tls", "reality":
 		return true
 	default:
 		return false
@@ -464,41 +468,41 @@ func shareStreamConfig(stream *shareStream) (*internet.StreamConfig, error) {
 //
 // Names already in the core map pass through unchanged.
 var fingerprintAliases = map[string]string{
-	"chrome":           "chrome_auto",
-	"firefox":          "firefox_auto",
-	"ios":              "ios_auto",
-	"android":          "android_11_okhttp",
-	"edge":             "edge_auto",
-	"safari":           "safari_auto",
-	"360":              "360_auto",
-	"qq":               "qq_auto",
-	"random":           "randomized",
-	"randomized":       "randomized",
-	"randomizedalpn":   "randomizedalpn",
-	"randomizednoalpn": "randomizednoalpn",
-	"firefox_auto":     "firefox_auto",
-	"firefox_55":       "firefox_55",
-	"firefox_56":       "firefox_56",
-	"firefox_63":       "firefox_63",
-	"firefox_65":       "firefox_65",
-	"firefox_99":       "firefox_99",
-	"firefox_102":      "firefox_102",
-	"firefox_105":      "firefox_105",
-	"chrome_auto":      "chrome_auto",
-	"chrome_58":        "chrome_58",
-	"chrome_62":        "chrome_62",
-	"chrome_70":        "chrome_70",
-	"chrome_72":        "chrome_72",
-	"chrome_83":        "chrome_83",
-	"chrome_87":        "chrome_87",
-	"chrome_96":        "chrome_96",
-	"chrome_100":       "chrome_100",
-	"chrome_102":       "chrome_102",
-	"ios_auto":         "ios_auto",
-	"ios_11_1":         "ios_11_1",
-	"ios_12_1":         "ios_12_1",
-	"ios_13":           "ios_13",
-	"ios_14":           "ios_14",
+	"chrome":            "chrome_auto",
+	"firefox":           "firefox_auto",
+	"ios":               "ios_auto",
+	"android":           "android_11_okhttp",
+	"edge":              "edge_auto",
+	"safari":            "safari_auto",
+	"360":               "360_auto",
+	"qq":                "qq_auto",
+	"random":            "randomized",
+	"randomized":        "randomized",
+	"randomizedalpn":    "randomizedalpn",
+	"randomizednoalpn":  "randomizednoalpn",
+	"firefox_auto":      "firefox_auto",
+	"firefox_55":        "firefox_55",
+	"firefox_56":        "firefox_56",
+	"firefox_63":        "firefox_63",
+	"firefox_65":        "firefox_65",
+	"firefox_99":        "firefox_99",
+	"firefox_102":       "firefox_102",
+	"firefox_105":       "firefox_105",
+	"chrome_auto":       "chrome_auto",
+	"chrome_58":         "chrome_58",
+	"chrome_62":         "chrome_62",
+	"chrome_70":         "chrome_70",
+	"chrome_72":         "chrome_72",
+	"chrome_83":         "chrome_83",
+	"chrome_87":         "chrome_87",
+	"chrome_96":         "chrome_96",
+	"chrome_100":        "chrome_100",
+	"chrome_102":        "chrome_102",
+	"ios_auto":          "ios_auto",
+	"ios_11_1":          "ios_11_1",
+	"ios_12_1":          "ios_12_1",
+	"ios_13":            "ios_13",
+	"ios_14":            "ios_14",
 	"android_11_okhttp": "android_11_okhttp",
 	"edge_auto":         "edge_auto",
 	"edge_85":           "edge_85",
