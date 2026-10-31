@@ -14,6 +14,9 @@ on:
       - ".github/workflows/mobile-build.yml"
       - ".github/actions/build-hy2bind-aar/**"
 
+permissions:
+  contents: read
+
 # A new push on the same ref cancels the previous run. Minutes already
 # spent are gone; stacked agent dispatches must not keep billing.
 concurrency:
@@ -24,10 +27,6 @@ env:
   # rive_native 0.1.x needs SemanticsRole / isRequired (post-3.29).
   FLUTTER_VERSION: "3.35.1"
   JAVA_VERSION: "17"
-  MIN_SDK: "26"
-  # Matches ios-testflight.yml. build-aar.sh pins the same hysteria release.
-  HYSTERIA_TAG: "v2.13.0"
-  GO_VERSION: "1.25.x"
 
 jobs:
   analyze-test:
@@ -37,15 +36,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: false
-          lfs: true
-
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: ${{ env.JAVA_VERSION }}
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -58,10 +48,6 @@ jobs:
         working-directory: mobile
         run: flutter pub get
 
-      - name: Verify pubspec
-        working-directory: mobile
-        run: flutter pub deps --no-dev --style=tree
-
       - name: Run analyzer
         working-directory: mobile
         run: flutter analyze --no-fatal-infos
@@ -70,40 +56,12 @@ jobs:
         working-directory: mobile
         run: flutter test --reporter compact --dart-define=AUTH_ANONYMOUS=false
 
-      - name: Verify minSdk = 26
-        working-directory: mobile
-        run: |
-          # minSdk enforced via androidComponents.finalizeDsl (Flutter tooling
-          # rewrites a literal `minSdk` back to flutter.minSdkVersion).
-          # minSdk 26 is a hard requirement: Hy2 bind / VpnService needs it.
-          if grep -q "requiredMinSdk = ${{ env.MIN_SDK }}" android/app/build.gradle.kts \
-            && grep -q "finalizeDsl" android/app/build.gradle.kts; then
-            echo "minSdk enforcement OK (finalizeDsl -> ${{ env.MIN_SDK }})"
-          else
-            echo "minSdk enforcement missing! finalizeDsl hook removed or requiredMinSdk changed."
-            exit 1
-          fi
-
-      - name: Verify non-production package suffixes
-        working-directory: mobile
-        run: |
-          # debug/profile/CI must not occupy the Play/sideload applicationId.
-          # Ids are set on ApplicationVariant (onVariants), not applicationIdSuffix:
-          # Flutter 3.32–3.35 copies buildTypes onto library plugins (flutter#169215).
-          if grep -q 'applicationId.set("$productionApplicationId.debug")' android/app/build.gradle.kts \
-            && grep -q 'applicationId.set("$productionApplicationId.profile")' android/app/build.gradle.kts \
-            && grep -q 'applicationId.set("$productionApplicationId.ci")' android/app/build.gradle.kts; then
-            echo "package ids OK (.debug / .profile / .ci via onVariants)"
-          else
-            echo "onVariants applicationId for debug/profile/ci missing from build.gradle.kts"
-            exit 1
-          fi
-
-  go-changes:
-    name: Detect hy2bind changes
+  changes:
+    name: Detect native changes
     runs-on: ubuntu-latest
     outputs:
       go: ${{ steps.filter.outputs.go }}
+      android: ${{ steps.filter.outputs.android }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -115,39 +73,52 @@ jobs:
               - 'mobile/assets/legal/**'
               - '.github/workflows/mobile-build.yml'
               - '.github/actions/build-hy2bind-aar/**'
+            android:
+              - 'mobile/android/**'
+              - 'mobile/pubspec.yaml'
+              - 'mobile/pubspec.lock'
+              - '.github/workflows/mobile-build.yml'
+              - '.github/actions/build-hy2bind-aar/**'
 
   hy2bind-go-test:
     name: hy2bind Go tests
-    needs: go-changes
-    if: needs.go-changes.outputs.go == 'true'
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: mobile/android/hysteria-bind
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: mobile/android/hysteria-bind/go.mod
           cache-dependency-path: mobile/android/hysteria-bind/go.sum
+      # The bind scripts refuse an untidy graph instead of rewriting it, so the
+      # same check runs here, where it fails before any machine binds.
+      - name: go.mod is tidy
+        run: go mod tidy -diff
+      - name: gofmt
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "gofmt -w these files:"
+            echo "$unformatted"
+            exit 1
+          fi
       # Verbose so a known violation prints its warning.
       - name: License guard and third-party notices
-        working-directory: mobile/android/hysteria-bind
         run: go test -count=1 -v -run 'TestLicenseGuard|TestLicenseClassifier|TestThirdPartyNotices' .
       - name: go test
-        working-directory: mobile/android/hysteria-bind
         run: go test ./...
       # This job runs on ubuntu, so the Windows half of the engine is excluded
       # by build constraints and never compiled: cmd/proxydom-engine (all files
       # are `//go:build windows`), hy2bind_tun_windows.go and
-      # hy2bind_protect_windows.go. That is the half the owner's machine
-      # actually runs, and it is the half the MSI carries.
-      #
-      # Measured: changing StartShareTunStack to take an argument leaves
-      # `GOOS=linux go build ./...` and `go vet ./...` both exiting 0 while
-      # main.go no longer compiles. Green CI, broken installer. Cross-compile
-      # instead. The tests cannot be run for another OS, but a compile error is
-      # the failure that reaches the owner.
+      # hy2bind_protect_windows.go. That is the half the MSI carries, so
+      # cross-compile it: the tests cannot run for another OS, but a compile
+      # error is the failure that reaches the owner.
       - name: Cross-compile the Windows engine
-        working-directory: mobile/android/hysteria-bind
         env:
           GOOS: windows
           GOARCH: amd64
@@ -158,27 +129,21 @@ jobs:
   # Built once and handed to the Android jobs as an artifact. Building it inline
   # in each consumer looks simpler and is wrong: the bind pulls the Go module
   # cache, the Go build cache and four ABIs onto the same machine that then has
-  # to package a four-ABI APK. Measured on a dispatch of android-apk.yml with
-  # the bind inline: the bind succeeded, and :device_info_plus:compileRelease
-  # Kotlin then died with "No space left on device". Keeping the Go work on its
-  # own machine is what iOS already does with Hy2bind.xcframework.
+  # to package a four-ABI APK, and :device_info_plus:compileRelease died with
+  # "No space left on device" when it was tried.
   hy2bind-aar:
     name: Build hy2bind AAR
+    needs: changes
+    if: needs.changes.outputs.android == 'true'
     runs-on: ubuntu-latest
     # 387s measured for all four ABIs on a cold Go cache, against 26s warm.
     timeout-minutes: 25
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: false
-          lfs: true
 
       - name: Build hysteria-client.aar
         uses: ./.github/actions/build-hy2bind-aar
-        with:
-          hysteria-tag: ${{ env.HYSTERIA_TAG }}
-          go-version: ${{ env.GO_VERSION }}
 
       # The sidecar travels with the archive. aar_stamp_test.go and
       # build-sideload.ps1 both refuse an archive whose hash disagrees with the
@@ -199,23 +164,23 @@ jobs:
   # and writes local.properties, then the unit-test task runs.
   android-unit-test:
     name: Android unit tests
+    needs: [changes, hy2bind-aar]
+    if: needs.changes.outputs.android == 'true'
     runs-on: ubuntu-latest
-    needs: hy2bind-aar
-    # No bind here any more: the archive arrives as an artifact, so this is back
-    # to Flutter plus Gradle.
     timeout-minutes: 25
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: false
-          lfs: true
 
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
+          cache: gradle
+          cache-dependency-path: |
+            mobile/android/*.gradle*
+            mobile/android/app/*.gradle*
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2

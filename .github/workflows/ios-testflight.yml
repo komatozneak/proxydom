@@ -19,10 +19,15 @@ on:
         default: false
         type: boolean
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-testflight-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
   FLUTTER_VERSION: "3.35.1"
-  HYSTERIA_TAG: "v2.13.0"
-  GO_VERSION: "1.25.x"
   APP_BUNDLE_ID: su.proxydom.app
   TUNNEL_BUNDLE_ID: su.proxydom.app.VpnTunnelProvider
 
@@ -46,9 +51,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: false
-          lfs: true
 
       - name: Check Apple secrets
         run: |
@@ -85,7 +87,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: mobile/android/hysteria-bind/go.mod
           cache-dependency-path: mobile/android/hysteria-bind/go.sum
 
       - name: Setup Flutter
@@ -95,19 +97,13 @@ jobs:
           channel: stable
           cache: true
 
-      # The committed graph. build-ios.sh runs the guard again after go mod tidy,
-      # which is the graph the xcframework is actually built from.
-      - name: License guard
-        working-directory: mobile/android/hysteria-bind
-        run: go test -count=1 -run 'TestLicenseGuard$' .
-
+      # build-ios.sh refuses an untidy graph and runs the license guard on the
+      # committed one before it binds.
       - name: Build Hy2bind.xcframework
         working-directory: mobile/android/hysteria-bind
         run: |
           export PATH="$(go env GOPATH)/bin:$PATH"
           bash build-ios.sh
-        env:
-          HYSTERIA_TAG: ${{ env.HYSTERIA_TAG }}
 
       - name: Flutter pub get
         working-directory: mobile

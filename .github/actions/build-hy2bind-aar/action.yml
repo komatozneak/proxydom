@@ -4,16 +4,7 @@ description: >-
   mobile/android/hysteria-bind with gomobile. The archive is a build product and
   is not committed, for the same reason iOS does not commit
   Hy2bind.xcframework: it is produced from source on the machine that needs it.
-
-inputs:
-  hysteria-tag:
-    description: apernet/hysteria release to build against.
-    required: false
-    default: "v2.13.0"
-  go-version:
-    description: Go toolchain version.
-    required: false
-    default: "1.25.x"
+  Every version (Go, hysteria, v2ray-core, x/mobile) comes from go.mod.
 
 runs:
   using: composite
@@ -24,7 +15,7 @@ runs:
     - name: Setup Go
       uses: actions/setup-go@v5
       with:
-        go-version: ${{ inputs.go-version }}
+        go-version-file: mobile/android/hysteria-bind/go.mod
         cache-dependency-path: mobile/android/hysteria-bind/go.sum
 
     # gomobile drives javac to produce classes.jar, so a JDK must be present
@@ -53,8 +44,6 @@ runs:
 
     - name: Build hysteria-client.aar
       shell: bash
-      env:
-        HYSTERIA_TAG: ${{ inputs.hysteria-tag }}
       run: |
         set -euo pipefail
         cd mobile/android/hysteria-bind

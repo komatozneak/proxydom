@@ -11,6 +11,9 @@ on:
       - "desktop/windows/**"
       - ".github/workflows/windows-service.yml"
 
+permissions:
+  contents: read
+
 concurrency:
   group: windows-service-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true

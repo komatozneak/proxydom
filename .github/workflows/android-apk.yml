@@ -11,6 +11,9 @@ on:
         default: false
         type: boolean
 
+permissions:
+  contents: read
+
 concurrency:
   group: android-apk-${{ github.ref }}
   cancel-in-progress: true
@@ -18,9 +21,6 @@ concurrency:
 env:
   FLUTTER_VERSION: "3.35.1"
   JAVA_VERSION: "17"
-  # Matches mobile-build.yml and ios-testflight.yml.
-  HYSTERIA_TAG: "v2.13.0"
-  GO_VERSION: "1.25.x"
 
 jobs:
   # Its own machine, because this job used to build the archive inline and then
@@ -33,15 +33,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: false
-          lfs: true
 
       - name: Build hysteria-client.aar
         uses: ./.github/actions/build-hy2bind-aar
-        with:
-          hysteria-tag: ${{ env.HYSTERIA_TAG }}
-          go-version: ${{ env.GO_VERSION }}
 
       - name: Upload hysteria-client.aar
         uses: actions/upload-artifact@v4
@@ -61,15 +55,16 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: false
-          lfs: true
 
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
+          cache: gradle
+          cache-dependency-path: |
+            mobile/android/*.gradle*
+            mobile/android/app/*.gradle*
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -96,8 +91,10 @@ jobs:
 
       - name: Build APK
         working-directory: mobile
+        env:
+          DEBUG_BUILD: ${{ inputs.debug_build }}
         run: |
-          if [ "${{ github.event.inputs.debug_build }}" = "true" ]; then
+          if [ "$DEBUG_BUILD" = "true" ]; then
             echo "Building DEBUG APK per workflow_dispatch input..."
             flutter build apk --debug
           else
@@ -106,8 +103,10 @@ jobs:
           fi
 
       - name: Verify CI APK exists
+        env:
+          DEBUG_BUILD: ${{ inputs.debug_build }}
         run: |
-          if [ "${{ github.event.inputs.debug_build }}" = "true" ]; then
+          if [ "$DEBUG_BUILD" = "true" ]; then
             test -f mobile/build/app/outputs/flutter-apk/app-debug.apk
           else
             test -f mobile/build/app/outputs/flutter-apk/app-release.apk
@@ -115,10 +114,12 @@ jobs:
 
       - name: Verify CI APK is not the production package
         working-directory: mobile
+        env:
+          DEBUG_BUILD: ${{ inputs.debug_build }}
         run: |
           python3 <<'PY'
-          import json, pathlib, sys
-          debug = "${{ github.event.inputs.debug_build }}" == "true"
+          import json, os, pathlib, sys
+          debug = os.environ["DEBUG_BUILD"] == "true"
           variant = "debug" if debug else "release"
           expected = (
               "com.proxy.dom.debug"
@@ -140,10 +141,12 @@ jobs:
               sys.exit(f"expected {expected}, got {app_id}")
           PY
 
+      # `inputs.debug_build` is a boolean; `github.event.inputs.debug_build` is
+      # the string "true"/"false", and comparing that string with `true` made
+      # the release upload run on every build and the debug upload on none.
       - name: Upload CI-only APK
-        if: github.event.inputs.debug_build != true
+        if: ${{ !inputs.debug_build }}
         uses: actions/upload-artifact@v4
-        continue-on-error: true
         with:
           name: android-apk-ci
           path: mobile/build/app/outputs/flutter-apk/app-release.apk
@@ -151,9 +154,8 @@ jobs:
           if-no-files-found: error
 
       - name: Upload CI debug APK
-        if: github.event.inputs.debug_build == true
+        if: ${{ inputs.debug_build }}
         uses: actions/upload-artifact@v4
-        continue-on-error: true
         with:
           name: android-apk-ci-debug
           path: mobile/build/app/outputs/flutter-apk/app-debug.apk
