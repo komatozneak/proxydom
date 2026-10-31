@@ -1,5 +1,6 @@
 #include "protocol.h"
 
+#include <algorithm>
 #include <cctype>
 #include <cstdio>
 #include <cstring>
@@ -719,12 +720,27 @@ bool parse_share_line(const std::string& raw, ShareLine& out, std::string& error
     // A SOCKS5 key is `user:pass@host:port`, and both halves are optional.
     // The URI's userinfo is percent-decoded above, so a password with `@` or
     // `:` in it survives only as much as the writer encoded it.
-    const auto colon = user.find(':');
+    //
+    // v2rayN and the panels that copy it write `socks://base64(user:pass)@...`
+    // instead. Read as plain text that becomes a username of base64 and no
+    // password, which every server refuses. A colon-free userinfo that decodes
+    // to printable `user:pass` is that spelling; a real colon-free username
+    // does not decode to text with a colon in it.
+    std::string credential = user;
+    if (credential.find(':') == std::string::npos && !credential.empty()) {
+      const std::string decoded = base64_decode_bytes(credential);
+      const bool printable =
+          !decoded.empty() &&
+          std::all_of(decoded.begin(), decoded.end(),
+                      [](char c) { return static_cast<unsigned char>(c) >= 0x20 && c != 0x7f; });
+      if (printable && decoded.find(':') != std::string::npos) credential = decoded;
+    }
+    const auto colon = credential.find(':');
     if (colon != std::string::npos) {
-      out.username = user.substr(0, colon);
-      out.password = user.substr(colon + 1);
+      out.username = credential.substr(0, colon);
+      out.password = credential.substr(colon + 1);
     } else {
-      out.username = user;
+      out.username = credential;
     }
   } else if (scheme == "trojan") {
     out.password = user;

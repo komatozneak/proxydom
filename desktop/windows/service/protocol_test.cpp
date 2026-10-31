@@ -432,6 +432,18 @@ int main() {
   expect(socks_config.find("\"type\":\"socks5\"") != std::string::npos, "socks5 is named for the engine");
   expect(socks_config.find("\"username\":\"alice\"") != std::string::npos, "socks5 user reaches the engine");
   expect(socks_config.find("\"streamSettings\"") == std::string::npos, "socks5 has no stream block");
+  // v2rayN writes the credential as base64 in the userinfo.
+  ShareLine b64_socks;
+  error.clear();
+  expect(parse_share_line("socks://YWxpY2U6czNjcmV0@1.2.3.4:1080#S", b64_socks, error),
+         "parse a base64 socks key");
+  expect(b64_socks.username == "alice" && b64_socks.password == "s3cret",
+         "a base64 socks credential is decoded");
+  ShareLine plain_user;
+  error.clear();
+  expect(parse_share_line("socks5://alice@1.2.3.4:1080#S", plain_user, error), "parse a user-only socks key");
+  expect(plain_user.username == "alice" && plain_user.password.empty(),
+         "a plain username is not mistaken for base64");
   // No credential is a valid key: the core offers noauth.
   ShareLine anon_socks;
   error.clear();

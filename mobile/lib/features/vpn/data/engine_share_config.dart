@@ -160,7 +160,7 @@ Map<String, Object?>? _socks(ParsedShareLink link) {
     'port': port,
   };
   if (uri.userInfo.isNotEmpty) {
-    final userinfo = Uri.decodeComponent(uri.userInfo);
+    final userinfo = _socksCredential(Uri.decodeComponent(uri.userInfo));
     final colon = userinfo.indexOf(':');
     server['users'] = [
       {
@@ -175,6 +175,19 @@ Map<String, Object?>? _socks(ParsedShareLink link) {
       'servers': [server],
     },
   };
+}
+
+/// v2rayN and the panels that copy it write `socks://base64(user:pass)@...`.
+/// Read as plain text that is a username of base64 with no password, which
+/// every server refuses. A colon-free userinfo that decodes to printable
+/// `user:pass` is that spelling; a real colon-free username does not decode to
+/// text with a colon in it.
+String _socksCredential(String userinfo) {
+  if (userinfo.contains(':')) return userinfo;
+  final decoded = _b64(userinfo);
+  if (decoded == null || !decoded.contains(':')) return userinfo;
+  final printable = decoded.codeUnits.every((c) => c >= 0x20 && c != 0x7f);
+  return printable ? decoded : userinfo;
 }
 
 Map<String, Object?>? _vless(ParsedShareLink link) {
