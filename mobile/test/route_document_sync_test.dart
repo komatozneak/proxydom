@@ -96,11 +96,11 @@ void main() {
     );
     expect(
       shareImportDial([trojan], fromDocument: false),
-      ShareImportDial.singleUnsupported,
+      ShareImportDial.dialable,
     );
     expect(
       shareImportDial([trojan], fromDocument: true),
-      ShareImportDial.noneDialable,
+      ShareImportDial.dialable,
     );
     expect(
       shareImportDial([hy2, trojan], fromDocument: true),
@@ -108,13 +108,14 @@ void main() {
     );
 
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    // iOS carries the v2ray family on the packet-flow dataplane now.
     expect(
       shareImportDial([vless], fromDocument: false),
-      ShareImportDial.singleUnsupported,
+      ShareImportDial.dialable,
     );
     expect(
       shareImportDial([vless], fromDocument: true),
-      ShareImportDial.noneDialable,
+      ShareImportDial.dialable,
     );
     expect(
       shareImportDial([hy2], fromDocument: false),

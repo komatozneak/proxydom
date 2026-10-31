@@ -37,9 +37,13 @@ void main() {
     expect(iosAppsSplitUnsupported, isFalse);
     expect(windowsDialScheme('vless'), isTrue);
     expect(windowsDialScheme('hy2'), isTrue);
-    expect(windowsDialScheme('trojan'), isFalse);
-    expect(windowsDialScheme('ss'), isFalse);
-    expect(windowsDialScheme('vmess'), isFalse);
+    // The broker now carries the whole v2ray-core family; what it still cannot
+    // carry is refused by name, and that is the line this guards.
+    expect(windowsDialScheme('trojan'), isTrue);
+    expect(windowsDialScheme('ss'), isTrue);
+    expect(windowsDialScheme('vmess'), isTrue);
+    expect(windowsDialScheme('socks5'), isTrue);
+    expect(windowsDialScheme('wireguard'), isFalse);
     expect(VpnNotificationPrefs.isSupported, isFalse);
     expect(QsTilePrefs.isSupported, isFalse);
   });
