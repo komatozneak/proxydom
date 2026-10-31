@@ -13,7 +13,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/komatozneak/proxydom/hy2bind/internal/aarstamp"
+	"proxydom/hy2bind/internal/aarstamp"
 )
 
 func main() {

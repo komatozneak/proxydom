@@ -97,24 +97,15 @@ abstract final class AppIcons {
   static const IconData xCircle = PhosphorIconsRegular.xCircle;
   static const IconData xCircleFill = PhosphorIconsFill.xCircle;
 
-  // Modes «По сайтам» — monochrome brand logos (charcoal via theme).
-  static const IconData siteCloudflare = PhosphorIconsRegular.cloud;
-  static const IconData siteYoutube = PhosphorIconsRegular.youtubeLogo;
-  static const IconData siteTiktok = PhosphorIconsRegular.tiktokLogo;
-  static const IconData siteInstagram = PhosphorIconsRegular.instagramLogo;
-  static const IconData siteWhatsapp = PhosphorIconsRegular.whatsappLogo;
-  static const IconData siteTelegram = PhosphorIconsRegular.telegramLogo;
-  static const IconData siteDiscord = PhosphorIconsRegular.discordLogo;
-  static const IconData siteChatgpt = PhosphorIconsRegular.sparkle;
-
-  /// Prefer [siteClaudeAsset] in Modes UI — Phosphor robot was a stand-in.
-  static const IconData siteClaude = PhosphorIconsRegular.sparkle;
-  static const String siteClaudeAsset = 'assets/brand/sites/claude.png';
-  static const IconData siteGemini = PhosphorIconsRegular.googleLogo;
+  // Neutral node categories. No third-party service marks are bundled: a
+  // subscription may name a provider, but the app draws its own category.
+  static const IconData categoryMedia = PhosphorIconsRegular.play;
+  static const IconData categoryCloud = PhosphorIconsRegular.cloudArrowUp;
+  static const IconData categoryWork = PhosphorIconsRegular.hardDrives;
+  static const IconData categoryBackup = PhosphorIconsRegular.shieldCheck;
   static const IconData siteCustom = PhosphorIconsRegular.globe;
 
-  // NoVPN Sites → «Основные» (VK uses launcher PNG, not these).
-  static const IconData osnovnyeTiktok = siteTiktok;
+  // "What works directly" rows.
   static const IconData osnovnyeYandex = PhosphorIconsRegular.magnifyingGlass;
   static const IconData osnovnyeOzon = PhosphorIconsRegular.package;
   static const IconData osnovnyeWb = PhosphorIconsRegular.shoppingBag;

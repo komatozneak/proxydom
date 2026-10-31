@@ -142,7 +142,7 @@ abstract class AppL10n {
   /// No description provided for @homeVpnHint.
   ///
   /// In en, this message translates to:
-  /// **'VPN UI — comes in step 9+'**
+  /// **'Tunnel status — comes in step 9+'**
   String get homeVpnHint;
 
   /// No description provided for @homeDisconnected.
@@ -334,19 +334,19 @@ abstract class AppL10n {
   /// No description provided for @homeNoVpnRow.
   ///
   /// In en, this message translates to:
-  /// **'Allowlists'**
+  /// **'Routing'**
   String get homeNoVpnRow;
 
   /// No description provided for @settingsNoVpn.
   ///
   /// In en, this message translates to:
-  /// **'Allowlists'**
+  /// **'Routing'**
   String get settingsNoVpn;
 
   /// No description provided for @settingsNoVpnHint.
   ///
   /// In en, this message translates to:
-  /// **'Apps and sites that go around'**
+  /// **'Split-tunnel rules for apps and sites'**
   String get settingsNoVpnHint;
 
   /// No description provided for @modesTitle.
@@ -358,7 +358,7 @@ abstract class AppL10n {
   /// No description provided for @modesSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'How VPN works'**
+  /// **'How the tunnel works'**
   String get modesSubtitle;
 
   /// No description provided for @modeSmartTitle.
@@ -370,7 +370,7 @@ abstract class AppL10n {
   /// No description provided for @modeSmartBody.
   ///
   /// In en, this message translates to:
-  /// **'Russian sites — direct, foreign sites — through VPN.'**
+  /// **'Russian corporate resources stay direct; everything else goes through the selected node.'**
   String get modeSmartBody;
 
   /// No description provided for @modeSmartBadge.
@@ -382,13 +382,13 @@ abstract class AppL10n {
   /// No description provided for @modeFullTitle.
   ///
   /// In en, this message translates to:
-  /// **'Full VPN'**
+  /// **'Full tunnel'**
   String get modeFullTitle;
 
   /// No description provided for @modeFullBody.
   ///
   /// In en, this message translates to:
-  /// **'All traffic goes through VPN. Simple and reliable.'**
+  /// **'All traffic goes through the selected node. Simple and predictable.'**
   String get modeFullBody;
 
   /// No description provided for @modeSitesTitle.
@@ -400,31 +400,31 @@ abstract class AppL10n {
   /// No description provided for @modeSitesBody.
   ///
   /// In en, this message translates to:
-  /// **'Only selected sites go through VPN. Everything else is direct.'**
+  /// **'Only selected sites go through the tunnel. Everything else is direct.'**
   String get modeSitesBody;
 
   /// No description provided for @modesVpnOffTitle.
   ///
   /// In en, this message translates to:
-  /// **'VPN is off'**
+  /// **'Tunnel is off'**
   String get modesVpnOffTitle;
 
   /// No description provided for @modesVpnOffBody.
   ///
   /// In en, this message translates to:
-  /// **'Connect VPN so modes can take effect'**
+  /// **'Connect the tunnel so modes can take effect'**
   String get modesVpnOffBody;
 
   /// No description provided for @modesConfirmFullTitle.
   ///
   /// In en, this message translates to:
-  /// **'Switch to Full VPN mode?'**
+  /// **'Switch to Full tunnel mode?'**
   String get modesConfirmFullTitle;
 
   /// No description provided for @modesConfirmFullBody.
   ///
   /// In en, this message translates to:
-  /// **'In this mode all traffic goes through VPN. Russian services — Ozon, Wildberries, banks, Gosuslugi… may stop opening.\n\nTo keep them direct — use Smart mode.'**
+  /// **'In this mode all traffic goes through the selected node. Internal services and Russian resources may become slower.\n\nTo keep them direct — use Smart mode.'**
   String get modesConfirmFullBody;
 
   /// No description provided for @modesConfirmFullCancel.
@@ -448,7 +448,7 @@ abstract class AppL10n {
   /// No description provided for @modesSitesSectionSites.
   ///
   /// In en, this message translates to:
-  /// **'Sites through VPN'**
+  /// **'Sites through the tunnel'**
   String get modesSitesSectionSites;
 
   /// No description provided for @modesSitesCustomSection.
@@ -460,20 +460,14 @@ abstract class AppL10n {
   /// No description provided for @modesSitesCustomHint.
   ///
   /// In en, this message translates to:
-  /// **'e.g. twitch.tv'**
+  /// **'gw.company-net.ru'**
   String get modesSitesCustomHint;
 
   /// No description provided for @modesSitesAllowlistHint.
   ///
   /// In en, this message translates to:
-  /// **'Only selected sites go through VPN — everything else goes direct at full speed.'**
+  /// **'Only selected sites go through the tunnel — everything else goes direct at full speed.'**
   String get modesSitesAllowlistHint;
-
-  /// No description provided for @modesSitesMetaNote.
-  ///
-  /// In en, this message translates to:
-  /// **'Instagram and Facebook belong to Meta, recognized in Russia as an extremist organization and banned in the Russian Federation.'**
-  String get modesSitesMetaNote;
 
   /// No description provided for @modesLocationTitle.
   ///
@@ -490,7 +484,7 @@ abstract class AppL10n {
   /// No description provided for @modesPendingTitle.
   ///
   /// In en, this message translates to:
-  /// **'Reconnect VPN required'**
+  /// **'Tunnel restart required'**
   String get modesPendingTitle;
 
   /// No description provided for @modesPendingBody.
@@ -508,7 +502,7 @@ abstract class AppL10n {
   /// No description provided for @modesReconnectingTitle.
   ///
   /// In en, this message translates to:
-  /// **'Reconnecting VPN…'**
+  /// **'Reconnecting the tunnel…'**
   String get modesReconnectingTitle;
 
   /// No description provided for @modesReconnectingBody.
@@ -640,19 +634,19 @@ abstract class AppL10n {
   /// No description provided for @homeVpnConflictTitle.
   ///
   /// In en, this message translates to:
-  /// **'Another VPN is blocking'**
+  /// **'Another tunnel is blocking'**
   String get homeVpnConflictTitle;
 
   /// No description provided for @homeVpnConflictHint.
   ///
   /// In en, this message translates to:
-  /// **'Turn off the other VPN in Android settings, then connect again.'**
+  /// **'Turn off the other tunnel in Android settings, then connect again.'**
   String get homeVpnConflictHint;
 
   /// No description provided for @homeVpnConflictHintIos.
   ///
   /// In en, this message translates to:
-  /// **'Turn off the other VPN in Settings → VPN.'**
+  /// **'Turn off the other tunnel in Settings → VPN.'**
   String get homeVpnConflictHintIos;
 
   /// No description provided for @homeVpnConflictHintNamed.
@@ -670,13 +664,13 @@ abstract class AppL10n {
   /// No description provided for @homeVpnPermissionHint.
   ///
   /// In en, this message translates to:
-  /// **'Allow the VPN in the Android system prompt, then tap connect again.'**
+  /// **'Allow the tunnel in the Android system prompt, then tap connect again.'**
   String get homeVpnPermissionHint;
 
   /// No description provided for @homeVpnPermissionHintIos.
   ///
   /// In en, this message translates to:
-  /// **'Allow VPN in the system prompt, then connect again.'**
+  /// **'Allow the tunnel in the system prompt, then connect again.'**
   String get homeVpnPermissionHintIos;
 
   /// No description provided for @homeConfigErrorFriendly.
@@ -709,18 +703,6 @@ abstract class AppL10n {
   /// **'Application'**
   String get settingsSectionApp;
 
-  /// No description provided for @settingsSubscription.
-  ///
-  /// In en, this message translates to:
-  /// **'Access'**
-  String get settingsSubscription;
-
-  /// No description provided for @settingsSubscriptionActive.
-  ///
-  /// In en, this message translates to:
-  /// **'Active'**
-  String get settingsSubscriptionActive;
-
   /// No description provided for @settingsProBadge.
   ///
   /// In en, this message translates to:
@@ -732,66 +714,6 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Active'**
   String get settingsActiveBadge;
-
-  /// No description provided for @settingsAccessEarlySubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Access is by invite.'**
-  String get settingsAccessEarlySubtitle;
-
-  /// No description provided for @settingsAccessBetaSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Invite access · Free limits lifted.'**
-  String get settingsAccessBetaSubtitle;
-
-  /// No description provided for @settingsAccessNoneTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'No access'**
-  String get settingsAccessNoneTitle;
-
-  /// No description provided for @settingsAccessNoneSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'An invite code is required.'**
-  String get settingsAccessNoneSubtitle;
-
-  /// No description provided for @settingsAccessFreeTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Free'**
-  String get settingsAccessFreeTitle;
-
-  /// No description provided for @settingsAccessActiveUntil.
-  ///
-  /// In en, this message translates to:
-  /// **'Valid until {date}.'**
-  String settingsAccessActiveUntil(String date);
-
-  /// No description provided for @settingsAccessCancelledSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Auto-renewal is off.'**
-  String get settingsAccessCancelledSubtitle;
-
-  /// No description provided for @settingsSubscriptionActiveUntil.
-  ///
-  /// In en, this message translates to:
-  /// **'Active until {date}'**
-  String settingsSubscriptionActiveUntil(String date);
-
-  /// No description provided for @settingsSubscriptionTrialUntil.
-  ///
-  /// In en, this message translates to:
-  /// **'Trial until {date}'**
-  String settingsSubscriptionTrialUntil(String date);
-
-  /// No description provided for @settingsSubscriptionLoadError.
-  ///
-  /// In en, this message translates to:
-  /// **'Couldn’t load status'**
-  String get settingsSubscriptionLoadError;
 
   /// No description provided for @settingsServerRegion.
   ///
@@ -814,19 +736,19 @@ abstract class AppL10n {
   /// No description provided for @settingsKillSwitchOpenVpn.
   ///
   /// In en, this message translates to:
-  /// **'Open VPN settings'**
+  /// **'Open tunnel settings'**
   String get settingsKillSwitchOpenVpn;
 
   /// No description provided for @settingsKillSwitchOpenFailed.
   ///
   /// In en, this message translates to:
-  /// **'Couldn\'t open VPN settings. Open Settings → Network & internet → VPN.'**
+  /// **'Couldn\'t open tunnel settings. Open Settings → Network & internet → VPN.'**
   String get settingsKillSwitchOpenFailed;
 
   /// No description provided for @settingsKillSwitchOpenFailedIos.
   ///
   /// In en, this message translates to:
-  /// **'Couldn\'t open VPN settings. Open Settings → VPN.'**
+  /// **'Couldn\'t open tunnel settings. Open Settings → VPN.'**
   String get settingsKillSwitchOpenFailedIos;
 
   /// No description provided for @settingsDevices.
@@ -910,7 +832,7 @@ abstract class AppL10n {
   /// No description provided for @devicesEmpty.
   ///
   /// In en, this message translates to:
-  /// **'No devices yet — connect VPN to register this one.'**
+  /// **'No devices yet — connect the tunnel to register this one.'**
   String get devicesEmpty;
 
   /// No description provided for @devicesLoadError.
@@ -988,7 +910,7 @@ abstract class AppL10n {
   /// No description provided for @devicesRevokeBody.
   ///
   /// In en, this message translates to:
-  /// **'This device\'s VPN key will stop working. Other devices are unaffected.'**
+  /// **'This device\'s tunnel key will stop working. Other devices are unaffected.'**
   String get devicesRevokeBody;
 
   /// No description provided for @devicesRevokeConfirm.
@@ -1120,7 +1042,7 @@ abstract class AppL10n {
   /// No description provided for @splitTunnelBundledInfoBody.
   ///
   /// In en, this message translates to:
-  /// **'Listed sites use your usual connection, not the protected one. Everything else still goes through Proxy Dom.\n\nOn iPhone you cannot take a whole app out of the VPN — only a website by address. Safari usually follows the list. A bank or marketplace app may stay in the VPN.\n\nBig services use many servers. Some pages or video may still go through the VPN with the switch on. If a site should stay protected, turn it off here.\n\nTap Reconnect after you change the list.'**
+  /// **'Listed sites use your usual connection, not the protected one. Everything else still goes through Proxy Dom.\n\nOn iPhone you cannot take a whole app out of the tunnel — only a website by address. Safari usually follows the list. A bank or marketplace app may stay in the tunnel.\n\nBig services use many servers. Some pages or video may still go through the tunnel with the switch on. If a site should stay protected, turn it off here.\n\nTap Reconnect after you change the list.'**
   String get splitTunnelBundledInfoBody;
 
   /// No description provided for @splitTunnelBundledInfoClose.
@@ -1168,7 +1090,7 @@ abstract class AppL10n {
   /// No description provided for @splitTunnelDomainHint.
   ///
   /// In en, this message translates to:
-  /// **'example.com'**
+  /// **'gw.company-net.ru'**
   String get splitTunnelDomainHint;
 
   /// No description provided for @splitTunnelSave.
@@ -1228,13 +1150,13 @@ abstract class AppL10n {
   /// No description provided for @splitTunnelEmptyBody.
   ///
   /// In en, this message translates to:
-  /// **'Add an exact hostname — only that address skips the VPN, not its subdomains.'**
+  /// **'Add an exact hostname — only that address skips the tunnel, not its subdomains.'**
   String get splitTunnelEmptyBody;
 
   /// No description provided for @splitTunnelInvalidDomain.
   ///
   /// In en, this message translates to:
-  /// **'Enter an address like example.com'**
+  /// **'Enter an address like gw.company-net.ru'**
   String get splitTunnelInvalidDomain;
 
   /// No description provided for @splitTunnelDuplicateDomain.
@@ -1288,7 +1210,7 @@ abstract class AppL10n {
   /// No description provided for @splitTunnelAppsLockdownWarning.
   ///
   /// In en, this message translates to:
-  /// **'Android “Block connections without VPN” is on. Apps in this list may have no internet until you turn that off or reconnect them through the VPN.'**
+  /// **'Android lockdown mode is on. Apps in this list may have no internet until you turn it off or return them to the tunnel.'**
   String get splitTunnelAppsLockdownWarning;
 
   /// No description provided for @splitTunnelGeoHy2Pending.
@@ -1354,7 +1276,7 @@ abstract class AppL10n {
   /// No description provided for @licensesTitle.
   ///
   /// In en, this message translates to:
-  /// **'Licenses'**
+  /// **'Open Source Notices'**
   String get licensesTitle;
 
   /// No description provided for @licensesSearch.
@@ -1630,7 +1552,7 @@ abstract class AppL10n {
   /// No description provided for @settingsVpnNotificationHint.
   ///
   /// In en, this message translates to:
-  /// **'Card in the shade with Disconnect. Off hides the card; VPN stays on.'**
+  /// **'Card in the shade with Disconnect. Off hides the card; the tunnel stays on.'**
   String get settingsVpnNotificationHint;
 
   /// No description provided for @settingsQsTileTitle.
@@ -1834,13 +1756,13 @@ abstract class AppL10n {
   /// No description provided for @regionSectionEurope.
   ///
   /// In en, this message translates to:
-  /// **'Latvia'**
+  /// **'Moscow'**
   String get regionSectionEurope;
 
   /// No description provided for @regionSectionUsa.
   ///
   /// In en, this message translates to:
-  /// **'USA'**
+  /// **'St Petersburg'**
   String get regionSectionUsa;
 
   /// No description provided for @regionComingSoon.
@@ -1918,7 +1840,7 @@ abstract class AppL10n {
   /// No description provided for @regionLoadErrorAbort.
   ///
   /// In en, this message translates to:
-  /// **'Cannot reach API — turn off Always-on VPN (and “Block without VPN”), then reopen the region list'**
+  /// **'Cannot reach API — turn off the system Always-on mode (and lockdown), then reopen the region list'**
   String get regionLoadErrorAbort;
 
   /// No description provided for @regionCachedHint.
@@ -2002,7 +1924,7 @@ abstract class AppL10n {
   /// No description provided for @logoutConfirmMessage.
   ///
   /// In en, this message translates to:
-  /// **'Your VPN connection will be closed. Restore with your code or register again next time.'**
+  /// **'Your tunnel connection will be closed. Restore with your code or register again next time.'**
   String get logoutConfirmMessage;
 
   /// No description provided for @logoutWarning.
@@ -2122,13 +2044,13 @@ abstract class AppL10n {
   /// No description provided for @onboardingConnectBody.
   ///
   /// In en, this message translates to:
-  /// **'Tap Connect on Home. Android will ask for VPN permission once — that’s normal.'**
+  /// **'Tap Connect on Home. Android will ask for tunnel permission once — that’s normal.'**
   String get onboardingConnectBody;
 
   /// No description provided for @onboardingConnectBodyIos.
   ///
   /// In en, this message translates to:
-  /// **'Tap Connect on Home. iPhone will ask for VPN permission once — that’s normal.'**
+  /// **'Tap Connect on Home. iPhone will ask for tunnel permission once — that’s normal.'**
   String get onboardingConnectBodyIos;
 
   /// No description provided for @onboardingRegionTitle.
@@ -2170,7 +2092,7 @@ abstract class AppL10n {
   /// No description provided for @betaGateErrorTimeout.
   ///
   /// In en, this message translates to:
-  /// **'The server did not respond. If VPN is on, turn it off and retry.'**
+  /// **'The server did not respond. If the tunnel is on, turn it off and retry.'**
   String get betaGateErrorTimeout;
 
   /// No description provided for @betaGateErrorUnauthorized.
@@ -2182,7 +2104,7 @@ abstract class AppL10n {
   /// No description provided for @betaGateDisconnectVpnRetry.
   ///
   /// In en, this message translates to:
-  /// **'Disconnect VPN and retry'**
+  /// **'Disconnect the tunnel and retry'**
   String get betaGateDisconnectVpnRetry;
 
   /// No description provided for @betaGateContinueAnyway.
@@ -2214,30 +2136,6 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Support'**
   String get settingsSupport;
-
-  /// No description provided for @lockedPlan1m.
-  ///
-  /// In en, this message translates to:
-  /// **'1 month'**
-  String get lockedPlan1m;
-
-  /// No description provided for @lockedPlan3m.
-  ///
-  /// In en, this message translates to:
-  /// **'3 months'**
-  String get lockedPlan3m;
-
-  /// No description provided for @lockedPlan6m.
-  ///
-  /// In en, this message translates to:
-  /// **'6 months'**
-  String get lockedPlan6m;
-
-  /// No description provided for @lockedPlan12m.
-  ///
-  /// In en, this message translates to:
-  /// **'12 months'**
-  String get lockedPlan12m;
 
   /// No description provided for @lockedSavePercent.
   ///
@@ -2310,36 +2208,6 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Enter recovery code'**
   String get restoreHeadline;
-
-  /// No description provided for @restorePaymentLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Payment ID'**
-  String get restorePaymentLabel;
-
-  /// No description provided for @restorePaymentHint.
-  ///
-  /// In en, this message translates to:
-  /// **'UUID from the payment receipt'**
-  String get restorePaymentHint;
-
-  /// No description provided for @restorePaymentEmpty.
-  ///
-  /// In en, this message translates to:
-  /// **'Enter the payment ID'**
-  String get restorePaymentEmpty;
-
-  /// No description provided for @restorePaymentNotFound.
-  ///
-  /// In en, this message translates to:
-  /// **'Payment not found. Check the ID.'**
-  String get restorePaymentNotFound;
-
-  /// No description provided for @restorePaymentNotConfirmed.
-  ///
-  /// In en, this message translates to:
-  /// **'This payment is not confirmed yet.'**
-  String get restorePaymentNotConfirmed;
 
   /// No description provided for @restoreCodeLabel.
   ///
@@ -2662,7 +2530,7 @@ abstract class AppL10n {
   /// No description provided for @vpnDisclosureLead.
   ///
   /// In en, this message translates to:
-  /// **'The app starts a tunnel for the selected line. Android will ask for VPN permission once.'**
+  /// **'The app starts a tunnel for the selected line. Android will ask for tunnel permission once.'**
   String get vpnDisclosureLead;
 
   /// No description provided for @vpnDisclosureVpnTitle.
@@ -2674,7 +2542,7 @@ abstract class AppL10n {
   /// No description provided for @vpnDisclosureVpnBody.
   ///
   /// In en, this message translates to:
-  /// **'After you agree, the app brings up a local tunnel for the selected line. Traffic goes to the server in that line. Android asks for VPN permission once.'**
+  /// **'After you agree, the app brings up a local tunnel for the selected line. Traffic goes to the server in that line. Android asks for tunnel permission once.'**
   String get vpnDisclosureVpnBody;
 
   /// No description provided for @vpnDisclosureVpnTitleIos.
@@ -2686,7 +2554,7 @@ abstract class AppL10n {
   /// No description provided for @vpnDisclosureVpnBodyIos.
   ///
   /// In en, this message translates to:
-  /// **'After you agree, the app brings up a local tunnel for the selected line. Traffic goes to the server in that line. iPhone asks for VPN permission once.'**
+  /// **'After you agree, the app brings up a local tunnel for the selected line. Traffic goes to the server in that line. iPhone asks for tunnel permission once.'**
   String get vpnDisclosureVpnBodyIos;
 
   /// No description provided for @vpnDisclosureDataTitle.
@@ -2902,7 +2770,7 @@ abstract class AppL10n {
   /// No description provided for @freeOnboardBody.
   ///
   /// In en, this message translates to:
-  /// **'An address or a key becomes a profile. Its servers stay in one list.'**
+  /// **'An address or a key becomes a profile. Its nodes stay in one list: Moscow (Primary), St Petersburg (Backup), Novosibirsk (Low ping).'**
   String get freeOnboardBody;
 
   /// No description provided for @freeOnboardAddTitle.
@@ -2938,7 +2806,7 @@ abstract class AppL10n {
   /// No description provided for @pcOnboardBody.
   ///
   /// In en, this message translates to:
-  /// **'Paste an access key or a document link. The app will show the servers it contains.'**
+  /// **'Paste an access key or a document link. The app will show the nodes it contains, for example gw.company-net.ru.'**
   String get pcOnboardBody;
 
   /// No description provided for @pcOnboardPrivacy.
@@ -3160,7 +3028,7 @@ abstract class AppL10n {
   /// No description provided for @freeFoundEmpty.
   ///
   /// In en, this message translates to:
-  /// **'Servers from the link will appear here.'**
+  /// **'Nodes from the link will appear here — for example Moscow (Primary) or St Petersburg (Backup).'**
   String get freeFoundEmpty;
 
   /// No description provided for @freeFieldEmpty.

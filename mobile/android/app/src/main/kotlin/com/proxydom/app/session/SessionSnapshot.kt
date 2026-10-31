@@ -3,7 +3,7 @@ package com.proxydom.app.session
 import org.json.JSONObject
 
 /**
- * Typed session snapshot for Flutter (ADR 014).
+ * Typed session snapshot for Flutter.
  * Also drives legacy string status via [phase].toLegacyStatus().
  */
 data class SessionSnapshot(

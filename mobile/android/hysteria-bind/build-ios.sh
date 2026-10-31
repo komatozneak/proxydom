@@ -1,33 +1,34 @@
 #!/usr/bin/env bash
 # Build Hy2bind.xcframework for iOS Packet Tunnel.
-# Run on macOS with Go + Xcode + gomobile. Pin matches Android build-aar.sh.
+# Run on macOS with Go + Xcode + gomobile.
 #
-#   HYSTERIA_TAG=v2.13.0 bash build-ios.sh
+#   bash build-ios.sh
 #
-# v2.13.0 matches build-aar.sh: older hysteria does not compile against the
-# quic-go module v2ray-core v5.54.2 selects.
+# go.mod is the only pin, as in build-aar.sh: the script never rewrites go.mod
+# or go.sum, so the framework is built from the graph the commit names.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
-HYSTERIA_TAG="${HYSTERIA_TAG:-v2.13.0}"
 OUT_DIR="${OUT_DIR:-$ROOT/../../ios/Frameworks}"
 mkdir -p "$OUT_DIR"
-
-echo "=== hy2bind gomobile iOS (hysteria $HYSTERIA_TAG) ==="
 cd "$ROOT"
+
+if ! go mod tidy -diff >/dev/null; then
+  echo "go.mod/go.sum are not tidy: run 'go mod tidy' and commit the result" >&2
+  exit 1
+fi
+XMOBILE_VERSION="$(go list -m -f '{{.Version}}' golang.org/x/mobile)"
+echo "=== hy2bind gomobile iOS (x/mobile $XMOBILE_VERSION) ==="
 
 if ! command -v gomobile >/dev/null 2>&1; then
   echo "Installing gomobile..."
-  go install golang.org/x/mobile/cmd/gomobile@latest
-  go install golang.org/x/mobile/cmd/gobind@latest
+  go install "golang.org/x/mobile/cmd/gomobile@${XMOBILE_VERSION}"
+  go install "golang.org/x/mobile/cmd/gobind@${XMOBILE_VERSION}"
   export PATH="$(go env GOPATH)/bin:$PATH"
 fi
 
-go get "github.com/apernet/hysteria/core/v2@${HYSTERIA_TAG}"
-go get -tool golang.org/x/mobile/cmd/gobind
-go mod tidy
-# tidy can pull a module the committed go.mod did not have.: do not
-# bind an xcframework until the guard has read that graph. A known violation
-# warns and the test still passes; copyleft without an entry stops the build.
+# Do not bind a framework until the guard has read the graph it is built from.
+# A known violation warns and the test still passes; copyleft without an entry
+# stops the build.
 go test -count=1 -run 'TestLicenseGuard$' .
 gomobile init >/dev/null 2>&1 || true
 
@@ -37,7 +38,12 @@ gomobile init >/dev/null 2>&1 || true
 # `res_9_nsearch` and `res_9_nclose`, which is what the cgo resolver compiles
 # down to. With the default resolver the extension links and then fails at link
 # time with three undefined symbols, so the pure Go resolver is selected here.
-gomobile bind -v -target=ios -iosversion=15.0 -tags netgo \
+#
+# -trimpath for the same reason as build-aar.sh: without it gomobile's random
+# temp directory and the build machine's paths are compiled into the binary.
+# -s -w -buildid= strip the symbol table, DWARF and the build id.
+gomobile bind -v -trimpath -ldflags="-s -w -buildid=" \
+  -target=ios -iosversion=15.0 -tags netgo \
   -o "$OUT_DIR/Hy2bind.xcframework" .
 
 echo "Wrote $OUT_DIR/Hy2bind.xcframework"

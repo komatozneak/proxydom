@@ -26,7 +26,6 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>proxydom</string>
-				<string>teremok</string>
 			</array>
 		</dict>
 	</array>
@@ -39,7 +38,7 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Proxy Dom uses the local network while establishing a protected connection.</string>
+	<string>Необходимо для установки защищенного соединения с корпоративным прокси-сервером и проверки задержки (пинга) сетевых узлов.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

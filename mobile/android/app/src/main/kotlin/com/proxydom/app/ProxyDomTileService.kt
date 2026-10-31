@@ -98,7 +98,7 @@ class ProxyDomTileService : TileService() {
         tile.label = getString(R.string.qs_tile_label)
         // Same house as the in-app DOM mark: white glyph, letters punched out
         // so the system tint still leaves DOM readable.
-        tile.icon = Icon.createWithResource(this, R.drawable.ic_qs_vpn)
+        tile.icon = Icon.createWithResource(this, R.drawable.ic_qs_tunnel)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             tile.subtitle = getString(
                 when (status) {

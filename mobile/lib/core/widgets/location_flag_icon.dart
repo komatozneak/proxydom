@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../theme.dart';
 import 'app_icon.dart';
 
-/// Full-bleed location mark (Hiddify-style flag as the icon background).
+/// Full-bleed location mark (flag as the icon background).
 ///
-/// Country codes use flag-icons SVGs. YouTube / gaming are colored Phosphor
-/// tiles (MIT), not monochrome SVG silhouettes.
+/// Country codes use flag SVGs. Node categories use neutral Phosphor tiles,
+/// not third-party service marks.
 class LocationFlagIcon extends StatelessWidget {
   const LocationFlagIcon({
     super.key,
@@ -17,7 +16,7 @@ class LocationFlagIcon extends StatelessWidget {
     this.borderRadius,
   });
 
-  /// Emoji (`🇺🇸`), short key (`us`, `lv`, `gaming`), or ISO code.
+  /// Emoji (`🇷🇺`), short key (`ru`, `media`, `cloud`), or ISO code.
   final String flag;
   final double size;
   final double? borderRadius;
@@ -27,7 +26,7 @@ class LocationFlagIcon extends StatelessWidget {
     final theme = Theme.of(context);
     final key = locationFlagKey(flag);
     final radius = borderRadius ?? (size * 0.28).clamp(8.0, 16.0);
-    final product = key == 'youtube' || key == 'gaming';
+    final product = isCategoryFlagKey(key);
     final asset = product ? null : locationFlagAsset(key);
 
     return ClipRRect(
@@ -42,7 +41,7 @@ class LocationFlagIcon extends StatelessWidget {
                   child: AppIcon(
                     _tileIcon(key),
                     size: size * 0.55,
-                    color: Colors.white,
+                    color: _tileForeground(theme, key),
                   ),
                 ),
               )
@@ -67,7 +66,16 @@ class LocationFlagIcon extends StatelessWidget {
   }
 }
 
-/// Known emoji → ISO / tile key. Anything else is passed through as lowercase.
+/// True for the neutral category keys a node card can carry.
+bool isCategoryFlagKey(String key) =>
+    key == 'media' ||
+    key == 'cloud' ||
+    key == 'work' ||
+    key == 'backup';
+
+/// Known emoji → ISO / category key. Anything else is passed through as
+/// lowercase. Legacy `youtube` / `gaming` values stay readable so an old
+/// stored node keeps a mark after the rename.
 String locationFlagKey(String flag) {
   final t = flag.trim();
   if (t.isEmpty || t == '🌐' || t == '🌍') return 'lv';
@@ -83,19 +91,21 @@ String locationFlagKey(String flag) {
     case '🇩🇪':
       return 'de';
     case '🎮':
-      return 'gaming';
+      return 'cloud';
     case '👑':
-      return 'youtube';
+      return 'media';
   }
   final lower = t.toLowerCase();
   if (lower == 'usa') return 'us';
   if (lower == 'eu') return 'lv';
+  if (lower == 'youtube') return 'media';
+  if (lower == 'gaming') return 'cloud';
   return lower;
 }
 
 /// Asset path for a country flag (flag-icons / FlagKit-compatible ISO file).
 String? locationFlagAsset(String key) {
-  if (key == 'gaming' || key == 'youtube') return null;
+  if (isCategoryFlagKey(key)) return null;
   if (key.length == 2 || key.contains('-')) {
     return 'assets/flags/$key.svg';
   }
@@ -103,13 +113,27 @@ String? locationFlagAsset(String key) {
 }
 
 IconData _tileIcon(String key) {
-  if (key == 'youtube') return PhosphorIconsFill.youtubeLogo;
-  if (key == 'gaming') return PhosphorIconsFill.gameController;
-  return AppIcons.globe;
+  return switch (key) {
+    'media' => AppIcons.categoryMedia,
+    'cloud' => AppIcons.categoryCloud,
+    'work' => AppIcons.categoryWork,
+    'backup' => AppIcons.categoryBackup,
+    _ => AppIcons.globe,
+  };
 }
 
 Color _tileColor(ThemeData theme, String key) {
-  if (key == 'youtube') return AppBrand.destructive;
-  if (key == 'gaming') return AppBrand.secondary;
-  return theme.colorScheme.primary;
+  return switch (key) {
+    'media' => AppBrand.mascotGoldDeep,
+    'cloud' => AppBrand.secondary,
+    'work' => AppBrand.moss,
+    _ => theme.colorScheme.surfaceContainerHighest,
+  };
+}
+
+Color _tileForeground(ThemeData theme, String key) {
+  return switch (key) {
+    'media' || 'cloud' || 'work' => AppBrand.mascotCream,
+    _ => theme.colorScheme.onSurface.withValues(alpha: 0.62),
+  };
 }

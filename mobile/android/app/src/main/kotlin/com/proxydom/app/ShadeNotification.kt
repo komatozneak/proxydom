@@ -10,9 +10,9 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 
 /**
- * VPN shade card. Two channels, one notification id, one user pref.
+ * Tunnel shade card. Two channels, one notification id, one user pref.
  *
- * Connected always has a standard [addAction] «Отключиться».
+ * Connected always has a standard [addAction] «Отключить».
  * No compact RemoteViews — Pixel clips a 48dp custom row.
  */
 object ShadeNotification {
@@ -21,21 +21,6 @@ object ShadeNotification {
     private const val NOTIFICATION_ID = 42_001
     private const val PREFS = "proxydom_shade"
     private const val KEY_VISIBLE = "shade_notification_visible"
-
-    private val LEGACY_CHANNELS = listOf(
-        "teremok_shade_v1",
-        "teremok_shade_quiet_v1",
-        "teremok_vpn",
-        "teremok_vpn_v2",
-        "teremok_vpn_v3",
-        "teremok_vpn_v4",
-        "teremok_vpn_v5",
-        "teremok_vpn_minimal",
-        "teremok_vpn_minimal_v3",
-        "teremok_vpn_minimal_v4",
-        "teremok_vpn_minimal_v5",
-        "teremok_vpn_connected_v6",
-    )
 
     fun notificationId(): Int = NOTIFICATION_ID
 
@@ -53,9 +38,6 @@ object ShadeNotification {
     fun ensureChannels(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val nm = context.getSystemService(NotificationManager::class.java) ?: return
-        for (id in LEGACY_CHANNELS) {
-            runCatching { nm.deleteNotificationChannel(id) }
-        }
         if (nm.getNotificationChannel(CHANNEL_VISIBLE) == null) {
             nm.createNotificationChannel(
                 NotificationChannel(
@@ -63,7 +45,7 @@ object ShadeNotification {
                     "Уведомление в шторке",
                     NotificationManager.IMPORTANCE_LOW,
                 ).apply {
-                    description = "Карточка VPN с кнопкой отключения"
+                    description = "Карточка защищенного маршрута с кнопкой отключения"
                     setShowBadge(false)
                     setSound(null, null)
                     enableVibration(false)
@@ -74,10 +56,10 @@ object ShadeNotification {
             nm.createNotificationChannel(
                 NotificationChannel(
                     CHANNEL_QUIET,
-                    "Фон VPN",
+                    "Фоновый туннель",
                     NotificationManager.IMPORTANCE_MIN,
                 ).apply {
-                    description = "Служебное уведомление, пока VPN включён"
+                    description = "Служебное уведомление, пока туннель активен"
                     setShowBadge(false)
                     setSound(null, null)
                     enableVibration(false)
@@ -90,7 +72,7 @@ object ShadeNotification {
         ensureChannels(context)
         return build(
             context = context,
-            line = context.getString(R.string.vpn_notification_connecting),
+            line = context.getString(R.string.tunnel_notification_connecting),
             connected = false,
         )
     }
@@ -132,7 +114,7 @@ object ShadeNotification {
     ): Notification {
         val visible = isVisible(context)
         val channel = if (visible) CHANNEL_VISIBLE else CHANNEL_QUIET
-        val status = line.ifBlank { context.getString(R.string.vpn_notification_connected) }
+        val status = line.ifBlank { context.getString(R.string.tunnel_notification_connected) }
         val builder = NotificationCompat.Builder(context, channel)
             .setSmallIcon(R.drawable.ic_stat_proxydom)
             .setContentTitle("Прокси Дом")
@@ -161,7 +143,7 @@ object ShadeNotification {
         if (connected && VpnShadePolicy.showConnectedAction("connected")) {
             builder.addAction(
                 0,
-                context.getString(R.string.vpn_notification_disconnect),
+                context.getString(R.string.tunnel_notification_disconnect),
                 disconnectPending(context),
             )
         }

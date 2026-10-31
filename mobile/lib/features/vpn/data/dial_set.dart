@@ -13,9 +13,10 @@
 /// Admitted here are Hysteria2 on every OS and the five the in-process
 /// `v2fly/v2ray-core` (MIT) outbound builder can describe — VLESS, VMess,
 /// Trojan, Shadowsocks and SOCKS5 — on the platforms where that core runs.
-/// Reality and XHTTP are not in that core, so [canDialLinkOn] refuses them even
-/// where the scheme itself is allowed; [kParkedSchemes] names the rest by
-/// protocol.
+/// REALITY is a security layer over VLESS and has its own permissive engine,
+/// so [canDialLinkOn] admits a VLESS line whose REALITY handshake the engine
+/// can describe. XHTTP is still refused: neither engine carries its framing.
+/// [kParkedSchemes] names the rest by protocol.
 library;
 
 import 'package:flutter/foundation.dart';
@@ -98,9 +99,10 @@ bool windowsDialScheme(String scheme) =>
 
 /// Whether [link] can start on [target].
 ///
-/// A scheme match is not enough. A `vless://` line with Reality or XHTTP must
-/// stay inactive, with a neutral badge, rather than fail at start: v2ray-core
-/// cannot describe it, and [buildShareSocksConfig] is the authority for that.
+/// A scheme match is not enough. A `vless://` line with XHTTP, or with a
+/// transport its engine cannot frame, must stay inactive with a neutral badge
+/// rather than fail at start: [buildShareSocksConfig] is the authority for
+/// what either share core can describe.
 bool canDialLinkOn(DialTarget target, ParsedShareLink link) {
   return canDialSchemeOn(target, link.scheme) &&
       (link.isHysteria2 || buildShareSocksConfig(link) != null);

@@ -83,3 +83,18 @@ List<String> controlPlaneHostsOf() {
   }
   return hosts.toList();
 }
+
+/// Host and port of a share line's `host:port` endpoint, or null when it has
+/// none. The port is after the last colon, so a bare IPv6 host still splits.
+({String host, int port})? shareServerOf(String? endpoint) {
+  final text = (endpoint ?? '').trim();
+  final colon = text.lastIndexOf(':');
+  if (colon <= 0 || colon == text.length - 1) return null;
+  final port = int.tryParse(text.substring(colon + 1));
+  if (port == null || port < 1 || port > 65535) return null;
+  var host = text.substring(0, colon);
+  if (host.startsWith('[') && host.endsWith(']')) {
+    host = host.substring(1, host.length - 1);
+  }
+  return host.isEmpty ? null : (host: host, port: port);
+}

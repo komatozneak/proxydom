@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme.dart';
+import '../../../core/widgets/app_icon.dart';
 import '../data/subscription_label.dart';
 
-/// Rounded tile: red YouTube play, green gamepad, or a flag emoji.
+/// Rounded tile for a node: a neutral category mark or a country flag.
 class PoolServerMark extends StatelessWidget {
   const PoolServerMark({super.key, required this.label});
 
@@ -11,10 +12,33 @@ class PoolServerMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = switch (label.tile) {
-      PoolTile.youtube => AppBrand.youtubePlay,
-      PoolTile.gaming => AppBrand.secondary,
-      PoolTile.flag => Theme.of(context).colorScheme.surfaceContainerHighest,
+    final theme = Theme.of(context);
+    final (color, icon, foreground) = switch (label.tile) {
+      PoolTile.media => (
+          AppBrand.mascotGoldDeep,
+          AppIcons.categoryMedia,
+          AppBrand.mascotCream,
+        ),
+      PoolTile.cloud => (
+          AppBrand.secondary,
+          AppIcons.categoryCloud,
+          AppBrand.mascotCream,
+        ),
+      PoolTile.work => (
+          AppBrand.moss,
+          AppIcons.categoryWork,
+          AppBrand.mascotCream,
+        ),
+      PoolTile.backup => (
+          theme.colorScheme.surfaceContainerHighest,
+          AppIcons.categoryBackup,
+          theme.colorScheme.onSurface.withValues(alpha: 0.62),
+        ),
+      PoolTile.flag => (
+          theme.colorScheme.surfaceContainerHighest,
+          AppIcons.globe,
+          theme.colorScheme.onSurface,
+        ),
     };
     return Container(
       width: 40,
@@ -24,34 +48,9 @@ class PoolServerMark extends StatelessWidget {
         color: color,
         borderRadius: BorderRadius.circular(10),
       ),
-      child: switch (label.tile) {
-        PoolTile.youtube => const CustomPaint(
-            size: Size(18, 14),
-            painter: _PlayPainter(),
-          ),
-        PoolTile.gaming => const Text('🎮', style: TextStyle(fontSize: 20)),
-        PoolTile.flag => Text(
-            label.flag.isEmpty ? '🌐' : label.flag,
-            style: const TextStyle(fontSize: 22),
-          ),
-      },
+      child: label.tile == PoolTile.flag && label.flag.isNotEmpty
+          ? Text(label.flag, style: const TextStyle(fontSize: 22))
+          : AppIcon(icon, size: 20, color: foreground),
     );
   }
-}
-
-class _PlayPainter extends CustomPainter {
-  const _PlayPainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final path = Path()
-      ..moveTo(0, 0)
-      ..lineTo(size.width, size.height / 2)
-      ..lineTo(0, size.height)
-      ..close();
-    canvas.drawPath(path, Paint()..color = AppBrand.surfaceElevatedLight);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

@@ -1,7 +1,10 @@
 package com.proxydom.app
 
 import android.content.ActivityNotFoundException
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.net.ConnectivityManager
 import android.net.IpPrefix
 import android.net.NetworkCapabilities
@@ -1184,10 +1187,7 @@ class ProxyDomVpnService : VpnService() {
         }
         builder.addDnsServer("1.1.1.1")
         builder.addDnsServer("8.8.8.8")
-        val server = Regex(""""address"\s*:\s*"([^"]+)"\s*,\s*"port"\s*:\s*(\d+)""")
-            .find(configJson)
-        val serverHost = server?.groupValues?.getOrNull(1).orEmpty()
-        val serverPort = server?.groupValues?.getOrNull(2)?.toIntOrNull() ?: 0
+        val (serverHost, serverPort) = shareServerOf(params)
         applyBypassRoutes(builder, serverHost, params)
         applyDisallowedApplications(builder, params)
         currentStatus = "connecting"
@@ -1195,7 +1195,7 @@ class ProxyDomVpnService : VpnService() {
         tunInterface.set(builder.establish())
         val activeTun = tunInterface.get()
         if (activeTun == null) {
-            failStart("VPN permission denied or establish() returned null")
+            failStart("Tunnel permission denied or establish() returned null")
             return
         }
         VpnUnderlyingNetworkPolicy.applyTo(this)
@@ -1321,7 +1321,7 @@ class ProxyDomVpnService : VpnService() {
         val activeTun = tunInterface.get()
         if (activeTun == null) {
             ProtectGuard.onFailure = null
-            failStart("VPN permission denied or establish() returned null")
+            failStart("Tunnel permission denied or establish() returned null")
             return
         }
         VpnUnderlyingNetworkPolicy.applyTo(this)
@@ -1749,14 +1749,45 @@ class ProxyDomVpnService : VpnService() {
                     currentStatus != "disconnecting" &&
                     currentStatus != "idle"
             },
+            interactive = {
+                (getSystemService(POWER_SERVICE) as? PowerManager)?.isInteractive ?: true
+            },
         )
+        registerScreenOnProbe()
         NativeLog.i(
             TAG,
             "path health watch started adapter=${watch.adapter} socks=${watch.port}",
         )
     }
 
+    /**
+     * The probe slows down with the screen off; when it comes back on, Home is
+     * about to show its `ms`, so take a reading now instead of after the rest
+     * of a thirty-second wait.
+     */
+    private var screenOnProbe: BroadcastReceiver? = null
+
+    private fun registerScreenOnProbe() {
+        if (screenOnProbe != null) return
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent?.action == Intent.ACTION_SCREEN_ON) pathHealth.probeNow()
+            }
+        }
+        runCatching {
+            registerReceiver(receiver, IntentFilter(Intent.ACTION_SCREEN_ON))
+            screenOnProbe = receiver
+        }.onFailure { NativeLog.w(TAG, "screen-on probe not registered", it) }
+    }
+
+    private fun unregisterScreenOnProbe() {
+        val receiver = screenOnProbe ?: return
+        screenOnProbe = null
+        runCatching { unregisterReceiver(receiver) }
+    }
+
     private fun stopPathHealthWatch() {
+        unregisterScreenOnProbe()
         pathHealth.stopContinuous()
         // A session that is gone has no reading: Home shows `—`, never the last
         // good ms. Clearing here, not in the traffic monitor, keeps a shade
@@ -1836,7 +1867,7 @@ class ProxyDomVpnService : VpnService() {
     }
 
     override fun onRevoke() {
-        NativeLog.w(TAG, "onRevoke: VPN отозван системой или пользователем")
+        NativeLog.w(TAG, "onRevoke: туннель отозван системой или пользователем")
         currentStatus = "revoked"
         VpnStatusBroadcaster.emit(currentStatus)
         stopVpn()

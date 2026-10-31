@@ -30,6 +30,7 @@ function New-CleanPayload([string]$Name) {
 }
 
 $script:SingBox = "Go buildinf: path github.com/sagernet/sing-box/cmd/sing-box"
+$script:Xray = "Go buildinf: path github.com/xtls/xray-core/cmd/xray"
 $cases = @(
     @{ Name = "clean payload has no sing-box"; Want = 0
        MustContain = "Payload license check passed"
@@ -44,6 +45,9 @@ $cases = @(
     @{ Name = "sing-box bytes under an allowed name"; Want = 1
        MustContain = "FAIL wintun.dll embeds github.com/sagernet/"
        Setup = { param($d) New-Binary (Join-Path $d "wintun.dll") $script:SingBox } },
+    @{ Name = "xray bytes under an allowed name"; Want = 1
+       MustContain = "FAIL wintun.dll embeds github.com/xtls/xray-core"
+       Setup = { param($d) New-Binary (Join-Path $d "wintun.dll") $script:Xray } },
     @{ Name = "sing-box hidden in a subfolder without an extension"; Want = 1
        MustContain = "FAIL data/engine embeds github.com/sagernet/"
        Setup = { param($d) New-Binary (Join-Path $d "data/engine") $script:SingBox } },

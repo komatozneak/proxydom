@@ -33,6 +33,8 @@ internal fun socksPortFromListen(listen: String): Int? {
 
 fun socksWatchFor(params: Map<String, Any?>): SocksWatch? {
     if (isVlessShareCore(params)) {
+        // Both share engines (v2ray family and REALITY) listen here: only one
+        // runs at a time.
         return SocksWatch(
             adapter = PathHealth.CoreAdapter.ShareSocks,
             port = GvisorTun2Socks.SHARE_SOCKS_PORT,

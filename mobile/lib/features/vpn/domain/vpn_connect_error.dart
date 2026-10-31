@@ -69,7 +69,7 @@ String? parseNodeHandshakeFailureServer(String detail) {
 /// Map native [getLastError] text to a structured [VpnError] for Home UI.
 VpnError vpnErrorFromNativeDetail(
   String? detail, {
-  String fallbackMessage = 'Native VPN error',
+  String fallbackMessage = 'Native tunnel error',
 }) {
   if (detail == null || detail.isEmpty) {
     return VpnError(message: fallbackMessage);
@@ -93,7 +93,7 @@ VpnError vpnErrorFromNativeDetail(
   }
   if (detail.toLowerCase().contains('permission denied')) {
     return const VpnError(
-      message: 'VPN permission denied',
+      message: 'Tunnel permission denied',
       code: 'permission_denied',
     );
   }
@@ -109,7 +109,7 @@ VpnError vpnErrorFromNativeDetail(
       code: kNodeAuthRefusedErrorCode,
     );
   }
-  return VpnError(message: 'vpn: $detail');
+  return VpnError(message: 'tunnel: $detail');
 }
 
 /// Masquerade returns 405 when the node refuses the password. That status is
@@ -122,7 +122,7 @@ bool _isNodeAuthRefusal(String detail) {
 /// Map session Error / PathIncompatible to Home [VpnError].
 VpnError vpnErrorFromSession(
   VpnSessionSnapshot snap, {
-  String fallbackMessage = 'Native VPN error',
+  String fallbackMessage = 'Native tunnel error',
 }) {
   if (snap.reason == VpnSessionReason.pathIncompatible) {
     return const VpnError(

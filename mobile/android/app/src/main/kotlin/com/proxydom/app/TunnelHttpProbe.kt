@@ -39,9 +39,19 @@ internal class TunnelHttpProbe(
     /** Round trip in ms, or null when the path did not answer. */
     fun sample(timeoutMs: Int): Long? {
         if (closed) return null
-        val ms = runCatching { measure(timeoutMs) }.getOrNull()
-        // A failed sample drops the stream; the next one reopens it.
+        val reused = socket != null
+        var ms = runCatching { measure(timeoutMs) }.getOrNull()
+        // A failed sample drops the stream; the next attempt reopens it.
         if (ms == null) dropConnection()
+        // A kept stream the far side closed while the probe waited fails on its
+        // first use. That is the server's idle timeout, not the path: try once
+        // more on a fresh stream before calling it a miss. The wait between
+        // samples is longer with the screen off, which is exactly when idle
+        // timeouts start to land.
+        if (ms == null && reused && !closed) {
+            ms = runCatching { measure(timeoutMs) }.getOrNull()
+            if (ms == null) dropConnection()
+        }
         return ms
     }
 

@@ -11,15 +11,25 @@ ops-документов здесь нет: они остались в закр�
 
 ---
 
-## 0. Быстрый старт
+## 0. Команды
+
+Те же, что гоняет CI (`.github/workflows/mobile-build.yml`):
 
 ```bash
 cd mobile && flutter pub get
 flutter analyze --no-fatal-infos
 flutter test --dart-define=AUTH_ANONYMOUS=false
+flutter test test/dial_set_test.dart          # один файл
 
-cd android/hysteria-bind && go test ./...
+cd android/hysteria-bind
+go mod tidy -diff                             # go.mod — единственный пин версий
+go test ./...
+go test -run TestLicenseGuard .               # один тест
+GOOS=windows GOARCH=amd64 go build ./... && GOOS=windows GOARCH=amd64 go vet ./...
 ```
+
+Kotlin-тесты (`./gradlew :app:testDebugUnitTest` в `mobile/android`) требуют
+собранного `hysteria-client.aar` — см. `mobile/AGENTS.md`.
 
 ## 1. Имена
 
@@ -44,23 +54,28 @@ cd android/hysteria-bind && go test ./...
 §6: лицензионные ограничения клиента касаются не выручки, а самого факта
 распространения, поэтому «приложение бесплатное» их не снимает.
 
-**Два набора строк, не путать:**
+**Что клиент умеет запускать** (подробно и по платформам решает только код,
+документация это не дублирует):
 
-- **Ключ узла** — `hy2://` и `hysteria2://`, включая `obfs=salamander` и
-  port hopping. Единственный транспорт для узлов.
+- **Hysteria2** — `hy2://` и `hysteria2://`, включая `obfs=salamander`, на
+  всех ОС. Port hopping движок умеет (`hy2bind_hop.go`), но сейчас его несёт
+  только Windows-брокер: Android и iOS не передают `server_ports`, а диапазон
+  прямо в порту (`host:20000-30000`) Dart-парсер отбрасывает на всех ОС.
 - **Импорт** — Hysteria2 на всех ОС и вся семья `v2fly/v2ray-core` там, где
-  движок её набирает: Android и Windows. Это VLESS, VMess, Trojan, Shadowsocks
-  и SOCKS5. Движок один — in-process `v2fly/v2ray-core` v5.54.2 (MIT) внутри
-  `hy2bind`, и на Windows тот же исходник становится `proxydom-engine.exe`.
-  Reality и XHTTP он не описывает, такие строки остаются неактивными. iOS
-  движка этой семьи не имеет и остаётся на Hysteria2.
+  движок её набирает: Android, Windows и iOS. Это VLESS, VMess, Trojan,
+  Shadowsocks и SOCKS5. Основной движок — in-process `v2fly/v2ray-core`
+  v5.54.2 (MIT) внутри `hy2bind`; на Windows тот же исходник становится
+  `proxydom-engine.exe`, на iOS семья идёт через packet-flow dataplane.
+  **Reality** несёт отдельный permissive-движок в `hy2bind/share_reality.go`
+  (uTLS + VLESS, без `xray-core`): TCP и UDP. XTLS Vision в нём пока нет, такие
+  Reality-строки остаются неактивными. **XHTTP** тоже не несёт ни один движок.
 
 `wireguard://`, `amneziawg://` и `vpn://` парсер опознаёт, считает и называет,
 но не запускает: в `hy2bind` нет userspace-WireGuard, а `vpn://` — контейнер, а
 не диалер. Смешанный документ импортируется целиком и не удаляется; строки,
 которые платформа не умеет запустить, показываются с нейтральным бейджем, а не
 с ошибкой. Источник правды — `mobile/lib/features/vpn/data/dial_set.dart`.
-Разбор INCY, из которого этот набор вырос, — `docs/parity/incy-intake-parity.md`.
+Разбор стандартного приёма ключей и подписок — `docs/parity/standard-intake-parity.md`.
 
 ## 3. Стек
 
@@ -76,7 +91,8 @@ cd android/hysteria-bind && go test ./...
 ```
 mobile/     Flutter-приложение (lib/, test/, android/, ios/, windows/)
 desktop/    Windows: service/ (C++) + installer/ (MSI)
-.github/    CI: mobile-build, android-apk, ios-testflight, windows-service
+.github/    CI: mobile-build (PR), ios-compile (PR), windows-service (PR),
+            android-apk и ios-testflight (вручную)
 ```
 
 ## 4. Стиль
@@ -88,7 +104,13 @@ desktop/    Windows: service/ (C++) + installer/ (MSI)
 **Go:** обычный `gofmt`; комментарии объясняют «почему», не «что».
 
 **Тесты** проверяют поведение, а не галочку. Тест, который проходит на сломанной
-реализации, хуже отсутствующего: он заявляет покрытие, которого нет.
+реализации, хуже отсутствующего: он заявляет покрытие, которого нет. Тесты
+вызывают код, а не читают исходники как текст: grep по `lib/`, `main.go` или
+чужому языку ломается от переименования и не ловит регрессию. Правило, которое
+нельзя проверить поведением, живёт в этом файле и в ревью, а не в тесте.
+
+**Комментарии и документы** не ссылаются на ADR, номера задач и прошлые решения:
+причина пишется рядом с кодом, которым она управляет.
 
 ## 5. CI ≠ устройство
 
@@ -122,18 +144,29 @@ desktop/    Windows: service/ (C++) + installer/ (MSI)
   `sing/common/control` в `system_dialer.go`), `sagernet/sing-shadowsocks` —
   из `infra/conf`, `juju/ratelimit` (LGPL) — через `xtls/reality`. Проверено
   2026-10-30 командой `go mod why` на v1.260327.0; `TestLicenseGuard` валит
-  такую сборку. Поэтому Reality и XHTTP в клиенте не запускаются: их умеет
-  только этот движок, а его граф не проходит §6. Переход возможен лишь если
-  GPL/LGPL-части будут вырезаны из графа (форк или build-теги), а это отдельное
-  решение, а не правка парсера.
+  такую сборку. Поэтому `xray-core` в клиент не входит. Reality этого не
+  требует: её клиентская половина реализована отдельно в
+  `hy2bind/share_reality.go` на uTLS, без графа Xray. XHTTP по-прежнему не
+  несёт ни один движок; его фрейминг придётся реализовать так же отдельно.
+  Переход на сам `xray-core` возможен лишь если GPL/LGPL-части будут вырезаны
+  из графа (форк или build-теги), а это отдельное решение.
 - **`com.android.vending.BILLING` не добавлять.** Платежей в приложении нет.
 - **Секреты и ключи серверов не отправлять на сервер.** Утилита локальная.
 
-## 7. Git
+## 7. Рабочий процесс
 
-Conventional Commits. Один коммит — одно откатываемое поведение, дерево
-собирается на каждом. Ветки `feat/…`, `fix/…`, `docs/…`, `refactor/…`,
-`chore/…`.
+- **Один агент — одно рабочее дерево.** Параллельная задача идёт в своём
+  `git worktree` на своей ветке, а не в общей папке: два агента в одном дереве
+  перетирают файлы друг друга и коммитят чужие правки.
+- Ветка от `main`: `feat/…`, `fix/…`, `docs/…`, `refactor/…`, `chore/…`.
+  Conventional Commits; один коммит — одно откатываемое поведение, дерево
+  собирается и тесты зелёные на каждом.
+- В коммит идут только свои файлы (`git add <path>`, не `-A`): в дереве может
+  лежать чужая незаконченная работа.
+- Перед сдачей — команды из §0. Красный тест чинится или явно называется в
+  отчёте; «должно работать» не выдаётся за «проверено» (§5).
+- Продукты сборки (`*.aar`, `*.xcframework`, APK, MSI, логи, скриншоты) не
+  коммитятся.
 
 ## 8. Чего в этом репозитории нет
 

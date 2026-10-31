@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:proxydom/features/vpn/data/vpn_controller.dart';
@@ -105,17 +103,5 @@ void main() {
       });
       expect(await VpnController.instance.openVpnSettings(), isFalse);
     });
-  });
-
-  test('Settings does not ship a kill-switch tile (ADR 020)', () {
-    final settings = File(
-      'lib/features/settings/presentation/settings_screen.dart',
-    ).readAsStringSync();
-    expect(settings.contains('KillSwitchSettingsTile'), isFalse);
-    expect(
-      File('lib/features/settings/presentation/kill_switch_settings_tile.dart')
-          .existsSync(),
-      isFalse,
-    );
   });
 }

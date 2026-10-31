@@ -59,6 +59,11 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    buildFeatures {
+        // NativeLog/CoreLog gate logcat detail on BuildConfig.DEBUG.
+        buildConfig = true
+    }
+
     kotlinOptions {
         jvmTarget = JavaVersion.VERSION_17.toString()
     }
@@ -165,8 +170,7 @@ androidComponents {
 
 dependencies {
     // Official Hy2 AAR (`hysteria-bind/build-aar.sh`). Do not add
-    // libs/libXray.aar: it embeds sagernet/sing (GPL-3.0) and was removed
-    // (ADR 036).
+    // libs/libXray.aar: it embeds sagernet/sing (GPL-3.0) and was removed.
     //
     // The archive is a build product and is not committed, so its absence is a
     // missing build step. Fail here with the command to run: `if (exists())`

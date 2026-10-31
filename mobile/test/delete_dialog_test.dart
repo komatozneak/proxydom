@@ -39,8 +39,14 @@ void main() {
       findsOneWidget,
     );
 
+    // `TextButton.icon` builds a private TextButton subclass on some Flutter
+    // releases, and `widgetWithText` matches the exact type: match any
+    // TextButton above the label instead.
     final delete = tester.widget<TextButton>(
-      find.widgetWithText(TextButton, 'Удалить'),
+      find.ancestor(
+        of: find.text('Удалить'),
+        matching: find.byWidgetPredicate((widget) => widget is TextButton),
+      ),
     );
     expect(
       delete.style?.foregroundColor?.resolve(<WidgetState>{}),

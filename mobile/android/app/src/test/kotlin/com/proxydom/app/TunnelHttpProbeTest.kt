@@ -78,4 +78,29 @@ class TunnelHttpProbeTest {
             }
         }
     }
+
+    /**
+     * With the screen off the probe waits thirty seconds, long enough for the
+     * far side to drop an idle keep-alive stream. That close is not the path
+     * failing: the sample retries once on a fresh stream instead of reporting
+     * a miss that could add up to a needless reconnect.
+     */
+    @Test
+    fun `a kept stream the server closed is reopened, not counted as a miss`() {
+        FakeSocksServer(
+            statusLine = "HTTP/1.1 204 No Content",
+            holdBackMs = 0,
+            keepAlive = true,
+            answersPerConnection = 1,
+        ).use { server ->
+            TunnelHttpProbe(socksPort = server.port).use { probe ->
+                assertNotNull(probe.sample(timeoutMs = 3_000))
+                assertNotNull(
+                    "a server-side idle close must not read as a dead path",
+                    probe.sample(timeoutMs = 3_000),
+                )
+                assertEquals(2, server.connections.get())
+            }
+        }
+    }
 }

@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 /// How much of the tunnel log is recorded, and which pool the screen shows.
 enum TunnelLogLevel {
   off,
@@ -22,10 +24,14 @@ enum TunnelLogLevel {
   }
 
   /// Picking Errors or Warnings must not stop recording the other pools.
+  ///
+  /// A release build records at `warn` unless the user explicitly asks for
+  /// `debug`: the info pool names DNS answers, node addresses and the chosen
+  /// outbound. Tests and debug builds keep the old `info` default.
   TunnelLogLevel get recordingLevel => switch (this) {
         TunnelLogLevel.off => TunnelLogLevel.off,
         TunnelLogLevel.debug => TunnelLogLevel.debug,
-        _ => TunnelLogLevel.info,
+        _ => kReleaseMode ? TunnelLogLevel.warn : TunnelLogLevel.info,
       };
 
   static int _rank(String lineLevel) => switch (lineLevel) {

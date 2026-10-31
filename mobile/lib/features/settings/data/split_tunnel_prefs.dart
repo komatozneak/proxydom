@@ -217,7 +217,6 @@ class SplitTunnelPrefs {
   static const _osnovnyeV2DefaultsKey = 'split_tunnel_osnovnye_v2_defaults_v1';
   static const _osnovnyeV3DefaultsKey = 'split_tunnel_osnovnye_v3_defaults_v1';
   static const _osnovnyeV4DefaultsKey = 'split_tunnel_osnovnye_v4_defaults_v1';
-  static const _tunnelOnlyDefaultsKey = 'split_tunnel_tunnel_only_defaults_v1';
   static const _disallowedAppsKey = 'split_tunnel_disallowed_apps_v1';
   static const _seededBypassKey = 'split_tunnel_seeded_bypass_v1';
   static const _seededBypassV2Key = 'split_tunnel_seeded_bypass_v2';
@@ -248,8 +247,6 @@ class SplitTunnelPrefs {
   }
 
   /// One-shot: turn ON live RF lists even if an older JSON saved them false.
-  ///
-  /// TikTok is deliberately absent — see [kTunnelOnlyOsnovnyeIds].
   static Future<void> _applyRfOsnovnyeDefaultsIfNeeded(
     SharedPreferences prefs,
   ) async {
@@ -312,8 +309,6 @@ class SplitTunnelPrefs {
   }
 
   /// One-shot: popular RU shops/mail/telecom/media/transport ON.
-  ///
-  /// TikTok is not here — [kTunnelOnlyOsnovnyeIds] keeps it in the tunnel.
   static Future<void> _applyV4OsnovnyeDefaultsIfNeeded(
     SharedPreferences prefs,
   ) async {
@@ -333,53 +328,13 @@ class SplitTunnelPrefs {
     await prefs.setBool(_osnovnyeV4DefaultsKey, true);
   }
 
-  /// One-shot: undo a wrong allowlist default on installs that already shipped it.
-  ///
-  /// TikTok is throttled in RF since 2022, so a bypassed TikTok is a dead app
-  /// for the ordinary user — the default was a bug, not a feature. Force it back
-  /// into the tunnel and drop the seeded TikTok packages from the bypass list.
-  /// Runs after every vN seed; later user toggles stick.
-  static Future<void> _applyTunnelOnlyDefaultsIfNeeded(
-    SharedPreferences prefs,
-  ) async {
-    if (prefs.getBool(_tunnelOnlyDefaultsKey) == true) return;
-    var changed = false;
-
-    final map = _decodeOsnovnyeMap(prefs);
-    var mapChanged = false;
-    for (final id in kTunnelOnlyOsnovnyeIds) {
-      if (map[id] != false) {
-        map[id] = false;
-        mapChanged = true;
-      }
-    }
-    if (mapChanged) {
-      await prefs.setString(_osnovnyeKey, jsonEncode(map));
-      changed = true;
-    }
-
-    final packages = await loadDisallowedPackages();
-    if (packages.any(kTunnelOnlyBypassPackages.contains)) {
-      packages.removeAll(kTunnelOnlyBypassPackages);
-      await prefs.setStringList(
-        _disallowedAppsKey,
-        packages.toList()..sort(),
-      );
-      changed = true;
-    }
-
-    if (changed) await _bumpDraft(prefs);
-    await prefs.setBool(_tunnelOnlyDefaultsKey, true);
-  }
-
-  /// Live «Основные» toggles. Popular RU Direct defaults ON; TikTok OFF.
+  /// Live «Основные» toggles. Popular RU Direct defaults ON.
   static Future<Map<String, bool>> loadOsnovnyeEnabled() async {
     final prefs = await SharedPreferences.getInstance();
     await _applyRfOsnovnyeDefaultsIfNeeded(prefs);
     await _applyV2OsnovnyeDefaultsIfNeeded(prefs);
     await _applyV3OsnovnyeDefaultsIfNeeded(prefs);
     await _applyV4OsnovnyeDefaultsIfNeeded(prefs);
-    await _applyTunnelOnlyDefaultsIfNeeded(prefs);
     return _decodeOsnovnyeMap(prefs);
   }
 
@@ -387,16 +342,13 @@ class SplitTunnelPrefs {
   ///
   /// NoVPN UI is hidden on iOS; this keeps excludedRoutes useful in the
   /// background. Runs once per install; later toggles stick.
-  /// [kTunnelOnlyOsnovnyeIds] rows are skipped — they only work behind the VPN.
   static Future<bool> ensureIosSitesAllEnabledIfNeeded() async {
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) return false;
     final prefs = await SharedPreferences.getInstance();
-    await _applyTunnelOnlyDefaultsIfNeeded(prefs);
     if (prefs.getBool(_iosAllOnKey) == true) return false;
     final map = await loadOsnovnyeEnabled();
     var changed = false;
     for (final c in kOsnovnyeCategories) {
-      if (kTunnelOnlyOsnovnyeIds.contains(c.id)) continue;
       if (map[c.id] != true) {
         map[c.id] = true;
         changed = true;
@@ -601,8 +553,6 @@ class SplitTunnelPrefs {
     for (final s in sites.where((s) => s.enabled && !s.isPreset)) {
       out.add(s.domain);
       out.addAll(s.players);
-      final aliases = kSplitTunnelDomainAliases[s.domain];
-      if (aliases != null) out.addAll(aliases);
     }
     final cats = await loadOsnovnyeEnabled();
     for (final c in kOsnovnyeCategories) {
@@ -632,17 +582,6 @@ class SplitTunnelPrefs {
     for (final c in kOsnovnyeCategories) {
       if (cats[c.id] != true) continue;
       out.addAll(c.resolutionHostsForIos);
-    }
-    return out.toList()..sort();
-  }
-
-  /// DC / CDN IP ranges when user adds matching custom domains (e.g. telegram.org).
-  static Future<List<String>> enabledProxyIpCidrs() async {
-    final sites = await loadSites();
-    final out = <String>{};
-    for (final s in sites.where((s) => s.enabled && !s.isPreset)) {
-      final cidrs = kSplitTunnelProxyIpCidrs[s.domain];
-      if (cidrs != null) out.addAll(cidrs);
     }
     return out.toList()..sort();
   }
@@ -787,22 +726,6 @@ const kOsnovnyeV4Ids = <String>{
   'transport',
 };
 
-/// Rows that must never be enabled by a default or a one-shot seed.
-///
-/// TikTok is globally throttled in RF since 2022: a bypassed TikTok opens to a
-/// stalled feed for the ordinary user, so only the tunnel makes it usable. The
-/// toggle stays in the UI — an explicit opt-in, never a shipped default.
-const kTunnelOnlyOsnovnyeIds = <String>{
-  'tiktok',
-};
-
-/// Android packages of the [kTunnelOnlyOsnovnyeIds] rows, removed from the
-/// seeded bypass by the same one-shot.
-const kTunnelOnlyBypassPackages = <String>{
-  'com.zhiliaoapp.musically',
-  'com.ss.android.ugc.trill',
-};
-
 /// One row under Sites → Основные.
 class OsnovnyeCategory {
   const OsnovnyeCategory({
@@ -850,22 +773,6 @@ const kOsnovnyeCategories = <OsnovnyeCategory>[
       'vkuserphoto.ru',
       'vk-cdn.net',
       'vk-cdn.me',
-    ],
-  ),
-  OsnovnyeCategory(
-    id: 'tiktok',
-    labelRu: 'TikTok',
-    labelEn: 'TikTok',
-    badge: 'TT',
-    // RF throttles TikTok since 2022 — direct is a dead app. Default OFF keeps
-    // it in the tunnel on every platform; the row stays as an opt-in toggle.
-    defaultEnabled: false,
-    domains: [
-      'tiktok.com',
-      'tiktokv.com',
-      'tiktokcdn.com',
-      'musical.ly',
-      'byteoversea.com',
     ],
   ),
   OsnovnyeCategory(
@@ -1106,102 +1013,3 @@ const kOsnovnyeCategories = <OsnovnyeCategory>[
     ],
   ),
 ];
-
-/// Extra suffixes applied when a matching custom domain is enabled.
-const kSplitTunnelDomainAliases = <String, List<String>>{
-  'youtube.com': [
-    'youtu.be',
-    'googlevideo.com',
-    'ytimg.com',
-    'ggpht.com',
-    'googleapis.com',
-    'gvt1.com',
-  ],
-  'tiktok.com': [
-    'tiktokv.com',
-    'tiktokcdn.com',
-    'musical.ly',
-    'byteoversea.com',
-  ],
-  'instagram.com': [
-    'cdninstagram.com',
-    'instagram.net',
-    'facebook.com',
-    'fb.com',
-    'fbcdn.net',
-    'messenger.com',
-  ],
-  'cloudflare.com': [
-    'cloudflare-dns.com',
-  ],
-  'whatsapp.com': [
-    'wa.me',
-    'whatsapp.net',
-    'cdn.whatsapp.net',
-  ],
-  'telegram.org': [
-    't.me',
-    'tx.me',
-    'telegram.me',
-    'telegram.dog',
-    'telegram.space',
-    'tdesktop.com',
-    'telegra.ph',
-    'telesco.pe',
-    'api.telegram.org',
-    'core.telegram.org',
-    'desktop.telegram.org',
-    'telegram-cdn.org',
-    'cdn-telegram.org',
-  ],
-  'discord.com': [
-    'discord.gg',
-    'discordapp.com',
-    'discord.media',
-    'discordcdn.com',
-  ],
-  'chatgpt.com': [
-    'openai.com',
-    'chat.openai.com',
-    'oaiusercontent.com',
-  ],
-  'claude.ai': [
-    'anthropic.com',
-  ],
-  'gemini.google.com': [
-    // Web / app surfaces
-    'aistudio.google.com',
-    'notebooklm.google.com',
-    'deepmind.google',
-    'bard.google.com',
-    // API / RPC
-    'generativelanguage.googleapis.com',
-    'alkalimakersuite-pa.clients6.google.com',
-    'clients6.google.com',
-    'googleapis.com',
-    // Static / media / auth — Gemini breaks without these (SNIFF miss → direct).
-    'google.com',
-    'gstatic.com',
-    'googleusercontent.com',
-    'ggpht.com',
-    'accounts.google.com',
-    'withgoogle.com',
-  ],
-};
-
-/// IP CIDRs routed to proxy when the matching preset is enabled (sites mode).
-///
-/// Telegram clients often skip SNI/DNS and dial DC IPs — domain_suffix alone
-/// leaves them on `final=direct`.
-const kSplitTunnelProxyIpCidrs = <String, List<String>>{
-  'telegram.org': [
-    '91.108.4.0/22',
-    '91.108.8.0/22',
-    '91.108.12.0/22',
-    '91.108.16.0/22',
-    '91.108.20.0/22',
-    '91.108.56.0/22',
-    '149.154.160.0/20',
-    '185.76.151.0/24',
-  ],
-};

@@ -11,7 +11,6 @@ $RequiredAbis = @("arm64-v8a", "armeabi-v7a", "x86_64")
 $androidDir = $PSScriptRoot
 $mobileDir = Split-Path $androidDir -Parent
 $keyProps = Join-Path $androidDir "key.properties"
-$jks = Join-Path $androidDir "teremok-upload.jks"
 $q = [char]39
 
 function Invoke-Flutter {
@@ -81,15 +80,25 @@ function Get-AaptField {
     }
 }
 
-if (-not (Test-Path -LiteralPath $jks)) {
-    Write-Error "Missing teremok-upload.jks in mobile\android"
-}
 if (-not (Test-Path -LiteralPath $keyProps)) {
     Write-Error "Missing key.properties. Copy from key.properties.template"
 }
 $keyText = Get-Content -LiteralPath $keyProps -Raw
 if ($keyText -match "YOUR_.*_PASSWORD_HERE") {
     Write-Error "Edit key.properties: replace YOUR_STORE_PASSWORD_HERE and YOUR_KEY_PASSWORD_HERE"
+}
+# The keystore name is whatever key.properties says; no brand-named file is
+# assumed here, and an existing checkout keeps signing with its current key.
+# Gradle resolves storeFile against the app module, while older checkouts kept
+# the JKS beside key.properties, so both locations are accepted.
+$storeRel = Read-KeyProperty "storeFile"
+$jksCandidates = @(
+    [System.IO.Path]::GetFullPath((Join-Path (Join-Path $androidDir "app") $storeRel)),
+    [System.IO.Path]::GetFullPath((Join-Path $androidDir $storeRel))
+)
+$jks = $jksCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+if (-not $jks) {
+    Write-Error ("Missing upload keystore. Tried: {0}" -f ($jksCandidates -join ", "))
 }
 
 # The APK links libs/hysteria-client.aar, not the Go source, and that archive is
@@ -136,7 +145,7 @@ Push-Location $mobileDir
 try {
     Invoke-Flutter pub get
     Invoke-Flutter gen-l10n
-    Invoke-Flutter build apk --release
+    Invoke-Flutter build apk --release --obfuscate --split-debug-info=build/symbols
 } finally {
     Pop-Location
 }
@@ -232,7 +241,7 @@ $ksShaLine = ($keytoolOut | Select-String -Pattern "SHA256:" | Select-Object -Fi
 if (-not $ksShaLine) { Write-Error "Could not read keystore SHA-256" }
 $ksSha = Normalize-Sha256 (($ksShaLine -split "SHA256:", 2)[-1])
 if ($apkSha -ne $ksSha) {
-    Write-Error "APK signer SHA-256 does not match teremok-upload.jks"
+    Write-Error "APK signer SHA-256 does not match proxydom-upload.jks"
 }
 
 # Do not print passwords. Fingerprints are public (same as Play upload cert).

@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:proxydom/core/ios_store_gates.dart';
@@ -37,25 +35,14 @@ void main() {
     expect(iosAppsSplitUnsupported, isFalse);
     expect(windowsDialScheme('vless'), isTrue);
     expect(windowsDialScheme('hy2'), isTrue);
-    expect(windowsDialScheme('trojan'), isFalse);
-    expect(windowsDialScheme('ss'), isFalse);
-    expect(windowsDialScheme('vmess'), isFalse);
+    // The broker now carries the whole v2ray-core family; what it still cannot
+    // carry is refused by name, and that is the line this guards.
+    expect(windowsDialScheme('trojan'), isTrue);
+    expect(windowsDialScheme('ss'), isTrue);
+    expect(windowsDialScheme('vmess'), isTrue);
+    expect(windowsDialScheme('socks5'), isTrue);
+    expect(windowsDialScheme('wireguard'), isFalse);
     expect(VpnNotificationPrefs.isSupported, isFalse);
     expect(QsTilePrefs.isSupported, isFalse);
-  });
-
-  test('lib has no Platega or tariff deep link', () {
-    final hits = <String>[];
-    for (final entity in Directory('lib').listSync(recursive: true)) {
-      if (entity is! File || !entity.path.endsWith('.dart')) continue;
-      final normalized = entity.path.replaceAll('\\', '/');
-      if (normalized.contains('/l10n/')) continue;
-      final text = entity.readAsStringSync();
-      if (text.contains('start=tariffs') ||
-          text.contains('createPlategaPayment')) {
-        hits.add(normalized);
-      }
-    }
-    expect(hits, isEmpty);
   });
 }

@@ -44,11 +44,17 @@ func (c androidLogCore) Check(ent zapcore.Entry, ce *zapcore.CheckedEntry) *zapc
 }
 
 func (c androidLogCore) Write(ent zapcore.Entry, _ []zapcore.Field) error {
+	// zap fills in the caller after Check, so the per-connection demotion can
+	// only be judged here, where the file the line came from is known.
+	level := tunnelEntryLevel(ent)
+	if !c.Enabled(level) {
+		return nil
+	}
 	msg := ent.Message
 	if ent.Caller.Defined {
 		msg = ent.Caller.TrimmedPath() + " " + msg
 	}
-	writeAndroidLog(androidLogPriority(ent.Level), msg)
+	writeAndroidLog(androidLogPriority(level), msg)
 	return nil
 }
 

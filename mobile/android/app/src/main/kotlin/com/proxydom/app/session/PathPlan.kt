@@ -3,7 +3,7 @@ package com.proxydom.app.session
 import android.net.Network
 
 /**
- * First-class path for one establish/replan (ADR 014 PathPlan).
+ * First-class path for one establish/replan.
  * Transport is derived from the bound iface — LTE-only is a valid plan.
  */
 enum class PathTransport {

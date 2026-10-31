@@ -90,6 +90,11 @@ func noteShareCore() {
 	appendCoreLine("info", "core.vless started version="+v2core.Version())
 }
 
+func noteRealityCore() {
+	appendCoreLine("info", "core.reality dns=system socks="+ShareSocksAddr())
+	appendCoreLine("info", "core.reality started")
+}
+
 type coreLogHandler struct{}
 
 func (coreLogHandler) Handle(msg clog.Message) {

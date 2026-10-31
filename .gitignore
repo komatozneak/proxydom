@@ -46,6 +46,8 @@ node_modules/
 .pub-cache/
 .pub/
 build/
+# Dart AOT symbol maps (--split-debug-info). Kept outside release archives.
+build/symbols/
 *.apk
 *.aab
 *.ipa

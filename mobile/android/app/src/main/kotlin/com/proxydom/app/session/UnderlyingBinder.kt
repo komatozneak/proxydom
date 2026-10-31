@@ -7,7 +7,7 @@ import com.proxydom.app.DefaultNetworkMonitor
 import com.proxydom.app.VpnUnderlyingNetworkPolicy
 
 /**
- * Public current OS underlying for establish (ADR 014).
+ * Public current OS underlying for establish.
  * Pinning mid-session is [DefaultNetworkMonitor] + [VpnUnderlyingNetworkPolicy].
  */
 data class PreferredUnderlying(

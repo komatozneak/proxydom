@@ -50,8 +50,14 @@ if (-not $PSBoundParameters.ContainsKey('KnownViolations')) {
     $KnownViolations = @{}
 }
 
-# Go module paths that mark a GPL engine inside a binary, whatever it is named.
-$ForbiddenMarkers = @("github.com/sagernet/")
+# Go module paths that mark a copyleft or forbidden engine inside a binary,
+# whatever it is named. sing-box/libbox are GPL-3.0; xray-core is MPL-2.0 but
+# its build graph pulls GPL/LGPL modules, so it is excluded by product policy.
+$ForbiddenMarkers = @(
+    "github.com/sagernet/",
+    "github.com/xtls/xray-core",
+    "github.com/libbox/"
+)
 
 $BinaryExtensions = @(".exe", ".dll", ".sys", ".so")
 

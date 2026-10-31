@@ -11,14 +11,14 @@ bool get androidPerAppSplit {
 }
 
 /// Per-app split (VpnService.Builder) is Android-only; iOS consumer VPN has no
-/// equivalent without MDM (ADR 025). Sites use shared prefs → iOS
+/// equivalent without MDM. Sites use shared prefs → iOS
 /// `excludedRoutes` (destination IP), not hyDialer-protect.
 bool get iosAppsSplitUnsupported {
   if (kIsWeb) return false;
   return defaultTargetPlatform == TargetPlatform.iOS;
 }
 
-/// Windows desktop utility (ADR 029). Same screens as the phone.
+/// Windows desktop utility. Same screens as the phone.
 bool get windowsDesktop {
   if (kIsWeb) return false;
   return defaultTargetPlatform == TargetPlatform.windows;

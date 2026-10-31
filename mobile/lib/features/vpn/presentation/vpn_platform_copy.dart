@@ -32,7 +32,7 @@ String vpnDisclosureDataBodyForPlatform(AppL10n l) =>
 /// Strings Home / gate / disclosure actually paint for the current platform.
 List<String> visibleVpnGuidanceCopy(AppL10n l) => [
       homeVpnConflictHintForPlatform(l),
-      homeVpnConflictHintNamedForPlatform(l, 'OtherVPN'),
+      homeVpnConflictHintNamedForPlatform(l, 'OtherTunnel'),
       homeVpnPermissionHintForPlatform(l),
       settingsKillSwitchOpenFailedForPlatform(l),
       vpnDisclosureVpnTitleForPlatform(l),

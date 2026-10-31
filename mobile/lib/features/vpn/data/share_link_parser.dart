@@ -37,9 +37,9 @@ class ParsedShareLink {
 /// document had three keys".
 ///
 /// `http://` and `https://` are deliberately absent. They are subscription
-/// document addresses here (see [subscriptionDocumentTarget]), and INCY's
-/// `http://user:pass@host` proxy key would have been indistinguishable from one
-/// until after the document was fetched.
+/// document addresses here (see [subscriptionDocumentTarget]), and the
+/// `http://user:pass@host` proxy key used by other clients would have been
+/// indistinguishable from one until after the document was fetched.
 const _schemes = <String>[
   'hysteria2://',
   'hy2://',

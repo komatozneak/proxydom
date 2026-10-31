@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -141,12 +141,12 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     // The terminal head sets its fields in caps.
-    expect(find.text('Мешает другой VPN'), findsOneWidget);
+    expect(find.text('Мешает другое туннельное подключение'), findsOneWidget);
     expect(
       find.textContaining('Огонь'),
       findsWidgets,
     );
-    expect(find.text('Открыть настройки VPN'), findsOneWidget);
+    expect(find.text('Открыть настройки туннеля'), findsOneWidget);
     expect(
         find.text('Не удалось подключиться. Попробуйте снова.'), findsNothing);
   });
@@ -180,14 +180,14 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     // The terminal head sets its fields in caps.
-    expect(find.text('Мешает другой VPN'), findsOneWidget);
+    expect(find.text('Мешает другое туннельное подключение'), findsOneWidget);
     expect(
       find.text(
-          'Отключите другой VPN в настройках Android, затем подключитесь снова.'),
+          'Отключите другое туннельное подключение в настройках Android, затем подключитесь снова.'),
       findsOneWidget,
     );
     expect(find.textContaining('Всегда включён'), findsNothing);
-    expect(find.text('Открыть настройки VPN'), findsOneWidget);
+    expect(find.text('Открыть настройки туннеля'), findsOneWidget);
   });
 
   testWidgets('Home connect_timeout is not painted as foreign VPN conflict',
@@ -218,8 +218,8 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.text('Мешает другой VPN'), findsNothing);
-    expect(find.text('Открыть настройки VPN'), findsNothing);
+    expect(find.text('Мешает другое туннельное подключение'), findsNothing);
+    expect(find.text('Открыть настройки туннеля'), findsNothing);
     expect(find.text('Ошибка подключения'), findsOneWidget);
     expect(
       find.text('Не удалось подключиться. Попробуйте снова.'),
@@ -242,7 +242,7 @@ void main() {
           vpnProvider.overrideWith(
             () => _FixedVpnNotifier(
               const VpnError(
-                message: 'VPN permission denied',
+                message: 'Tunnel permission denied',
                 code: 'permission_denied',
               ),
             ),
@@ -261,8 +261,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.text('Ошибка подключения'), findsOneWidget);
-    expect(find.textContaining('Разрешите VPN'), findsOneWidget);
-    expect(find.text('Открыть настройки VPN'), findsNothing);
+    expect(find.textContaining('Разрешите туннель'), findsOneWidget);
+    expect(find.text('Открыть настройки туннеля'), findsNothing);
   });
 
   testWidgets('Home shows path_incompatible hint, not generic friendly error',

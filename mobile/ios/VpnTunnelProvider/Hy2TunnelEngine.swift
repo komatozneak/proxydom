@@ -7,7 +7,7 @@ import NetworkExtension
 import Hy2bind
 #endif
 
-/// Hysteria2 engine inside the Packet Tunnel (ADR 019 / ADR 025).
+/// Hysteria2 engine inside the Packet Tunnel.
 ///
 /// Honest Connected = `setTunnelNetworkSettings` + Hy2 `Start` + packet tun
 /// + `packetFlow` pump. SOCKS-only is never Connected.
@@ -826,7 +826,7 @@ struct Hy2StartConfig {
     let parts = server.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
     let host = parts.first.map(String.init) ?? server
     let port = parts.count == 2 ? Int(parts[1]) ?? 443 : 443
-    // ADR 025: iOS never feeds direct_domain_suffixes to Go. Direct paths are
+    // iOS never feeds direct_domain_suffixes to Go. Direct paths are
     // only exact destination IPs in NetworkExtension excludedRoutes.
     let go: [String: Any] = [
       "server": server,

@@ -11,12 +11,15 @@ bool _registered = false;
 /// The asset is not read here. [LicenseRegistry] calls the closure only when
 /// something listens to [LicenseRegistry.licenses], which is the license page.
 /// A missing asset then fails that page and leaves startup alone: launch must
-/// not wait on a file most people never open (ADR 036).
+/// not wait on a file most people never open.
 void registerThirdPartyNotices() {
   if (_registered) return;
   LicenseRegistry.addLicense(() async* {
     final text = await rootBundle.loadString(thirdPartyNoticesAsset);
-    yield LicenseEntryWithLineBreaks(const ['hy2bind'], text);
+    yield LicenseEntryWithLineBreaks(
+      const ['hy2bind', 'hysteria', 'quic-go', 'gvisor', 'v2ray-core'],
+      text,
+    );
   });
   _registered = true;
 }

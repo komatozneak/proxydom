@@ -314,7 +314,7 @@ void main() {
       PoolServerLabel(
         title: 'Игровой',
         subtitle: 'низкий пинг',
-        tile: PoolTile.gaming,
+        tile: PoolTile.cloud,
         flag: '',
       ),
     ];

@@ -203,7 +203,7 @@ try {
     $env:GOOS = "windows"
     $env:GOARCH = "amd64"
     $env:CGO_ENABLED = "0"
-    Invoke-Native { go build -o (Join-Path $Payload "proxydom-engine.exe") ./cmd/proxydom-engine } "go build proxydom-engine"
+    Invoke-Native { go build -trimpath -ldflags "-s -w -buildid=" -o (Join-Path $Payload "proxydom-engine.exe") ./cmd/proxydom-engine } "go build proxydom-engine"
 } finally {
     Pop-Location
     if ($null -eq $prevGOOS) { Remove-Item Env:GOOS -ErrorAction SilentlyContinue } else { $env:GOOS = $prevGOOS }

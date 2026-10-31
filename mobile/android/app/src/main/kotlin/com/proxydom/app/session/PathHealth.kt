@@ -51,6 +51,20 @@ class PathHealth {
 
     private val continuousRunning = AtomicBoolean(false)
     private var continuousThread: Thread? = null
+
+    /**
+     * Bumped by every [startContinuous]. A loop from an earlier start sees a
+     * newer generation and ends, instead of waking into the new run's
+     * `continuousRunning = true` and probing beside it.
+     */
+    private val runGeneration = AtomicInteger(0)
+
+    /** Wait between probes; [probeNow] and [stopContinuous] end it early. */
+    private val pauseLock = Object()
+
+    /** Whether someone can see the Home `ms`: the screen is on. */
+    @Volatile
+    private var interactive: () -> Boolean = { true }
     private val consecutiveFails = AtomicInteger(0)
 
     /**
@@ -227,14 +241,17 @@ class PathHealth {
         socksPort: Int,
         listener: Listener,
         alive: () -> Boolean,
+        interactive: () -> Boolean = { true },
     ) {
         stopContinuous()
+        this.interactive = interactive
+        val generation = runGeneration.incrementAndGet()
         consecutiveFails.set(0)
         continuousRunning.set(true)
         if (adapter == CoreAdapter.TrustTunnel) {
             continuousThread = Thread(
                 {
-                    while (continuousRunning.get() && alive()) {
+                    while (continuousRunning.get() && runGeneration.get() == generation && alive()) {
                         val rtt = runCatching {
                             VpnPingMonitor.tcpConnectRttMs(
                                 timeoutMs = CONTINUOUS_PROBE_TIMEOUT_MS,
@@ -269,7 +286,7 @@ class PathHealth {
         continuousThread = Thread(
             {
                 NativeLog.i(TAG, "continuous socks probe port=$socksPort")
-                while (continuousRunning.get() && alive()) {
+                while (continuousRunning.get() && runGeneration.get() == generation && alive()) {
                     // One request on the kept-alive connection: a single round
                     // trip, without paying the tunnel's stream setup each time.
                     val rtt = probe.sample(CONTINUOUS_PROBE_TIMEOUT_MS)
@@ -296,23 +313,44 @@ class PathHealth {
     }
 
     /**
-     * Wait one interval between probes, in slices: [stopContinuous] interrupts
-     * the thread and must not wait out the rest of five seconds.
+     * Wait one interval between probes.
+     *
+     * The probe is also the Home `ms`, so while the screen is on it keeps its
+     * five seconds. With the screen off nobody reads the number and a healthy
+     * path is checked every thirty seconds, which keeps the radio idle in
+     * between. The first miss puts it back on five seconds until the path
+     * answers again, so a dead path is still called within one long wait plus
+     * three short ones (about 45 s) rather than four long ones. [probeNow] cuts
+     * the wait short when the screen comes back, so Home never shows a stale
+     * reading.
+     *
+     * One timed wait, not a loop of 200 ms sleeps: those woke the CPU five
+     * times a second for the whole session.
      */
     private fun pauseBetweenProbes() {
-        var waited = 0L
-        while (continuousRunning.get() && waited < CONTINUOUS_INTERVAL_MS) {
+        val interval = if (interactive() || consecutiveFails.get() > 0) {
+            CONTINUOUS_INTERVAL_MS
+        } else {
+            SCREEN_OFF_INTERVAL_MS
+        }
+        synchronized(pauseLock) {
+            if (!continuousRunning.get()) return
             try {
-                Thread.sleep(200)
+                pauseLock.wait(interval)
             } catch (_: InterruptedException) {
                 return
             }
-            waited += 200
         }
+    }
+
+    /** Probe without waiting out the interval (the screen just came on). */
+    fun probeNow() {
+        synchronized(pauseLock) { pauseLock.notifyAll() }
     }
 
     fun stopContinuous() {
         continuousRunning.set(false)
+        probeNow()
         continuousThread?.interrupt()
         continuousThread = null
         httpProbe?.close()
@@ -323,6 +361,7 @@ class PathHealth {
     companion object {
         private const val TAG = "PathHealth"
         private const val CONTINUOUS_INTERVAL_MS = 5_000L
+        private const val SCREEN_OFF_INTERVAL_MS = 30_000L
         private const val CONTINUOUS_PROBE_TIMEOUT_MS = 2_500
         const val DEGRADED_THRESHOLD = 2
         const val DEAD_THRESHOLD = 4

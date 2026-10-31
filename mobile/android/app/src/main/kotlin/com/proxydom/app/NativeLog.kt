@@ -22,6 +22,14 @@ import android.util.Log
  */
 internal object NativeLog {
 
+    /**
+     * Logcat is a developer channel. A release build still writes the
+     * user-facing [DiagnosticRing] (a local file the person can send), but it
+     * must not spray node addresses, subscription hosts or config structure
+     * into a system log another process may read.
+     */
+    private val logcatEnabled = BuildConfig.DEBUG
+
     /** Level the user chose in the log screen. Written by the MethodChannel. */
     @Volatile
     var level: String = "info"
@@ -34,23 +42,29 @@ internal object NativeLog {
     @Volatile
     var sessionId: String? = null
 
+    /**
+     * Debug lines reach logcat only when the user picked `debug` in the log
+     * screen, the same rule the ring follows. A release build used to print
+     * every one of them — a path probe every five seconds for the whole
+     * session — into a log nobody reads without adb.
+     */
     fun d(tag: String, message: String, error: Throwable? = null) {
-        Log.d(tag, message, error)
+        if (level == "debug" && logcatEnabled) Log.d(tag, message, error)
         mirror("debug", tag, message, error)
     }
 
     fun i(tag: String, message: String, error: Throwable? = null) {
-        Log.i(tag, message, error)
+        if (logcatEnabled) Log.i(tag, message, error)
         mirror("info", tag, message, error)
     }
 
     fun w(tag: String, message: String, error: Throwable? = null) {
-        Log.w(tag, message, error)
+        if (logcatEnabled) Log.w(tag, message, error)
         mirror("warn", tag, message, error)
     }
 
     fun e(tag: String, message: String, error: Throwable? = null) {
-        Log.e(tag, message, error)
+        if (logcatEnabled) Log.e(tag, message, error)
         mirror("error", tag, message, error)
     }
 

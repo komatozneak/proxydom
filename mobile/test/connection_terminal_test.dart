@@ -32,7 +32,7 @@ void main() {
             status: 'Не подключено',
             serverName: 'Игровой',
             serverSubtitle: 'низкий пинг',
-            tile: PoolTile.gaming,
+            tile: PoolTile.cloud,
             accent: AppBrand.inkMutedDark,
             trafficLabel: '22 ГБ',
             uptime: '00:01:02',

@@ -57,7 +57,7 @@ object QsTilePrompter {
         try {
             val component = ComponentName(context, ProxyDomTileService::class.java)
             // Same Living House as ic_launcher_monochrome (tight crop for the dialog).
-            val icon = Icon.createWithResource(context, R.drawable.ic_qs_vpn)
+            val icon = Icon.createWithResource(context, R.drawable.ic_qs_tunnel)
             sb.requestAddTileService(
                 component,
                 context.getString(R.string.qs_tile_label),

@@ -3,7 +3,6 @@ package hy2bind
 import (
 	"context"
 	"errors"
-	"log"
 	"net"
 	"net/netip"
 	"sync"
@@ -66,7 +65,7 @@ func (d *hyDialer) DialContext(ctx context.Context, m *M.Metadata) (net.Conn, er
 	// One line per connection. The broker reads this to tell a tunnel that
 	// never received the packet apart from one that received it and could not
 	// dial, which is the difference between a routing fault and a proxy fault.
-	log.Printf("hy2bind dial tcp %s", addr)
+	connLogf("hy2bind dial tcp %s", addr)
 	if shouldHijackDNS(m.DstIP, m.DstPort) {
 		return d.dialRoute("tcp", addr, false, "dns")
 	}
@@ -92,7 +91,7 @@ func (d *hyDialer) dialRoute(network, addr string, direct bool, why string) (net
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("hy2bind route %s %s why=%s", chain, addr, why)
+	connLogf("hy2bind route %s %s why=%s", chain, addr, why)
 	return trackStream(conn, network, addr, chain), nil
 }
 

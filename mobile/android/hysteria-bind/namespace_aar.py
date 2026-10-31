@@ -63,6 +63,27 @@ def _rewrite_bytes(data: bytes, pairs: tuple[tuple[bytes, bytes], ...]) -> bytes
     return data
 
 
+def _scrub_source_paths(data: bytes) -> bytes:
+    """Replace this checkout's absolute path with a neutral, same-length one.
+
+    `-trimpath` removes file names from the symbol table and DWARF, but Go's
+    module build info still records the `replace` target gomobile generates for
+    the local module. That string is the build machine's checkout path (and the
+    user name in it). Same length keeps every ELF offset and Go string length
+    prefix valid; spaces pad the neutral path so the build info stays parseable.
+    """
+    root = Path(__file__).resolve().parent
+    neutral = b"C:\\build\\hy2bind"
+    for old in {str(root).encode(), str(root).replace("\\", "/").encode()}:
+        if len(old) < len(neutral):
+            replacement = b"C:\\b"
+        else:
+            replacement = neutral
+        replacement = (replacement + b" " * len(old))[: len(old)]
+        data = data.replace(old, replacement)
+    return data
+
+
 def _rewrite_class_jar(src: bytes) -> bytes:
     src_buf = io.BytesIO(src)
     out_buf = io.BytesIO()
@@ -156,6 +177,7 @@ def _rewrite_elf(so: bytes) -> bytes:
     n_fwd = _apply_symbol_renames(parsed, _JNI_PREFIX_RENAMES)
     rebuilt = _lief_write(parsed)
     rebuilt = _rewrite_bytes(rebuilt, _SO_RODATA_REPLACEMENTS)
+    rebuilt = _scrub_source_paths(rebuilt)
     print(f"  elf: renamed {n_fwd} Java_go_* symbols, wrote {len(rebuilt)} bytes")
     return rebuilt
 
@@ -268,6 +290,9 @@ def _verify(aar_path: Path) -> None:
         raise SystemExit("namespace_aar: libhyjni.so still references go.Seq")
     if b"Java_hy_Seq" not in so:
         raise SystemExit("namespace_aar: libhyjni.so missing Java_hy_Seq")
+    root = str(Path(__file__).resolve().parent)
+    if root.encode() in so or root.replace("\\", "/").encode() in so:
+        raise SystemExit("namespace_aar: build checkout path still in libhyjni.so")
     exported = _exported_names(so)
     if "Java_hy_Seq_init" not in exported:
         raise SystemExit(

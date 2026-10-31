@@ -118,35 +118,43 @@ bool isResolvedPlace(NodePlace place) {
   return flag.isNotEmpty && flag != '🌐' && flag != '🌍';
 }
 
-/// Product label for YouTube / Premium egress (never country name).
-const NodePlace kYoutubePremiumPlace = NodePlace(
-  title: 'YouTube',
-  titleEn: 'YouTube',
+/// Product categories for nodes that are sold as a role, not a country.
+const NodePlace kMediaNodePlace = NodePlace(
+  title: 'Медиа-поток',
+  titleEn: 'Media stream',
   subtitle: '',
-  flag: 'youtube',
+  flag: 'media',
 );
 
-/// Premium gaming TT (DE ping for RF clients) — never country name.
-const NodePlace kGamingPremiumPlace = NodePlace(
-  title: 'Игровой',
-  titleEn: 'Gaming',
+const NodePlace kCloudNodePlace = NodePlace(
+  title: 'Облачный API',
+  titleEn: 'Cloud API',
   subtitle: '',
-  flag: 'gaming',
+  flag: 'cloud',
 );
 
-/// Premium India geo (local apps / prices) — country is the product.
-const NodePlace kIndiaPremiumPlace = NodePlace(
-  title: 'Индия',
-  titleEn: 'India',
+const NodePlace kWorkNodePlace = NodePlace(
+  title: 'Рабочий узел',
+  titleEn: 'Work node',
   subtitle: '',
-  flag: '🇮🇳',
+  flag: 'work',
+);
+
+const NodePlace kBackupNodePlace = NodePlace(
+  title: 'Резервный канал',
+  titleEn: 'Backup channel',
+  subtitle: '',
+  flag: 'backup',
 );
 
 const String kFlagEurope = '🇱🇻';
 const String kFlagUsa = '🇺🇸';
 const String kFlagIndia = '🇮🇳';
 const String kFlagGlobe = '🌐';
-const String kFlagGaming = 'gaming';
+const String kFlagMedia = 'media';
+const String kFlagCloud = 'cloud';
+const String kFlagWork = 'work';
+const String kFlagBackup = 'backup';
 
 /// Visible Free Hy2 row if a live Hy2 node is in the catalog (not on 204.11).
 const NodePlace kHysteriaMobilePlace = NodePlace(
@@ -165,11 +173,11 @@ const NodePlace kUsaMobilePlace = NodePlace(
   flag: kFlagUsa,
 );
 
-/// Drop catalog «· Free / · Premium» — country or product name only.
+/// Drop the catalog tier suffix — country or product name only.
 String stripTierRole(String raw) {
   return raw.trim().replaceFirst(
         RegExp(
-          r'\s*[·•.\-–—]\s*(Бесплатно|Free|Premium|Премиум)\s*$',
+          r'\s*[·•.\-–—]\s*(Бесплатно|Free)\s*$',
           caseSensitive: false,
         ),
         '',
@@ -189,8 +197,14 @@ String? englishTitleForProduct(String raw) {
     'europe': 'Latvia',
     'индия': 'India',
     'india': 'India',
-    'игровой': 'Gaming',
-    'gaming': 'Gaming',
+    'игровой': 'Cloud API',
+    'gaming': 'Cloud API',
+    'медиа': 'Media stream',
+    'media': 'Media stream',
+    'рабочий': 'Work node',
+    'work': 'Work node',
+    'резерв': 'Backup channel',
+    'backup': 'Backup channel',
     'нидерланды': 'Netherlands',
     'netherlands': 'Netherlands',
     'амстердам': 'Amsterdam',
@@ -204,13 +218,35 @@ String? englishTitleForProduct(String raw) {
   return null;
 }
 
-/// Catalog product copy → bilingual place (Free USA/EU, Premium slots).
+/// Catalog product copy → bilingual category or country place.
 NodePlace? canonicalPlaceForProductLabel(String raw) {
   final t = stripTierRole(raw).trim().toLowerCase();
   if (t.isEmpty) return null;
-  if (t.contains('youtube')) return kYoutubePremiumPlace;
-  if (t.contains('игровой') || t.contains('gaming')) return kGamingPremiumPlace;
-  if (t.contains('индия') || t.contains('india')) return kIndiaPremiumPlace;
+  if (t.contains('youtube') ||
+      t.contains('медиа') ||
+      t.contains('media') ||
+      t.contains('video') ||
+      t.contains('stream')) {
+    return kMediaNodePlace;
+  }
+  if (t.contains('игров') ||
+      t.contains('gaming') ||
+      t.contains('cloud') ||
+      t.contains('облак') ||
+      t.contains('api')) {
+    return kCloudNodePlace;
+  }
+  if (t.contains('рабоч') ||
+      t.contains('work') ||
+      t.contains('офис') ||
+      t.contains('office')) {
+    return kWorkNodePlace;
+  }
+  if (t.contains('резерв') ||
+      t.contains('backup') ||
+      t.contains('запасн')) {
+    return kBackupNodePlace;
+  }
   if (t.contains('сша') ||
       t.contains('united states') ||
       t.contains('usa') ||
@@ -249,11 +285,35 @@ String sanitizeHomeLabel(String raw) {
   return stripTierRole(t);
 }
 
-/// Infer EU/US/IN flag from user-facing catalog copy.
+/// Infer a category or country flag from user-facing catalog copy.
 String flagForProductLabel(String label) {
   final t = label.trim().toLowerCase();
   if (t.isEmpty) return kFlagGlobe;
-  if (t.contains('игровой') || t.contains('gaming')) return kFlagGaming;
+  if (t.contains('youtube') ||
+      t.contains('медиа') ||
+      t.contains('media') ||
+      t.contains('video') ||
+      t.contains('stream')) {
+    return kFlagMedia;
+  }
+  if (t.contains('игров') ||
+      t.contains('gaming') ||
+      t.contains('cloud') ||
+      t.contains('облак') ||
+      t.contains('api')) {
+    return kFlagCloud;
+  }
+  if (t.contains('рабоч') ||
+      t.contains('work') ||
+      t.contains('офис') ||
+      t.contains('office')) {
+    return kFlagWork;
+  }
+  if (t.contains('резерв') ||
+      t.contains('backup') ||
+      t.contains('запасн')) {
+    return kFlagBackup;
+  }
   if (t.contains('индия') || t.contains('india')) return kFlagIndia;
   if (t.contains('латвия') || t.contains('latvia')) return kFlagEurope;
   if (t.contains('европа') || t.contains('europe')) return kFlagEurope;
@@ -266,7 +326,7 @@ String flagForProductLabel(String label) {
   return kFlagGlobe;
 }
 
-/// Sync place: YouTube → product label → known pool → GeoIP → placeholder.
+/// Sync place: category → product label → known pool → GeoIP → placeholder.
 ///
 /// Never surfaces hostnames, FQDNs, Marzban ids, bare IPs, or ops nicknames.
 NodePlace placeForHost(String host, {int index = 0, String? fallbackLabel}) {

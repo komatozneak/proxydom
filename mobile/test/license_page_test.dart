@@ -35,7 +35,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
     registerThirdPartyNotices();
 
-    await tester.tap(find.text('О приложении'));
+    await tester.tap(find.text('Лицензии открытого ПО'));
     // The license list loads behind a progress indicator, which never goes
     // idle, so pumpAndSettle does not return. The asset read now happens
     // inside that load, on a real future, so fake-async pumps alone never

@@ -59,7 +59,10 @@ internal object CoreLog {
     private fun normalize(raw: String?): String {
         return when (raw) {
             "off", "error", "warn", "info", "debug" -> raw
-            else -> "info"
+            // A release build defaults to warnings: info-level core lines
+            // name DNS answers, node addresses and the selected outbound.
+            // The user can still choose a more verbose level explicitly.
+            else -> if (BuildConfig.DEBUG) "info" else "warn"
         }
     }
 }

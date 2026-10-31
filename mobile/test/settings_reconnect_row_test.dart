@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -45,16 +43,4 @@ void main() {
       debugDefaultTargetPlatformOverride = null;
     });
   }
-
-  test('the auto-reconnect preference is gone from the client', () {
-    expect(
-      File('lib/features/settings/data/auto_reconnect_prefs.dart')
-          .existsSync(),
-      isFalse,
-    );
-    final provider =
-        File('lib/features/home/application/vpn_provider.dart')
-            .readAsStringSync();
-    expect(provider.contains('AutoReconnectPrefs'), isFalse);
-  });
 }

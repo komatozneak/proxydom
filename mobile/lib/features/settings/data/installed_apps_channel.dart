@@ -84,7 +84,6 @@ Uint8List? iconForOsnovnyeCategory(
 /// Phosphor glyph for «Основные» rows. Null for [vk] (launcher PNG / badge).
 IconData? osnovnyeCategoryIcon(String categoryId) {
   return switch (categoryId) {
-    'tiktok' => AppIcons.osnovnyeTiktok,
     'yandex' => AppIcons.osnovnyeYandex,
     'ozon' => AppIcons.osnovnyeOzon,
     'wb' => AppIcons.osnovnyeWb,

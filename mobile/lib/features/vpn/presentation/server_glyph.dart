@@ -31,28 +31,48 @@ class ServerGlyph extends StatelessWidget {
     final theme = Theme.of(context);
 
     switch (label.tile) {
-      case PoolTile.youtube:
-        // The one tile that is allowed to shout: YouTube is the reason a lot
-        // of these profiles exist.
+      case PoolTile.media:
         return _Tile(
           size: size,
-          fill: AppBrand.youtubePlay,
+          fill: AppBrand.mascotGoldDeep,
           radius: size * 0.28,
           child: AppIcon(
-            AppIcons.play,
+            AppIcons.categoryMedia,
             size: _glyph(size, 15),
             color: AppBrand.mascotCream,
           ),
         );
-      case PoolTile.gaming:
+      case PoolTile.cloud:
         return _Tile(
           size: size,
-          fill: AppBrand.moss.withValues(alpha: 0.9),
+          fill: AppBrand.secondary,
           radius: size * 0.28,
           child: AppIcon(
-            AppIcons.gamepad,
+            AppIcons.categoryCloud,
             size: _glyph(size, 18),
             color: AppBrand.mascotCream,
+          ),
+        );
+      case PoolTile.work:
+        return _Tile(
+          size: size,
+          fill: AppBrand.moss,
+          radius: size * 0.28,
+          child: AppIcon(
+            AppIcons.categoryWork,
+            size: _glyph(size, 16),
+            color: AppBrand.mascotCream,
+          ),
+        );
+      case PoolTile.backup:
+        return _Tile(
+          size: size,
+          fill: theme.colorScheme.surfaceContainerHighest,
+          radius: size * 0.28,
+          child: AppIcon(
+            AppIcons.categoryBackup,
+            size: _glyph(size, 16),
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.62),
           ),
         );
       case PoolTile.flag:

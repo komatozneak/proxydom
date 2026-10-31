@@ -125,16 +125,16 @@ void main() {
     test('a transport failure stays a transport failure', () {
       final err = vpnErrorFromNativeDetail('connection reset by peer');
       expect(err.code, isNull);
-      expect(err.message, 'vpn: connection reset by peer');
+      expect(err.message, 'tunnel: connection reset by peer');
     });
 
     test('falls back when detail empty', () {
       final err = vpnErrorFromNativeDetail(
         null,
-        fallbackMessage: 'Failed to start VPN service',
+        fallbackMessage: 'Failed to start the tunnel service',
       );
       expect(err.code, isNull);
-      expect(err.message, 'Failed to start VPN service');
+      expect(err.message, 'Failed to start the tunnel service');
     });
   });
 

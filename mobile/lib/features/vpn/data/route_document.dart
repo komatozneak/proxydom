@@ -63,7 +63,7 @@ class DocumentSyncException implements Exception {
   final DocumentSyncDecision decision;
 }
 
-/// How a parsed paste should behave on the add screen (ADR 035).
+/// How a parsed paste should behave on the add screen.
 enum ShareImportDial {
   /// At least one line can start on this platform.
   dialable,

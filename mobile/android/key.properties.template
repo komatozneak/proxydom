@@ -1,16 +1,16 @@
-# ⚠️ НЕ КОММИТИТЬ этот файл — он в .gitignore!
+﻿# ⚠️ НЕ КОММИТИТЬ этот файл — он в .gitignore!
 #
 # Скопируй в key.properties и заполни реальными значениями:
 #   cp key.properties.template key.properties
 #
 # Генерация keystore:
-#   keytool -genkey -v -keystore ../teremok-upload.jks \
+#   keytool -genkey -v -keystore ../proxydom-upload.jks \
 #     -storetype JKS -keyalg RSA -keysize 2048 -validity 10000 \
 #     -alias upload \
 #     -dname "CN=Proxy Dom, OU=Mobile, O=UMIKUM, L=Pavlodar, ST=Pavlodar, C=KZ"
 #
 # Пароли НЕ хранить в git — только в локальном key.properties.
-storeFile=../teremok-upload.jks
+storeFile=../proxydom-upload.jks
 storePassword=YOUR_STORE_PASSWORD_HERE
 keyAlias=upload
 keyPassword=YOUR_KEY_PASSWORD_HERE

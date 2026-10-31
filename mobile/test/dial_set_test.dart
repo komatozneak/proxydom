@@ -93,18 +93,27 @@ void main() {
     expect(canDialSchemeOn(DialTarget.android, ' WireGuard '), isFalse);
   });
 
-  test('a vless Reality line does not pass canDialLink on Android', () {
+  test('a vless Reality line passes canDialLink where the REALITY engine runs', () {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     const raw =
         'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
         '?security=reality&sni=www.example.com&pbk=PUBLIC&sid=ab&fp=chrome#R';
     final link = parseShareLink(raw);
     expect(canDialSchemeOn(DialTarget.android, link.scheme), isTrue);
+    expect(canDialLinkOn(DialTarget.android, link), isTrue);
+    expect(canDialLinkOn(DialTarget.windows, link), isTrue);
+    expect(canDialLinkOn(DialTarget.ios, link), isTrue);
+    expect(canDialLinkOn(DialTarget.other, link), isFalse);
+    expect(canDialLink(link), isTrue);
+  });
+
+  test('a Reality line over WebSocket stays inactive', () {
+    const raw =
+        'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
+        '?security=reality&pbk=PUBLIC&type=ws&path=%2Fws&sni=front.example#RW';
+    final link = parseShareLink(raw);
     expect(canDialLinkOn(DialTarget.android, link), isFalse);
-    expect(canDialLink(link), isFalse);
-    for (final target in DialTarget.values) {
-      expect(canDialLinkOn(target, link), isFalse, reason: '$target');
-    }
+    expect(canDialLinkOn(DialTarget.windows, link), isFalse);
   });
 
   test('a vless WS/TLS line passes canDialLink only where the engine runs', () {
