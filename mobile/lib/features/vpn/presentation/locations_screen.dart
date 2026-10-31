@@ -371,8 +371,8 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
     final title = catalog.titleIsCustom
         ? fallbackTitle
         : (manifest?.displayName ?? fallbackTitle);
-    // Document order. The premium/general split moved YouTube, gaming and
-    // India above the rest, so a line appeared to jump when a document came
+    // Document order. The premium/general split moved category lines and
+    // some countries above the rest, so a line appeared to jump when a document came
     // back in a different order. The store already keeps the document order.
     final query = _query.trim().toLowerCase();
     final nodeIndexes = <int>[];

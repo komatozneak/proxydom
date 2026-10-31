@@ -68,14 +68,11 @@ class LocationFlagIcon extends StatelessWidget {
 
 /// True for the neutral category keys a node card can carry.
 bool isCategoryFlagKey(String key) =>
-    key == 'media' ||
-    key == 'cloud' ||
-    key == 'work' ||
-    key == 'backup';
+    key == 'media' || key == 'cloud' || key == 'work' || key == 'backup';
 
 /// Known emoji → ISO / category key. Anything else is passed through as
-/// lowercase. Legacy `youtube` / `gaming` values stay readable so an old
-/// stored node keeps a mark after the rename.
+/// lowercase. A legacy `gaming` value stays readable so an old stored node
+/// keeps a mark after the rename.
 String locationFlagKey(String flag) {
   final t = flag.trim();
   if (t.isEmpty || t == '🌐' || t == '🌍') return 'lv';
@@ -98,7 +95,6 @@ String locationFlagKey(String flag) {
   final lower = t.toLowerCase();
   if (lower == 'usa') return 'us';
   if (lower == 'eu') return 'lv';
-  if (lower == 'youtube') return 'media';
   if (lower == 'gaming') return 'cloud';
   return lower;
 }

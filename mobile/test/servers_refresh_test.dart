@@ -50,7 +50,7 @@ void _seedDocuments() {
       'catalogs': [
         {
           'id': '1790657811181866',
-          'title': 'Teremok',
+          'title': 'CompanyNet',
           'url': 'https://sub.proxydom.su/2aq93K0svSy2IRUj',
           'lines': [_line('Москва'), _line('США')],
         },

@@ -168,11 +168,11 @@ void main() {
       formatTrafficAmount(live.total, russian: true, decimal: true),
       '644 ГБ',
     );
-    expect(decodeProfileTitle('base64:RG9EbyBWUE4='), 'DoDo VPN');
+    expect(decodeProfileTitle('base64:Q29tcGFueU5ldCBHYXRld2F5'), 'CompanyNet Gateway');
 
     const piped =
-        'hysteria2://x:x@c.example.invalid:443/?sni=c.example.invalid#DoDoVPN | Hysteria | YouTube - x';
-    expect(labelForShareLink(parseShareLink(piped)).title, isNot('YouTube'));
+        'hysteria2://x:x@c.example.invalid:443/?sni=c.example.invalid#CompanyNet | Hysteria | Медиа - x';
+    expect(labelForShareLink(parseShareLink(piped)).title, isNot('Медиа'));
 
     const plain = '''
 hysteria2://x:x@a.example.invalid:443/?sni=a.example.invalid#synth-hy2-a
@@ -190,7 +190,7 @@ vless://00000000-0000-0000-0000-000000000002@e.example.invalid:443#synth-vless-b
     );
 
     const oldLines = [
-      'hysteria2://x:x@old-a.example.invalid:443/?sni=old-a.example.invalid#YouTube',
+      'hysteria2://x:x@old-a.example.invalid:443/?sni=old-a.example.invalid#Медиа',
       'hysteria2://x:x@old-b.example.invalid:443/?sni=old-b.example.invalid#США',
       'hysteria2://x:x@old-c.example.invalid:443/?sni=old-c.example.invalid#Игровой',
       'hysteria2://x:x@old-d.example.invalid:443/?sni=old-d.example.invalid#Нидерланды',
@@ -268,7 +268,7 @@ vless://00000000-0000-0000-0000-000000000002@e.example.invalid:443#five
         id: 'catalog-key',
         title: 'Прокси Дом',
         lines: const [
-          'hysteria2://x:x@old.example.invalid:443/?sni=old.example.invalid#YouTube',
+          'hysteria2://x:x@old.example.invalid:443/?sni=old.example.invalid#Медиа',
         ],
         url: 'https://id.docdn.pro/v2/synthetic',
         trafficMeta: 'upload=0; download=0; total=107374182400',
@@ -287,7 +287,7 @@ vless://00000000-0000-0000-0000-000000000002@e.example.invalid:443#five
       () async {
     const old = '2026-10-01T09:00:00Z';
     const line =
-        'hysteria2://x:x@old.example.invalid:443/?sni=old.example.invalid#YouTube';
+        'hysteria2://x:x@old.example.invalid:443/?sni=old.example.invalid#Медиа';
     final junk = base64Encode(utf8.encode('not a subscription document'));
     expect(
       decideDocumentSync(status: 200, body: junk),

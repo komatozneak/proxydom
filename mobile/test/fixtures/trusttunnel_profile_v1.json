@@ -5,16 +5,16 @@
   "active_core": "trusttunnel",
   "selected_link": null,
   "xray_profile": null,
-  "node_host": "tt-al.teremokconnect.online",
+  "node_host": "tt-al.company-net.ru",
   "egress_candidates": [],
   "trusttunnel_profile": {
     "schema_version": 1,
     "node_id": "al-tirana-tt",
-    "hostname": "tt-al.teremokconnect.online",
-    "addresses": ["tt-al.teremokconnect.online:443"],
+    "hostname": "tt-al.company-net.ru",
+    "addresses": ["tt-al.company-net.ru:443"],
     "port": 443,
     "region": "al",
-    "purpose": "youtube",
+    "purpose": "media",
     "username": "ttu42xdeadbeef",
     "password": "fixture-secret-password",
     "upstream_protocol": "http2",
@@ -24,6 +24,6 @@
       "https://dns.adguard-dns.com/dns-query",
       "https://dns.google/dns-query"
     ],
-    "toml": "# Teremok Connect — TrustTunnel client config (schema v1)\nloglevel = \"info\"\nvpn_mode = \"general\"\nkillswitch_enabled = true\nanti_dpi = false\n\n[endpoint]\nhostname = \"tt-al.teremokconnect.online\"\naddresses = [\"tt-al.teremokconnect.online:443\"]\nhas_ipv6 = true\nusername = \"ttu42xdeadbeef\"\npassword = \"fixture-secret-password\"\nskip_verification = false\nupstream_protocol = \"http2\"\nupstream_fallback_protocol = \"http2\"\ndns_upstreams = [\"https://dns.adguard-dns.com/dns-query\", \"https://dns.google/dns-query\"]\n\n[listener.tun]\nincluded_routes = [\"0.0.0.0/0\", \"2000::/3\"]\nexcluded_routes = [\"0.0.0.0/8\", \"10.0.0.0/8\", \"169.254.0.0/16\", \"172.16.0.0/12\", \"192.168.0.0/16\", \"224.0.0.0/3\"]\nmtu_size = 1420\n"
+    "toml": "# CompanyNet Connect — TrustTunnel client config (schema v1)\nloglevel = \"info\"\nvpn_mode = \"general\"\nkillswitch_enabled = true\nanti_dpi = false\n\n[endpoint]\nhostname = \"tt-al.company-net.ru\"\naddresses = [\"tt-al.company-net.ru:443\"]\nhas_ipv6 = true\nusername = \"ttu42xdeadbeef\"\npassword = \"fixture-secret-password\"\nskip_verification = false\nupstream_protocol = \"http2\"\nupstream_fallback_protocol = \"http2\"\ndns_upstreams = [\"https://dns.adguard-dns.com/dns-query\", \"https://dns.google/dns-query\"]\n\n[listener.tun]\nincluded_routes = [\"0.0.0.0/0\", \"2000::/3\"]\nexcluded_routes = [\"0.0.0.0/8\", \"10.0.0.0/8\", \"169.254.0.0/16\", \"172.16.0.0/12\", \"192.168.0.0/16\", \"224.0.0.0/3\"]\nmtu_size = 1420\n"
   }
 }

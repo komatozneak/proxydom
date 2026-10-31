@@ -134,7 +134,7 @@ void main() {
     const line = 'upload=0; download=1; total=10';
     expect(
       subscriptionTrafficMeta(
-        body: '# Teremok VPN\n#subscription-userinfo: $line\nhysteria2://x',
+        body: '# CompanyNet Gateway\n#subscription-userinfo: $line\nhysteria2://x',
       ),
       line,
     );

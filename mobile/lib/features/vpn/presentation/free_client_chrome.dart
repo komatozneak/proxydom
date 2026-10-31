@@ -321,7 +321,7 @@ class ConnectionTerminal extends StatelessWidget {
   /// line has nothing to say beyond the name.
   final String? serverSubtitle;
 
-  /// What the mark beside the name is: a country, YouTube, or a gamepad.
+  /// What the mark beside the name is: a country or a category tile.
   final PoolTile tile;
 
   final Color accent;
@@ -383,7 +383,7 @@ class ConnectionTerminal extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               // The same mark the profile list draws for this node. It was a
-              // globe here and a red YouTube tile there, for the same line:
+              // globe here and a category tile there, for the same line:
               // one node, one mark, wherever it appears.
               if (tile == PoolTile.flag) ...[
                 FlagMark(flag: serverFlag ?? '', width: 76),

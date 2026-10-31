@@ -16,12 +16,12 @@ void main() {
 
   test('percent-encoded remark becomes the server title', () {
     const uri =
-        'hysteria2://user:pass@45.91.248.91:443/?sni=hy2-us.teremokconnect.online'
+        'hysteria2://user:pass@45.91.248.91:443/?sni=hy2-us.company-net.ru'
         '#%D0%A1%D0%A8%D0%90%20%C2%B7%20%D0%A1%D0%B5%D1%80%D0%B2%D0%B8%D1%81%D1%8B';
     final parsed = parseHy2Link(uri);
     expect(parsed.name, 'США');
     expect(parsed.profile.server, '45.91.248.91:443');
-    expect(parsed.profile.sni, 'hy2-us.teremokconnect.online');
+    expect(parsed.profile.sni, 'hy2-us.company-net.ru');
     expect(parsed.profile.auth, 'user:pass');
     expect(parsed.profile.nodeId, '45.91.248.91');
   });
@@ -55,7 +55,7 @@ hy2://c:d@5.6.7.8:443/?sni=b.example.com#B
 
   test('insecure and salamander are kept on the profile', () {
     const uri = 'hysteria2://standHy2pass@95.182.81.27:20002'
-        '?sni=stand.teremok.test&insecure=1&obfs=salamander'
+        '?sni=stand.company-net.test&insecure=1&obfs=salamander'
         '&obfs-password=standObfsPass#hy2-obfs';
     final parsed = parseHy2Link(uri);
     expect(parsed.profile.insecure, isTrue);
@@ -160,7 +160,7 @@ hy2://c:d@5.6.7.8:443/?sni=b.example.com#B
 
   test('a catalog link without fm leaves timers and congestion empty', () {
     const uri =
-        'hysteria2://user:pass@203.0.113.12:443/?sni=hy2-us.teremokconnect.online';
+        'hysteria2://user:pass@203.0.113.12:443/?sni=hy2-us.company-net.ru';
     final parsed = parseHy2Link(uri);
     expect(parsed.profile.maxIdleTimeout, isEmpty);
     expect(parsed.profile.keepAlivePeriod, isEmpty);

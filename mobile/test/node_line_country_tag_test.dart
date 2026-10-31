@@ -10,7 +10,7 @@ void main() {
   testWidgets('a line tagged DE shows the flag, not the code', (tester) async {
     final link = parseShareLink(
       'hysteria2://user:pass@31.59.193.35:443/?sni=example.test'
-      '#${Uri.encodeComponent('DE DoDoVPN | Hysteria')}',
+      '#${Uri.encodeComponent('DE CompanyNet | Hysteria')}',
     );
 
     await tester.pumpWidget(
@@ -28,8 +28,8 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('DE DoDoVPN | Hysteria'), findsNothing);
-    expect(find.text('DoDoVPN | Hysteria'), findsOneWidget);
+    expect(find.text('DE CompanyNet | Hysteria'), findsNothing);
+    expect(find.text('CompanyNet | Hysteria'), findsOneWidget);
     expect(find.byType(SvgPicture), findsOneWidget);
   });
 }

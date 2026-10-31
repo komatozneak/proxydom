@@ -177,7 +177,9 @@ if (Test-Path $aot) {
 Write-Host "Building Flutter window"
 Push-Location $Mobile
 try {
-    Invoke-Native { flutter build windows --release } "flutter build windows"
+    # The symbol map stays in mobile\build\symbols, outside the payload that
+    # Staging copies, so the MSI carries only the obfuscated snapshot.
+    Invoke-Native { flutter build windows --release --obfuscate --split-debug-info=build/symbols } "flutter build windows"
 } finally {
     Pop-Location
 }

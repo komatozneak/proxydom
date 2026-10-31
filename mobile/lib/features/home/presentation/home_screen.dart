@@ -1054,7 +1054,7 @@ class _ServerChip extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
             children: [
-              // The same mark the list draws: a YouTube tile for a YouTube
+              // The same mark the list draws: a category tile for a category
               // line, a flag for a country. LocationFlagIcon's product branch
               // is not the list's mark and drew a red bar here.
               ServerGlyph(

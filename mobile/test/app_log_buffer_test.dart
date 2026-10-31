@@ -53,7 +53,7 @@ void main() {
 
   test('AppLogBuffer persists across attach', () async {
     final file = File(
-      '${Directory.systemTemp.path}/teremok_product_log_test.log',
+      '${Directory.systemTemp.path}/product_log_test.log',
     );
     if (await file.exists()) {
       await file.delete();
@@ -164,6 +164,6 @@ void main() {
       ),
     );
     expect(text, isNot(contains('217.60.3.9')));
-    expect(text, isNot(contains('hy2-eu.teremokconnect.online')));
+    expect(text, isNot(contains('hy2-eu.company-net.ru')));
   });
 }

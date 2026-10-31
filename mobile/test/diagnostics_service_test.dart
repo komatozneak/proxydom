@@ -99,7 +99,7 @@ void main() {
       expect(
         egressCheckLabel(
           externalIp: '217.60.3.9',
-          catalogHost: 'hy2-eu.teremokconnect.online',
+          catalogHost: 'hy2-eu.company-net.ru',
         ),
         'inconclusive',
       );
@@ -151,7 +151,7 @@ void main() {
           MethodChannel('dev.fluttercommunity.plus/package_info');
       messenger.setMockMethodCallHandler(packageChannel, (call) async {
         return <String, dynamic>{
-          'appName': 'Teremok',
+          'appName': 'CompanyNet',
           'packageName': 'su.proxydom.app',
           'version': '0.1.15',
           'buildNumber': '2034',
@@ -199,7 +199,7 @@ void main() {
           MethodChannel('dev.fluttercommunity.plus/package_info');
       messenger.setMockMethodCallHandler(packageChannel, (call) async {
         return <String, dynamic>{
-          'appName': 'Teremok',
+          'appName': 'CompanyNet',
           'packageName': 'su.proxydom.app',
           'version': '0.1.15',
           'buildNumber': '2034',
