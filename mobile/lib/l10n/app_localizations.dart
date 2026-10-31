@@ -103,48 +103,6 @@ abstract class AppL10n {
   /// **'Proxy Dom'**
   String get appTitle;
 
-  /// No description provided for @loginTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Sign in'**
-  String get loginTitle;
-
-  /// No description provided for @loginTestButton.
-  ///
-  /// In en, this message translates to:
-  /// **'Sign in (test button)'**
-  String get loginTestButton;
-
-  /// No description provided for @loginErrorTimeout.
-  ///
-  /// In en, this message translates to:
-  /// **'Server did not respond'**
-  String get loginErrorTimeout;
-
-  /// No description provided for @loginErrorNetwork.
-  ///
-  /// In en, this message translates to:
-  /// **'No connection to server'**
-  String get loginErrorNetwork;
-
-  /// No description provided for @loginErrorGeneric.
-  ///
-  /// In en, this message translates to:
-  /// **'Request failed'**
-  String get loginErrorGeneric;
-
-  /// No description provided for @homeTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Proxy Dom'**
-  String get homeTitle;
-
-  /// No description provided for @homeVpnHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Tunnel status — comes in step 9+'**
-  String get homeVpnHint;
-
   /// No description provided for @homeDisconnected.
   ///
   /// In en, this message translates to:
@@ -163,30 +121,6 @@ abstract class AppL10n {
   /// **'Connected'**
   String get homeConnected;
 
-  /// No description provided for @homeTapHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Tap to connect'**
-  String get homeTapHint;
-
-  /// No description provided for @homeConnectingHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Connecting…'**
-  String get homeConnectingHint;
-
-  /// No description provided for @homeConnectedHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Connected'**
-  String get homeConnectedHint;
-
-  /// No description provided for @homeProtected.
-  ///
-  /// In en, this message translates to:
-  /// **'Protected'**
-  String get homeProtected;
-
   /// No description provided for @homeError.
   ///
   /// In en, this message translates to:
@@ -199,23 +133,11 @@ abstract class AppL10n {
   /// **'Connect'**
   String get homeConnect;
 
-  /// No description provided for @homeDisconnect.
-  ///
-  /// In en, this message translates to:
-  /// **'Disconnect'**
-  String get homeDisconnect;
-
   /// No description provided for @homeRegion.
   ///
   /// In en, this message translates to:
   /// **'Region'**
   String get homeRegion;
-
-  /// No description provided for @homeSettings.
-  ///
-  /// In en, this message translates to:
-  /// **'Settings'**
-  String get homeSettings;
 
   /// No description provided for @navHome.
   ///
@@ -228,24 +150,6 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Tunnel'**
   String get navVpn;
-
-  /// No description provided for @navLocations.
-  ///
-  /// In en, this message translates to:
-  /// **'Locations'**
-  String get navLocations;
-
-  /// No description provided for @navModes.
-  ///
-  /// In en, this message translates to:
-  /// **'Modes'**
-  String get navModes;
-
-  /// No description provided for @homeTrafficRemainder.
-  ///
-  /// In en, this message translates to:
-  /// **'Data left'**
-  String get homeTrafficRemainder;
 
   /// No description provided for @homeTrafficExhausted.
   ///
@@ -270,12 +174,6 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Time'**
   String get homeMetricTime;
-
-  /// No description provided for @homeMetricSpeed.
-  ///
-  /// In en, this message translates to:
-  /// **'Speed'**
-  String get homeMetricSpeed;
 
   /// No description provided for @homeMetricTraffic.
   ///
@@ -325,12 +223,6 @@ abstract class AppL10n {
   /// **'local import'**
   String get profileSourceLocal;
 
-  /// No description provided for @homeTrafficAmount.
-  ///
-  /// In en, this message translates to:
-  /// **'{remaining} / {limit} GB'**
-  String homeTrafficAmount(String remaining, String limit);
-
   /// No description provided for @homeNoVpnRow.
   ///
   /// In en, this message translates to:
@@ -348,180 +240,6 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Split-tunnel rules for apps and sites'**
   String get settingsNoVpnHint;
-
-  /// No description provided for @modesTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Mode'**
-  String get modesTitle;
-
-  /// No description provided for @modesSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'How the tunnel works'**
-  String get modesSubtitle;
-
-  /// No description provided for @modeSmartTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Smart mode'**
-  String get modeSmartTitle;
-
-  /// No description provided for @modeSmartBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Russian corporate resources stay direct; everything else goes through the selected node.'**
-  String get modeSmartBody;
-
-  /// No description provided for @modeSmartBadge.
-  ///
-  /// In en, this message translates to:
-  /// **'AUTO'**
-  String get modeSmartBadge;
-
-  /// No description provided for @modeFullTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Full tunnel'**
-  String get modeFullTitle;
-
-  /// No description provided for @modeFullBody.
-  ///
-  /// In en, this message translates to:
-  /// **'All traffic goes through the selected node. Simple and predictable.'**
-  String get modeFullBody;
-
-  /// No description provided for @modeSitesTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'By site'**
-  String get modeSitesTitle;
-
-  /// No description provided for @modeSitesBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Only selected sites go through the tunnel. Everything else is direct.'**
-  String get modeSitesBody;
-
-  /// No description provided for @modesVpnOffTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Tunnel is off'**
-  String get modesVpnOffTitle;
-
-  /// No description provided for @modesVpnOffBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Connect the tunnel so modes can take effect'**
-  String get modesVpnOffBody;
-
-  /// No description provided for @modesConfirmFullTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Switch to Full tunnel mode?'**
-  String get modesConfirmFullTitle;
-
-  /// No description provided for @modesConfirmFullBody.
-  ///
-  /// In en, this message translates to:
-  /// **'In this mode all traffic goes through the selected node. Internal services and Russian resources may become slower.\n\nTo keep them direct — use Smart mode.'**
-  String get modesConfirmFullBody;
-
-  /// No description provided for @modesConfirmFullCancel.
-  ///
-  /// In en, this message translates to:
-  /// **'Don\'t switch'**
-  String get modesConfirmFullCancel;
-
-  /// No description provided for @modesConfirmFullOk.
-  ///
-  /// In en, this message translates to:
-  /// **'Switch'**
-  String get modesConfirmFullOk;
-
-  /// No description provided for @modesSitesSectionSmart.
-  ///
-  /// In en, this message translates to:
-  /// **'Also direct'**
-  String get modesSitesSectionSmart;
-
-  /// No description provided for @modesSitesSectionSites.
-  ///
-  /// In en, this message translates to:
-  /// **'Sites through the tunnel'**
-  String get modesSitesSectionSites;
-
-  /// No description provided for @modesSitesCustomSection.
-  ///
-  /// In en, this message translates to:
-  /// **'Your sites'**
-  String get modesSitesCustomSection;
-
-  /// No description provided for @modesSitesCustomHint.
-  ///
-  /// In en, this message translates to:
-  /// **'gw.company-net.ru'**
-  String get modesSitesCustomHint;
-
-  /// No description provided for @modesSitesAllowlistHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Only selected sites go through the tunnel — everything else goes direct at full speed.'**
-  String get modesSitesAllowlistHint;
-
-  /// No description provided for @modesLocationTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Location'**
-  String get modesLocationTitle;
-
-  /// No description provided for @modesLocationHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Server and country'**
-  String get modesLocationHint;
-
-  /// No description provided for @modesPendingTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Tunnel restart required'**
-  String get modesPendingTitle;
-
-  /// No description provided for @modesPendingBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Routing changes apply after you reconnect.'**
-  String get modesPendingBody;
-
-  /// No description provided for @modesReconnect.
-  ///
-  /// In en, this message translates to:
-  /// **'Reconnect'**
-  String get modesReconnect;
-
-  /// No description provided for @modesReconnectingTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Reconnecting the tunnel…'**
-  String get modesReconnectingTitle;
-
-  /// No description provided for @modesReconnectingBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Applying routing changes'**
-  String get modesReconnectingBody;
-
-  /// No description provided for @modesReconnectedTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Connected'**
-  String get modesReconnectedTitle;
-
-  /// No description provided for @modesReconnectFailedTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Reconnect failed'**
-  String get modesReconnectFailedTitle;
 
   /// No description provided for @navSettings.
   ///
@@ -547,48 +265,6 @@ abstract class AppL10n {
   /// **'measuring'**
   String get homeStatPingPending;
 
-  /// No description provided for @homeLinkOnline.
-  ///
-  /// In en, this message translates to:
-  /// **'Connected'**
-  String get homeLinkOnline;
-
-  /// No description provided for @homeLinkOffline.
-  ///
-  /// In en, this message translates to:
-  /// **'Home offline'**
-  String get homeLinkOffline;
-
-  /// No description provided for @homeLinkLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Link'**
-  String get homeLinkLabel;
-
-  /// No description provided for @homeStatDownload.
-  ///
-  /// In en, this message translates to:
-  /// **'Download'**
-  String get homeStatDownload;
-
-  /// No description provided for @homeStatUpload.
-  ///
-  /// In en, this message translates to:
-  /// **'Upload'**
-  String get homeStatUpload;
-
-  /// No description provided for @homeMoreMenu.
-  ///
-  /// In en, this message translates to:
-  /// **'More'**
-  String get homeMoreMenu;
-
-  /// No description provided for @homeRetry.
-  ///
-  /// In en, this message translates to:
-  /// **'Retry'**
-  String get homeRetry;
-
   /// No description provided for @homeErrorFriendly.
   ///
   /// In en, this message translates to:
@@ -606,18 +282,6 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Couldn’t reach a server. Tap again or pick a location yourself.'**
   String get homePathIncompatibleHint;
-
-  /// No description provided for @homeTtProvisionFailedTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Server unavailable'**
-  String get homeTtProvisionFailedTitle;
-
-  /// No description provided for @homeTtProvisionFailedHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Couldn’t prepare this location. Try again later or pick another.'**
-  String get homeTtProvisionFailedHint;
 
   /// No description provided for @homeVpnProbeFailedTitle.
   ///
@@ -673,24 +337,6 @@ abstract class AppL10n {
   /// **'Allow the tunnel in the system prompt, then connect again.'**
   String get homeVpnPermissionHintIos;
 
-  /// No description provided for @homeConfigErrorFriendly.
-  ///
-  /// In en, this message translates to:
-  /// **'Couldn’t fetch config. Check your connection and try again.'**
-  String get homeConfigErrorFriendly;
-
-  /// No description provided for @networkErrorFriendly.
-  ///
-  /// In en, this message translates to:
-  /// **'No connection to the server. Please try again.'**
-  String get networkErrorFriendly;
-
-  /// No description provided for @settingsSectionAccount.
-  ///
-  /// In en, this message translates to:
-  /// **'Account'**
-  String get settingsSectionAccount;
-
   /// No description provided for @settingsSectionConnection.
   ///
   /// In en, this message translates to:
@@ -702,36 +348,6 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Application'**
   String get settingsSectionApp;
-
-  /// No description provided for @settingsProBadge.
-  ///
-  /// In en, this message translates to:
-  /// **'PRO'**
-  String get settingsProBadge;
-
-  /// No description provided for @settingsActiveBadge.
-  ///
-  /// In en, this message translates to:
-  /// **'Active'**
-  String get settingsActiveBadge;
-
-  /// No description provided for @settingsServerRegion.
-  ///
-  /// In en, this message translates to:
-  /// **'Server region'**
-  String get settingsServerRegion;
-
-  /// No description provided for @settingsProtocol.
-  ///
-  /// In en, this message translates to:
-  /// **'Protocol'**
-  String get settingsProtocol;
-
-  /// No description provided for @settingsProtocolLocked.
-  ///
-  /// In en, this message translates to:
-  /// **'Only VLESS + Reality is available for now'**
-  String get settingsProtocolLocked;
 
   /// No description provided for @settingsKillSwitchOpenVpn.
   ///
@@ -751,306 +367,6 @@ abstract class AppL10n {
   /// **'Couldn\'t open tunnel settings. Open Settings → VPN.'**
   String get settingsKillSwitchOpenFailedIos;
 
-  /// No description provided for @settingsDevices.
-  ///
-  /// In en, this message translates to:
-  /// **'Devices'**
-  String get settingsDevices;
-
-  /// No description provided for @settingsDevicesHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Registered installs and revoke access'**
-  String get settingsDevicesHint;
-
-  /// No description provided for @devicesTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Devices'**
-  String get devicesTitle;
-
-  /// No description provided for @devicesHint.
-  ///
-  /// In en, this message translates to:
-  /// **'You can log out other devices if you no longer have them.'**
-  String get devicesHint;
-
-  /// No description provided for @devicesCreated.
-  ///
-  /// In en, this message translates to:
-  /// **'Created: {date}'**
-  String devicesCreated(String date);
-
-  /// No description provided for @devicesCurrentDevice.
-  ///
-  /// In en, this message translates to:
-  /// **'Current device'**
-  String get devicesCurrentDevice;
-
-  /// No description provided for @devicesSectionThis.
-  ///
-  /// In en, this message translates to:
-  /// **'This install'**
-  String get devicesSectionThis;
-
-  /// No description provided for @devicesSectionGroup.
-  ///
-  /// In en, this message translates to:
-  /// **'In the group'**
-  String get devicesSectionGroup;
-
-  /// No description provided for @devicesSectionActions.
-  ///
-  /// In en, this message translates to:
-  /// **'Group'**
-  String get devicesSectionActions;
-
-  /// No description provided for @devicesInGroupLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'In the group'**
-  String get devicesInGroupLabel;
-
-  /// No description provided for @devicesGroupEmpty.
-  ///
-  /// In en, this message translates to:
-  /// **'One device so far · {count} slots left'**
-  String devicesGroupEmpty(int count);
-
-  /// No description provided for @devicesLimitReached.
-  ///
-  /// In en, this message translates to:
-  /// **'Device limit reached'**
-  String get devicesLimitReached;
-
-  /// No description provided for @devicesCount.
-  ///
-  /// In en, this message translates to:
-  /// **'{active} of {max}'**
-  String devicesCount(int active, int max);
-
-  /// No description provided for @devicesEmpty.
-  ///
-  /// In en, this message translates to:
-  /// **'No devices yet — connect the tunnel to register this one.'**
-  String get devicesEmpty;
-
-  /// No description provided for @devicesLoadError.
-  ///
-  /// In en, this message translates to:
-  /// **'Could not load devices'**
-  String get devicesLoadError;
-
-  /// No description provided for @devicesUntitled.
-  ///
-  /// In en, this message translates to:
-  /// **'Device'**
-  String get devicesUntitled;
-
-  /// No description provided for @devicesRename.
-  ///
-  /// In en, this message translates to:
-  /// **'Rename'**
-  String get devicesRename;
-
-  /// No description provided for @devicesRenameTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Device name'**
-  String get devicesRenameTitle;
-
-  /// No description provided for @devicesRenameHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Shown in the device list'**
-  String get devicesRenameHint;
-
-  /// No description provided for @devicesRenameSave.
-  ///
-  /// In en, this message translates to:
-  /// **'Save'**
-  String get devicesRenameSave;
-
-  /// No description provided for @devicesRenamed.
-  ///
-  /// In en, this message translates to:
-  /// **'Name updated'**
-  String get devicesRenamed;
-
-  /// No description provided for @devicesRenameFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'Could not rename device'**
-  String get devicesRenameFailed;
-
-  /// No description provided for @devicesThisDevice.
-  ///
-  /// In en, this message translates to:
-  /// **'You'**
-  String get devicesThisDevice;
-
-  /// No description provided for @devicesInvitedLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Invited device'**
-  String get devicesInvitedLabel;
-
-  /// No description provided for @devicesRevoke.
-  ///
-  /// In en, this message translates to:
-  /// **'Remove'**
-  String get devicesRevoke;
-
-  /// No description provided for @devicesRevokeTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Revoke this device?'**
-  String get devicesRevokeTitle;
-
-  /// No description provided for @devicesRevokeBody.
-  ///
-  /// In en, this message translates to:
-  /// **'This device\'s tunnel key will stop working. Other devices are unaffected.'**
-  String get devicesRevokeBody;
-
-  /// No description provided for @devicesRevokeConfirm.
-  ///
-  /// In en, this message translates to:
-  /// **'Revoke'**
-  String get devicesRevokeConfirm;
-
-  /// No description provided for @devicesCancel.
-  ///
-  /// In en, this message translates to:
-  /// **'Cancel'**
-  String get devicesCancel;
-
-  /// No description provided for @devicesRevoked.
-  ///
-  /// In en, this message translates to:
-  /// **'Device revoked'**
-  String get devicesRevoked;
-
-  /// No description provided for @devicesRevokeFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'Could not revoke device'**
-  String get devicesRevokeFailed;
-
-  /// No description provided for @devicesLeaveHint.
-  ///
-  /// In en, this message translates to:
-  /// **'This install becomes its own Free account'**
-  String get devicesLeaveHint;
-
-  /// No description provided for @devicesLeaveConfirm.
-  ///
-  /// In en, this message translates to:
-  /// **'Leave'**
-  String get devicesLeaveConfirm;
-
-  /// No description provided for @devicesLeft.
-  ///
-  /// In en, this message translates to:
-  /// **'Device left the account'**
-  String get devicesLeft;
-
-  /// No description provided for @devicesLeaveFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'Could not leave the account'**
-  String get devicesLeaveFailed;
-
-  /// No description provided for @devicesLogoutAll.
-  ///
-  /// In en, this message translates to:
-  /// **'Sign out everywhere'**
-  String get devicesLogoutAll;
-
-  /// No description provided for @devicesLogoutAllHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Revoke every device on this account, including this one'**
-  String get devicesLogoutAllHint;
-
-  /// No description provided for @devicesLogoutAllTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Sign out on all devices?'**
-  String get devicesLogoutAllTitle;
-
-  /// No description provided for @devicesLogoutAllBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Every device on this account will lose access, including this one. Recover with your code or register again.'**
-  String get devicesLogoutAllBody;
-
-  /// No description provided for @devicesLogoutAllConfirm.
-  ///
-  /// In en, this message translates to:
-  /// **'Sign out everywhere'**
-  String get devicesLogoutAllConfirm;
-
-  /// No description provided for @devicesLogoutAllFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'Could not sign out everywhere'**
-  String get devicesLogoutAllFailed;
-
-  /// No description provided for @devicesLimitOpenManage.
-  ///
-  /// In en, this message translates to:
-  /// **'Manage devices'**
-  String get devicesLimitOpenManage;
-
-  /// No description provided for @splitTunnelSearchHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Search my sites'**
-  String get splitTunnelSearchHint;
-
-  /// No description provided for @splitTunnelBundledSection.
-  ///
-  /// In en, this message translates to:
-  /// **'Ready-made list'**
-  String get splitTunnelBundledSection;
-
-  /// No description provided for @splitTunnelBundledLead.
-  ///
-  /// In en, this message translates to:
-  /// **'Listed sites use your usual connection, not the protected one. Everything else still goes through Proxy Dom.'**
-  String get splitTunnelBundledLead;
-
-  /// No description provided for @splitTunnelBundledRuTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Ready-made lists'**
-  String get splitTunnelBundledRuTitle;
-
-  /// No description provided for @splitTunnelBundledRuSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'VK, Yandex, marketplaces, MAX, and more — one tap'**
-  String get splitTunnelBundledRuSubtitle;
-
-  /// No description provided for @splitTunnelBundledInfoTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'How it works'**
-  String get splitTunnelBundledInfoTitle;
-
-  /// No description provided for @splitTunnelBundledInfoBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Listed sites use your usual connection, not the protected one. Everything else still goes through Proxy Dom.\n\nOn iPhone you cannot take a whole app out of the tunnel — only a website by address. Safari usually follows the list. A bank or marketplace app may stay in the tunnel.\n\nBig services use many servers. Some pages or video may still go through the tunnel with the switch on. If a site should stay protected, turn it off here.\n\nTap Reconnect after you change the list.'**
-  String get splitTunnelBundledInfoBody;
-
-  /// No description provided for @splitTunnelBundledInfoClose.
-  ///
-  /// In en, this message translates to:
-  /// **'Got it'**
-  String get splitTunnelBundledInfoClose;
-
   /// No description provided for @splitTunnelSitesLead.
   ///
   /// In en, this message translates to:
@@ -1062,12 +378,6 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'My sites'**
   String get splitTunnelCustomSection;
-
-  /// No description provided for @splitTunnelCustomCount.
-  ///
-  /// In en, this message translates to:
-  /// **'{count}'**
-  String splitTunnelCustomCount(int count);
 
   /// No description provided for @splitTunnelAddSite.
   ///
@@ -1141,12 +451,6 @@ abstract class AppL10n {
   /// **'Players: {count}'**
   String splitTunnelPlayersCount(int count);
 
-  /// No description provided for @splitTunnelEmptyTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'No custom sites'**
-  String get splitTunnelEmptyTitle;
-
   /// No description provided for @splitTunnelEmptyBody.
   ///
   /// In en, this message translates to:
@@ -1170,12 +474,6 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Latin addresses only'**
   String get splitTunnelNonAsciiUnsupported;
-
-  /// No description provided for @splitTunnelPendingTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Changes not applied yet'**
-  String get splitTunnelPendingTitle;
 
   /// No description provided for @splitTunnelPendingBody.
   ///
@@ -1213,12 +511,6 @@ abstract class AppL10n {
   /// **'Android lockdown mode is on. Apps in this list may have no internet until you turn it off or return them to the tunnel.'**
   String get splitTunnelAppsLockdownWarning;
 
-  /// No description provided for @splitTunnelGeoHy2Pending.
-  ///
-  /// In en, this message translates to:
-  /// **'Not applied on this connection yet (needs IP lists). Use Apps or add a site.'**
-  String get splitTunnelGeoHy2Pending;
-
   /// No description provided for @settingsLanguage.
   ///
   /// In en, this message translates to:
@@ -1237,29 +529,11 @@ abstract class AppL10n {
   /// **'English'**
   String get settingsLanguageEnglish;
 
-  /// No description provided for @settingsComingSoon.
-  ///
-  /// In en, this message translates to:
-  /// **'Coming soon — placeholder for now'**
-  String get settingsComingSoon;
-
-  /// No description provided for @settingsComingSoonBadge.
-  ///
-  /// In en, this message translates to:
-  /// **'Soon'**
-  String get settingsComingSoonBadge;
-
   /// No description provided for @settingsPrivacyPlaceholder.
   ///
   /// In en, this message translates to:
   /// **'Privacy policy'**
   String get settingsPrivacyPlaceholder;
-
-  /// No description provided for @settingsDarkTheme.
-  ///
-  /// In en, this message translates to:
-  /// **'Appearance'**
-  String get settingsDarkTheme;
 
   /// No description provided for @settingsAppearance.
   ///
@@ -1327,18 +601,6 @@ abstract class AppL10n {
   /// **'Light'**
   String get settingsThemeLight;
 
-  /// No description provided for @settingsDiagnostics.
-  ///
-  /// In en, this message translates to:
-  /// **'Diagnostics'**
-  String get settingsDiagnostics;
-
-  /// No description provided for @settingsDiagnosticsHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Check connection'**
-  String get settingsDiagnosticsHint;
-
   /// No description provided for @settingsVersion.
   ///
   /// In en, this message translates to:
@@ -1350,12 +612,6 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Settings'**
   String get settingsTitle;
-
-  /// No description provided for @settingsSendReport.
-  ///
-  /// In en, this message translates to:
-  /// **'Send diagnostic report'**
-  String get settingsSendReport;
 
   /// No description provided for @tunnelLogsTitle.
   ///
@@ -1489,54 +745,6 @@ abstract class AppL10n {
   /// **'No entries'**
   String get tunnelLogsEmpty;
 
-  /// No description provided for @settingsSendReportHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Copies diagnostics. Paste them into support yourself.'**
-  String get settingsSendReportHint;
-
-  /// No description provided for @settingsSendReportConfirm.
-  ///
-  /// In en, this message translates to:
-  /// **'Send'**
-  String get settingsSendReportConfirm;
-
-  /// No description provided for @settingsReportSent.
-  ///
-  /// In en, this message translates to:
-  /// **'Report sent to support via the bot. Also copied.'**
-  String get settingsReportSent;
-
-  /// No description provided for @settingsReportCopied.
-  ///
-  /// In en, this message translates to:
-  /// **'Report text copied'**
-  String get settingsReportCopied;
-
-  /// No description provided for @settingsReportSaved.
-  ///
-  /// In en, this message translates to:
-  /// **'Report saved: {id}. Copied to clipboard.'**
-  String settingsReportSaved(String id);
-
-  /// No description provided for @settingsReportFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'Couldn\'t build the report'**
-  String get settingsReportFailed;
-
-  /// No description provided for @settingsReportUnauthorized.
-  ///
-  /// In en, this message translates to:
-  /// **'Session expired — sign in again and retry'**
-  String get settingsReportUnauthorized;
-
-  /// No description provided for @settingsReportNetworkError.
-  ///
-  /// In en, this message translates to:
-  /// **'Can\'t reach the server — try again later'**
-  String get settingsReportNetworkError;
-
   /// No description provided for @settingsVpnNotificationTitle.
   ///
   /// In en, this message translates to:
@@ -1567,29 +775,11 @@ abstract class AppL10n {
   /// **'Add a tile to connect and disconnect from Quick Settings'**
   String get settingsQsTileHint;
 
-  /// No description provided for @settingsQsTileAdd.
-  ///
-  /// In en, this message translates to:
-  /// **'Add to Quick Settings'**
-  String get settingsQsTileAdd;
-
-  /// No description provided for @settingsQsTileAddHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Show the system prompt to pin the tile'**
-  String get settingsQsTileAddHint;
-
   /// No description provided for @settingsQsTileAdded.
   ///
   /// In en, this message translates to:
   /// **'Tile added to Quick Settings'**
   String get settingsQsTileAdded;
-
-  /// No description provided for @settingsQsTileAlreadyAdded.
-  ///
-  /// In en, this message translates to:
-  /// **'Tile already in Quick Settings — open the shade and scroll'**
-  String get settingsQsTileAlreadyAdded;
 
   /// No description provided for @settingsQsTileAddedHint.
   ///
@@ -1633,89 +823,11 @@ abstract class AppL10n {
   /// **'The tile was not added'**
   String get settingsQsTileNotAdded;
 
-  /// No description provided for @homeAbout.
-  ///
-  /// In en, this message translates to:
-  /// **'About'**
-  String get homeAbout;
-
-  /// No description provided for @homeConfigError.
-  ///
-  /// In en, this message translates to:
-  /// **'Failed to get config: {message}'**
-  String homeConfigError(String message);
-
-  /// No description provided for @homeFetchConfig.
-  ///
-  /// In en, this message translates to:
-  /// **'Fetch config'**
-  String get homeFetchConfig;
-
-  /// No description provided for @homeUptime.
-  ///
-  /// In en, this message translates to:
-  /// **'Session: {time}'**
-  String homeUptime(String time);
-
   /// No description provided for @homeSessionLabel.
   ///
   /// In en, this message translates to:
   /// **'Session'**
   String get homeSessionLabel;
-
-  /// No description provided for @homeServer.
-  ///
-  /// In en, this message translates to:
-  /// **'Server: {name}'**
-  String homeServer(String name);
-
-  /// No description provided for @homeIp.
-  ///
-  /// In en, this message translates to:
-  /// **'Your IP: {ip}'**
-  String homeIp(String ip);
-
-  /// No description provided for @homeIpLoading.
-  ///
-  /// In en, this message translates to:
-  /// **'Your IP: …'**
-  String get homeIpLoading;
-
-  /// No description provided for @homeIpUnavailable.
-  ///
-  /// In en, this message translates to:
-  /// **'Your IP: unavailable — tunnel has no internet'**
-  String get homeIpUnavailable;
-
-  /// No description provided for @homeRegionAuto.
-  ///
-  /// In en, this message translates to:
-  /// **'Auto'**
-  String get homeRegionAuto;
-
-  /// No description provided for @homeVpnDisconnected.
-  ///
-  /// In en, this message translates to:
-  /// **'Disconnected'**
-  String get homeVpnDisconnected;
-
-  /// No description provided for @homeDisconnectUndo.
-  ///
-  /// In en, this message translates to:
-  /// **'Undo'**
-  String get homeDisconnectUndo;
-
-  /// No description provided for @regionTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Region'**
-  String get regionTitle;
-
-  /// No description provided for @regionSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Pick a server or leave automatic selection'**
-  String get regionSubtitle;
 
   /// No description provided for @regionAutoTitle.
   ///
@@ -1729,210 +841,6 @@ abstract class AppL10n {
   /// **'Nearest available location'**
   String get regionAutoSubtitle;
 
-  /// No description provided for @regionSelected.
-  ///
-  /// In en, this message translates to:
-  /// **'Selected'**
-  String get regionSelected;
-
-  /// No description provided for @regionSectionServers.
-  ///
-  /// In en, this message translates to:
-  /// **'Servers'**
-  String get regionSectionServers;
-
-  /// No description provided for @regionSectionGeneral.
-  ///
-  /// In en, this message translates to:
-  /// **'General'**
-  String get regionSectionGeneral;
-
-  /// No description provided for @regionSectionFree.
-  ///
-  /// In en, this message translates to:
-  /// **'Free'**
-  String get regionSectionFree;
-
-  /// No description provided for @regionSectionEurope.
-  ///
-  /// In en, this message translates to:
-  /// **'Moscow'**
-  String get regionSectionEurope;
-
-  /// No description provided for @regionSectionUsa.
-  ///
-  /// In en, this message translates to:
-  /// **'St Petersburg'**
-  String get regionSectionUsa;
-
-  /// No description provided for @regionComingSoon.
-  ///
-  /// In en, this message translates to:
-  /// **'Coming soon'**
-  String get regionComingSoon;
-
-  /// No description provided for @regionComingSoonBadge.
-  ///
-  /// In en, this message translates to:
-  /// **'Soon'**
-  String get regionComingSoonBadge;
-
-  /// No description provided for @regionSectionOffline.
-  ///
-  /// In en, this message translates to:
-  /// **'Unavailable servers'**
-  String get regionSectionOffline;
-
-  /// No description provided for @regionOnline.
-  ///
-  /// In en, this message translates to:
-  /// **'online'**
-  String get regionOnline;
-
-  /// No description provided for @regionBlurbFree.
-  ///
-  /// In en, this message translates to:
-  /// **'Apps and websites'**
-  String get regionBlurbFree;
-
-  /// No description provided for @regionBlurbGaming.
-  ///
-  /// In en, this message translates to:
-  /// **'Low ping'**
-  String get regionBlurbGaming;
-
-  /// No description provided for @regionBlurbYoutube.
-  ///
-  /// In en, this message translates to:
-  /// **'Comfortable streaming'**
-  String get regionBlurbYoutube;
-
-  /// No description provided for @regionBlurbIndia.
-  ///
-  /// In en, this message translates to:
-  /// **'Apps and websites'**
-  String get regionBlurbIndia;
-
-  /// No description provided for @regionOffline.
-  ///
-  /// In en, this message translates to:
-  /// **'offline'**
-  String get regionOffline;
-
-  /// No description provided for @regionFree.
-  ///
-  /// In en, this message translates to:
-  /// **'Available'**
-  String get regionFree;
-
-  /// No description provided for @regionNoneOnline.
-  ///
-  /// In en, this message translates to:
-  /// **'No servers online — try again later'**
-  String get regionNoneOnline;
-
-  /// No description provided for @regionLoadError.
-  ///
-  /// In en, this message translates to:
-  /// **'Failed to load servers: {error}'**
-  String regionLoadError(String error);
-
-  /// No description provided for @regionLoadErrorAbort.
-  ///
-  /// In en, this message translates to:
-  /// **'Cannot reach API — turn off the system Always-on mode (and lockdown), then reopen the region list'**
-  String get regionLoadErrorAbort;
-
-  /// No description provided for @regionCachedHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Showing a saved list — network is unstable right now'**
-  String get regionCachedHint;
-
-  /// No description provided for @regionEmpty.
-  ///
-  /// In en, this message translates to:
-  /// **'No servers available'**
-  String get regionEmpty;
-
-  /// No description provided for @regionChanged.
-  ///
-  /// In en, this message translates to:
-  /// **'Region: {name}'**
-  String regionChanged(String name);
-
-  /// No description provided for @regionChangeFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'Failed to change region: {error}'**
-  String regionChangeFailed(String error);
-
-  /// No description provided for @regionSwitchingTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Switching location…'**
-  String get regionSwitchingTitle;
-
-  /// No description provided for @regionSwitchingBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Connecting to the selected server'**
-  String get regionSwitchingBody;
-
-  /// No description provided for @regionSwitchedTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Done'**
-  String get regionSwitchedTitle;
-
-  /// No description provided for @regionSwitchFailedTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Could not switch location'**
-  String get regionSwitchFailedTitle;
-
-  /// No description provided for @logoutTooltip.
-  ///
-  /// In en, this message translates to:
-  /// **'Sign out'**
-  String get logoutTooltip;
-
-  /// No description provided for @settingsDeviceId.
-  ///
-  /// In en, this message translates to:
-  /// **'Device ID'**
-  String get settingsDeviceId;
-
-  /// No description provided for @settingsDeviceIdCopied.
-  ///
-  /// In en, this message translates to:
-  /// **'Device ID copied'**
-  String get settingsDeviceIdCopied;
-
-  /// No description provided for @settingsDeviceIdHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Install identifier for support'**
-  String get settingsDeviceIdHint;
-
-  /// No description provided for @logoutConfirmTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Sign out?'**
-  String get logoutConfirmTitle;
-
-  /// No description provided for @logoutConfirmMessage.
-  ///
-  /// In en, this message translates to:
-  /// **'Your tunnel connection will be closed. Restore with your code or register again next time.'**
-  String get logoutConfirmMessage;
-
-  /// No description provided for @logoutWarning.
-  ///
-  /// In en, this message translates to:
-  /// **'Logout completed with warnings'**
-  String get logoutWarning;
-
   /// No description provided for @cancel.
   ///
   /// In en, this message translates to:
@@ -1944,12 +852,6 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Back'**
   String get navBack;
-
-  /// Short label of language toggle button (shows next-language code)
-  ///
-  /// In en, this message translates to:
-  /// **'EN'**
-  String get switchLanguage;
 
   /// No description provided for @updateAvailableTitle.
   ///
@@ -1975,48 +877,6 @@ abstract class AppL10n {
   /// **'Later'**
   String get updateLater;
 
-  /// No description provided for @welcomeHeadline.
-  ///
-  /// In en, this message translates to:
-  /// **'A warm house on a cold internet'**
-  String get welcomeHeadline;
-
-  /// No description provided for @welcomeBody.
-  ///
-  /// In en, this message translates to:
-  /// **'An account is created automatically. Then one tap for a protected connection.'**
-  String get welcomeBody;
-
-  /// No description provided for @welcomeContinue.
-  ///
-  /// In en, this message translates to:
-  /// **'Continue'**
-  String get welcomeContinue;
-
-  /// No description provided for @welcomeSkip.
-  ///
-  /// In en, this message translates to:
-  /// **'Skip'**
-  String get welcomeSkip;
-
-  /// No description provided for @referralShareTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Invite a friend'**
-  String get referralShareTitle;
-
-  /// No description provided for @referralShareBody.
-  ///
-  /// In en, this message translates to:
-  /// **'They enter your code after install. Extra days land after they pay, not after install.'**
-  String get referralShareBody;
-
-  /// No description provided for @referralCopy.
-  ///
-  /// In en, this message translates to:
-  /// **'Copy link'**
-  String get referralCopy;
-
   /// No description provided for @onboardingSkip.
   ///
   /// In en, this message translates to:
@@ -2028,18 +888,6 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Next'**
   String get onboardingNext;
-
-  /// No description provided for @onboardingDone.
-  ///
-  /// In en, this message translates to:
-  /// **'Get started'**
-  String get onboardingDone;
-
-  /// No description provided for @onboardingConnectTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Connect'**
-  String get onboardingConnectTitle;
 
   /// No description provided for @onboardingConnectBody.
   ///
@@ -2053,443 +901,11 @@ abstract class AppL10n {
   /// **'Tap Connect on Home. iPhone will ask for tunnel permission once — that’s normal.'**
   String get onboardingConnectBodyIos;
 
-  /// No description provided for @onboardingRegionTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Region'**
-  String get onboardingRegionTitle;
-
-  /// No description provided for @onboardingRegionBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Automatic region is recommended. You can change it later in the list.'**
-  String get onboardingRegionBody;
-
-  /// No description provided for @onboardingHelpTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Help and privacy'**
-  String get onboardingHelpTitle;
-
-  /// No description provided for @onboardingHelpBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Send a diagnostic report from Settings if something breaks. We only collect a minimal daily aggregate — no browsing history, apps list, or ad IDs.'**
-  String get onboardingHelpBody;
-
-  /// No description provided for @betaGateError.
-  ///
-  /// In en, this message translates to:
-  /// **'Couldn’t check access. Check your connection.'**
-  String get betaGateError;
-
-  /// No description provided for @betaGateChecking.
-  ///
-  /// In en, this message translates to:
-  /// **'Checking access…'**
-  String get betaGateChecking;
-
-  /// No description provided for @betaGateErrorTimeout.
-  ///
-  /// In en, this message translates to:
-  /// **'The server did not respond. If the tunnel is on, turn it off and retry.'**
-  String get betaGateErrorTimeout;
-
-  /// No description provided for @betaGateErrorUnauthorized.
-  ///
-  /// In en, this message translates to:
-  /// **'Session expired. Try again.'**
-  String get betaGateErrorUnauthorized;
-
-  /// No description provided for @betaGateDisconnectVpnRetry.
-  ///
-  /// In en, this message translates to:
-  /// **'Disconnect the tunnel and retry'**
-  String get betaGateDisconnectVpnRetry;
-
-  /// No description provided for @betaGateContinueAnyway.
-  ///
-  /// In en, this message translates to:
-  /// **'Continue anyway'**
-  String get betaGateContinueAnyway;
-
-  /// No description provided for @lockedTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Activation'**
-  String get lockedTitle;
-
-  /// No description provided for @lockedHeadline.
-  ///
-  /// In en, this message translates to:
-  /// **'Welcome!'**
-  String get lockedHeadline;
-
-  /// No description provided for @lockedRefreshAccess.
-  ///
-  /// In en, this message translates to:
-  /// **'Refresh access'**
-  String get lockedRefreshAccess;
-
   /// No description provided for @settingsSupport.
   ///
   /// In en, this message translates to:
   /// **'Support'**
   String get settingsSupport;
-
-  /// No description provided for @lockedSavePercent.
-  ///
-  /// In en, this message translates to:
-  /// **'−{percent}%'**
-  String lockedSavePercent(int percent);
-
-  /// No description provided for @lockedVerifyCode.
-  ///
-  /// In en, this message translates to:
-  /// **'Verification code: {code}'**
-  String lockedVerifyCode(String code);
-
-  /// No description provided for @settingsTerms.
-  ///
-  /// In en, this message translates to:
-  /// **'Agreement'**
-  String get settingsTerms;
-
-  /// No description provided for @settingsDeleteAccount.
-  ///
-  /// In en, this message translates to:
-  /// **'Delete account'**
-  String get settingsDeleteAccount;
-
-  /// No description provided for @recoveryCodeTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Recovery code'**
-  String get recoveryCodeTitle;
-
-  /// No description provided for @recoveryCodeHeadline.
-  ///
-  /// In en, this message translates to:
-  /// **'Recovery code'**
-  String get recoveryCodeHeadline;
-
-  /// No description provided for @recoveryCodeCopy.
-  ///
-  /// In en, this message translates to:
-  /// **'Copy code'**
-  String get recoveryCodeCopy;
-
-  /// No description provided for @recoveryCodeCopied.
-  ///
-  /// In en, this message translates to:
-  /// **'Code copied'**
-  String get recoveryCodeCopied;
-
-  /// No description provided for @recoveryCodeConfirm.
-  ///
-  /// In en, this message translates to:
-  /// **'Continue'**
-  String get recoveryCodeConfirm;
-
-  /// No description provided for @recoveryCodeContinue.
-  ///
-  /// In en, this message translates to:
-  /// **'Continue'**
-  String get recoveryCodeContinue;
-
-  /// No description provided for @restoreTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Restore access'**
-  String get restoreTitle;
-
-  /// No description provided for @restoreHeadline.
-  ///
-  /// In en, this message translates to:
-  /// **'Enter recovery code'**
-  String get restoreHeadline;
-
-  /// No description provided for @restoreCodeLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Recovery code'**
-  String get restoreCodeLabel;
-
-  /// No description provided for @restoreCodeHint.
-  ///
-  /// In en, this message translates to:
-  /// **'TRM-XXXX-XXXX-XXXX'**
-  String get restoreCodeHint;
-
-  /// No description provided for @restoreCodeEmpty.
-  ///
-  /// In en, this message translates to:
-  /// **'Enter your recovery code'**
-  String get restoreCodeEmpty;
-
-  /// No description provided for @restoreSubmit.
-  ///
-  /// In en, this message translates to:
-  /// **'Restore'**
-  String get restoreSubmit;
-
-  /// No description provided for @restoreInvalid.
-  ///
-  /// In en, this message translates to:
-  /// **'Invalid recovery code'**
-  String get restoreInvalid;
-
-  /// No description provided for @restoreFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'Couldn’t restore access. Try again.'**
-  String get restoreFailed;
-
-  /// No description provided for @restoreDeviceLimitTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Device limit reached'**
-  String get restoreDeviceLimitTitle;
-
-  /// No description provided for @restoreDeviceLimitBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Choose which device to disconnect so this device can join.'**
-  String get restoreDeviceLimitBody;
-
-  /// No description provided for @restoreAccountFull.
-  ///
-  /// In en, this message translates to:
-  /// **'Device limit reached. Remove one in the device list, then sign in again. Devices already signed in stay online.'**
-  String get restoreAccountFull;
-
-  /// No description provided for @restoreDeviceLimitOwner.
-  ///
-  /// In en, this message translates to:
-  /// **'Owner'**
-  String get restoreDeviceLimitOwner;
-
-  /// No description provided for @restoreDeviceLimitPickFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'Couldn’t free a device slot. Try again.'**
-  String get restoreDeviceLimitPickFailed;
-
-  /// No description provided for @restoreSettingsHint.
-  ///
-  /// In en, this message translates to:
-  /// **'After reinstall — enter your recovery code'**
-  String get restoreSettingsHint;
-
-  /// No description provided for @restoreHeadlineCode.
-  ///
-  /// In en, this message translates to:
-  /// **'Enter recovery code'**
-  String get restoreHeadlineCode;
-
-  /// No description provided for @settingsInviteDeviceHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Create a code to join your group'**
-  String get settingsInviteDeviceHint;
-
-  /// No description provided for @settingsAcceptSeat.
-  ///
-  /// In en, this message translates to:
-  /// **'Join group'**
-  String get settingsAcceptSeat;
-
-  /// No description provided for @settingsAcceptSeatHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Join a subscription by invitation'**
-  String get settingsAcceptSeatHint;
-
-  /// No description provided for @settingsSeatCodeTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Invitation code'**
-  String get settingsSeatCodeTitle;
-
-  /// No description provided for @settingsSeatCodeCopied.
-  ///
-  /// In en, this message translates to:
-  /// **'Code copied'**
-  String get settingsSeatCodeCopied;
-
-  /// No description provided for @settingsSeatInviteFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'Couldn’t create an invitation code'**
-  String get settingsSeatInviteFailed;
-
-  /// No description provided for @settingsAcceptSeatOk.
-  ///
-  /// In en, this message translates to:
-  /// **'Device added to the group'**
-  String get settingsAcceptSeatOk;
-
-  /// No description provided for @settingsSeatCodeNotFound.
-  ///
-  /// In en, this message translates to:
-  /// **'Code not found or expired'**
-  String get settingsSeatCodeNotFound;
-
-  /// No description provided for @settingsSeatOwnCode.
-  ///
-  /// In en, this message translates to:
-  /// **'You can’t accept your own code — enter it on another device'**
-  String get settingsSeatOwnCode;
-
-  /// No description provided for @settingsSeatAcceptFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'Couldn’t join the group'**
-  String get settingsSeatAcceptFailed;
-
-  /// No description provided for @settingsSeatCodeTtl.
-  ///
-  /// In en, this message translates to:
-  /// **'Code is valid for 30 minutes'**
-  String get settingsSeatCodeTtl;
-
-  /// No description provided for @settingsSeatShowQr.
-  ///
-  /// In en, this message translates to:
-  /// **'Show code'**
-  String get settingsSeatShowQr;
-
-  /// No description provided for @settingsSeatScanHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Scan the QR code or follow the link'**
-  String get settingsSeatScanHint;
-
-  /// No description provided for @seatAcceptConsentTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Join this group?'**
-  String get seatAcceptConsentTitle;
-
-  /// No description provided for @seatAcceptConsentBody.
-  ///
-  /// In en, this message translates to:
-  /// **'The account owner will see this device’s name, platform, and the date it was added. You can leave the group later.'**
-  String get seatAcceptConsentBody;
-
-  /// No description provided for @seatAcceptConsentConfirm.
-  ///
-  /// In en, this message translates to:
-  /// **'Join'**
-  String get seatAcceptConsentConfirm;
-
-  /// No description provided for @devicesOwnerCannotLeave.
-  ///
-  /// In en, this message translates to:
-  /// **'Revoke other devices before leaving'**
-  String get devicesOwnerCannotLeave;
-
-  /// No description provided for @settingsRecoverAccess.
-  ///
-  /// In en, this message translates to:
-  /// **'Restore access'**
-  String get settingsRecoverAccess;
-
-  /// No description provided for @settingsRecoverAccessHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Use recovery code after reinstall'**
-  String get settingsRecoverAccessHint;
-
-  /// No description provided for @bootstrapFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'Couldn’t start the session. Check your connection.'**
-  String get bootstrapFailed;
-
-  /// No description provided for @accountEmailLead.
-  ///
-  /// In en, this message translates to:
-  /// **'Enter your email — we’ll send a one-time code.'**
-  String get accountEmailLead;
-
-  /// No description provided for @accountEmailLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Email'**
-  String get accountEmailLabel;
-
-  /// No description provided for @accountEmailSendCode.
-  ///
-  /// In en, this message translates to:
-  /// **'Send code'**
-  String get accountEmailSendCode;
-
-  /// No description provided for @accountEmailCodeLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Code from email'**
-  String get accountEmailCodeLabel;
-
-  /// No description provided for @accountEmailVerify.
-  ///
-  /// In en, this message translates to:
-  /// **'Confirm'**
-  String get accountEmailVerify;
-
-  /// No description provided for @accountEmailChangeAddress.
-  ///
-  /// In en, this message translates to:
-  /// **'Different address'**
-  String get accountEmailChangeAddress;
-
-  /// No description provided for @accountEmailInvalid.
-  ///
-  /// In en, this message translates to:
-  /// **'Enter a valid email'**
-  String get accountEmailInvalid;
-
-  /// No description provided for @accountEmailSendFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'Couldn’t send the code'**
-  String get accountEmailSendFailed;
-
-  /// No description provided for @accountEmailCodeRequired.
-  ///
-  /// In en, this message translates to:
-  /// **'Enter the code from email'**
-  String get accountEmailCodeRequired;
-
-  /// No description provided for @accountEmailVerifyFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'Invalid or expired code'**
-  String get accountEmailVerifyFailed;
-
-  /// No description provided for @accountEmailDebugHint.
-  ///
-  /// In en, this message translates to:
-  /// **'DEBUG: code filled from API response'**
-  String get accountEmailDebugHint;
-
-  /// No description provided for @navPromo.
-  ///
-  /// In en, this message translates to:
-  /// **'Invite code'**
-  String get navPromo;
-
-  /// No description provided for @iosBillingUnavailableBody.
-  ///
-  /// In en, this message translates to:
-  /// **'In-app payment is not available. Free locations still work.'**
-  String get iosBillingUnavailableBody;
-
-  /// No description provided for @iosAdvancedFeaturesCta.
-  ///
-  /// In en, this message translates to:
-  /// **'Advanced features'**
-  String get iosAdvancedFeaturesCta;
 
   /// No description provided for @vpnDisclosureTitle.
   ///
@@ -2599,12 +1015,6 @@ abstract class AppL10n {
   /// **'Not now'**
   String get vpnDisclosureDecline;
 
-  /// No description provided for @freeAdd.
-  ///
-  /// In en, this message translates to:
-  /// **'Add'**
-  String get freeAdd;
-
   /// No description provided for @freePaste.
   ///
   /// In en, this message translates to:
@@ -2647,12 +1057,6 @@ abstract class AppL10n {
   /// **'Profile'**
   String get freeProfile;
 
-  /// No description provided for @freeProtocol.
-  ///
-  /// In en, this message translates to:
-  /// **'Protocol'**
-  String get freeProtocol;
-
   /// No description provided for @freeTrafficLeft.
   ///
   /// In en, this message translates to:
@@ -2688,18 +1092,6 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Save'**
   String get freeSaveConnect;
-
-  /// No description provided for @freeSaveOnly.
-  ///
-  /// In en, this message translates to:
-  /// **'Save only'**
-  String get freeSaveOnly;
-
-  /// No description provided for @freePreview.
-  ///
-  /// In en, this message translates to:
-  /// **'Found'**
-  String get freePreview;
 
   /// No description provided for @freeServerAdded.
   ///
@@ -2742,12 +1134,6 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'The document sent a placeholder instead of a server.'**
   String get freeSubscriptionClientRefused;
-
-  /// No description provided for @freeSharePool.
-  ///
-  /// In en, this message translates to:
-  /// **'Share'**
-  String get freeSharePool;
 
   /// No description provided for @freeShareCopied.
   ///
@@ -2851,18 +1237,6 @@ abstract class AppL10n {
   /// **'Servers'**
   String get freeServers;
 
-  /// No description provided for @freePoolMarked.
-  ///
-  /// In en, this message translates to:
-  /// **'Marked'**
-  String get freePoolMarked;
-
-  /// No description provided for @freeIosHy2Only.
-  ///
-  /// In en, this message translates to:
-  /// **'This protocol cannot start.'**
-  String get freeIosHy2Only;
-
   /// No description provided for @freeHy2OnlyAdd.
   ///
   /// In en, this message translates to:
@@ -2880,12 +1254,6 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'This protocol cannot start.'**
   String get freeSchemeParked;
-
-  /// No description provided for @freePoolGeneral.
-  ///
-  /// In en, this message translates to:
-  /// **'General'**
-  String get freePoolGeneral;
 
   /// No description provided for @freeSearch.
   ///
@@ -2917,35 +1285,11 @@ abstract class AppL10n {
   /// **'Nodes'**
   String get locationsNodes;
 
-  /// No description provided for @locationsSelected.
-  ///
-  /// In en, this message translates to:
-  /// **'IN USE'**
-  String get locationsSelected;
-
   /// No description provided for @locationsActive.
   ///
   /// In en, this message translates to:
   /// **'Active'**
   String get locationsActive;
-
-  /// No description provided for @locationsNotUsed.
-  ///
-  /// In en, this message translates to:
-  /// **'NOT USED'**
-  String get locationsNotUsed;
-
-  /// No description provided for @locationsUseIt.
-  ///
-  /// In en, this message translates to:
-  /// **'Connect'**
-  String get locationsUseIt;
-
-  /// No description provided for @locationsInUse.
-  ///
-  /// In en, this message translates to:
-  /// **'Connected'**
-  String get locationsInUse;
 
   /// No description provided for @locationsShareKey.
   ///
@@ -2958,12 +1302,6 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Telegram'**
   String get freeTelegram;
-
-  /// No description provided for @locationsKeyHandle.
-  ///
-  /// In en, this message translates to:
-  /// **'key'**
-  String get locationsKeyHandle;
 
   /// No description provided for @freeDelete.
   ///
