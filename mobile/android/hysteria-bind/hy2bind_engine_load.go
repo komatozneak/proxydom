@@ -327,7 +327,9 @@ func vmessOutbound(item shareOutbound) *vmessout.Config {
 // only the JSON short name and is not a dialer.
 func engineTransport(network string) (string, error) {
 	switch strings.ToLower(strings.TrimSpace(network)) {
-	case "", "tcp":
+	// Xray renamed its TCP transport to RAW; links from newer panels say
+	// `type=raw` for the same plain stream.
+	case "", "tcp", "raw":
 		return "tcp", nil
 	case "ws", "websocket":
 		return "websocket", nil

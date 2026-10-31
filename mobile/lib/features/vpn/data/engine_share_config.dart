@@ -91,10 +91,10 @@ String? buildRealityConfig(ParsedShareLink link) {
   final publicKey = (q['pbk'] ?? '').trim();
   if (publicKey.isEmpty) return null;
   final network = (q['type'] ?? q['net'] ?? 'tcp').trim().toLowerCase();
-  // TCP only. WebSocket and gRPC put another framing layer above this stream;
-  // until that layer exists the line stays inactive instead of failing after
-  // the TLS handshake.
-  if (network.isNotEmpty && network != 'tcp') return null;
+  // TCP only (`raw` is Xray's newer name for it). WebSocket and gRPC put
+  // another framing layer above this stream; until that layer exists the line
+  // stays inactive instead of failing after the TLS handshake.
+  if (network.isNotEmpty && network != 'tcp' && network != 'raw') return null;
   final uuid = Uri.decodeComponent(uri.userInfo);
   if (uuid.isEmpty) return null;
   // A server's short ids are whole bytes, at most eight of them. Anything else
@@ -379,7 +379,8 @@ Map<String, Object?>? _stream(
   // dial shown as unsupported, which is the least useful answer available.
   final folded = network.trim().toLowerCase();
   final normalized = switch (folded) {
-    '' => 'tcp',
+    // `raw` is Xray's newer name for the plain TCP stream.
+    '' || 'raw' => 'tcp',
     'mkcp' => 'kcp',
     _ => folded,
   };

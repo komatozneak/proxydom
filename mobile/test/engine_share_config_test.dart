@@ -46,6 +46,13 @@ void main() {
     expect(buildShareSocksConfig(parseShareLink(odd)), isNull);
   });
 
+  test('reality over raw is the tcp stream', () {
+    const raw =
+        'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
+        '?security=reality&pbk=PUBLIC&sid=ab&type=raw#Raw';
+    expect(buildShareSocksConfig(parseShareLink(raw)), isNotNull);
+  });
+
   test('reality over a transport the engine does not carry stays inactive', () {
     const raw =
         'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
@@ -202,6 +209,17 @@ void main() {
     final tls = (((decoded['outbounds'] as List).first as Map)['streamSettings']
         as Map)['tlsSettings'] as Map;
     expect(tls.containsKey('fingerprint'), isFalse);
+  });
+
+  test('type=raw is the plain tcp stream', () {
+    const raw =
+        'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
+        '?security=tls&sni=a.example&type=raw#Raw';
+    final decoded = jsonDecode(buildShareSocksConfig(parseShareLink(raw))!)
+        as Map<String, dynamic>;
+    final stream =
+        ((decoded['outbounds'] as List).first as Map)['streamSettings'] as Map;
+    expect(stream['network'], 'tcp');
   });
 
   test('hysteria2 is not an engine document', () {

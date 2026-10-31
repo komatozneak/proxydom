@@ -102,7 +102,7 @@ func parseRealityDocument(configJSON string) (realityEndpoint, error) {
 	// REALITY stream; refusing them here keeps a line inactive instead of
 	// failing after the TLS handshake.
 	network := strings.ToLower(strings.TrimSpace(doc.Network))
-	if network != "" && network != "tcp" {
+	if network != "" && network != "tcp" && network != "raw" {
 		return realityEndpoint{}, fmt.Errorf("reality: transport %q is not carried yet", network)
 	}
 	// XTLS Vision is another framing layer above VLESS, and a Vision user is

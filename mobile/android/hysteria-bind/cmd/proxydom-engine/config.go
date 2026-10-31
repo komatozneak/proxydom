@@ -85,7 +85,7 @@ type outboundConfig struct {
 // default the link parsers use.
 func (o outboundConfig) networkName() string {
 	name := strings.ToLower(strings.TrimSpace(o.Network))
-	if name == "" {
+	if name == "" || name == "raw" {
 		return "tcp"
 	}
 	return name
