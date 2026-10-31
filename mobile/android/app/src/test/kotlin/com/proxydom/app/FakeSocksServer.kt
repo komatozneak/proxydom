@@ -18,12 +18,15 @@ import java.util.concurrent.atomic.AtomicInteger
  *
  * The instant CONNECT ack mirrors the real core; that is exactly why a bare
  * CONNECT is not a latency sample. With [keepAlive] the connection serves one
- * answer per request and stays open, so a test can prove the probe reuses it.
+ * answer per request and stays open, so a test can prove the probe reuses it;
+ * [answersPerConnection] closes it after that many answers, the way a server's
+ * keep-alive timeout does while the probe waits.
  */
 internal class FakeSocksServer(
     private val statusLine: String?,
     private val holdBackMs: Long,
     private val keepAlive: Boolean = false,
+    private val answersPerConnection: Int = Int.MAX_VALUE,
 ) : Closeable {
     private val server = ServerSocket(0, 4, InetAddress.getByName("127.0.0.1"))
     val port: Int = server.localPort
@@ -71,6 +74,7 @@ internal class FakeSocksServer(
             val reader = BufferedReader(
                 InputStreamReader(inp, StandardCharsets.US_ASCII),
             )
+            var answered = 0
             do {
                 // Request headers, up to the blank line.
                 while (true) {
@@ -81,7 +85,7 @@ internal class FakeSocksServer(
                 val answer = statusLine ?: return
                 out.write("$answer\r\n\r\n".toByteArray(StandardCharsets.US_ASCII))
                 out.flush()
-            } while (keepAlive)
+            } while (keepAlive && ++answered < answersPerConnection)
         }
     }
 
