@@ -45,6 +45,10 @@
 | 30 | MPL-2.0 без пояснения об источнике | `third_party_notices_test.go` | условная секция «MPL-2.0 components» с указанием апстрима | готово |
 | 31 | Прямые ссылки на GitHub в клиенте | `mobile/lib`, `.github` | не найдены; updater ходит на `api.proxydom.su` | проверено |
 | 32 | Публичная витрина релизов | `scripts/release-publisher/` | новый publisher: только бинарники + `RELEASE.json` + SHA256 | готово |
+| 33 | 277 неиспользуемых l10n-ключей в бинарнике | `app_ru.arb`, `app_en.arb` | удалены: аккаунт, устройства, лимиты, «Оплата в приложении недоступна», `−{percent}%`, реферальные «дни после оплаты», «Тёплый дом в холодном интернете» | готово |
+| 34 | Диагностический отчёт целиком в logcat в release | `diagnostics_service.dart` | `debugPrint` не вырезается из release; дамп теперь только при `kDebugMode`, отчёт остаётся в файле | готово |
+| 35 | Windows-окно без обфускации Dart | `build-msi.ps1` | `flutter build windows --release --obfuscate --split-debug-info=build/symbols` | готово |
+| 36 | Нет CI-гейта лицензий Dart-графа | `mobile/test/dependency_license_guard_test.dart` | тест обходит `.dart_tool/package_config.json`, валит GPL/LGPL/AGPL/SSPL/EUPL, вырезает MPL-определение Secondary License | готово |
 
 ## 2. Что изменено по шагам
 
@@ -156,7 +160,7 @@
 | AAR paths | `llvm-readelf` + raw scan | нет `C:\Users`, владельца, `.debug_*` |
 | Windows exe | `go build -trimpath -ldflags "-s -w -buildid="` | нет `C:\Users`, `.debug_info` |
 | Flutter analyze | `flutter analyze --no-fatal-infos` | 26 issues, все — прежние style-infos; 0 errors |
-| Flutter tests | `flutter test --dart-define=AUTH_ANONYMOUS=false` | 491 pass |
+| Flutter tests | `flutter test --dart-define=AUTH_ANONYMOUS=false` | 496 pass (включая `dependency_license_guard_test.dart`: 126 пакетов) |
 | License self-test | `test-check-payload-licenses.ps1` | 10/10 |
 | C++ | `protocol_test.exe`, `supervisor_test.exe` | ok |
 | Kotlin | `gradlew :app:testDebugUnitTest` | BUILD SUCCESSFUL |
@@ -178,10 +182,12 @@
 4. **Локальный `key.properties`** может всё ещё указывать на старый
    `teremok-upload.jks`; скрипты теперь читают `storeFile` и работают с любым
    именем. Переименование самого JKS — на усмотрение владельца.
-5. **Тестовые фикстуры** (`mobile/test/*`) всё ещё содержат исторические
-   примеры `Teremok`/`DoDoVPN`. Они не входят в APK/IPA/MSI; продакшен-код и
-   документация очищены. Если нужен нулевой grep по всему репозиторию, это
-   отдельная механическая правка тестов.
+5. **Тестовые фикстуры** переименованы: `Teremok`/`DoDoVPN`/`teremokconnect`
+   → `CompanyNet`/`company-net.ru`. Единственный остаток — имя старого
+   Wintun-адаптера `teremokhy2` в `desktop/windows/service/protocol.cpp`:
+   служба по нему находит и удаляет адаптер, оставленный старыми установками.
+   Без него этот адаптер на обновлённых машинах считался бы чужим туннелем.
+   Убирать — после того как старых установок не останется.
 6. **MPL-2.0**: в текущем графе Go MPL-модулей нет; секция в notices появится
    автоматически, если зависимость с MPL-2.0 будет добавлена. В Dart-графе
    `gtk` (Linux-only) идёт под MPL-2.0, в мобильные/Windows-поставки не входит.
@@ -192,6 +198,15 @@
    очищены; для APK/IPA нужен либо нейтральный build-root в CI, либо
    пост-обработка `libapp.so` до подписи. Этот пункт нельзя закрыть только
    флагами `flutter build`.
+8. **Слово `youtube`** убрано из продакшен-Dart: классификаторы имён
+   строк, discovery плееров, комментарии. Строка, названная только «YouTube»,
+   и сохранённый старой версией ключ `youtube` теперь получают глобус вместо
+   «Медиа-поток»; `media`/`video`/`stream`/`медиа` по-прежнему дают категорию.
+   В Go/Swift-комментариях упоминания остаются, в бинарник они не попадают.
+9. **C++-тесты.** На этой машине `cmake --build` не находит заголовки MSVC
+   (`cstddef`), поэтому прогнаны ранее собранные `protocol_test.exe` и
+   `supervisor_test.exe` — они старше последнего коммита в
+   `desktop/windows/service`. Актуальный прогон — джоба `windows-service` в CI.
 
 ## 5. Вердикт
 
