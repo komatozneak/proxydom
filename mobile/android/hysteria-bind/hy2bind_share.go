@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"strconv"
 	"sync"
@@ -274,7 +273,7 @@ func (d *socksDialer) dialRoute(network, addr string, direct bool, why string) (
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("hy2bind share route %s %s why=%s", chain, addr, why)
+	connLogf("hy2bind share route %s %s why=%s", chain, addr, why)
 	return trackStream(conn, network, addr, chain), nil
 }
 
