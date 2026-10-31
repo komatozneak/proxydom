@@ -44,9 +44,8 @@ flutter:
   uses-material-design: true
   generate: true
   assets:
-    # Brand / onboarding (Figma zinc+honey).
-    # Directory entries are NOT recursive — nest paths must be listed.
-    - assets/brand/
+    # Brand: list files, not the folder. A folder entry also bundles the
+    # notes and unused artwork that sit beside the files the app draws.
     - assets/brand/connect/s1-flat-launcher.png
     - assets/icon/mono_proxydom.png
     - assets/icon/ic_launcher_monochrome.png
