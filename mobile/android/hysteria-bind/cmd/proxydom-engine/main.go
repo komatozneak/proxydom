@@ -107,6 +107,11 @@ func startTUN(cfg engineConfig) error {
 	if msg := hy2bind.OpenNamedTun(cfg.Tun.Name, cfg.Tun.MTU); msg != "" {
 		return fmt.Errorf("%s", msg)
 	}
+	// The address goes on before any stack reads the adapter. gVisor's
+	// iobased.dispatchLoop leaves its read loop for good on the first read
+	// error and Attach runs once, so an address change under a running loop
+	// leaves a tunnel that is up and routed yet hands the stack nothing
+	// (Windows reports win32=10065, which reads as a routing fault).
 	if err := assignTunIPv4(cfg.Tun.Name, cfg.Tun.Address); err != nil {
 		hy2bind.StopTun()
 		return err
