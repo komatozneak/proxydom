@@ -119,7 +119,9 @@ class DiagnosticsService {
   }) async {
     final reportId = newReportId();
     final body = 'report_id: $reportId\n$report';
-    dumpReportToLogcat(body);
+    // Release builds keep the report in the file only: debugPrint is not
+    // stripped from release and would put node hosts in the system log.
+    if (kDebugMode) dumpReportToLogcat(body);
     File? file;
     try {
       final dir = directory ?? await getApplicationSupportDirectory();
@@ -131,7 +133,7 @@ class DiagnosticsService {
     return (reportId: reportId, body: body, file: file);
   }
 
-  /// Last [postMaxChars] so Telegram accepts the POST; logcat still gets the full bundle.
+  /// Last [postMaxChars] so the POST is accepted; debug logcat still gets the full bundle.
   static String clipForPost(String report) {
     if (report.length <= postMaxChars) return report;
     return report.substring(report.length - postMaxChars);
