@@ -2,14 +2,14 @@
 
 ## Ship (bundled)
 
+Each shipped file is listed by path in `pubspec.yaml`; this note is not bundled.
+
 | Path | Notes |
 |---|---|
-| `onboarding_globe.png` | Onboarding hero. |
 | `connect/s1-flat-launcher.png` | Living House mascot (mustard + white door). Used by Home connect glyph. |
 | `icon/fg_proxydom.png` | Adaptive icon foreground (from mascot). |
 | `icon/mono_proxydom.png` | Android 13+ themed / monochrome silhouette. |
 | `icon/nav_vpn_proxydom.png` | Bottom-nav center mark: mono house + «DOM» cutout (Latin, not l10n). |
-| `rive/signal_nest_connect.riv` | Optional Rive export (Flutter painter is SoT). |
 
 ## Regenerate launcher icons
 
