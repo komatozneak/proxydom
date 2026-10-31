@@ -173,8 +173,8 @@ void main() {
     expect((stream['wsSettings'] as Map)['path'], '/vless-ws');
     final tls = stream['tlsSettings'] as Map;
     expect(tls['serverName'], 'front.example');
-    // `fp=chrome` is not a v2ray-core uTLS preset. The builder translates it.
-    expect(tls['fingerprint'], 'chrome_auto');
+    // The link's word travels; the Go loader maps it to a uTLS preset.
+    expect(tls['fingerprint'], 'chrome');
     // A front that serves only http/1.1 refuses a WS upgrade offered under h2.
     expect(tls['alpn'], ['http/1.1']);
   });
@@ -200,15 +200,27 @@ void main() {
     expect(plainTls.containsKey('alpn'), isFalse);
   });
 
-  test('an unknown fingerprint is omitted rather than sent to the core', () {
-    const raw =
-        'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
-        '?security=tls&sni=a.example&fp=not-a-preset#A';
-    final decoded = jsonDecode(buildShareSocksConfig(parseShareLink(raw))!)
-        as Map<String, dynamic>;
-    final tls = (((decoded['outbounds'] as List).first as Map)['streamSettings']
-        as Map)['tlsSettings'] as Map;
-    expect(tls.containsKey('fingerprint'), isFalse);
+  test('fp travels folded, and a link without fp sends none', () {
+    // Which names are presets is the Go loader's table, which drops a name it
+    // does not know; this side only forwards the link's word.
+    Map tlsOf(String raw) {
+      final decoded = jsonDecode(buildShareSocksConfig(parseShareLink(raw))!)
+          as Map<String, dynamic>;
+      return (((decoded['outbounds'] as List).first as Map)['streamSettings']
+          as Map)['tlsSettings'] as Map;
+    }
+
+    expect(
+      tlsOf('vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
+          '?security=tls&sni=a.example&fp=%20Firefox%20#A')['fingerprint'],
+      'firefox',
+    );
+    expect(
+      tlsOf('vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
+              '?security=tls&sni=a.example#A')
+          .containsKey('fingerprint'),
+      isFalse,
+    );
   });
 
   test('type=raw is the plain tcp stream', () {

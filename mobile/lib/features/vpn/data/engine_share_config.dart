@@ -407,13 +407,13 @@ Map<String, Object?>? _stream(
     // `http/1.1`. A front that serves only http/1.1 rejects a WS upgrade
     // offered under h2; the link's own alpn is the only authority on that.
     final alpn = _alpnList(q['alpn']);
-    final fingerprint = _fingerprint(q['fp']);
+    final fingerprint = (q['fp'] ?? '').trim().toLowerCase();
     stream['tlsSettings'] = {
       'serverName': sni,
-      // Share links say `fp=chrome`. v2ray-core's uTLS map has no such name
-      // (`unknown preset name`) and then the dial never starts. Translate the
-      // short names to the presets that core actually has.
-      if (fingerprint != null) 'fingerprint': fingerprint,
+      // The link's own word. The Go loader owns the one table that maps share
+      // names (`chrome`) to uTLS presets (`chrome_auto`) and drops a name it
+      // does not know, on every platform; a second copy here could only drift.
+      if (fingerprint.isNotEmpty) 'fingerprint': fingerprint,
       if (allowInsecure) 'allowInsecure': true,
       if (alpn.isNotEmpty) 'alpn': alpn,
     };
@@ -446,66 +446,6 @@ Map<String, Object?>? _stream(
     }
   }
   return stream;
-}
-
-/// Short `fp` values from share links, and the uTLS preset v2ray-core accepts.
-///
-/// Names already in the core map pass through. Anything else is omitted: the
-/// loader treats a non-empty fingerprint as a uTLS imitate string, and an
-/// unknown one fails the dial before TLS starts.
-const _fingerprintAliases = <String, String>{
-  'chrome': 'chrome_auto',
-  'firefox': 'firefox_auto',
-  'ios': 'ios_auto',
-  'android': 'android_11_okhttp',
-  'edge': 'edge_auto',
-  'safari': 'safari_auto',
-  '360': '360_auto',
-  'qq': 'qq_auto',
-  'random': 'randomized',
-  'randomized': 'randomized',
-  'randomizedalpn': 'randomizedalpn',
-  'randomizednoalpn': 'randomizednoalpn',
-  'firefox_auto': 'firefox_auto',
-  'firefox_55': 'firefox_55',
-  'firefox_56': 'firefox_56',
-  'firefox_63': 'firefox_63',
-  'firefox_65': 'firefox_65',
-  'firefox_99': 'firefox_99',
-  'firefox_102': 'firefox_102',
-  'firefox_105': 'firefox_105',
-  'chrome_auto': 'chrome_auto',
-  'chrome_58': 'chrome_58',
-  'chrome_62': 'chrome_62',
-  'chrome_70': 'chrome_70',
-  'chrome_72': 'chrome_72',
-  'chrome_83': 'chrome_83',
-  'chrome_87': 'chrome_87',
-  'chrome_96': 'chrome_96',
-  'chrome_100': 'chrome_100',
-  'chrome_102': 'chrome_102',
-  'ios_auto': 'ios_auto',
-  'ios_11_1': 'ios_11_1',
-  'ios_12_1': 'ios_12_1',
-  'ios_13': 'ios_13',
-  'ios_14': 'ios_14',
-  'android_11_okhttp': 'android_11_okhttp',
-  'edge_auto': 'edge_auto',
-  'edge_85': 'edge_85',
-  'edge_106': 'edge_106',
-  'safari_auto': 'safari_auto',
-  'safari_16_0': 'safari_16_0',
-  '360_auto': '360_auto',
-  '360_7_5': '360_7_5',
-  '360_11_0': '360_11_0',
-  'qq_auto': 'qq_auto',
-  'qq_11_1': 'qq_11_1',
-};
-
-String? _fingerprint(String? raw) {
-  final name = (raw ?? '').trim().toLowerCase();
-  if (name.isEmpty) return null;
-  return _fingerprintAliases[name];
 }
 
 /// `alpn=http/1.1` or `alpn=h2,http/1.1` → `['http/1.1']` / `['h2','http/1.1']`.
