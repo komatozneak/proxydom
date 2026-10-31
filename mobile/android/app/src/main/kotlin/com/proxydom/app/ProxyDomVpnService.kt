@@ -1,7 +1,10 @@
 package com.proxydom.app
 
 import android.content.ActivityNotFoundException
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.net.ConnectivityManager
 import android.net.IpPrefix
 import android.net.NetworkCapabilities
@@ -1746,14 +1749,45 @@ class ProxyDomVpnService : VpnService() {
                     currentStatus != "disconnecting" &&
                     currentStatus != "idle"
             },
+            interactive = {
+                (getSystemService(POWER_SERVICE) as? PowerManager)?.isInteractive ?: true
+            },
         )
+        registerScreenOnProbe()
         NativeLog.i(
             TAG,
             "path health watch started adapter=${watch.adapter} socks=${watch.port}",
         )
     }
 
+    /**
+     * The probe slows down with the screen off; when it comes back on, Home is
+     * about to show its `ms`, so take a reading now instead of after the rest
+     * of a thirty-second wait.
+     */
+    private var screenOnProbe: BroadcastReceiver? = null
+
+    private fun registerScreenOnProbe() {
+        if (screenOnProbe != null) return
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent?.action == Intent.ACTION_SCREEN_ON) pathHealth.probeNow()
+            }
+        }
+        runCatching {
+            registerReceiver(receiver, IntentFilter(Intent.ACTION_SCREEN_ON))
+            screenOnProbe = receiver
+        }.onFailure { NativeLog.w(TAG, "screen-on probe not registered", it) }
+    }
+
+    private fun unregisterScreenOnProbe() {
+        val receiver = screenOnProbe ?: return
+        screenOnProbe = null
+        runCatching { unregisterReceiver(receiver) }
+    }
+
     private fun stopPathHealthWatch() {
+        unregisterScreenOnProbe()
         pathHealth.stopContinuous()
         // A session that is gone has no reading: Home shows `—`, never the last
         // good ms. Clearing here, not in the traffic monitor, keeps a shade
