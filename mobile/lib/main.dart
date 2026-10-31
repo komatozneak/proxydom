@@ -4,7 +4,6 @@ import 'dart:io' as io;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:rive/rive.dart';
 
 import 'app.dart';
 import 'core/config.dart';
@@ -38,12 +37,6 @@ void main() async {
     // Persist is best-effort; in-memory ring still feeds the log screen.
   }
   AppLogBuffer.instance.debug('app.boot t0 ms=${boot.elapsedMilliseconds}');
-
-  final riveSw = Stopwatch()..start();
-  await RiveNative.init();
-  AppLogBuffer.instance.debug(
-    'app.boot rive.init_ms=${riveSw.elapsedMilliseconds}',
-  );
 
   // Android 17: INTERNET grant (iOS no-op). Do not await discovery here —
   // LaunchScreen stays white until runApp; 8s Dio probes used to block first frame.

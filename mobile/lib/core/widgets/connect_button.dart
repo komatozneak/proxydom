@@ -8,13 +8,12 @@ import '../theme.dart';
 /// ============================================================================
 /// PROXY DOM CONNECT BUTTON — Signal Nest (CustomPainter)
 /// ============================================================================
-/// Real motion (not PNG / not broken Rive timeline swap):
+/// Real motion, painted in code (no animation runtime):
 ///   1. Idle — muted nest, soft slow pulse
 ///   2. Tap — house squash, then arcs emit 1→2→3
 ///   3. Connected — all arcs on, calm faster pulse
 ///
-/// Failure-only fallback when [SignalNestHero] cannot load `.riv`.
-/// Primary path is Rive (`assets/rive/signal_nest_connect.riv`).
+/// [SignalNestHero] draws the home screen's nest with the same painter.
 /// ============================================================================
 
 enum TreeState { disconnected, connecting, connected, error }

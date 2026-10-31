@@ -24,7 +24,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # rive_native 0.1.x needs SemanticsRole / isRequired (post-3.29).
+  # Same toolchain in every workflow, so a PR builds what a release builds.
   FLUTTER_VERSION: "3.35.1"
   JAVA_VERSION: "17"
 

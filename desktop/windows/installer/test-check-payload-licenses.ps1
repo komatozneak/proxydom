@@ -17,7 +17,7 @@ function New-Binary([string]$Path, [string]$Body = "") {
 function New-CleanPayload([string]$Name) {
     $dir = Join-Path $work $Name
     foreach ($exe in @("ProxyDomBroker.exe", "ProxyDomCtl.exe", "proxy_dom.exe",
-                       "flutter_windows.dll", "rive_native.dll", "wintun.dll")) {
+                       "flutter_windows.dll", "share_plus_plugin.dll", "wintun.dll")) {
         New-Binary (Join-Path $dir $exe)
     }
     $aot = Join-Path $dir "data/app.so"
