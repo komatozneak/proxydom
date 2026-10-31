@@ -13,8 +13,8 @@ void main() {
     expect(locationFlagKey('🇮🇳'), 'in');
     expect(locationFlagKey('🇳🇱'), 'nl');
     expect(locationFlagKey('🇩🇪'), 'de');
-    expect(locationFlagKey('🎮'), 'gaming');
-    expect(locationFlagKey('👑'), 'youtube');
+    expect(locationFlagKey('🎮'), 'cloud');
+    expect(locationFlagKey('👑'), 'media');
     expect(locationFlagKey('🌐'), 'lv');
   });
 
@@ -37,7 +37,7 @@ void main() {
     expect(find.text('🇺🇸'), findsNothing);
   });
 
-  testWidgets('YouTube and gaming tiles are colored icons, not SVG',
+  testWidgets('media and cloud category tiles are colored icons, not SVG',
       (tester) async {
     await tester.pumpWidget(
       MaterialApp(

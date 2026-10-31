@@ -125,6 +125,23 @@ run in ` + "`mobile/android/hysteria-bind`" + `:
 			g.users = append(g.users, "`"+e.name+"/"+f.name+"`")
 		}
 	}
+	hasMPL := false
+	for _, e := range entries {
+		for _, class := range e.classes {
+			if class == "MPL-2.0" {
+				hasMPL = true
+			}
+		}
+	}
+	if hasMPL {
+		b.WriteString(`
+## MPL-2.0 components
+
+Modules marked MPL-2.0 are used unmodified. The source of each such module is
+available from its upstream repository at the version pinned in ` + "`go.mod`" + `.
+MPL-2.0 applies to those files only; it does not cover Proxy Dom's own source.
+`)
+	}
 	b.WriteString("\n## License texts\n")
 	for _, g := range groups {
 		fmt.Fprintf(&b, "\n### %s\n\n", g.users[0])

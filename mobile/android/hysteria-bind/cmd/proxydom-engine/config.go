@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/komatozneak/proxydom/hy2bind"
+	"proxydom/hy2bind"
 )
 
 // engineConfig is the document the Windows broker writes. It is not a

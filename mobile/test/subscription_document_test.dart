@@ -34,7 +34,7 @@ void main() {
     final samples = [
       'happ://add/$https',
       'proxydom://add/$https',
-      'teremok://import?url=https%3A%2F%2Fsub.example.org%2Fexport.txt',
+      'proxydom://import?url=https%3A%2F%2Fsub.example.org%2Fexport.txt',
       'happ://sub/$encoded',
     ];
     for (final raw in samples) {
@@ -42,7 +42,7 @@ void main() {
     }
     expect(
       subscriptionDocumentTarget(
-        'teremok://add/http://95.182.81.27:8080/sub.txt',
+        'proxydom://add/http://95.182.81.27:8080/sub.txt',
       )?.url,
       'http://95.182.81.27:8080/sub.txt',
     );

@@ -30,7 +30,7 @@ class AppL10nEn extends AppL10n {
   String get homeTitle => 'Proxy Dom';
 
   @override
-  String get homeVpnHint => 'VPN UI — comes in step 9+';
+  String get homeVpnHint => 'Tunnel status — comes in step 9+';
 
   @override
   String get homeDisconnected => 'Not connected';
@@ -128,56 +128,56 @@ class AppL10nEn extends AppL10n {
   }
 
   @override
-  String get homeNoVpnRow => 'Allowlists';
+  String get homeNoVpnRow => 'Routing';
 
   @override
-  String get settingsNoVpn => 'Allowlists';
+  String get settingsNoVpn => 'Routing';
 
   @override
-  String get settingsNoVpnHint => 'Apps and sites that go around';
+  String get settingsNoVpnHint => 'Split-tunnel rules for apps and sites';
 
   @override
   String get modesTitle => 'Mode';
 
   @override
-  String get modesSubtitle => 'How VPN works';
+  String get modesSubtitle => 'How the tunnel works';
 
   @override
   String get modeSmartTitle => 'Smart mode';
 
   @override
   String get modeSmartBody =>
-      'Russian sites — direct, foreign sites — through VPN.';
+      'Russian corporate resources stay direct; everything else goes through the selected node.';
 
   @override
   String get modeSmartBadge => 'AUTO';
 
   @override
-  String get modeFullTitle => 'Full VPN';
+  String get modeFullTitle => 'Full tunnel';
 
   @override
   String get modeFullBody =>
-      'All traffic goes through VPN. Simple and reliable.';
+      'All traffic goes through the selected node. Simple and predictable.';
 
   @override
   String get modeSitesTitle => 'By site';
 
   @override
   String get modeSitesBody =>
-      'Only selected sites go through VPN. Everything else is direct.';
+      'Only selected sites go through the tunnel. Everything else is direct.';
 
   @override
-  String get modesVpnOffTitle => 'VPN is off';
+  String get modesVpnOffTitle => 'Tunnel is off';
 
   @override
-  String get modesVpnOffBody => 'Connect VPN so modes can take effect';
+  String get modesVpnOffBody => 'Connect the tunnel so modes can take effect';
 
   @override
-  String get modesConfirmFullTitle => 'Switch to Full VPN mode?';
+  String get modesConfirmFullTitle => 'Switch to Full tunnel mode?';
 
   @override
   String get modesConfirmFullBody =>
-      'In this mode all traffic goes through VPN. Russian services — Ozon, Wildberries, banks, Gosuslugi… may stop opening.\n\nTo keep them direct — use Smart mode.';
+      'In this mode all traffic goes through the selected node. Internal services and Russian resources may become slower.\n\nTo keep them direct — use Smart mode.';
 
   @override
   String get modesConfirmFullCancel => 'Don\'t switch';
@@ -189,21 +189,17 @@ class AppL10nEn extends AppL10n {
   String get modesSitesSectionSmart => 'Also direct';
 
   @override
-  String get modesSitesSectionSites => 'Sites through VPN';
+  String get modesSitesSectionSites => 'Sites through the tunnel';
 
   @override
   String get modesSitesCustomSection => 'Your sites';
 
   @override
-  String get modesSitesCustomHint => 'e.g. twitch.tv';
+  String get modesSitesCustomHint => 'gw.company-net.ru';
 
   @override
   String get modesSitesAllowlistHint =>
-      'Only selected sites go through VPN — everything else goes direct at full speed.';
-
-  @override
-  String get modesSitesMetaNote =>
-      'Instagram and Facebook belong to Meta, recognized in Russia as an extremist organization and banned in the Russian Federation.';
+      'Only selected sites go through the tunnel — everything else goes direct at full speed.';
 
   @override
   String get modesLocationTitle => 'Location';
@@ -212,7 +208,7 @@ class AppL10nEn extends AppL10n {
   String get modesLocationHint => 'Server and country';
 
   @override
-  String get modesPendingTitle => 'Reconnect VPN required';
+  String get modesPendingTitle => 'Tunnel restart required';
 
   @override
   String get modesPendingBody => 'Routing changes apply after you reconnect.';
@@ -221,7 +217,7 @@ class AppL10nEn extends AppL10n {
   String get modesReconnect => 'Reconnect';
 
   @override
-  String get modesReconnectingTitle => 'Reconnecting VPN…';
+  String get modesReconnectingTitle => 'Reconnecting the tunnel…';
 
   @override
   String get modesReconnectingBody => 'Applying routing changes';
@@ -292,15 +288,15 @@ class AppL10nEn extends AppL10n {
   }
 
   @override
-  String get homeVpnConflictTitle => 'Another VPN is blocking';
+  String get homeVpnConflictTitle => 'Another tunnel is blocking';
 
   @override
   String get homeVpnConflictHint =>
-      'Turn off the other VPN in Android settings, then connect again.';
+      'Turn off the other tunnel in Android settings, then connect again.';
 
   @override
   String get homeVpnConflictHintIos =>
-      'Turn off the other VPN in Settings → VPN.';
+      'Turn off the other tunnel in Settings → VPN.';
 
   @override
   String homeVpnConflictHintNamed(String app) {
@@ -314,11 +310,11 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get homeVpnPermissionHint =>
-      'Allow the VPN in the Android system prompt, then tap connect again.';
+      'Allow the tunnel in the Android system prompt, then tap connect again.';
 
   @override
   String get homeVpnPermissionHintIos =>
-      'Allow VPN in the system prompt, then connect again.';
+      'Allow the tunnel in the system prompt, then connect again.';
 
   @override
   String get homeConfigErrorFriendly =>
@@ -338,53 +334,10 @@ class AppL10nEn extends AppL10n {
   String get settingsSectionApp => 'Application';
 
   @override
-  String get settingsSubscription => 'Access';
-
-  @override
-  String get settingsSubscriptionActive => 'Active';
-
-  @override
   String get settingsProBadge => 'PRO';
 
   @override
   String get settingsActiveBadge => 'Active';
-
-  @override
-  String get settingsAccessEarlySubtitle => 'Access is by invite.';
-
-  @override
-  String get settingsAccessBetaSubtitle =>
-      'Invite access · Free limits lifted.';
-
-  @override
-  String get settingsAccessNoneTitle => 'No access';
-
-  @override
-  String get settingsAccessNoneSubtitle => 'An invite code is required.';
-
-  @override
-  String get settingsAccessFreeTitle => 'Free';
-
-  @override
-  String settingsAccessActiveUntil(String date) {
-    return 'Valid until $date.';
-  }
-
-  @override
-  String get settingsAccessCancelledSubtitle => 'Auto-renewal is off.';
-
-  @override
-  String settingsSubscriptionActiveUntil(String date) {
-    return 'Active until $date';
-  }
-
-  @override
-  String settingsSubscriptionTrialUntil(String date) {
-    return 'Trial until $date';
-  }
-
-  @override
-  String get settingsSubscriptionLoadError => 'Couldn’t load status';
 
   @override
   String get settingsServerRegion => 'Server region';
@@ -397,15 +350,15 @@ class AppL10nEn extends AppL10n {
       'Only VLESS + Reality is available for now';
 
   @override
-  String get settingsKillSwitchOpenVpn => 'Open VPN settings';
+  String get settingsKillSwitchOpenVpn => 'Open tunnel settings';
 
   @override
   String get settingsKillSwitchOpenFailed =>
-      'Couldn\'t open VPN settings. Open Settings → Network & internet → VPN.';
+      'Couldn\'t open tunnel settings. Open Settings → Network & internet → VPN.';
 
   @override
   String get settingsKillSwitchOpenFailedIos =>
-      'Couldn\'t open VPN settings. Open Settings → VPN.';
+      'Couldn\'t open tunnel settings. Open Settings → VPN.';
 
   @override
   String get settingsDevices => 'Devices';
@@ -455,7 +408,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get devicesEmpty =>
-      'No devices yet — connect VPN to register this one.';
+      'No devices yet — connect the tunnel to register this one.';
 
   @override
   String get devicesLoadError => 'Could not load devices';
@@ -495,7 +448,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get devicesRevokeBody =>
-      'This device\'s VPN key will stop working. Other devices are unaffected.';
+      'This device\'s tunnel key will stop working. Other devices are unaffected.';
 
   @override
   String get devicesRevokeConfirm => 'Revoke';
@@ -566,7 +519,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get splitTunnelBundledInfoBody =>
-      'Listed sites use your usual connection, not the protected one. Everything else still goes through Proxy Dom.\n\nOn iPhone you cannot take a whole app out of the VPN — only a website by address. Safari usually follows the list. A bank or marketplace app may stay in the VPN.\n\nBig services use many servers. Some pages or video may still go through the VPN with the switch on. If a site should stay protected, turn it off here.\n\nTap Reconnect after you change the list.';
+      'Listed sites use your usual connection, not the protected one. Everything else still goes through Proxy Dom.\n\nOn iPhone you cannot take a whole app out of the tunnel — only a website by address. Safari usually follows the list. A bank or marketplace app may stay in the tunnel.\n\nBig services use many servers. Some pages or video may still go through the tunnel with the switch on. If a site should stay protected, turn it off here.\n\nTap Reconnect after you change the list.';
 
   @override
   String get splitTunnelBundledInfoClose => 'Got it';
@@ -593,7 +546,7 @@ class AppL10nEn extends AppL10n {
   String get splitTunnelDomainLabel => 'Site address';
 
   @override
-  String get splitTunnelDomainHint => 'example.com';
+  String get splitTunnelDomainHint => 'gw.company-net.ru';
 
   @override
   String get splitTunnelSave => 'Add';
@@ -628,10 +581,11 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get splitTunnelEmptyBody =>
-      'Add an exact hostname — only that address skips the VPN, not its subdomains.';
+      'Add an exact hostname — only that address skips the tunnel, not its subdomains.';
 
   @override
-  String get splitTunnelInvalidDomain => 'Enter an address like example.com';
+  String get splitTunnelInvalidDomain =>
+      'Enter an address like gw.company-net.ru';
 
   @override
   String get splitTunnelDuplicateDomain =>
@@ -660,7 +614,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get splitTunnelAppsLockdownWarning =>
-      'Android “Block connections without VPN” is on. Apps in this list may have no internet until you turn that off or reconnect them through the VPN.';
+      'Android lockdown mode is on. Apps in this list may have no internet until you turn it off or return them to the tunnel.';
 
   @override
   String get splitTunnelGeoHy2Pending =>
@@ -695,7 +649,7 @@ class AppL10nEn extends AppL10n {
       'Licenses of the engine and the libraries it links';
 
   @override
-  String get licensesTitle => 'Licenses';
+  String get licensesTitle => 'Open Source Notices';
 
   @override
   String get licensesSearch => 'Search packages';
@@ -846,7 +800,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get settingsVpnNotificationHint =>
-      'Card in the shade with Disconnect. Off hides the card; VPN stays on.';
+      'Card in the shade with Disconnect. Off hides the card; the tunnel stays on.';
 
   @override
   String get settingsQsTileTitle => 'Quick Settings tile';
@@ -961,10 +915,10 @@ class AppL10nEn extends AppL10n {
   String get regionSectionFree => 'Free';
 
   @override
-  String get regionSectionEurope => 'Latvia';
+  String get regionSectionEurope => 'Moscow';
 
   @override
-  String get regionSectionUsa => 'USA';
+  String get regionSectionUsa => 'St Petersburg';
 
   @override
   String get regionComingSoon => 'Coming soon';
@@ -1006,7 +960,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get regionLoadErrorAbort =>
-      'Cannot reach API — turn off Always-on VPN (and “Block without VPN”), then reopen the region list';
+      'Cannot reach API — turn off the system Always-on mode (and lockdown), then reopen the region list';
 
   @override
   String get regionCachedHint =>
@@ -1054,7 +1008,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get logoutConfirmMessage =>
-      'Your VPN connection will be closed. Restore with your code or register again next time.';
+      'Your tunnel connection will be closed. Restore with your code or register again next time.';
 
   @override
   String get logoutWarning => 'Logout completed with warnings';
@@ -1119,11 +1073,11 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get onboardingConnectBody =>
-      'Tap Connect on Home. Android will ask for VPN permission once — that’s normal.';
+      'Tap Connect on Home. Android will ask for tunnel permission once — that’s normal.';
 
   @override
   String get onboardingConnectBodyIos =>
-      'Tap Connect on Home. iPhone will ask for VPN permission once — that’s normal.';
+      'Tap Connect on Home. iPhone will ask for tunnel permission once — that’s normal.';
 
   @override
   String get onboardingRegionTitle => 'Region';
@@ -1147,13 +1101,13 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get betaGateErrorTimeout =>
-      'The server did not respond. If VPN is on, turn it off and retry.';
+      'The server did not respond. If the tunnel is on, turn it off and retry.';
 
   @override
   String get betaGateErrorUnauthorized => 'Session expired. Try again.';
 
   @override
-  String get betaGateDisconnectVpnRetry => 'Disconnect VPN and retry';
+  String get betaGateDisconnectVpnRetry => 'Disconnect the tunnel and retry';
 
   @override
   String get betaGateContinueAnyway => 'Continue anyway';
@@ -1169,18 +1123,6 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get settingsSupport => 'Support';
-
-  @override
-  String get lockedPlan1m => '1 month';
-
-  @override
-  String get lockedPlan3m => '3 months';
-
-  @override
-  String get lockedPlan6m => '6 months';
-
-  @override
-  String get lockedPlan12m => '12 months';
 
   @override
   String lockedSavePercent(int percent) {
@@ -1221,21 +1163,6 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get restoreHeadline => 'Enter recovery code';
-
-  @override
-  String get restorePaymentLabel => 'Payment ID';
-
-  @override
-  String get restorePaymentHint => 'UUID from the payment receipt';
-
-  @override
-  String get restorePaymentEmpty => 'Enter the payment ID';
-
-  @override
-  String get restorePaymentNotFound => 'Payment not found. Check the ID.';
-
-  @override
-  String get restorePaymentNotConfirmed => 'This payment is not confirmed yet.';
 
   @override
   String get restoreCodeLabel => 'Recovery code';
@@ -1409,21 +1336,21 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get vpnDisclosureLead =>
-      'The app starts a tunnel for the selected line. Android will ask for VPN permission once.';
+      'The app starts a tunnel for the selected line. Android will ask for tunnel permission once.';
 
   @override
   String get vpnDisclosureVpnTitle => 'What the app does';
 
   @override
   String get vpnDisclosureVpnBody =>
-      'After you agree, the app brings up a local tunnel for the selected line. Traffic goes to the server in that line. Android asks for VPN permission once.';
+      'After you agree, the app brings up a local tunnel for the selected line. Traffic goes to the server in that line. Android asks for tunnel permission once.';
 
   @override
   String get vpnDisclosureVpnTitleIos => 'What the app does';
 
   @override
   String get vpnDisclosureVpnBodyIos =>
-      'After you agree, the app brings up a local tunnel for the selected line. Traffic goes to the server in that line. iPhone asks for VPN permission once.';
+      'After you agree, the app brings up a local tunnel for the selected line. Traffic goes to the server in that line. iPhone asks for tunnel permission once.';
 
   @override
   String get vpnDisclosureDataTitle => 'What stays on the phone';
@@ -1540,7 +1467,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get freeOnboardBody =>
-      'An address or a key becomes a profile. Its servers stay in one list.';
+      'An address or a key becomes a profile. Its nodes stay in one list: Moscow (Primary), St Petersburg (Backup), Novosibirsk (Low ping).';
 
   @override
   String get freeOnboardAddTitle => 'Pick a server';
@@ -1561,7 +1488,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get pcOnboardBody =>
-      'Paste an access key or a document link. The app will show the servers it contains.';
+      'Paste an access key or a document link. The app will show the nodes it contains, for example gw.company-net.ru.';
 
   @override
   String get pcOnboardPrivacy =>
@@ -1678,7 +1605,8 @@ class AppL10nEn extends AppL10n {
   String get freeStepFound => 'Found';
 
   @override
-  String get freeFoundEmpty => 'Servers from the link will appear here.';
+  String get freeFoundEmpty =>
+      'Nodes from the link will appear here — for example Moscow (Primary) or St Petersburg (Backup).';
 
   @override
   String get freeFieldEmpty =>

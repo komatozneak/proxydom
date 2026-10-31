@@ -50,16 +50,16 @@ class VpnController {
   ///
   /// Games reach their servers over UDP to bare addresses that change, so no
   /// domain rule can keep them off the tunnel and no IP list survives a patch.
-  /// Windows therefore bypasses UDP by protocol, and the force-proxy hosts are
-  /// sent separately so their QUIC does not leave through that same rule.
+  /// Windows therefore bypasses UDP by protocol. Force-proxy rules are not
+  /// hardcoded: a subscription may add them at sync time.
   Future<bool> startWindowsShare(String uri) async {
-    final domains = stripForceProxySuffixes(
+    final domains = normalizeRouteSuffixes(
       await SplitTunnelPrefs.enabledDomainSuffixes(),
     );
     final result = await WindowsTunnel.instance.connect(
       uri,
       directDomains: domains,
-      forceProxyDomains: kSmartProxyForceSuffixes,
+      forceProxyDomains: const <String>[],
       udpDirect: true,
     );
     windowsNotice = result.notice;
@@ -84,17 +84,17 @@ class VpnController {
         : ((await SplitTunnelPrefs.loadDisallowedPackages()).toList()..sort());
     final directSuffixes = _isIosSplit
         ? const <String>[]
-        : stripForceProxySuffixes(
+        : normalizeRouteSuffixes(
             await SplitTunnelPrefs.enabledDomainSuffixes(),
           );
     final iosCustomHosts = !_isIosSplit
         ? const <String>[]
-        : stripForceProxySuffixes(
+        : normalizeRouteSuffixes(
             await SplitTunnelPrefs.enabledIosCustomResolutionHosts(),
           );
     final iosCatalogHosts = !_isIosSplit
         ? const <String>[]
-        : stripForceProxySuffixes(
+        : normalizeRouteSuffixes(
             await SplitTunnelPrefs.enabledIosCatalogResolutionHosts(),
           );
     return jsonEncode({
@@ -687,7 +687,7 @@ class VpnControllerException implements Exception {
   final String message;
 
   @override
-  String toString() => 'VpnControllerException: $message';
+  String toString() => 'Tunnel controller: $message';
 }
 
 /// Snapshot from Android `getVpnConflict` (foreign Always-on / live VPN).
@@ -714,7 +714,7 @@ final class VpnConflictInfo {
     if (label != null && label.isNotEmpty) return label;
     final pkg = packageName?.trim();
     if (pkg != null && pkg.isNotEmpty) return pkg;
-    return 'VPN';
+    return 'Tunnel';
   }
 
   factory VpnConflictInfo.fromNative(dynamic raw) {

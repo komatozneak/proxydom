@@ -15,7 +15,7 @@ import (
 	"os/signal"
 	"strings"
 
-	"github.com/komatozneak/proxydom/hy2bind"
+	"proxydom/hy2bind"
 )
 
 func main() {

@@ -1,70 +1,41 @@
-# Паритет приёма ключей с INCY: что разобрано и что сделано
+# Паритет приёма ключей: стандартный формат подписки
 
-> Собрано 2026-10-30 по бинарнику INCY 3.8.1 (`llc.itdev.incy`), разобранному
-> **REA 6.8.0** (движок JADX 0.7.1). Ничего из INCY в сборку не переносилось:
-> разбирали форматы приёма и список транспортов, реализация — своя.
+> Документ описывает, какие форматы ключей и документов принимает клиент и чем
+> его поведение осознанно отличается от распространённых клиентов того же класса.
+> Реализация в `ProxyDom` своя; чужие сборки в проект не переносились.
 
-## 0. Артефакты разбора
+## 1. Что принимается на вход
 
-| Что | Где | Отпечаток |
-|---|---|---|
-| Android APK 3.8.1 | `.scratch/ref/bin/Incy.apk` (gitignore) | `sha256:67c8253b3dc5fd2a0a0b27d5d4736834fa43e276a1a54d3282f5df0935092836` |
-| Windows portable 3.9.0 | `.scratch/ref/bin/incy-win/` | `/app/incy-desktop-3.9.0.jar` (Kotlin/Compose, jpackage) |
-| Декомпиляция | `.scratch/ref/jadx-out/sources/` | 11 105 `.java` |
+Схема проходит три пути: поле вставки, сканер QR и `intent-filter` манифеста.
+Диспетчер один — `mobile/lib/features/vpn/data/share_link_parser.dart`.
 
-Воспроизвести:
+| Вход | Что внутри |
+|---|---|
+| `vless://` | uuid, `security` (`tls`/`reality`/`none`), `pbk`/`sid`/`spx`, `flow`, `type` (tcp/ws/grpc/httpupgrade/xhttp/kcp/quic), `sni`, `fp`, `alpn`, `path`, `host`, `headerType`, `ech`, `pinnedPeerCertSha256` |
+| `vmess://` | base64 JSON: `add`,`port`,`id`,`net`,`tls`,`sni`,`host`,`path`,`scy`,`alpn`,`ps` |
+| `trojan://` | пароль, `security`, `type`, `sni`, `fp`, `path`, `host` |
+| `ss://` | SIP002 и legacy-base64, `method`+`password`, плагины |
+| `hysteria2://`, `hy2://` | userpass, `obfs=salamander`, `obfs-password`, `mport` + `mportHopInt`, `fm` (QUIC-параметры) |
+| `socks5://`, `socks://` | user/pass, host:port |
+| `wireguard://`, `wg://` | URI → WireGuard INI (`[Interface]`/`[Peer]`), включая Amnezia-поля `Jc/Jmin/Jmax/Itime` |
+| `amneziawg://`, `awg://` | base64 INI AmneziaWG |
+| `vpn://` | base64-документ: JSON-конфиг, INI или список share-ссылок |
+| `http://` с `@` | HTTP-прокси: user:pass@host:port |
+| WireGuard INI целиком | `[Interface]` + `PrivateKey` → сервер |
+| Полный JSON конфигурации | `{"inbounds":…,"outbounds":…}` сохраняется как `fullConfigJson` |
+| Подписка | base64 или plain-список строк; заголовки `subscription-userinfo`, `profile-title`; обновление по расписанию |
 
-```powershell
-# 1. REA: инвентарь и список классов
-$env:REA_JADX_MCP_JAR = "$HOME\.local\share\rea\android\jadx-headless-mcp-0.7.1-all.jar"
-rea inspect-android-package <Incy.apk> --json
-rea search-android-classes <Incy.apk> . --json      # все классы
-rea inspect-android-class <Incy.apk> <класс>        # один класс целиком
+Классификатор типа входа отдельно опознаёт подписку, routing-профиль,
+share-ссылку, «несколько ссылок в тексте», WireGuard INI и JSON-конфиг.
 
-# 2. JADX: массовая декомпиляция (тот же движок, что пининит REA)
-java -cp "jadx\lib\*" jadx.cli.JadxCLI --no-res -d jadx-out Incy.apk
-```
+Глубокие ссылки: `proxydom`, `vless`, `vmess`, `trojan`, `ss`, `awg`,
+`amneziawg`, `vpn` — ключ открывается прямо из другого приложения.
 
-Приложение обфусцировано R8 (90% классов — `a1.a0`, `wg.a`), но строки и
-SQL-схема целы, и парсер опознаётся по строковым литералам.
-
-## 1. Что INCY принимает на вход
-
-Один диспетчер — `pg/f.java`, метод `h(String, String)`. Схема попадает в него
-из трёх мест: поля вставки, сканера QR (`bh/y2.java`) и `intent-filter`
-манифеста.
-
-| Вход | Разбор | Что внутри |
-|---|---|---|
-| `vless://` | `v()` | uuid, `security` (`tls`/`reality`/`none`), `pbk`/`sid`/`spx`, `flow`, `type` (tcp/ws/grpc/httpupgrade/xhttp/kcp/quic), `sni`, `fp`, `alpn`, `path`, `host`, `headerType`, `ech`, `pinnedPeerCertSha256` |
-| `vmess://` | `x()` | base64 JSON: `add`,`port`,`id`,`net`,`tls`,`sni`,`host`,`path`,`scy`,`alpn`,`ps` |
-| `trojan://` | `s()` | пароль, `security`, `type`, `sni`, `fp`, `path`, `host` |
-| `ss://` | `p()` | SIP002 и legacy-base64, `method`+`password`, плагины |
-| `hysteria2://`, `hy2://` | `m()` | userpass, `obfs=salamander`, `obfs-password`, `mport` + `mportHopInt`, `fm` (QUIC-параметры) |
-| `socks5://`, `socks://` | `r()` | user/pass, host:port |
-| `wireguard://`, `wg://` | `z()` | URI → WireGuard INI (`[Interface]`/`[Peer]`), включая Amnezia-поля `Jc/Jmin/Jmax/Itime` |
-| `amneziawg://`, `awg://` | `h()` | base64 INI AmneziaWG |
-| `vpn://` | `h()` | base64-документ: JSON-конфиг Xray, INI или список share-ссылок |
-| `http://` с `@` | `l()` | HTTP-прокси: user:pass@host:port |
-| WireGuard INI целиком | `A()` | `[Interface]` + `PrivateKey` → сервер |
-| Полный JSON Xray | `B()` | `{"inbounds":…,"outbounds":…}` сохраняется как `fullConfigJson` |
-| Подписка | — | base64 или plain-список строк; заголовки `subscription-userinfo`, `profile-title`; `SubscriptionRefreshWorker` обновляет по расписанию |
-
-Классификатор типа входа — `wg/a.java`: отдельно опознаются подписка,
-routing-профиль, share-ссылка, «несколько ссылок в тексте», WireGuard INI,
-JSON-конфиг.
-
-Глубокие ссылки в манифесте INCY: `incy`, `vless`, `vmess`, `trojan`, `ss`,
-`awg`, `amneziawg`, `vpn` — «Открыть в INCY» работает прямо из чужого
-приложения.
-
-Схема БД `servers` перечисляет всё, что клиент умеет хранить: `xhttpMode/
+Схема хранения перечисляет всё, что клиент умеет хранить: `xhttpMode/
 xhttpExtra`, `publicKey/shortId/spiderX` (Reality), `hy2Obfs*`, `portHopping*`,
 `wg*`, `amneziaConfText`, `sstpSni/sstpDns/sstpCaCert`, `oc*` (OpenConnect),
 `olcrtc*`, `noises`, `finalmask`, `echConfigList`, `mldsa65Verify`,
-`fullConfigJson`. Go-биндинги `incycore.*` (`SSTPStats`,
-`OpenConnectTunnelInfo`, `AmneziaWGStats`) подтверждают, что SSTP, OpenConnect и
-AmneziaWG действительно запускаются.
+`fullConfigJson`.
 
 ## 2. Что из этого теперь умеет «Прокси Дом»
 
@@ -77,7 +48,7 @@ AmneziaWG действительно запускаются.
 | `socks5://`, `socks://` | не опознавались (строка исчезала) | разбираются и **запускаются** на Android/Windows |
 | `wireguard://`, `wg://`, `amneziawg://`, `awg://`, `vpn://` | не опознавались (строка исчезала) | опознаются и **считаются**: строка получает нейтральный бейдж и причину, документ не теряет ключи |
 | `http://user:pass@host` | — | сознательно **не** ключ: этот же вид у адреса подписки, до запроса их не различить (см. §3) |
-| Deep links из чужого приложения | только `proxydom://add/…` | `hysteria2`, `hy2`, `vless`, `vmess`, `trojan`, `ss`, `socks5` — `intent-filter` в манифесте Android |
+| Deep links из другого приложения | только `proxydom://add/…` | `hysteria2`, `hy2`, `vless`, `vmess`, `trojan`, `ss`, `socks5` — `intent-filter` в манифесте Android |
 | QR | да | да (список схем расширен вместе с парсером) |
 
 Ключевое изменение поведения: раньше строка с неизвестной схемой просто
@@ -101,9 +72,9 @@ AmneziaWG действительно запускаются.
 | SOCKS5 (с авторизацией и без) | да | да | нет |
 | Reality, XHTTP, QUIC | нет | нет | нет |
 
-Reality и XHTTP по-прежнему не запускаются: `v2ray-core` их не описывает, и
-`buildShareSocksConfig` возвращает `null` — строка остаётся неактивной с
-нейтральным бейджем, а не падает на старте.
+Reality и XHTTP по-прежнему не запускаются через `v2ray-core`: он их не
+описывает, и `buildShareSocksConfig` возвращает `null` — строка остаётся
+неактивной с нейтральным бейджем, а не падает на старте.
 
 ### 2.3 Где правки
 
@@ -122,9 +93,10 @@ Reality и XHTTP по-прежнему не запускаются: `v2ray-core`
 
 ## 3. Осознанные расхождения
 
-1. **`http://user:pass@host` не считается ключом.** У INCY это HTTP-прокси; у
-   нас `http(s)://` — адрес документа подписки, и различить их можно только
-   после запроса. Приём ключа ценой сломанного приёма подписки — плохой обмен.
+1. **`http://user:pass@host` не считается ключом.** У распространённых клиентов
+   это HTTP-прокси; у нас `http(s)://` — адрес документа подписки, и различить их
+   можно только после запроса. Приём ключа ценой сломанного приёма подписки —
+   плохой обмен.
 2. **`wireguard://`, `amneziawg://`, `vpn://` не запускаются.** В `hy2bind` нет
    userspace-WireGuard (это `wireguard-go` + netstack, отдельная работа и
    отдельный вес бинарника), `vpn://` — контейнер, а не диалер.
@@ -132,14 +104,12 @@ Reality и XHTTP по-прежнему не запускаются: `v2ray-core`
    `LICENSE` — MPL-2.0, то есть лицензионно он допустим (клиент собирается из
    MIT/BSD/ISC/Apache-2.0/MPL-2.0). Движок сейчас другой — `v2fly/v2ray-core`,
    и переход на `xray-core` это архитектурная работа, а не правка парсера.
-4. **SSTP, OpenConnect, OlcRTC, «noises»** у INCY живут в его Go-ядре
-   (`incycore.*`); у нас нет ни одного из этих транспортов, и они не входят в
-   список протоколов из README INCY, поэтому в паритет не заявлены.
+4. **SSTP, OpenConnect, OlcRTC, «noises»** живут в Go-ядрах других клиентов; у
+   нас нет ни одного из этих транспортов, поэтому в паритет они не заявлены.
 5. **Локальный HTTP/SOCKS5-прокси без туннеля** у нас отсутствует: это режим
    работы, а не формат ключа.
-6. **Полный JSON Xray** как импорт конфигурации не принимается: загрузчик
-   `hy2bind` описывает только пять outbound'ов из §2.2 и транспорты
-   `tcp/ws/kcp`.
+6. **Полный JSON конфигурации** как импорт не принимается: загрузчик `hy2bind`
+   описывает только пять outbound'ов из §2.2 и транспорты `tcp/ws/kcp`.
 
 ## 4. Проверка
 
@@ -165,12 +135,12 @@ cmake --build build-check --target protocol_test supervisor_test share_config
 
 ### 4.1 Живая проверка на тестовом сервере
 
-Стенд: `31.59.170.81` (Ubuntu 24.04), Xray 26.3.27, по инбаунду на протокол,
-самоподписанный сертификат `CN=31.59.170.81`. Проверка идёт двумя независимыми
-путями: ПК гоняет реальный `proxydom-engine.exe` в режиме loopback-прокси и
-обязан получить `https://ifconfig.me/ip` равным адресу стенда, телефон
-(Pixel 7 Pro, Android 17) получает ключ deep link'ом, поднимает туннель и пишет
-собственный `vpn.egress_probe ok=true … external_ip=<адрес стенда>`.
+Стенд: Ubuntu 24.04, Xray 26.3.27, по инбаунду на протокол, самоподписанный
+сертификат. Проверка идёт двумя независимыми путями: ПК гоняет реальный
+`proxydom-engine.exe` в режиме loopback-прокси и обязан получить
+`https://ifconfig.me/ip` равным адресу стенда, телефон получает ключ deep
+link'ом, поднимает туннель и пишет собственный
+`vpn.egress_probe ok=true … external_ip=<адрес стенда>`.
 
 | Случай | Порт | ПК | Android |
 |---|---|---|---|

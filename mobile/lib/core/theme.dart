@@ -29,7 +29,6 @@ class AppBrand {
   static const Color flame = Color(0xFFFF8F00);
 
   /// YouTube play tile. Not a Unicode emoji.
-  static const Color youtubePlay = Color(0xFFFF0000);
 
   /// Accent on dark surfaces — near-white.
   static const Color accentOnDark = Color(0xFFF5F5F5);

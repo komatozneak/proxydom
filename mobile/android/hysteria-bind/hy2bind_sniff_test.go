@@ -302,6 +302,7 @@ func TestUDPGameModeChecksEveryForceName(t *testing.T) {
 
 func TestUDPPolicy(t *testing.T) {
 	t.Cleanup(clearSplitState)
+	setExtraForceSuffixes([]string{"youtube.com"})
 	setDirectSuffixes([]string{"vk.com"})
 	direct := netip.MustParseAddr("203.0.113.30")
 	forced := netip.MustParseAddr("203.0.113.31")

@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="vpn_notification_connecting">Подключение…</string>
-    <string name="vpn_notification_connected">Подключено</string>
-    <string name="vpn_notification_disconnect">Отключиться</string>
-    <string name="vpn_notification_vpn_settings">Настройки VPN</string>
+    <string name="tunnel_notification_connecting">Установка соединения…</string>
+    <string name="tunnel_notification_connected">Активен защищенный маршрут</string>
+    <string name="tunnel_notification_disconnect">Отключить</string>
+    <string name="tunnel_notification_settings">Настройки туннеля</string>
     <string name="qs_tile_label">Прокси Дом</string>
     <string name="qs_tile_subtitle_on">Вкл</string>
     <string name="qs_tile_subtitle_off">Выкл</string>

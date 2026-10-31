@@ -126,7 +126,7 @@ void main() {
     expect(_cardFlag(tester), kFlagUsa);
   });
 
-  testWidgets('Auto Connecting cycles Premium pool through gaming and YouTube',
+  testWidgets('Auto Connecting cycles category pool through cloud and media',
       (tester) async {
     await tester.pumpWidget(
       _wrap(
@@ -135,7 +135,7 @@ void main() {
           subtitle: 'Ближайшая локация',
           flagEmoji: kFlagEurope,
           selectionIsAuto: true,
-          autoPoolFlags: [kFlagEurope, kFlagUsa, kFlagGaming, 'youtube'],
+          autoPoolFlags: [kFlagEurope, kFlagUsa, kFlagCloud, 'media'],
         ),
         overrides: [
           vpnProvider.overrideWith(
@@ -152,10 +152,10 @@ void main() {
     expect(_cardFlag(tester), kFlagUsa);
     await tester.pump(kAutoFlagCycleDuration);
     await tester.pump();
-    expect(_cardFlag(tester), kFlagGaming);
+    expect(_cardFlag(tester), kFlagCloud);
     await tester.pump(kAutoFlagCycleDuration);
     await tester.pump();
-    expect(_cardFlag(tester), 'youtube');
+    expect(_cardFlag(tester), 'media');
   });
 
   testWidgets('Auto Connected keeps the winner flag and does not cycle',
@@ -165,9 +165,9 @@ void main() {
         const ServerCard(
           title: 'YouTube',
           subtitle: '',
-          flagEmoji: 'youtube',
+          flagEmoji: 'media',
           selectionIsAuto: true,
-          autoPoolFlags: [kFlagEurope, kFlagUsa, kFlagGaming, 'youtube'],
+          autoPoolFlags: [kFlagEurope, kFlagUsa, kFlagCloud, 'media'],
         ),
         overrides: [
           vpnProvider.overrideWith(
@@ -183,10 +183,10 @@ void main() {
       ),
     );
     await tester.pump();
-    expect(_cardFlag(tester), 'youtube');
+    expect(_cardFlag(tester), 'media');
 
     await tester.pump(kAutoFlagCycleDuration);
     await tester.pump();
-    expect(_cardFlag(tester), 'youtube');
+    expect(_cardFlag(tester), 'media');
   });
 }

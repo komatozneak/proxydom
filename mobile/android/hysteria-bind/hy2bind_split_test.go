@@ -28,12 +28,21 @@ func TestSuffixMatches(t *testing.T) {
 
 func TestForceProxyBlocksDirect(t *testing.T) {
 	t.Cleanup(clearSplitState)
+	setExtraForceSuffixes([]string{"youtube.com", "googlevideo.com"})
 	setDirectSuffixes([]string{"youtube.com", "vk.com"})
 	if hostMatchesDirect("youtube.com") || hostMatchesDirect("googlevideo.com") {
-		t.Fatal("YouTube must stay on Hy2")
+		t.Fatal("force-proxy domains must stay on the tunnel")
 	}
 	if !hostMatchesDirect("vk.com") {
 		t.Fatal("vk.com should be direct")
+	}
+}
+
+func TestNoBuiltInForceProxyList(t *testing.T) {
+	t.Cleanup(clearSplitState)
+	setDirectSuffixes([]string{"youtube.com"})
+	if !hostMatchesDirect("youtube.com") {
+		t.Fatal("no blocked-site list ships in the engine; a user suffix must be direct")
 	}
 }
 
@@ -82,6 +91,7 @@ func TestDNSCacheDoesNotDirectUnlisted(t *testing.T) {
 
 func TestRememberDNSFromAResponse(t *testing.T) {
 	t.Cleanup(clearSplitState)
+	setExtraForceSuffixes([]string{"googlevideo.com"})
 	setDirectSuffixes([]string{"googlevideo.com"})
 	ip := net.IPv4(142, 250, 185, 14)
 	msg := buildAResponse(ip)
@@ -97,6 +107,7 @@ func TestRememberDNSFromAResponse(t *testing.T) {
 
 func TestFilterDNSResponseCachesARecords(t *testing.T) {
 	t.Cleanup(clearSplitState)
+	setExtraForceSuffixes([]string{"googlevideo.com"})
 	setDirectSuffixes([]string{"googlevideo.com"})
 	ip := net.IPv4(142, 250, 185, 14)
 	_ = filterDNSResponse(buildAResponse(ip))
@@ -115,12 +126,13 @@ func TestStartConfigUnmarshalsSuffixes(t *testing.T) {
 	if err := json.Unmarshal([]byte(`{"direct_domain_suffixes":["VK.com","youtube.com"]}`), &cfg); err != nil {
 		t.Fatal(err)
 	}
+	setExtraForceSuffixes([]string{"youtube.com"})
 	setDirectSuffixes(cfg.DirectDomainSuffixes)
 	if !hostMatchesDirect("m.vk.com") {
 		t.Fatal("vk suffix from Start JSON")
 	}
 	if hostMatchesDirect("youtube.com") {
-		t.Fatal("youtube must stay force-proxy")
+		t.Fatal("a force_proxy_domains entry must override a direct suffix")
 	}
 }
 

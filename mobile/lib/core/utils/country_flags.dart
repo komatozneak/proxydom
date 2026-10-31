@@ -1,10 +1,10 @@
 /// Country markers providers put in front of node names.
 ///
-/// A subscription line is often named `DE DoDoVPN | Hysteria` or
-/// `🇩🇪 DoDoVPN | Hysteria`. The marker is a location, not part of the name:
+/// A subscription line is often named `DE CompanyNet | Hysteria` or
+/// `🇩🇪 CompanyNet | Hysteria`. The marker is a location, not part of the name:
 /// the list draws it as the country's flag and the rest is what the person
 /// reads. Parsing is prefix-only on purpose — `WS` in
-/// `DoDoVPN | WS | Резерв` is a transport, and reading it as Samoa would put
+/// `CompanyNet | WS | Резерв` is a transport, and reading it as Samoa would put
 /// the wrong flag on the line.
 library;
 
@@ -271,7 +271,7 @@ CountryTag? countryTagFrom(String raw) {
   String? code;
   var tookCode = false;
   // Two passes are enough for the shapes providers actually use: emoji + code
-  // or code + emoji. A second code is not taken — `DE No DoDoVPN` must not
+  // or code + emoji. A second code is not taken — `DE No CompanyNet` must not
   // lose `No` to Norway.
   for (var pass = 0; pass < 2; pass++) {
     rest = rest.trimLeft();
@@ -368,7 +368,7 @@ String? countryCodeForFlagValue(String value) =>
 ///
 /// `No lag` and `In stock` are names that happen to start with ISO codes. A
 /// provider's tag is either uppercase (`DE`, `NL`) or lowercase followed by a
-/// proper name (`de DoDoVPN`); `No` and `In` are neither.
+/// proper name (`de CompanyNet`); `No` and `In` are neither.
 bool _tagShapeAllows(String rawCode, String rest) {
   if (rawCode != rawCode.toUpperCase() && rawCode != rawCode.toLowerCase()) {
     return false;

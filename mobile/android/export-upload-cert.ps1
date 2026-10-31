@@ -13,9 +13,13 @@ foreach ($line in $lines) {
     $k, $v = $line -split "=", 2
     $cfg[$k.Trim()] = $v.Trim()
 }
-$storeFile = Join-Path $PSScriptRoot ($cfg["storeFile"] -replace "^\.\./", "")
-if (-not (Test-Path $storeFile)) {
-    $storeFile = Join-Path $PSScriptRoot "teremok-upload.jks"
+$storeCandidates = @(
+    (Join-Path (Join-Path $PSScriptRoot "app") $cfg["storeFile"]),
+    (Join-Path $PSScriptRoot $cfg["storeFile"])
+)
+$storeFile = $storeCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+if (-not $storeFile) {
+    Write-Error ("Upload keystore not found. Tried: {0}" -f ($storeCandidates -join ", "))
 }
 $out = Join-Path $PSScriptRoot "upload_certificate.pem"
 & keytool -export -rfc `

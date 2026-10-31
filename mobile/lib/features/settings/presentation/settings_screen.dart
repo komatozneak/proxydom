@@ -459,7 +459,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
           ),
           _SettingsRow(
             icon: AppIcons.info,
-            title: l.homeAbout,
+            title: l.licensesTitle,
             subtitle: l.settingsLicensesHint,
             onTap: () {
               UiLog.action('settings', 'licenses');

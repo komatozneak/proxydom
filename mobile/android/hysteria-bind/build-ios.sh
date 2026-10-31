@@ -41,7 +41,9 @@ gomobile init >/dev/null 2>&1 || true
 #
 # -trimpath for the same reason as build-aar.sh: without it gomobile's random
 # temp directory and the build machine's paths are compiled into the binary.
-gomobile bind -v -trimpath -target=ios -iosversion=15.0 -tags netgo \
+# -s -w -buildid= strip the symbol table, DWARF and the build id.
+gomobile bind -v -trimpath -ldflags="-s -w -buildid=" \
+  -target=ios -iosversion=15.0 -tags netgo \
   -o "$OUT_DIR/Hy2bind.xcframework" .
 
 echo "Wrote $OUT_DIR/Hy2bind.xcframework"

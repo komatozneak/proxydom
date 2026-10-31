@@ -5,6 +5,7 @@
   <Package
       Name="Прокси Дом"
       Manufacturer="Proxy Dom"
+      Description="Corporate proxy &amp; network tunnel configuration client"
       Version="$(var.ProductVersion)"
       UpgradeCode="7C2A1B4E-6D3F-4A91-9E2B-1F6C8A0D4E27"
       Scope="perMachine"

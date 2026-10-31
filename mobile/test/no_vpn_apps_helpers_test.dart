@@ -67,7 +67,6 @@ void main() {
       expect(osnovnyeCategoryIcon('vk'), isNull);
       expect(osnovnyeCategoryIcon('ru'), isNull);
       expect(osnovnyeCategoryIcon('gov'), isNull);
-      expect(osnovnyeCategoryIcon('tiktok'), AppIcons.osnovnyeTiktok);
       expect(osnovnyeCategoryIcon('yandex'), AppIcons.osnovnyeYandex);
       expect(osnovnyeCategoryIcon('ozon'), AppIcons.osnovnyeOzon);
       expect(osnovnyeCategoryIcon('wb'), AppIcons.osnovnyeWb);

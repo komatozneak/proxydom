@@ -59,7 +59,9 @@ go test -count=1 -run 'TestLicenseGuard$' .
 # libraries of 31033792 and 31033832 bytes with different hashes, and with it
 # two binds produced one identical 30957992-byte library. It also keeps the
 # build machine's absolute paths, and the user name in them, out of the APK.
-gomobile bind -v -trimpath -target=android -androidapi=26 -o "$OUT_AAR" .
+# -s -w drop the symbol table and DWARF; -buildid= drops the toolchain build id.
+gomobile bind -v -trimpath -ldflags="-s -w -buildid=" \
+  -target=android -androidapi=26 -o "$OUT_AAR" .
 # Relocate go.Seq and libgojni.so. A second gomobile archive on the classpath
 # (the removed libXray.aar) collided on those names, and AGP still rejects
 # the stock names via checkDebugDuplicateClasses.

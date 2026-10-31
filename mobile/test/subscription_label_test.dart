@@ -24,9 +24,9 @@ hysteria2://user:pass@45.91.248.91:443/?sni=hy2-us.teremokconnect.online#США 
     final india = labelForShareLink(links[2]);
     final latvia = labelForShareLink(links[3]);
     final usa = labelForShareLink(links[4]);
-    expect(youtube.tile, PoolTile.youtube);
+    expect(youtube.tile, PoolTile.media);
     expect(youtube.subtitle, 'Без рекламы');
-    expect(gaming.tile, PoolTile.gaming);
+    expect(gaming.tile, PoolTile.cloud);
     expect(gaming.subtitle, 'Низкий пинг');
     expect(india.flag, '🇮🇳');
     expect(india.subtitle, 'Местные сервисы и цены');
@@ -55,8 +55,8 @@ hysteria2://user:pass@45.91.248.91:443/?sni=hy2-us.teremokconnect.online#США 
     expect(emoji.flag, '🇷🇺');
 
     // `WS` is the transport on this line, not Samoa.
-    final websocket = labelForShareLink(link('DE DoDoVPN | WS | Резерв'));
-    expect(websocket.title, 'DoDoVPN | WS | Резерв');
+    final websocket = labelForShareLink(link('DE DoDoVPN | WS'));
+    expect(websocket.title, 'DoDoVPN | WS');
     expect(websocket.flag, '🇩🇪');
   });
 

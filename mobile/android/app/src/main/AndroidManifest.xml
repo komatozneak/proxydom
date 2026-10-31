@@ -5,7 +5,7 @@
          also requests it at runtime. Missing grant → SocketException errno 13. -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
-    <!-- VPN service permissions (Шаг 11) -->
+    <!-- Tunnel service permissions (Android VpnService API) -->
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
@@ -57,22 +57,12 @@
                  app instead of showing the raw Hysteria2 lines. Google verifies
                  this filter against the assetlinks.json the backend serves on
                  that same host, so the signing fingerprint in
-                 ANDROID_APP_LINK_FINGERPRINTS has to match the installed build.
-                 Verified links are handled by the SYSTEM, not by a WebView:
-                 Telegram's in-app browser still shows the document text. -->
+                 ANDROID_APP_LINK_FINGERPRINTS has to match the installed build. -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="https" android:host="sub.proxydom.su"/>
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW"/>
-                <category android:name="android.intent.category.DEFAULT"/>
-                <category android:name="android.intent.category.BROWSABLE"/>
-                <data android:scheme="teremok" android:host="add"/>
-                <data android:scheme="teremok" android:host="import"/>
-                <data android:scheme="teremok" android:host="sub"/>
             </intent-filter>
             <!-- Server keys shared from another app or tapped in a chat. Without
                  this filter the only way in is copy-paste: the OS has no handler
@@ -131,7 +121,7 @@
         <service
             android:name=".ProxyDomTileService"
             android:exported="true"
-            android:icon="@drawable/ic_qs_vpn"
+            android:icon="@drawable/ic_qs_tunnel"
             android:label="@string/qs_tile_label"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>

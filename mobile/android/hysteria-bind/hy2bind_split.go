@@ -17,28 +17,9 @@ import (
 
 var errProtect = errors.New("protect failed")
 
-// Keep in sync with mobile/lib/features/vpn/data/vpn_route_policy.dart
-// kSmartProxyForceSuffixes — TSPU / YouTube must stay on Hy2.
-var forceProxySuffixes = []string{
-	"youtube.com",
-	"youtu.be",
-	"youtube-nocookie.com",
-	"youtubekids.com",
-	"googlevideo.com",
-	"ytimg.com",
-	"ggpht.com",
-	"googleapis.com",
-	"gstatic.com",
-	"googleusercontent.com",
-	"gvt1.com",
-	"gvt2.com",
-	"gvt3.com",
-	"video.google.com",
-	"play.google.com",
-	"widevine.com",
-	"withyoutube.com",
-	"google.com",
-}
+// No built-in force-proxy list ships with the app. The default is direct for
+// the suffixes the user chose and tunnel for everything else; a subscription
+// may add `force_proxy_domains`, which setExtraForceSuffixes merges here.
 
 const (
 	dnsCacheCap   = 4096
@@ -308,11 +289,6 @@ func suffixMatches(host, suffix string) bool {
 }
 
 func isForceProxyHost(host string) bool {
-	for _, s := range forceProxySuffixes {
-		if suffixMatches(host, s) {
-			return true
-		}
-	}
 	splitMu.RLock()
 	extra := extraForce
 	splitMu.RUnlock()

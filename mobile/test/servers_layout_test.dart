@@ -134,7 +134,7 @@ NodeLine _node(String title, {bool selected = false}) {
     label: PoolServerLabel(
       title: title,
       subtitle: 'низкий пинг',
-      tile: title.contains('YouTube') ? PoolTile.youtube : PoolTile.flag,
+      tile: title.contains('YouTube') ? PoolTile.media : PoolTile.flag,
       flag: '',
     ),
     endpoint: 'eu1.proxydom.su:443',

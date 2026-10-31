@@ -21,27 +21,19 @@ void main() {
     );
   });
 
-  test('stripForceProxySuffixes drops YouTube/Google keeps VK', () {
+  test('normalizeRouteSuffixes keeps user domains', () {
     expect(
-      stripForceProxySuffixes([
+      normalizeRouteSuffixes([
         'vk.com',
-        'youtube.com',
-        'www.googlevideo.com',
+        ' YouTube.com ',
         'example.com',
-        'google.com',
+        'example.com',
       ]),
-      ['example.com', 'vk.com'],
+      ['example.com', 'vk.com', 'youtube.com'],
     );
   });
 
-  test('isSmartForceProxyHost matches suffix', () {
-    expect(isSmartForceProxyHost('youtube.com'), isTrue);
-    expect(isSmartForceProxyHost('m.youtube.com'), isTrue);
-    expect(isSmartForceProxyHost('notyoutube.com'), isFalse);
-    expect(isSmartForceProxyHost('vk.com'), isFalse);
-  });
-
-  test('buildHy2StartParamsJson ships RF defaults and strips YouTube', () async {
+  test('buildHy2StartParamsJson ships RF defaults and user domains', () async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     SharedPreferences.setMockInitialValues({});
     final defaultJson = await VpnController.instance.buildHy2StartParamsJson(
@@ -55,13 +47,12 @@ void main() {
     expect(defaultSuffixes, contains('yandex.ru'));
     expect(defaultSuffixes, contains('ozon.ru'));
     expect(defaultSuffixes, contains('wildberries.ru'));
-    expect(defaultSuffixes, isNot(contains('tiktok.com')));
     expect(defaultSuffixes, contains('yoomoney.ru'));
     expect(defaultSuffixes, contains('rustore.ru'));
 
     await SplitTunnelPrefs.setOsnovnyeEnabled('vk', true);
     await SplitTunnelPrefs.addSite(domain: 'example.com');
-    await SplitTunnelPrefs.addSite(domain: 'youtube.com');
+    await SplitTunnelPrefs.addSite(domain: 'gw.company-net.ru');
     final wired = jsonDecode(
       await VpnController.instance.buildHy2StartParamsJson(_hy2Profile()),
     ) as Map<String, dynamic>;
@@ -70,10 +61,7 @@ void main() {
     );
     expect(suffixes, contains('vk.com'));
     expect(suffixes, contains('example.com'));
-    expect(suffixes, isNot(contains('youtube.com')));
-    expect(suffixes, isNot(contains('googlevideo.com')));
-    expect(suffixes, isNot(contains('google.com')));
-    expect(suffixes, isNot(contains('tiktok.com')));
+    expect(suffixes, contains('gw.company-net.ru'));
   });
 
   test('fm timer keys ride in start params and an empty profile omits them',

@@ -1192,7 +1192,7 @@ class ProxyDomVpnService : VpnService() {
         tunInterface.set(builder.establish())
         val activeTun = tunInterface.get()
         if (activeTun == null) {
-            failStart("VPN permission denied or establish() returned null")
+            failStart("Tunnel permission denied or establish() returned null")
             return
         }
         VpnUnderlyingNetworkPolicy.applyTo(this)
@@ -1318,7 +1318,7 @@ class ProxyDomVpnService : VpnService() {
         val activeTun = tunInterface.get()
         if (activeTun == null) {
             ProtectGuard.onFailure = null
-            failStart("VPN permission denied or establish() returned null")
+            failStart("Tunnel permission denied or establish() returned null")
             return
         }
         VpnUnderlyingNetworkPolicy.applyTo(this)
@@ -1833,7 +1833,7 @@ class ProxyDomVpnService : VpnService() {
     }
 
     override fun onRevoke() {
-        NativeLog.w(TAG, "onRevoke: VPN отозван системой или пользователем")
+        NativeLog.w(TAG, "onRevoke: туннель отозван системой или пользователем")
         currentStatus = "revoked"
         VpnStatusBroadcaster.emit(currentStatus)
         stopVpn()

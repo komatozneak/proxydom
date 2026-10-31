@@ -75,7 +75,7 @@ Kotlin-тесты (`./gradlew :app:testDebugUnitTest` в `mobile/android`) тр�
 не диалер. Смешанный документ импортируется целиком и не удаляется; строки,
 которые платформа не умеет запустить, показываются с нейтральным бейджем, а не
 с ошибкой. Источник правды — `mobile/lib/features/vpn/data/dial_set.dart`.
-Разбор INCY, из которого этот набор вырос, — `docs/parity/incy-intake-parity.md`.
+Разбор стандартного приёма ключей и подписок — `docs/parity/standard-intake-parity.md`.
 
 ## 3. Стек
 

@@ -16,6 +16,16 @@ import (
 // fails the build — that is the point.
 var knownViolations = map[string]string{}
 
+// forbiddenModules are product-level exclusions, not a license classifier:
+// xray-core itself is MPL-2.0, but its build graph pulls GPL-3.0/LGPL modules.
+// sing-box/libbox are GPL-3.0 outright. The guard reads the same graph the
+// linker will use, so a new import path cannot slip past it.
+var forbiddenModulePrefixes = []string{
+	"github.com/sagernet/",
+	"github.com/xtls/xray-core",
+	"github.com/libbox/",
+}
+
 // reviewedLicense is a license a person has read because the markers could not
 // classify it (no license file at the module root, or unusual wording).
 type reviewedLicense struct {
@@ -292,6 +302,11 @@ func sortedModulePaths(modules map[string]guardModule) []string {
 func TestLicenseGuard(t *testing.T) {
 	modules := shippedModules(t)
 	for _, path := range sortedModulePaths(modules) {
+		for _, prefix := range forbiddenModulePrefixes {
+			if strings.HasPrefix(path, prefix) {
+				t.Errorf("%s must not ship in the client build; it is on the product's forbidden list", path)
+			}
+		}
 		m := modules[path]
 		files, err := readLicenseFiles(m.dir)
 		if err != nil {

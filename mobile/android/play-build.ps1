@@ -9,17 +9,22 @@
 $ErrorActionPreference = "Stop"
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $keyProps = Join-Path $PSScriptRoot "key.properties"
-$jks = Join-Path $PSScriptRoot "teremok-upload.jks"
 
-if (-not (Test-Path $jks)) {
-    Write-Error "Missing teremok-upload.jks in mobile\android"
-}
 if (-not (Test-Path $keyProps)) {
     Write-Error "Missing key.properties - copy from key.properties.template"
 }
 $text = Get-Content $keyProps -Raw
 if ($text -match "YOUR_.*_PASSWORD_HERE") {
     Write-Error "Edit key.properties: replace YOUR_STORE_PASSWORD_HERE and YOUR_KEY_PASSWORD_HERE"
+}
+$storeRel = ($text -split "`n" | Where-Object { $_ -match '^storeFile=' } | Select-Object -First 1) -replace '^storeFile=', ''
+$storeRel = $storeRel.Trim()
+$jksCandidates = @(
+    [System.IO.Path]::GetFullPath((Join-Path (Join-Path $PSScriptRoot "app") $storeRel)),
+    [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot $storeRel))
+)
+if (-not ($jksCandidates | Where-Object { Test-Path -LiteralPath $_ })) {
+    Write-Error ("Missing upload keystore from key.properties. Tried: {0}" -f ($jksCandidates -join ", "))
 }
 
 Write-Host "Building app bundle (release, signed)..."
@@ -28,7 +33,7 @@ Write-Host "Building app bundle (release, signed)..."
 Push-Location (Join-Path $root "mobile")
 try {
     flutter pub get
-    flutter build appbundle --release
+    flutter build appbundle --release --obfuscate --split-debug-info=build/symbols
     $aab = "build\app\outputs\bundle\release\app-release.aab"
     if (Test-Path $aab) {
         $size = (Get-Item $aab).Length / 1MB

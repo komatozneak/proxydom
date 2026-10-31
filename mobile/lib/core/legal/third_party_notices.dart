@@ -16,7 +16,10 @@ void registerThirdPartyNotices() {
   if (_registered) return;
   LicenseRegistry.addLicense(() async* {
     final text = await rootBundle.loadString(thirdPartyNoticesAsset);
-    yield LicenseEntryWithLineBreaks(const ['hy2bind'], text);
+    yield LicenseEntryWithLineBreaks(
+      const ['hy2bind', 'hysteria', 'quic-go', 'gvisor', 'v2ray-core'],
+      text,
+    );
   });
   _registered = true;
 }

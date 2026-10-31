@@ -99,8 +99,18 @@ jobs:
             flutter build apk --debug
           else
             echo "Building RELEASE APK (4 ABIs)..."
-            flutter build apk --release
+            flutter build apk --release --obfuscate --split-debug-info=build/symbols
           fi
+
+      # Kept out of the APK; needed to deobfuscate a crash from this build.
+      - name: Upload Dart symbols
+        if: inputs.debug_build != true
+        uses: actions/upload-artifact@v4
+        with:
+          name: proxydom-android-dart-symbols
+          path: mobile/build/symbols/
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Verify CI APK exists
         env:

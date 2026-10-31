@@ -5,7 +5,9 @@ import 'hy2_link_parser.dart';
 import 'node_display.dart';
 import 'share_link_parser.dart';
 
-enum PoolTile { youtube, gaming, flag }
+/// Neutral category mark drawn in front of a node. A subscription may name a
+/// provider or a service; the app never ships that service's logo.
+enum PoolTile { media, cloud, work, backup, flag }
 
 class PoolServerLabel {
   const PoolServerLabel({
@@ -19,7 +21,7 @@ class PoolServerLabel {
   final String subtitle;
   final PoolTile tile;
 
-  /// Flag emoji for country tiles. Empty for YouTube and gaming.
+  /// Flag emoji for country tiles. Empty for category tiles.
   final String flag;
 }
 
@@ -79,8 +81,8 @@ String? titleFromSubscriptionBody(String body) {
 
 PoolServerLabel labelForShareLink(ParsedShareLink link) {
   final split = _splitRemark(_remark(link));
-  // A provider's country tag is a location, not a name: `DE DoDoVPN` draws
-  // the German flag and the line is read as `DoDoVPN`. The tag wins over the
+  // A provider's country tag is a location, not a name: `DE CompanyNet` draws
+  // the German flag and the line is read as `CompanyNet`. The tag wins over the
   // host table because the provider knows the exit node it sold.
   final tag = countryTagFrom(split.$1);
   final title = tag?.title ?? split.$1;
@@ -110,9 +112,30 @@ String _remark(ParsedShareLink link) {
 
 PoolTile _tileForTitle(String title) {
   final lower = title.toLowerCase();
-  if (lower.contains('youtube')) return PoolTile.youtube;
-  if (lower.contains('игров') || lower.contains('gaming')) {
-    return PoolTile.gaming;
+  if (lower.contains('youtube') ||
+      lower.contains('медиа') ||
+      lower.contains('media') ||
+      lower.contains('video') ||
+      lower.contains('stream')) {
+    return PoolTile.media;
+  }
+  if (lower.contains('игров') ||
+      lower.contains('gaming') ||
+      lower.contains('cloud') ||
+      lower.contains('облак') ||
+      lower.contains('api')) {
+    return PoolTile.cloud;
+  }
+  if (lower.contains('рабоч') ||
+      lower.contains('work') ||
+      lower.contains('офис') ||
+      lower.contains('office')) {
+    return PoolTile.work;
+  }
+  if (lower.contains('резерв') ||
+      lower.contains('backup') ||
+      lower.contains('запасн')) {
+    return PoolTile.backup;
   }
   return PoolTile.flag;
 }
@@ -120,15 +143,6 @@ PoolTile _tileForTitle(String title) {
 /// Which mark a node's name earns, for anything that has a name and no label.
 ///
 /// The profile list and the home screen show the same node, and the home used
-/// to draw a globe for both: the YouTube line had its red tile in the list and
+/// to draw a globe for both: a category line had its own tile in the list and
 /// a globe on the button. One name, one mark.
 PoolTile tileForName(String title) => _tileForTitle(title);
-
-bool isPremiumPoolServer(String title) {
-  final lower = title.toLowerCase();
-  return lower.contains('youtube') ||
-      lower.contains('игров') ||
-      lower.contains('gaming') ||
-      lower.contains('индия') ||
-      lower.contains('india');
-}

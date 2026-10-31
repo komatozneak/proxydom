@@ -221,6 +221,12 @@ jobs:
 
       - name: Build IPA
         working-directory: mobile
+        env:
+          # xcode_backend reads these when xcodebuild runs the Flutter phase.
+          # They keep the Dart AOT snapshot obfuscated and put the symbol map
+          # outside the .app/.ipa, in mobile/build/symbols.
+          DART_OBFUSCATION: "true"
+          SPLIT_DEBUG_INFO: build/symbols
         # Official Codemagic App Store sample: workspace + scheme only.
         # Do not pass --config (becomes invalid xcodebuild -config, exit 64).
         # Do not pass adhoc --archive-flags destination (Codemagic docs: adhoc
@@ -234,6 +240,16 @@ jobs:
             --disable-xcpretty \
             --export-options-plist "$HOME/export_options.plist" \
             --archive-xcargs "COMPILER_INDEX_STORE_ENABLE=NO CODE_SIGN_STYLE=Manual"
+
+      # The symbol map is a separate artifact: it must never be inside the
+      # .app or the .ipa, but crash reports need it after TestFlight.
+      - name: Upload Dart symbols
+        uses: actions/upload-artifact@v4
+        with:
+          name: proxydom-ios-dart-symbols
+          path: mobile/build/symbols/
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Upload xcodebuild logs
         if: failure()

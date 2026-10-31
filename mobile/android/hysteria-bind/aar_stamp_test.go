@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/komatozneak/proxydom/hy2bind/internal/aarstamp"
+	"proxydom/hy2bind/internal/aarstamp"
 )
 
 // aarPath is the built archive, relative to this package. It is gitignored:

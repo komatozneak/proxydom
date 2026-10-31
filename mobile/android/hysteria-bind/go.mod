@@ -1,4 +1,4 @@
-module github.com/komatozneak/proxydom/hy2bind
+module proxydom/hy2bind
 
 go 1.26.3
 

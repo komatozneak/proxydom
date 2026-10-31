@@ -190,7 +190,7 @@ class MainActivity : FlutterFragmentActivity() {
                 if (prepareIntent == null) {
                     result.success(true)
                 } else if (pendingPermissionResult != null) {
-                    result.error("busy", "VPN permission request already in progress", null)
+                    result.error("busy", "Tunnel permission request already in progress", null)
                 } else {
                     pendingPermissionResult = result
                     NativeLog.i(TAG, "Launching VPN consent dialog via VpnService.prepare()")

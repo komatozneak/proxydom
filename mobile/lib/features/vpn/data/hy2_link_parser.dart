@@ -308,8 +308,7 @@ SubscriptionDocumentTarget? subscriptionDocumentTarget(String raw) {
     return _webTarget(text);
   }
   if (lower.startsWith('happ://') ||
-      lower.startsWith('proxydom://') ||
-      lower.startsWith('teremok://')) {
+      lower.startsWith('proxydom://')) {
     return _deeplinkTarget(text);
   }
   return null;
@@ -344,7 +343,7 @@ SubscriptionDocumentTarget _webTarget(String text) {
 
 SubscriptionDocumentTarget _deeplinkTarget(String text) {
   final nested = RegExp(
-    r'^(?:proxydom|teremok|happ)://(?:add|import)/(https?://.*)$',
+    r'^(?:proxydom|happ)://(?:add|import)/(https?://.*)$',
     caseSensitive: false,
   ).firstMatch(text);
   if (nested != null) {
