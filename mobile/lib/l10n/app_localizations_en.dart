@@ -84,6 +84,21 @@ class AppL10nEn extends AppL10n {
   String get navSettings => 'Settings';
 
   @override
+  String get navPaneCollapse => 'Collapse pane';
+
+  @override
+  String get navPaneExpand => 'Expand pane';
+
+  @override
+  String get windowTitle => 'Proxy Dom · utility';
+
+  @override
+  String get trayOpen => 'Open';
+
+  @override
+  String get trayQuit => 'Quit';
+
+  @override
   String get homeStatServer => 'Server';
 
   @override
@@ -197,6 +212,18 @@ class AppL10nEn extends AppL10n {
   @override
   String splitTunnelPlayersFound(int count) {
     return 'Players found: $count';
+  }
+
+  @override
+  String splitTunnelPlayersDetected(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '($count players detected)',
+      one: '(1 player detected)',
+      zero: '(no players detected)',
+    );
+    return '$_temp0';
   }
 
   @override

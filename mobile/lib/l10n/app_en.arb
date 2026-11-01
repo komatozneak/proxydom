@@ -40,6 +40,16 @@
   "@settingsNoVpnHint": {},
   "navSettings": "Settings",
   "@navSettings": {},
+  "navPaneCollapse": "Collapse pane",
+  "@navPaneCollapse": {},
+  "navPaneExpand": "Expand pane",
+  "@navPaneExpand": {},
+  "windowTitle": "Proxy Dom · utility",
+  "@windowTitle": {},
+  "trayOpen": "Open",
+  "@trayOpen": {},
+  "trayQuit": "Quit",
+  "@trayQuit": {},
   "homeStatServer": "Server",
   "@homeStatServer": {},
   "homeStatPing": "Ping",
@@ -123,6 +133,14 @@
   "@splitTunnelEditDone": {},
   "splitTunnelPlayersFound": "Players found: {count}",
   "@splitTunnelPlayersFound": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "splitTunnelPlayersDetected": "{count, plural, =0{(no players detected)} =1{(1 player detected)} other{({count} players detected)}}",
+  "@splitTunnelPlayersDetected": {
     "placeholders": {
       "count": {
         "type": "int"

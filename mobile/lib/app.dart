@@ -68,13 +68,12 @@ class _WindowsWindowFrame extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final dark = theme.brightness == Brightness.dark;
-    final russian = Localizations.localeOf(context).languageCode == 'ru';
     return Material(
       color: theme.scaffoldBackgroundColor,
       child: Column(
         children: [
           WindowCaptionBar(
-            label: russian ? 'Прокси' : 'Proxy',
+            label: AppL10n.of(context).windowTitle,
             ink: dark ? AppBrand.inkDark : AppBrand.inkLight,
           ),
           Expanded(child: child),
@@ -130,9 +129,8 @@ class _UpdateCheckHostState extends State<_UpdateCheckHost> {
     // node is silently not added. The platform keeps the intent's own string,
     // so it is preferred over anything reconstructed here.
     final delivered = await VpnController.instance.takeRawLink();
-    final raw = (delivered == null || delivered.isEmpty)
-        ? uri.toString()
-        : delivered;
+    final raw =
+        (delivered == null || delivered.isEmpty) ? uri.toString() : delivered;
     if (raw == _lastLink) return;
     // Two kinds of link arrive here: a document address from the bot's QR, and
     // a bare server key from another app's "share" sheet. The second one used

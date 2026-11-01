@@ -85,6 +85,21 @@ class AppL10nRu extends AppL10n {
   String get navSettings => 'Настройки';
 
   @override
+  String get navPaneCollapse => 'Свернуть панель';
+
+  @override
+  String get navPaneExpand => 'Развернуть панель';
+
+  @override
+  String get windowTitle => 'Прокси Дом · утилита';
+
+  @override
+  String get trayOpen => 'Открыть';
+
+  @override
+  String get trayQuit => 'Выход';
+
+  @override
   String get homeStatServer => 'Сервер';
 
   @override
@@ -198,6 +213,19 @@ class AppL10nRu extends AppL10n {
   @override
   String splitTunnelPlayersFound(int count) {
     return 'Плееры найдены: $count';
+  }
+
+  @override
+  String splitTunnelPlayersDetected(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '(обнаружено $count плееров)',
+      few: '(обнаружено $count плеера)',
+      one: '(обнаружен $count плеер)',
+      zero: '(плееры не обнаружены)',
+    );
+    return '$_temp0';
   }
 
   @override

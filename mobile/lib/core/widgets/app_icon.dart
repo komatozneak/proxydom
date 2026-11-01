@@ -41,6 +41,7 @@ abstract final class AppIcons {
   static const IconData hourglass = PhosphorIconsRegular.hourglass;
   static const IconData servers = PhosphorIconsRegular.hardDrives;
   static const IconData settings = PhosphorIconsRegular.gearSix;
+  static const IconData sidebar = PhosphorIconsRegular.sidebarSimple;
   static const IconData gear = PhosphorIconsRegular.gear;
   static const IconData info = PhosphorIconsRegular.info;
   static const IconData question = PhosphorIconsRegular.question;

@@ -247,6 +247,36 @@ abstract class AppL10n {
   /// **'Settings'**
   String get navSettings;
 
+  /// No description provided for @navPaneCollapse.
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse pane'**
+  String get navPaneCollapse;
+
+  /// No description provided for @navPaneExpand.
+  ///
+  /// In en, this message translates to:
+  /// **'Expand pane'**
+  String get navPaneExpand;
+
+  /// No description provided for @windowTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Proxy Dom · utility'**
+  String get windowTitle;
+
+  /// No description provided for @trayOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get trayOpen;
+
+  /// No description provided for @trayQuit.
+  ///
+  /// In en, this message translates to:
+  /// **'Quit'**
+  String get trayQuit;
+
   /// No description provided for @homeStatServer.
   ///
   /// In en, this message translates to:
@@ -444,6 +474,12 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Players found: {count}'**
   String splitTunnelPlayersFound(int count);
+
+  /// No description provided for @splitTunnelPlayersDetected.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{(no players detected)} =1{(1 player detected)} other{({count} players detected)}}'**
+  String splitTunnelPlayersDetected(int count);
 
   /// No description provided for @splitTunnelPlayersCount.
   ///

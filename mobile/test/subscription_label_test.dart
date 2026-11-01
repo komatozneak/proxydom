@@ -6,7 +6,7 @@ void main() {
   test('subscription title and server remarks keep emoji flags', () {
     const body = '''
 # CompanyNet Gateway 🏠
-hysteria2://user:pass@85.155.228.235:443/?sni=hy2-yt.company-net.ru#Медиа · Без рекламы
+hysteria2://user:pass@85.155.228.235:443/?sni=hy2-media.company-net.ru#Медиа · Видео
 hysteria2://user:pass@204.11.2.216:443/?sni=hy2-gaming.company-net.ru#Игровой · Низкий пинг
 hysteria2://user:pass@107.181.139.193:443/?sni=hy2-in.company-net.ru#Индия · Местные сервисы и цены
 hysteria2://user:pass@217.60.3.9:443/?sni=hy2-eu.company-net.ru#Латвия · Низкий пинг
@@ -25,7 +25,7 @@ hysteria2://user:pass@45.91.248.91:443/?sni=hy2-us.company-net.ru#США · Се
     final latvia = labelForShareLink(links[3]);
     final usa = labelForShareLink(links[4]);
     expect(media.tile, PoolTile.media);
-    expect(media.subtitle, 'Без рекламы');
+    expect(media.subtitle, 'Видео');
     expect(gaming.tile, PoolTile.cloud);
     expect(gaming.subtitle, 'Низкий пинг');
     expect(india.flag, '🇮🇳');

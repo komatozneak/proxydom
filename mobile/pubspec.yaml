@@ -102,13 +102,14 @@ flutter:
 # Regenerate:
 #   python tool/generate_adaptive_icon.py
 #   dart run flutter_launcher_icons
-# Source: Living House mascot (s1-flat-launcher.png) — not oak/moss shield.
+# Source: the key-and-house icon, printed by tool/bake_brand_icons.dart from
+# the painter the app draws it with (lib/core/widgets/proxydom_brand.dart).
 flutter_launcher_icons:
   android: true
   ios: true
   remove_alpha_ios: true
-  image_path: assets/icon/fg_proxydom.png
-  adaptive_icon_background: "#FAF8F3"
-  adaptive_icon_foreground: assets/icon/fg_proxydom.png
-  adaptive_icon_monochrome: assets/icon/mono_proxydom.png
+  image_path: assets/icon/app_icon_c1.png
+  adaptive_icon_background: "#1A1A1A"
+  adaptive_icon_foreground: assets/icon/fg_c1.png
+  adaptive_icon_monochrome: assets/icon/mono_c1.png
   min_sdk_android: 26

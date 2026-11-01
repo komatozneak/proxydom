@@ -105,7 +105,10 @@ class _ProxydomGroundState extends State<ProxydomGround>
         ),
         isComplex: true,
         willChange: true,
-        child: widget.child,
+        // The painter repaints on every tick of its clock. Without a boundary
+        // of its own the whole app above it shares the layer and is repainted
+        // sixty times a second with it — on a large window that is the lag.
+        child: RepaintBoundary(child: widget.child),
       ),
     );
   }
