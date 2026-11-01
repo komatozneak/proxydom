@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:proxydom/core/theme.dart';
 import 'package:proxydom/core/widgets/proxydom_mark.dart';
@@ -41,9 +42,9 @@ void main() {
     expect(ProxyDomMark.aspect, closeTo(width / height, 0.0001));
   });
 
-  test('the lockup fits the word to the letters inside the house', () {
-    // The word is sized so its cap band and the DOM band are the same height:
-    // DOM runs 97.62 units of a 279-unit drawing, Onest's caps are 0.753 em.
+  test('the word in the wing is cut as tall as DOM', () {
+    // The word and DOM are one line of type: Onest's caps are 0.753 em, DOM
+    // runs 97.62 units of a 279-unit drawing.
     const size = 40.0;
     const lockup = ProxyDomLockup(
       label: 'Прокси',
@@ -51,43 +52,157 @@ void main() {
       size: size,
     );
     final capHeight = lockup.fittedWordSize * 0.753;
-    const domHeight = size * 0.3499;
-    expect(capHeight, closeTo(domHeight, 0.001));
-    expect(capHeight, closeTo(14.0, 0.01));
+    expect(capHeight, closeTo(size * 97.62 / 279, 0.001));
   });
 
-  test('the lockup drops the word onto DOM\'s line, not the other way round', () {
-    const size = 40.0;
+  testWidgets('the wing joins the house without reaching into the D', (
+    tester,
+  ) async {
+    late LockupGeometry geo;
     const lockup = ProxyDomLockup(
       label: 'Прокси',
       ink: AppBrand.inkDark,
-      size: size,
+      size: 40,
     );
-    // DOM's centre is 9.33% of the house's height below the box middle; the
-    // word's cap centre is 0.044 em above its own. The word moves down by both,
-    // which is the only way the house can keep the full height of the band.
-    final drop = size * (0.5933 - 0.5) + lockup.fittedWordSize * 0.044;
-    expect(drop, closeTo(3.732 + 0.818, 0.002));
-    expect(drop, greaterThan(0));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) {
+            geo = lockup.geometry(context);
+            return const SizedBox();
+          },
+        ),
+      ),
+    );
 
-    // Where the two centres land once the word has dropped: the house's own DOM
-    // centre. Anything else and the letters sit off the word's baseline.
-    const wordBoxMiddle = size / 2;
-    final capCentre = wordBoxMiddle + drop - lockup.fittedWordSize * 0.044;
-    expect(capCentre, closeTo(size * 0.5933, 0.001));
+    // The house's left wall is at x 30 under the eave and the D starts at 36:
+    // the wing has to end between them to make one silhouette and keep the D.
+    expect(geo.wingRight, greaterThan(geo.house(30, 0).dx));
+    expect(geo.wingRight, lessThan(geo.house(36, 0).dx));
+
+    // The word sits inside the wing, clear of both its ends and its roof.
+    expect(geo.wordRect.left, greaterThan(0));
+    expect(geo.wordRect.right, lessThan(geo.wingRight));
+    expect(geo.wordRect.top, greaterThanOrEqualTo(geo.wingTop));
+    expect(geo.wordRect.bottom, lessThanOrEqualTo(40));
+    // Same air at the wing's end as between the word and the D.
+    expect(
+      geo.wordRect.left,
+      closeTo(geo.house(36, 0).dx - geo.wordRect.right, 0.001),
+    );
   });
 
-  test('the lockup keeps a word space, not a seam', () {
-    const size = 40.0;
-    const lockup = ProxyDomLockup(
-      label: 'Прокси',
-      ink: AppBrand.inkDark,
-      size: size,
+  testWidgets('the lockup is as wide as the wing and the house together', (
+    tester,
+  ) async {
+    late LockupGeometry geo;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Center(
+          child: Builder(
+            builder: (context) {
+              const lockup = ProxyDomLockup(
+                label: 'Proxy',
+                ink: AppBrand.inkDark,
+                size: 40,
+              );
+              geo = lockup.geometry(context);
+              return lockup;
+            },
+          ),
+        ),
+      ),
     );
-    // The house's wall is where the word ends, so the gap has to read as space:
-    // under 0.1 of the mark the last letter reads as touching the house.
-    expect(lockup.gap, greaterThan(size * 0.1));
-    expect(lockup.gap, lessThan(size * 0.2));
+    final box = tester.getSize(find.byType(ProxyDomLockup));
+    expect(box.height, 40);
+    expect(box.width, closeTo(geo.width, 0.001));
+    expect(geo.width, closeTo(geo.houseLeft + 40 * ProxyDomMark.aspect, 0.001));
+    // The word is set in capitals whatever the label's case.
+    expect(geo.word, 'PROXY');
+  });
+
+  testWidgets('the word is a hole in the wing and the door is lit', (
+    tester,
+  ) async {
+    const ground = AppBrand.groundDark;
+    const ink = AppBrand.inkDark;
+    const door = AppBrand.mascotGoldLit;
+    const size = 120.0;
+    final key = GlobalKey();
+    late LockupGeometry geo;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          backgroundColor: ground,
+          body: Align(
+            alignment: Alignment.topLeft,
+            child: RepaintBoundary(
+              key: key,
+              child: ColoredBox(
+                color: ground,
+                child: Builder(
+                  builder: (context) {
+                    const lockup = ProxyDomLockup(
+                      label: 'Proxy',
+                      ink: ink,
+                      door: door,
+                      size: size,
+                    );
+                    geo = lockup.geometry(context);
+                    return lockup;
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final pixels = await tester.runAsync(() async {
+      final boundary =
+          key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+      final image = await boundary.toImage();
+      final data = await image.toByteData();
+      return (image.width, data!);
+    });
+    final (width, data) = pixels!;
+    Color at(Offset p) {
+      final i = (p.dy.round() * width + p.dx.round()) * 4;
+      return Color.fromARGB(
+        data.getUint8(i + 3),
+        data.getUint8(i),
+        data.getUint8(i + 1),
+        data.getUint8(i + 2),
+      );
+    }
+
+    void expectColor(Offset p, Color want, String reason) {
+      final got = at(p);
+      expect(
+        (got.r - want.r).abs() +
+            (got.g - want.g).abs() +
+            (got.b - want.b).abs(),
+        lessThan(0.06),
+        reason: '$reason at $p: got $got',
+      );
+    }
+
+    final word = geo.wordRect;
+    final band =
+        geo.house(0, (ProxyDomLockup.domTop + ProxyDomLockup.domBottom) / 2).dy;
+    // The wing before the word is solid.
+    expectColor(Offset(word.left / 2, band), ink, 'the wing');
+    // Inside the first letter the ground shows through: cut, not painted over.
+    // (The test font draws Latin glyphs as solid boxes, so a box's middle
+    // would be ink if the word were painted rather than cut.)
+    expectColor(
+      Offset(word.left + geo.style.fontSize! * 0.3, band),
+      ground,
+      'the word',
+    );
+    // Light in the doorway, under the O.
+    expectColor(geo.house(148, 265), door, 'the door');
   });
 
   testWidgets('the caption lockup renders one row without overflow', (
