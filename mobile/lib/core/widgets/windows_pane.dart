@@ -13,12 +13,20 @@ class WindowsPane {
 
   static const double width = 248;
   static const double compactWidth = 60;
+
+  /// Below this the pane lays itself out folded, also while it animates; the
+  /// caption shows the lockup only at or above it.
+  static const double wideFrom = 160;
   static const Duration fold = Duration(milliseconds: 200);
   static const Curve foldCurve = Curves.easeOutCubic;
 
   /// The pane's target width, or null when no pane is on screen (onboarding,
   /// import): then the caption is the ground's, with no column in it.
   static final ValueNotifier<double?> currentWidth = ValueNotifier(null);
+
+  /// Height of the window caption: tall enough to carry the lockup over the
+  /// pane, the way a Windows app puts its name in the title bar.
+  static const double captionHeight = 52;
 
   static Color panel(bool dark) =>
       dark ? AppBrand.surfaceRaisedDark : AppBrand.stoneLight;

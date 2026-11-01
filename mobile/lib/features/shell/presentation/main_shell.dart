@@ -280,8 +280,7 @@ class WindowsNavRail extends StatefulWidget {
   static const double width = WindowsPane.width;
   static const double compactWidth = WindowsPane.compactWidth;
 
-  /// Below this the pane lays itself out folded, also while it animates.
-  static const double wideFrom = 160;
+  static const double wideFrom = WindowsPane.wideFrom;
 
   static const Duration fold = WindowsPane.fold;
 
@@ -364,29 +363,13 @@ class _WindowsNavRailState extends State<WindowsNavRail> {
                       alignment: wide ? Alignment.centerLeft : Alignment.center,
                       child: _PaneButton(
                         icon: AppIcons.sidebar,
-                        tooltip:
-                            _expanded ? l.navPaneCollapse : l.navPaneExpand,
+                        label: _expanded ? l.navPaneCollapse : l.navPaneExpand,
                         onTap: _toggle,
                       ),
                     ),
+                    // The name sits in the caption above the pane, so the
+                    // destinations start right under the fold button.
                     const SizedBox(height: 10),
-                    SizedBox(
-                      height: 60,
-                      child: wide
-                          ? FittedBox(
-                              fit: BoxFit.scaleDown,
-                              alignment: Alignment.centerLeft,
-                              child: ProxyDomLockup(
-                                label: l.appTitle,
-                                ink: ink,
-                                height: 60,
-                              ),
-                            )
-                          // Folded, there is no room for the name, and the PC
-                          // version carries no other mark.
-                          : null,
-                    ),
-                    const SizedBox(height: 18),
                     for (final item in items)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 4),
@@ -428,40 +411,40 @@ class _WindowsNavRailState extends State<WindowsNavRail> {
 class _PaneButton extends StatelessWidget {
   const _PaneButton({
     required this.icon,
-    required this.tooltip,
+    required this.label,
     required this.onTap,
   });
 
   final IconData icon;
-  final String tooltip;
+
+  /// For screen readers only: a hover hint over a button whose click says
+  /// what it does got in the way.
+  final String label;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final ink = dark ? AppBrand.inkDark : AppBrand.inkLight;
-    return Tooltip(
-      message: tooltip,
-      child: Semantics(
-        button: true,
-        label: tooltip,
-        child: HoverBuilder(
-          onTap: onTap,
-          onKeyActivate: onTap,
-          builder: (context, hovered) => Container(
-            width: 40,
-            height: 36,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: hovered
-                  ? (dark
-                      ? AppBrand.lightSource.withValues(alpha: 0.06)
-                      : AppBrand.inkLight.withValues(alpha: 0.05))
-                  : null,
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: AppIcon(icon, size: 18, color: ink.withValues(alpha: 0.82)),
+    return Semantics(
+      button: true,
+      label: label,
+      child: HoverBuilder(
+        onTap: onTap,
+        onKeyActivate: onTap,
+        builder: (context, hovered) => Container(
+          width: 40,
+          height: 36,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: hovered
+                ? (dark
+                    ? AppBrand.lightSource.withValues(alpha: 0.06)
+                    : AppBrand.inkLight.withValues(alpha: 0.05))
+                : null,
+            borderRadius: BorderRadius.circular(6),
           ),
+          child: AppIcon(icon, size: 18, color: ink.withValues(alpha: 0.82)),
         ),
       ),
     );

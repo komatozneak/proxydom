@@ -71,10 +71,11 @@ void main() {
         WindowsNavRail(selected: 1, onSelect: (_) {}),
         const Expanded(child: SizedBox()),
       ])));
-      expect(find.byType(ProxyDomLockup), findsOneWidget);
+      // The name lives in the caption now, not in the pane.
+      expect(find.byType(ProxyDomLockup), findsNothing);
       expect(find.text('Настройки'), findsOneWidget);
 
-      await tester.tap(find.byTooltip('Свернуть панель'));
+      await tester.tap(find.bySemanticsLabel('Свернуть панель'));
       for (var t = 0; t < 12; t++) {
         await tester.pump(const Duration(milliseconds: 20));
         expect(tester.takeException(), isNull);
@@ -87,7 +88,7 @@ void main() {
       expect(find.byType(ProxyDomLockup), findsNothing);
       expect(find.byType(ProxyDomKeyIcon), findsNothing);
 
-      await tester.tap(find.byTooltip('Развернуть панель'));
+      await tester.tap(find.bySemanticsLabel('Развернуть панель'));
       await tester.pumpAndSettle();
       expect(tester.getSize(find.byType(WindowsNavRail)).width,
           WindowsNavRail.width);
@@ -127,16 +128,39 @@ void main() {
 
     final column = find.byKey(const ValueKey('caption-pane-column'));
 
-    testWidgets('carries no mark and no title of its own', (tester) async {
+    testWidgets('carries the lockup over the pane, and no other mark',
+        (tester) async {
       await pumpWindow(tester);
-      expect(find.text('Прокси Дом'), findsNothing);
       expect(
-        find.descendant(
-            of: find.byType(WindowCaptionBar),
-            matching: find.byType(ProxyDomKeyIcon)),
-        findsNothing,
+        find.descendant(of: column, matching: find.byType(ProxyDomLockup)),
+        findsOneWidget,
       );
-      expect(find.bySemanticsLabel('Прокси Дом'), findsWidgets);
+      expect(find.text('Прокси Дом'), findsNothing);
+      expect(find.byType(ProxyDomKeyIcon), findsNothing);
+    });
+
+    testWidgets('drops the lockup when the pane folds', (tester) async {
+      await pumpWindow(tester);
+      await tester.tap(find.bySemanticsLabel('Свернуть панель'));
+      for (var t = 0; t < 12; t++) {
+        await tester.pump(const Duration(milliseconds: 20));
+        expect(tester.takeException(), isNull);
+      }
+      await tester.pumpAndSettle();
+      expect(find.byType(ProxyDomLockup), findsNothing);
+    });
+
+    testWidgets('the fold button has no hover hint', (tester) async {
+      await pumpWindow(tester);
+      expect(find.byTooltip('Свернуть панель'), findsNothing);
+    });
+
+    testWidgets('the destinations start right under the fold button',
+        (tester) async {
+      await pumpWindow(tester);
+      final fold = tester.getRect(find.bySemanticsLabel('Свернуть панель'));
+      final first = tester.getRect(find.text('Сервера'));
+      expect(first.top - fold.bottom, lessThan(32));
     });
 
     testWidgets('continues the pane to the top of the window, folded or not',
@@ -144,7 +168,7 @@ void main() {
       await pumpWindow(tester);
       expect(tester.getSize(column).width, WindowsNavRail.width);
 
-      await tester.tap(find.byTooltip('Свернуть панель'));
+      await tester.tap(find.bySemanticsLabel('Свернуть панель'));
       await tester.pumpAndSettle();
       expect(tester.getSize(column).width, WindowsNavRail.compactWidth);
       expect(tester.getSize(find.byType(WindowsNavRail)).width,

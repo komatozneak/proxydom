@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../theme.dart';
+import 'proxydom_brand.dart';
 import 'windows_pane.dart';
 
 /// The Windows caption, drawn by the app instead of by the system frame.
@@ -17,7 +18,7 @@ class WindowCaptionBar extends StatefulWidget {
     super.key,
     required this.label,
     required this.ink,
-    this.height = 40,
+    this.height = WindowsPane.captionHeight,
   });
 
   final String label;
@@ -108,8 +109,8 @@ class _WindowCaptionBarState extends State<WindowCaptionBar> {
         children: [
           // The navigation pane's column runs to the top of the window: over
           // the pane's width the caption is the pane, so the pane does not end
-          // where the window frame begins. No mark here — the name lives at
-          // the top of the pane. The window is still named for screen readers.
+          // where the window frame begins. The lockup sits in that column, the
+          // app's only mark on the PC; folded, there is no room for it.
           Positioned.fill(
             child: Semantics(
               label: widget.label,
@@ -130,6 +131,24 @@ class _WindowCaptionBarState extends State<WindowCaptionBar> {
                         color: WindowsPane.panel(dark),
                         border: Border(right: WindowsPane.edge(dark)),
                       ),
+                      // Clipped and laid out at full size, so while the pane
+                      // unfolds the name is revealed rather than squeezed.
+                      child: paneWidth < WindowsPane.wideFrom
+                          ? null
+                          : ClipRect(
+                              child: OverflowBox(
+                                alignment: Alignment.centerLeft,
+                                maxWidth: double.infinity,
+                                child: Padding(
+                                  padding: const EdgeInsets.only(left: 16),
+                                  child: ProxyDomLockup(
+                                    label: widget.label,
+                                    ink: widget.ink,
+                                    height: widget.height - 14,
+                                  ),
+                                ),
+                              ),
+                            ),
                     );
                   },
                 ),
