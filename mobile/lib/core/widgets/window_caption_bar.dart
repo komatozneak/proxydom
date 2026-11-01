@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../theme.dart';
-import 'proxydom_mark.dart';
+import 'proxydom_brand.dart';
 
 /// The Windows caption, drawn by the app instead of by the system frame.
 ///
@@ -118,13 +118,24 @@ class _WindowCaptionBarState extends State<WindowCaptionBar> {
               ),
               child: Align(
                 alignment: Alignment.centerLeft,
-                child: ProxyDomLockup(
-                  label: widget.label,
-                  ink: widget.ink,
-                  // The house takes the whole height of the band: the caption is
-                  // a frame, and a mark that stops short of its top and bottom
-                  // reads as an icon dropped into a bar rather than as the name.
-                  size: widget.height,
+                // A Windows caption: the small app icon, then the title. The
+                // brand lockup lives at the top of the navigation pane, where
+                // it has the room to be read; the caption only names the window.
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const ProxyDomKeyIcon(size: 18),
+                    const SizedBox(width: 10),
+                    Text(
+                      widget.label,
+                      maxLines: 1,
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                            color: widget.ink.withValues(alpha: 0.86),
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -222,8 +233,8 @@ class _CaptionButtonState extends State<_CaptionButton> {
             alignment: Alignment.center,
             color: _hovered
                 ? (widget.close
-                      ? AppBrand.hoverCloseCaption
-                      : AppBrand.hoverCaption)
+                    ? AppBrand.hoverCloseCaption
+                    : AppBrand.hoverCaption)
                 : AppBrand.idleCaption,
             child: CustomPaint(
               size: const Size(10, 10),

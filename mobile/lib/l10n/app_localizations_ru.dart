@@ -85,6 +85,12 @@ class AppL10nRu extends AppL10n {
   String get navSettings => 'Настройки';
 
   @override
+  String get navPaneCollapse => 'Свернуть панель';
+
+  @override
+  String get navPaneExpand => 'Развернуть панель';
+
+  @override
   String get homeStatServer => 'Сервер';
 
   @override

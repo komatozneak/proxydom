@@ -247,6 +247,18 @@ abstract class AppL10n {
   /// **'Settings'**
   String get navSettings;
 
+  /// No description provided for @navPaneCollapse.
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse pane'**
+  String get navPaneCollapse;
+
+  /// No description provided for @navPaneExpand.
+  ///
+  /// In en, this message translates to:
+  /// **'Expand pane'**
+  String get navPaneExpand;
+
   /// No description provided for @homeStatServer.
   ///
   /// In en, this message translates to:

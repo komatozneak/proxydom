@@ -25,6 +25,8 @@
   "settingsNoVpn": "Маршрутизация",
   "settingsNoVpnHint": "Правила раздельного туннеля для приложений и сайтов",
   "navSettings": "Настройки",
+  "navPaneCollapse": "Свернуть панель",
+  "navPaneExpand": "Развернуть панель",
   "homeStatServer": "Сервер",
   "homeStatPing": "Пинг",
   "homeStatPingPending": "измеряем",

@@ -84,6 +84,12 @@ class AppL10nEn extends AppL10n {
   String get navSettings => 'Settings';
 
   @override
+  String get navPaneCollapse => 'Collapse pane';
+
+  @override
+  String get navPaneExpand => 'Expand pane';
+
+  @override
   String get homeStatServer => 'Server';
 
   @override

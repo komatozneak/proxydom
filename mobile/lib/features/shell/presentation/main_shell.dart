@@ -13,6 +13,7 @@ import '../../../core/theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/interaction.dart';
 import '../../../core/widgets/mossy_rail.dart';
+import '../../../core/widgets/proxydom_brand.dart';
 import '../../../core/widgets/proxydom_ground.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../home/application/vpn_provider.dart';
@@ -250,32 +251,52 @@ class _MainShellState extends ConsumerState<MainShell> {
   }
 }
 
-/// Desktop navigation rail.
+/// Desktop navigation pane.
 ///
-/// Same three destinations as the phone dock, drawn the way a window draws
-/// them: a mark, then a vertical list of items where the selected one is a lit
-/// plate with an accent bar, and where the pointer gets hover and the keyboard
-/// gets a focus ring.
+/// Drawn the way Windows draws one: a flat pane with a hairline edge, a button
+/// that folds it down to icons and back, the brand at the top, and items where
+/// the selected one is a lit plate with an accent pill. Folded, the lockup
+/// gives way to the app icon and every item keeps its name as a tooltip.
+///
+/// The pane is its own repaint boundary: the yard behind it animates forever,
+/// and the pane must not be repainted with it.
 ///
 /// Public so the shell and the capture harness render the same widget.
-class WindowsNavRail extends StatelessWidget {
+class WindowsNavRail extends StatefulWidget {
   const WindowsNavRail({
     super.key,
     required this.selected,
     required this.onSelect,
+    this.initiallyExpanded = true,
   });
 
   final int selected;
 
   final ValueChanged<int> onSelect;
 
-  static const double width = 212;
+  final bool initiallyExpanded;
+
+  static const double width = 248;
+  static const double compactWidth = 60;
+
+  /// Below this the pane lays itself out folded, also while it animates.
+  static const double wideFrom = 160;
+
+  static const Duration fold = Duration(milliseconds: 200);
+
+  @override
+  State<WindowsNavRail> createState() => _WindowsNavRailState();
+}
+
+class _WindowsNavRailState extends State<WindowsNavRail> {
+  late bool _expanded = widget.initiallyExpanded;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l = AppL10n.of(context);
     final dark = theme.brightness == Brightness.dark;
+    final ink = dark ? AppBrand.inkDark : AppBrand.inkLight;
     final mute = dark ? AppBrand.inkMutedDark : AppBrand.inkMutedLight;
 
     final items = <({IconData icon, String label, int index})>[
@@ -294,43 +315,129 @@ class WindowsNavRail extends StatelessWidget {
       ),
     ];
 
-    return MossyRail(
-      light: !dark,
-      child: SizedBox(
-        width: width,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 22, 14, 18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // The name lives in the window caption now, so the rail starts
-              // with its first destination. A rail that repeats the title it
-              // already shows two inches above reads as two separate objects.
-              for (final item in items)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: _RailItem(
-                    icon: item.icon,
-                    label: item.label,
-                    selected: item.index == selected,
-                    onTap: () => onSelect(item.index),
-                  ),
+    return RepaintBoundary(
+      child: AnimatedContainer(
+        duration: WindowsNavRail.fold,
+        curve: Curves.easeOutCubic,
+        width: _expanded ? WindowsNavRail.width : WindowsNavRail.compactWidth,
+        decoration: BoxDecoration(
+          color: dark ? AppBrand.surfaceRaisedDark : AppBrand.stoneLight,
+          border: Border(
+            right: BorderSide(
+              color: (dark ? AppBrand.mossLight : AppBrand.inkLight)
+                  .withValues(alpha: dark ? 0.16 : 0.10),
+            ),
+          ),
+        ),
+        child: ClipRect(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final wide = constraints.maxWidth >= WindowsNavRail.wideFrom;
+              final pad = wide ? 14.0 : 8.0;
+              return Padding(
+                padding: EdgeInsets.fromLTRB(pad, 8, pad, 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Align(
+                      alignment: wide ? Alignment.centerLeft : Alignment.center,
+                      child: _PaneButton(
+                        icon: AppIcons.sidebar,
+                        tooltip:
+                            _expanded ? l.navPaneCollapse : l.navPaneExpand,
+                        onTap: () => setState(() => _expanded = !_expanded),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      height: 60,
+                      child: wide
+                          ? FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: ProxyDomLockup(
+                                label: l.appTitle,
+                                ink: ink,
+                                height: 60,
+                              ),
+                            )
+                          : const Center(child: ProxyDomKeyIcon(size: 34)),
+                    ),
+                    const SizedBox(height: 18),
+                    for (final item in items)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: _RailItem(
+                          icon: item.icon,
+                          label: item.label,
+                          selected: item.index == widget.selected,
+                          compact: !wide,
+                          onTap: () => widget.onSelect(item.index),
+                        ),
+                      ),
+                    const Spacer(),
+                    if (wide)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 12, right: 4),
+                        child: Text(
+                          Localizations.localeOf(context).languageCode == 'ru'
+                              ? 'Прокси Дом · утилита'
+                              : 'Proxy Dom · utility',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: mute.withValues(alpha: 0.65),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-              const Spacer(),
-              Padding(
-                padding: const EdgeInsets.only(left: 12, right: 4),
-                child: Text(
-                  Localizations.localeOf(context).languageCode == 'ru'
-                      ? 'Прокси Дом · утилита'
-                      : 'Proxy Dom · utility',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: mute.withValues(alpha: 0.65),
-                  ),
-                ),
-              ),
-            ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The square button that folds the pane, like the one in Windows Settings.
+class _PaneButton extends StatelessWidget {
+  const _PaneButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final ink = dark ? AppBrand.inkDark : AppBrand.inkLight;
+    return Tooltip(
+      message: tooltip,
+      child: Semantics(
+        button: true,
+        label: tooltip,
+        child: HoverBuilder(
+          onTap: onTap,
+          onKeyActivate: onTap,
+          builder: (context, hovered) => Container(
+            width: 40,
+            height: 36,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: hovered
+                  ? (dark
+                      ? AppBrand.lightSource.withValues(alpha: 0.06)
+                      : AppBrand.inkLight.withValues(alpha: 0.05))
+                  : null,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: AppIcon(icon, size: 18, color: ink.withValues(alpha: 0.82)),
           ),
         ),
       ),
@@ -344,12 +451,14 @@ class _RailItem extends StatefulWidget {
     required this.label,
     required this.selected,
     required this.onTap,
+    this.compact = false,
   });
 
   final IconData icon;
   final String label;
   final bool selected;
   final VoidCallback onTap;
+  final bool compact;
 
   @override
   State<_RailItem> createState() => _RailItemState();
@@ -369,8 +478,9 @@ class _RailItemState extends State<_RailItem> {
     final theme = Theme.of(context);
     final dark = theme.brightness == Brightness.dark;
     final ink = dark ? AppBrand.inkDark : AppBrand.inkLight;
+    final accent = dark ? AppBrand.mossLight : AppBrand.moss;
 
-    return Semantics(
+    final item = Semantics(
       button: true,
       selected: widget.selected,
       label: widget.label,
@@ -381,73 +491,74 @@ class _RailItemState extends State<_RailItem> {
         builder: (context, hovered) {
           final fill = widget.selected
               ? (dark
-                  ? AppBrand.mossDeep.withValues(alpha: 0.92)
-                  : AppBrand.mossLight.withValues(alpha: 0.12))
+                  ? AppBrand.lightSource.withValues(alpha: 0.07)
+                  : AppBrand.inkLight.withValues(alpha: 0.06))
               : hovered
                   ? (dark
-                      ? AppBrand.lightSource.withValues(alpha: 0.045)
-                      : AppBrand.inkLight.withValues(alpha: 0.035))
+                      ? AppBrand.lightSource.withValues(alpha: 0.04)
+                      : AppBrand.inkLight.withValues(alpha: 0.03))
                   : null;
-          return AnimatedContainer(
-            duration: AppBrand.motionReveal,
-            curve: AppBrand.motionRevealCurve,
-            padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
+          final icon = AppIcon(
+            widget.icon,
+            size: 19,
+            color: widget.selected ? accent : ink.withValues(alpha: 0.78),
+          );
+          // The accent pill sits at the item's left edge, the way a Windows
+          // navigation pane marks where you are, folded or not.
+          final pill = AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            curve: Curves.easeOutCubic,
+            width: 3,
+            height: widget.selected ? 16 : 0,
+            decoration: BoxDecoration(
+              color: accent,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          );
+          return Container(
+            height: 40,
             decoration: BoxDecoration(
               color: fill,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: widget.selected
-                    ? (dark
-                        ? AppBrand.moss.withValues(alpha: 0.35)
-                        : AppBrand.moss.withValues(alpha: 0.28))
-                    : Colors.transparent,
-              ),
+              borderRadius: BorderRadius.circular(6),
             ),
-            child: Row(
+            child: Stack(
+              alignment: Alignment.centerLeft,
               children: [
-                // The accent bar is moss: the selection belongs to the stone the
-                // rail is made of, not to the house on the other side of it.
-                AnimatedContainer(
-                  duration: AppBrand.motionReveal,
-                  curve: AppBrand.motionRevealCurve,
-                  width: 3,
-                  height: 20,
-                  margin: const EdgeInsets.only(right: 11),
-                  decoration: BoxDecoration(
-                    color: widget.selected
-                        ? (dark ? AppBrand.mossLight : AppBrand.moss)
-                        : AppBrand.shadeSource.withValues(alpha: 0.0),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                AppIcon(
-                  widget.icon,
-                  size: 19,
-                  color: widget.selected
-                      ? (dark ? AppBrand.mossLight : AppBrand.moss)
-                      : ink.withValues(alpha: 0.78),
-                ),
-                const SizedBox(width: 11),
-                Flexible(
-                  child: Text(
-                    widget.label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: ink,
-                      fontSize: 14.5,
-                      fontWeight:
-                          widget.selected ? FontWeight.w700 : FontWeight.w600,
-                      letterSpacing: -0.1,
+                Positioned(left: 0, child: pill),
+                if (widget.compact)
+                  Center(child: icon)
+                else
+                  Padding(
+                    padding: const EdgeInsets.only(left: 14, right: 10),
+                    child: Row(
+                      children: [
+                        icon,
+                        const SizedBox(width: 12),
+                        Flexible(
+                          child: Text(
+                            widget.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              color: ink,
+                              fontSize: 14,
+                              fontWeight: widget.selected
+                                  ? FontWeight.w700
+                                  : FontWeight.w600,
+                              letterSpacing: -0.1,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
               ],
             ),
           );
         },
       ),
     );
+    return widget.compact ? Tooltip(message: widget.label, child: item) : item;
   }
 }
 
