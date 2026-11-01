@@ -1,8 +1,8 @@
 """Bake the Прокси Дом mark into the Windows runner icon.
 
-Source: `assets/icon/nav_vpn_proxydom.png` — the same DOM cutout the bottom nav
-uses, with the charcoal panel already baked in. Output: a multi-size
-`windows/runner/resources/app_icon.ico`.
+Source: `assets/icon/app_icon_c1_win.png` — the key-and-house icon on its
+rounded tile, printed by `tool/bake_brand_icons.dart` from the painter the app
+draws it with. Output: a multi-size `windows/runner/resources/app_icon.ico`.
 
 Why not a single 256px entry: Explorer, the taskbar, the Start menu and the
 Alt+Tab switcher ask for 16/24/32/48. A lone 256 entry is downscaled by the
@@ -25,7 +25,7 @@ import numpy as np
 from PIL import Image
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
-SRC = os.path.join(ROOT, "assets", "icon", "nav_vpn_proxydom.png")
+SRC = os.path.join(ROOT, "assets", "icon", "app_icon_c1_win.png")
 OUT = os.path.join(ROOT, "windows", "runner", "resources", "app_icon.ico")
 
 # Sizes Explorer actually asks for. 256 is the last one that may be PNG;
