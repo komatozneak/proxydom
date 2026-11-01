@@ -32,25 +32,38 @@ Future<void> _write(String name, void Function(Canvas canvas) draw) async {
   File('assets/icon/$name').writeAsBytesSync(png!.buffer.asUint8List());
 }
 
-void _mark(Canvas canvas, double scale, {Color? tile, required Color key, required Color frame}) {
+void _mark(Canvas canvas, double scale,
+    {Color? tile, required Color key, required Color frame, Color? tone}) {
   final side = _size * scale;
   canvas.save();
   canvas.translate((_size - side) / 2, (_size - side) / 2);
-  KeyIconPainter(tile: tile, key: key, frame: frame).paint(canvas, Size(side, side));
+  KeyIconPainter(tile: tile, key: key, frame: frame, tone: tone)
+      .paint(canvas, Size(side, side));
   canvas.restore();
 }
 
 void main() {
   test('bake launcher sources', () async {
     await _write('app_icon_c1.png', (c) {
-      c.drawRect(const Rect.fromLTWH(0, 0, 1024, 1024), Paint()..color = AppBrand.inkLight);
-      _mark(c, 1, key: AppBrand.inkDark, frame: AppBrand.mascotGold);
+      c.drawRect(const Rect.fromLTWH(0, 0, 1024, 1024),
+          Paint()..color = AppBrand.inkLight);
+      _mark(c, 1,
+          key: AppBrand.inkDark,
+          frame: AppBrand.mascotGold,
+          tone: AppBrand.lightSource.withValues(alpha: 0.10));
     });
     await _write('app_icon_c1_win.png', (c) {
-      _mark(c, 1, tile: AppBrand.inkLight, key: AppBrand.inkDark, frame: AppBrand.mascotGold);
+      _mark(c, 1,
+          tile: AppBrand.inkLight,
+          key: AppBrand.inkDark,
+          frame: AppBrand.mascotGold,
+          tone: AppBrand.lightSource.withValues(alpha: 0.10));
     });
     await _write('fg_c1.png', (c) {
-      _mark(c, _safeScale, key: AppBrand.inkDark, frame: AppBrand.mascotGold);
+      _mark(c, _safeScale,
+          key: AppBrand.inkDark,
+          frame: AppBrand.mascotGold,
+          tone: AppBrand.lightSource.withValues(alpha: 0.10));
     });
     await _write('mono_c1.png', (c) {
       _mark(c, _safeScale, key: AppBrand.inkDark, frame: AppBrand.inkDark);

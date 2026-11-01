@@ -13,8 +13,9 @@ import '../theme.dart';
 
 // ── The icon ────────────────────────────────────────────────────────────────
 
-/// The app icon: a pixel key standing in front of the outline of a house —
-/// a stepped roof with its chimney, and the house's corners as brackets.
+/// The app icon: a pixel key standing in front of a house — a stepped roof
+/// outlined in gold with its chimney, and the house itself as a soft shape in
+/// a quiet tone behind the key.
 ///
 /// Laid out on a 100×100 field; [size] scales it.
 class ProxyDomKeyIcon extends StatelessWidget {
@@ -45,6 +46,9 @@ class ProxyDomKeyIcon extends StatelessWidget {
           tile: tile ? (night ? AppBrand.inkLight : AppBrand.inkDark) : null,
           key: night ? AppBrand.inkDark : AppBrand.inkLight,
           frame: AppBrand.mascotGold,
+          tone: night
+              ? AppBrand.lightSource.withValues(alpha: 0.10)
+              : AppBrand.stoneShade.withValues(alpha: 0.45),
         ),
       ),
     );
@@ -53,11 +57,20 @@ class ProxyDomKeyIcon extends StatelessWidget {
 
 /// Paints [ProxyDomKeyIcon]. Public so the launcher bake can drive it directly.
 class KeyIconPainter extends CustomPainter {
-  KeyIconPainter({required this.tile, required this.key, required this.frame});
+  KeyIconPainter({
+    required this.tile,
+    required this.key,
+    required this.frame,
+    this.tone,
+  });
 
   final Color? tile;
   final Color key;
   final Color frame;
+
+  /// The house behind the key. Null leaves it out — the monochrome launcher
+  /// icon is one silhouette, and a filled house would swallow the key.
+  final Color? tone;
 
   /// The key, top to bottom: ring, collar, blade with its bitting.
   static const List<String> keyCells = [
@@ -83,8 +96,8 @@ class KeyIconPainter extends CustomPainter {
     '...##...',
     '...#....',
   ];
-  static const double cell = 4;
-  static const Offset keyOrigin = Offset(34, 10);
+  static const double cell = 3.6;
+  static const Offset keyOrigin = Offset(50 - 4 * cell, 16);
 
   /// Gap between the key and the house behind it.
   static const double gap = 2.2;
@@ -117,23 +130,8 @@ class KeyIconPainter extends CustomPainter {
     return p;
   }
 
-  /// The roof outline, the chimney and the corner brackets, minus the room
-  /// the key needs: the gap around it and the inside of its ring.
-  static Path framePath() {
-    const sw = 84 / 2 / 6, sh = 40 / 6;
-    const chimneyX = 50 - 42 + 1.5 * sw;
-    final outer = Path.combine(PathOperation.union, _stairs(50, 54, 84, 40, 6),
-        _rect(chimneyX, 54 - 3.2 * sh, chimneyX + 0.9 * sw, 54 - 1.5 * sh));
-    var frame = Path.combine(
-        PathOperation.difference, outer, _stairs(50, 54.1, 66, 31, 6));
-    for (final b in [
-      _rect(17, 84, 20, 94),
-      _rect(17, 91, 27, 94),
-      _rect(80, 84, 83, 94),
-      _rect(73, 91, 83, 94),
-    ]) {
-      frame = Path.combine(PathOperation.union, frame, b);
-    }
+  /// The room the key needs around it, so nothing behind touches it.
+  static Path _halo() {
     final halo = Path();
     for (var r = 0; r < keyCells.length; r++) {
       for (var c = 0; c < keyCells[r].length; c++) {
@@ -146,16 +144,33 @@ class KeyIconPainter extends CustomPainter {
         }
       }
     }
-    frame = Path.combine(PathOperation.difference, frame, halo);
-    return Path.combine(
-        PathOperation.difference,
-        frame,
-        _rect(keyOrigin.dx, keyOrigin.dy, keyOrigin.dx + 8 * cell,
-            keyOrigin.dy + 8 * cell));
+    return halo;
+  }
+
+  /// The roof outlined in stairs, with its chimney, minus the key's room.
+  static Path framePath() {
+    const sw = 84 / 2 / 6, sh = 40 / 6;
+    const chimneyX = 50 - 42 + 1.5 * sw;
+    final outer = Path.combine(PathOperation.union, _stairs(50, 54, 84, 40, 6),
+        _rect(chimneyX, 54 - 3.2 * sh, chimneyX + 0.9 * sw, 54 - 1.5 * sh));
+    var frame = Path.combine(
+        PathOperation.difference, outer, _stairs(50, 54.1, 66, 31, 6));
+    frame = Path.combine(PathOperation.difference, frame, _halo());
+    // The ridge sits behind the ring; what the gap leaves of it beside the
+    // ring is a sliver, not a roof.
+    return Path.combine(PathOperation.difference, frame, _rect(30, 0, 70, 24));
+  }
+
+  /// The house as a soft shape: the walls and the inside of the roof.
+  static Path tonePath() {
+    final house = Path.combine(PathOperation.union, _rect(17, 54, 83, 92),
+        _stairs(50, 54.1, 66, 31, 6));
+    return Path.combine(PathOperation.difference, house, _halo());
   }
 
   static final Path _key = keyPath();
   static final Path _frame = framePath();
+  static final Path _tone = tonePath();
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -168,6 +183,7 @@ class KeyIconPainter extends CustomPainter {
         Paint()..color = tile!,
       );
     }
+    if (tone != null) canvas.drawPath(_tone, Paint()..color = tone!);
     canvas.drawPath(_frame, Paint()..color = frame);
     canvas.drawPath(_key, Paint()..color = key);
     canvas.restore();
@@ -175,7 +191,10 @@ class KeyIconPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(KeyIconPainter old) =>
-      old.tile != tile || old.key != key || old.frame != frame;
+      old.tile != tile ||
+      old.key != key ||
+      old.frame != frame ||
+      old.tone != tone;
 }
 
 // ── The desktop lockup ──────────────────────────────────────────────────────

@@ -57,12 +57,17 @@ void main() {
   });
 
   test('the key never touches the house behind it', () {
-    final overlap = Path.combine(
-      PathOperation.intersect,
-      KeyIconPainter.keyPath(),
+    for (final behind in [
       KeyIconPainter.framePath(),
-    );
-    expect(overlap.getBounds().isEmpty, isTrue);
+      KeyIconPainter.tonePath(),
+    ]) {
+      final overlap = Path.combine(
+        PathOperation.intersect,
+        KeyIconPainter.keyPath(),
+        behind,
+      );
+      expect(overlap.getBounds().isEmpty, isTrue);
+    }
   });
 
   group('the Windows pane', () {

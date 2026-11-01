@@ -147,7 +147,7 @@ class _WindowCaptionBarState extends State<WindowCaptionBar> {
                                 scale: folded ? 1 : 0.5,
                                 duration: WindowsPane.fold,
                                 curve: WindowsPane.foldCurve,
-                                child: const ProxyDomKeyIcon(size: 22),
+                                child: const ProxyDomKeyIcon(size: 26),
                               ),
                             ),
                           ),
@@ -159,8 +159,9 @@ class _WindowCaptionBarState extends State<WindowCaptionBar> {
               ),
             ),
           ),
-          // The window's title, the way a Windows caption carries one: over the
-          // pane while it is open, just past its edge when it is folded.
+          // The window's title, the way a Windows caption carries one: centred
+          // over the pane while it is open, like the lockup at the pane's foot;
+          // just past the pane's edge when it is folded.
           Positioned.fill(
             child: ExcludeSemantics(
               child: ValueListenableBuilder<double?>(
@@ -172,19 +173,28 @@ class _WindowCaptionBarState extends State<WindowCaptionBar> {
                     duration: WindowsPane.fold,
                     curve: WindowsPane.foldCurve,
                     padding: EdgeInsets.only(
-                      left: folded ? paneWidth + 14 : 16,
+                      left: folded
+                          ? paneWidth + 14
+                          : (paneWidth == null ? 16 : 0),
                     ),
                     child: Align(
                       alignment: Alignment.centerLeft,
-                      child: Text(
-                        widget.label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: widget.ink.withValues(alpha: 0.6),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
+                      child: SizedBox(
+                        width: folded ? null : paneWidth,
+                        child: Text(
+                          textAlign: folded || paneWidth == null
+                              ? TextAlign.start
+                              : TextAlign.center,
+                          widget.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              Theme.of(context).textTheme.labelSmall?.copyWith(
+                                    color: widget.ink.withValues(alpha: 0.6),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                        ),
                       ),
                     ),
                   );
