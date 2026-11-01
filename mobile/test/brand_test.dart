@@ -140,6 +140,17 @@ void main() {
       expect(
           find.descendant(of: caption, matching: find.byType(ProxyDomLockup)),
           findsNothing);
+      // Open, the corner icon is hidden: the lockup at the pane's foot is
+      // the mark.
+      expect(
+          tester
+              .widget<AnimatedOpacity>(
+                  find.byKey(const ValueKey('caption-folded-icon')))
+              .opacity,
+          0);
+      // The lockup is centred on the pane.
+      expect(tester.getRect(find.byType(ProxyDomLockup)).center.dx,
+          closeTo(WindowsNavRail.width / 2, 2));
       expect(
           find.descendant(
               of: find.byType(WindowsNavRail),
@@ -186,6 +197,14 @@ void main() {
       }
       await tester.pumpAndSettle();
       expect(find.byType(ProxyDomLockup), findsNothing);
+      // The app icon has grown into the corner over the folded pane.
+      final icon = tester.widget<AnimatedOpacity>(
+          find.byKey(const ValueKey('caption-folded-icon')));
+      expect(icon.opacity, 1);
+      expect(tester.getRect(find.byType(ProxyDomKeyIcon)).center.dx,
+          closeTo(WindowsNavRail.compactWidth / 2, 1));
+      // No hover labels on the folded destinations.
+      expect(find.byType(Tooltip), findsNothing);
       // The title moves past the folded pane's edge instead of crossing it.
       final text = tester.getRect(find.text(title));
       expect(text.left, greaterThan(WindowsNavRail.compactWidth));

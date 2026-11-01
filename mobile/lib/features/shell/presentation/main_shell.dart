@@ -381,16 +381,15 @@ class _WindowsNavRailState extends State<WindowsNavRail> {
                         ),
                       ),
                     const Spacer(),
-                    // The name stands at the foot of the pane, where the
-                    // pane ends; folded, there is no room for it.
+                    // The name stands at the foot of the pane, centred on the
+                    // column of destinations above it; folded, there is no
+                    // room for it.
                     if (wide)
                       Padding(
-                        padding: const EdgeInsets.only(left: 4, right: 4),
-                        child: Align(
-                          alignment: Alignment.centerLeft,
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Center(
                           child: FittedBox(
                             fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerLeft,
                             child: ProxyDomLockup(
                               label: l.appTitle,
                               ink: ink,
@@ -567,7 +566,9 @@ class _RailItemState extends State<_RailItem> {
         },
       ),
     );
-    return widget.compact ? Tooltip(message: widget.label, child: item) : item;
+    // No hover hint even when folded: the hover wash is the answer to the
+    // pointer, and a label popping up under it got in the way.
+    return item;
   }
 }
 

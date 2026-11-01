@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../theme.dart';
+import 'proxydom_brand.dart';
 import 'windows_pane.dart';
 
 /// The Windows caption, drawn by the app instead of by the system frame.
@@ -118,6 +119,7 @@ class _WindowCaptionBarState extends State<WindowCaptionBar> {
                   valueListenable: WindowsPane.currentWidth,
                   builder: (context, paneWidth, _) {
                     if (paneWidth == null) return const SizedBox.shrink();
+                    final folded = paneWidth < WindowsPane.wideFrom;
                     final dark =
                         Theme.of(context).brightness == Brightness.dark;
                     return AnimatedContainer(
@@ -128,6 +130,28 @@ class _WindowCaptionBarState extends State<WindowCaptionBar> {
                       decoration: BoxDecoration(
                         color: WindowsPane.panel(dark),
                         border: Border(right: WindowsPane.edge(dark)),
+                      ),
+                      // Folded, the app icon takes the corner over the pane,
+                      // growing in as the title slides out of its way.
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: SizedBox(
+                          width: WindowsPane.compactWidth,
+                          child: Center(
+                            child: AnimatedOpacity(
+                              key: const ValueKey('caption-folded-icon'),
+                              opacity: folded ? 1 : 0,
+                              duration: WindowsPane.fold,
+                              curve: WindowsPane.foldCurve,
+                              child: AnimatedScale(
+                                scale: folded ? 1 : 0.5,
+                                duration: WindowsPane.fold,
+                                curve: WindowsPane.foldCurve,
+                                child: const ProxyDomKeyIcon(size: 22),
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
                     );
                   },
