@@ -463,6 +463,12 @@ abstract class AppL10n {
   /// **'Players found: {count}'**
   String splitTunnelPlayersFound(int count);
 
+  /// No description provided for @splitTunnelPlayersDetected.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{(no players detected)} =1{(1 player detected)} other{({count} players detected)}}'**
+  String splitTunnelPlayersDetected(int count);
+
   /// No description provided for @splitTunnelPlayersCount.
   ///
   /// In en, this message translates to:

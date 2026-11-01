@@ -210,6 +210,19 @@ class AppL10nRu extends AppL10n {
   }
 
   @override
+  String splitTunnelPlayersDetected(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '(обнаружено $count плееров)',
+      few: '(обнаружено $count плеера)',
+      one: '(обнаружен $count плеер)',
+      zero: '(плееры не обнаружены)',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String splitTunnelPlayersCount(int count) {
     return 'Плееров: $count';
   }

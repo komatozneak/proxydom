@@ -82,6 +82,7 @@
   "splitTunnelEdit": "Редактировать",
   "splitTunnelEditDone": "Готово",
   "splitTunnelPlayersFound": "Плееры найдены: {count}",
+  "splitTunnelPlayersDetected": "{count, plural, =0{(плееры не обнаружены)} one{(обнаружен {count} плеер)} few{(обнаружено {count} плеера)} other{(обнаружено {count} плееров)}}",
   "splitTunnelPlayersCount": "Плееров: {count}",
   "splitTunnelEmptyBody": "Добавьте точный hostname — без туннеля пойдёт только он, не его поддомены.",
   "splitTunnelInvalidDomain": "Введите адрес вида gw.company-net.ru",

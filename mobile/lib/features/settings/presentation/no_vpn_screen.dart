@@ -704,11 +704,13 @@ class _SitesTabState extends State<_SitesTab> {
                 Expanded(
                   child: _AllowRow(
                     title: site.label.isNotEmpty ? site.label : site.domain,
+                    // Every site says how many players came with it, zero
+                    // included: a silent row could not tell "none found"
+                    // from "never checked".
                     subtitle: site.label.isNotEmpty
-                        ? site.domain
-                        : (site.players.isEmpty
-                            ? null
-                            : l.splitTunnelPlayersCount(site.players.length)),
+                        ? '${site.domain}  '
+                            '${l.splitTunnelPlayersDetected(site.players.length)}'
+                        : l.splitTunnelPlayersDetected(site.players.length),
                     value: site.enabled,
                     onChanged: (v) => widget.onToggleSite(site, v),
                   ),

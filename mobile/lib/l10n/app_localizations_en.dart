@@ -209,6 +209,18 @@ class AppL10nEn extends AppL10n {
   }
 
   @override
+  String splitTunnelPlayersDetected(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '($count players detected)',
+      one: '(1 player detected)',
+      zero: '(no players detected)',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String splitTunnelPlayersCount(int count) {
     return 'Players: $count';
   }
