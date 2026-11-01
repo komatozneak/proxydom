@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../theme.dart';
 import 'windows_pane.dart';
 
@@ -74,18 +75,29 @@ class _WindowCaptionBarState extends State<WindowCaptionBar> {
     }
   }
 
-  Future<void> _send(String method) async {
+  Future<void> _send(String method, [Object? arguments]) async {
     try {
-      await WindowCaptionBar._chrome.invokeMethod<void>(method);
+      await WindowCaptionBar._chrome.invokeMethod<void>(method, arguments);
     } on PlatformException {
       // Ignore: the window may already be gone.
     }
   }
 
-  void _invoke(String method) {
+  void _invoke(String method, [Object? arguments]) {
     // Fire and forget on purpose: the channel call crosses to the runner, and a
     // failed invoke must never surface as an unhandled error in the UI.
-    _send(method);
+    _send(method, arguments);
+  }
+
+  /// Minimize puts the window in the tray: a VPN keeps running with its window
+  /// away. The runner draws the tray icon and its menu, in these words.
+  void _hideToTray() {
+    final l = AppL10n.of(context);
+    _invoke('hideToTray', {
+      'tooltip': widget.label,
+      'open': l.trayOpen,
+      'quit': l.trayQuit,
+    });
   }
 
   @override
@@ -166,7 +178,7 @@ class _WindowCaptionBarState extends State<WindowCaptionBar> {
                 _CaptionButton(
                   width: _buttonWidth,
                   height: _buttonHeight,
-                  onTap: () => _invoke('minimize'),
+                  onTap: _hideToTray,
                   semanticLabel: 'Minimize',
                   painter: (c, s, h) => _drawMinimize(c, s, widget.ink),
                 ),

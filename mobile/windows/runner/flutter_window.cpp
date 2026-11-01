@@ -3,11 +3,29 @@
 #include <flutter/method_channel.h>
 #include <flutter/standard_method_codec.h>
 
+#include <shellapi.h>
+
 #include <optional>
 
 #include "flutter/generated_plugin_registrant.h"
+#include "resource.h"
 
 namespace {
+
+constexpr UINT kTrayMessage = WM_APP + 1;
+constexpr UINT kTrayIconId = 1;
+constexpr UINT kTrayOpen = 1;
+constexpr UINT kTrayQuit = 2;
+
+std::wstring Widen(const std::string& utf8) {
+  if (utf8.empty()) return std::wstring();
+  const int size = MultiByteToWideChar(CP_UTF8, 0, utf8.data(),
+                                       static_cast<int>(utf8.size()), nullptr, 0);
+  std::wstring wide(size, L'\0');
+  MultiByteToWideChar(CP_UTF8, 0, utf8.data(), static_cast<int>(utf8.size()),
+                      wide.data(), size);
+  return wide;
+}
 
 // The Flutter view fills the whole client area, so it — not the top-level
 // window — is what the system hit-tests for mouse input. Without this the view
@@ -91,6 +109,7 @@ bool FlutterWindow::OnCreate() {
 }
 
 void FlutterWindow::OnDestroy() {
+  RemoveTrayIcon();
   caption_channel_ = nullptr;
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
@@ -121,6 +140,21 @@ void FlutterWindow::SetCaptionChannel() {
         const std::string& method = call.method_name();
         if (method == "minimize") {
           ShowWindow(hwnd, SW_MINIMIZE);
+        } else if (method == "hideToTray") {
+          const auto* args = std::get_if<flutter::EncodableMap>(
+              call.arguments());
+          if (args != nullptr) {
+            auto text = [args](const char* key) -> std::wstring {
+              auto it = args->find(flutter::EncodableValue(key));
+              if (it == args->end()) return std::wstring();
+              const auto* value = std::get_if<std::string>(&it->second);
+              return value == nullptr ? std::wstring() : Widen(*value);
+            };
+            if (auto v = text("tooltip"); !v.empty()) tray_tip_ = v;
+            if (auto v = text("open"); !v.empty()) tray_open_ = v;
+            if (auto v = text("quit"); !v.empty()) tray_quit_ = v;
+          }
+          HideToTray();
         } else if (method == "toggleMaximize") {
           const bool maximized = IsZoomed(hwnd) != FALSE;
           ShowWindow(hwnd, maximized ? SW_RESTORE : SW_MAXIMIZE);
@@ -173,11 +207,108 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
     }
   }
 
+  if (taskbar_created_ == 0) {
+    taskbar_created_ = RegisterWindowMessage(L"TaskbarCreated");
+  }
+  if (message == taskbar_created_ && tray_visible_) {
+    // Explorer came back with an empty tray; put the icon back in it.
+    tray_visible_ = false;
+    AddTrayIcon();
+    return 0;
+  }
+
   switch (message) {
     case WM_FONTCHANGE:
       flutter_controller_->engine()->ReloadSystemFonts();
       break;
+    case kTrayMessage:
+      switch (LOWORD(lparam)) {
+        case WM_LBUTTONUP:
+        case WM_LBUTTONDBLCLK:
+          RestoreFromTray();
+          return 0;
+        case WM_RBUTTONUP:
+        case WM_CONTEXTMENU:
+          ShowTrayMenu();
+          return 0;
+      }
+      return 0;
   }
 
   return Win32Window::MessageHandler(hwnd, message, wparam, lparam);
+}
+
+bool FlutterWindow::AddTrayIcon() {
+  if (tray_visible_) return true;
+  HWND hwnd = GetHandle();
+  if (hwnd == nullptr) return false;
+  NOTIFYICONDATAW data{};
+  data.cbSize = sizeof(data);
+  data.hWnd = hwnd;
+  data.uID = kTrayIconId;
+  data.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
+  data.uCallbackMessage = kTrayMessage;
+  // The small size of the same .ico the window and the taskbar use.
+  data.hIcon = static_cast<HICON>(LoadImage(
+      GetModuleHandle(nullptr), MAKEINTRESOURCE(IDI_APP_ICON), IMAGE_ICON,
+      GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), 0));
+  wcsncpy_s(data.szTip, tray_tip_.c_str(), _TRUNCATE);
+  tray_visible_ = Shell_NotifyIconW(NIM_ADD, &data) != FALSE;
+  if (data.hIcon != nullptr) DestroyIcon(data.hIcon);
+  return tray_visible_;
+}
+
+void FlutterWindow::RemoveTrayIcon() {
+  if (!tray_visible_) return;
+  NOTIFYICONDATAW data{};
+  data.cbSize = sizeof(data);
+  data.hWnd = GetHandle();
+  data.uID = kTrayIconId;
+  Shell_NotifyIconW(NIM_DELETE, &data);
+  tray_visible_ = false;
+}
+
+void FlutterWindow::HideToTray() {
+  HWND hwnd = GetHandle();
+  if (hwnd == nullptr) return;
+  // No icon, no way back: then the window is minimized as before instead.
+  if (!AddTrayIcon()) {
+    ShowWindow(hwnd, SW_MINIMIZE);
+    return;
+  }
+  ShowWindow(hwnd, SW_HIDE);
+}
+
+void FlutterWindow::RestoreFromTray() {
+  HWND hwnd = GetHandle();
+  if (hwnd == nullptr) return;
+  ShowWindow(hwnd, IsIconic(hwnd) ? SW_RESTORE : SW_SHOW);
+  SetForegroundWindow(hwnd);
+  RemoveTrayIcon();
+}
+
+void FlutterWindow::ShowTrayMenu() {
+  HWND hwnd = GetHandle();
+  if (hwnd == nullptr) return;
+  HMENU menu = CreatePopupMenu();
+  if (menu == nullptr) return;
+  AppendMenuW(menu, MF_STRING, kTrayOpen, tray_open_.c_str());
+  AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+  AppendMenuW(menu, MF_STRING, kTrayQuit, tray_quit_.c_str());
+  SetMenuDefaultItem(menu, kTrayOpen, FALSE);
+  POINT cursor;
+  GetCursorPos(&cursor);
+  // Without the window in front the menu does not close on an outside click.
+  SetForegroundWindow(hwnd);
+  const UINT picked = static_cast<UINT>(TrackPopupMenu(
+      menu, TPM_RETURNCMD | TPM_NONOTIFY | TPM_RIGHTBUTTON, cursor.x, cursor.y,
+      0, hwnd, nullptr));
+  PostMessage(hwnd, WM_NULL, 0, 0);
+  DestroyMenu(menu);
+  if (picked == kTrayOpen) {
+    RestoreFromTray();
+  } else if (picked == kTrayQuit) {
+    RemoveTrayIcon();
+    PostMessage(hwnd, WM_CLOSE, 0, 0);
+  }
 }

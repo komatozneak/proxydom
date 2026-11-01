@@ -265,6 +265,18 @@ abstract class AppL10n {
   /// **'Proxy Dom · utility'**
   String get windowTitle;
 
+  /// No description provided for @trayOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get trayOpen;
+
+  /// No description provided for @trayQuit.
+  ///
+  /// In en, this message translates to:
+  /// **'Quit'**
+  String get trayQuit;
+
   /// No description provided for @homeStatServer.
   ///
   /// In en, this message translates to:

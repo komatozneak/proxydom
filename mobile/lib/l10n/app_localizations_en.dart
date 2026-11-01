@@ -93,6 +93,12 @@ class AppL10nEn extends AppL10n {
   String get windowTitle => 'Proxy Dom · utility';
 
   @override
+  String get trayOpen => 'Open';
+
+  @override
+  String get trayQuit => 'Quit';
+
+  @override
   String get homeStatServer => 'Server';
 
   @override

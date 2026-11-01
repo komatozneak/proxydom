@@ -28,6 +28,8 @@
   "navPaneCollapse": "Свернуть панель",
   "navPaneExpand": "Развернуть панель",
   "windowTitle": "Прокси Дом · утилита",
+  "trayOpen": "Открыть",
+  "trayQuit": "Выход",
   "homeStatServer": "Сервер",
   "homeStatPing": "Пинг",
   "homeStatPingPending": "измеряем",

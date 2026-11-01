@@ -94,6 +94,12 @@ class AppL10nRu extends AppL10n {
   String get windowTitle => 'Прокси Дом · утилита';
 
   @override
+  String get trayOpen => 'Открыть';
+
+  @override
+  String get trayQuit => 'Выход';
+
+  @override
   String get homeStatServer => 'Сервер';
 
   @override

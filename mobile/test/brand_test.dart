@@ -147,6 +147,28 @@ void main() {
           findsOneWidget);
     });
 
+    testWidgets('minimize puts the window in the tray, in the app language',
+        (tester) async {
+      final calls = <MethodCall>[];
+      await pumpWindow(tester);
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        const MethodChannel('proxydom/window_chrome'),
+        (call) async {
+          calls.add(call);
+          return null;
+        },
+      );
+      await tester.tap(find.bySemanticsLabel('Minimize'));
+      await tester.pump();
+      final hide = calls.singleWhere((c) => c.method == 'hideToTray');
+      expect(hide.arguments, {
+        'tooltip': title,
+        'open': 'Открыть',
+        'quit': 'Выход',
+      });
+      expect(calls.where((c) => c.method == 'minimize'), isEmpty);
+    });
+
     testWidgets('has minimize and close, and no maximize', (tester) async {
       await pumpWindow(tester);
       expect(find.bySemanticsLabel('Minimize'), findsOneWidget);
