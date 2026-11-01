@@ -69,7 +69,8 @@
                  for `vless://` and the link lands in a browser that cannot open
                  it. Only schemes this build can actually start are registered;
                  a key it would have to refuse is not an intake path.
-                 `ss` and `socks5` have no host, so the filter matches any. -->
+                 `ss`, `socks5` and `socks` have no host, so the filter matches any.
+                 `socks` is the spelling v2rayN exports, credential in base64. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
@@ -81,6 +82,7 @@
                 <data android:scheme="trojan"/>
                 <data android:scheme="ss"/>
                 <data android:scheme="socks5"/>
+                <data android:scheme="socks"/>
             </intent-filter>
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE_PREFERENCES"/>

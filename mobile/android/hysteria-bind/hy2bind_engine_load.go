@@ -241,25 +241,28 @@ func shareProxy(item shareOutbound) (*anypb.Any, error) {
 			}},
 		}}}), nil
 	case "socks":
-		// SOCKS5 outbound. No credential is a valid server: the account is empty
-		// and the core offers `noauth`. A user with an empty password is valid
-		// too, and the account keeps the empty string rather than inventing one.
+		// SOCKS5 outbound. The core offers username/password whenever the
+		// endpoint has a user, even an empty one, and `noauth` only when it has
+		// none — so a key without a credential must carry no user at all, or a
+		// server that allows only `noauth` turns it away. A user with an empty
+		// password is still a user, and keeps the empty string.
 		if len(item.Settings.Servers) == 0 {
 			return nil, fmt.Errorf("socks server missing")
 		}
 		server := item.Settings.Servers[0]
-		account := &socks.Account{}
-		if len(server.Users) > 0 {
-			account.Username = server.Users[0].User
-			account.Password = server.Users[0].Pass
-		}
-		return serial.ToTypedMessage(&socks.ClientConfig{Server: []*protocol.ServerEndpoint{{
+		endpoint := &protocol.ServerEndpoint{
 			Address: net.NewIPOrDomain(net.ParseAddress(server.Address)),
 			Port:    uint32(server.Port),
-			User: []*protocol.User{{
-				Account: serial.ToTypedMessage(account),
-			}},
-		}}}), nil
+		}
+		if len(server.Users) > 0 && server.Users[0].User != "" {
+			endpoint.User = []*protocol.User{{
+				Account: serial.ToTypedMessage(&socks.Account{
+					Username: server.Users[0].User,
+					Password: server.Users[0].Pass,
+				}),
+			}}
+		}
+		return serial.ToTypedMessage(&socks.ClientConfig{Server: []*protocol.ServerEndpoint{endpoint}}), nil
 	default:
 		return nil, fmt.Errorf("unsupported outbound %q", item.Protocol)
 	}

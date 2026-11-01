@@ -129,6 +129,28 @@ void main() {
     expect((users.first as Map)['pass'], 's3cret');
   });
 
+  Map<dynamic, dynamic> socksUser(String raw) {
+    final decoded = jsonDecode(buildShareSocksConfig(parseShareLink(raw))!)
+        as Map<String, dynamic>;
+    final settings =
+        ((decoded['outbounds'] as List).first as Map)['settings'] as Map;
+    final server = (settings['servers'] as List).first as Map;
+    return (server['users'] as List).first as Map;
+  }
+
+  test('a base64 socks credential (v2rayN) is decoded', () {
+    // base64("alice:s3cret"), unpadded and URL-safe as the exporters write it.
+    final user = socksUser('socks://YWxpY2U6czNjcmV0@203.0.113.10:1080#s');
+    expect(user['user'], 'alice');
+    expect(user['pass'], 's3cret');
+  });
+
+  test('a plain socks username is not mistaken for base64', () {
+    final user = socksUser('socks5://alice@203.0.113.10:1080#s');
+    expect(user['user'], 'alice');
+    expect(user['pass'], '');
+  });
+
   test('a socks5 key with no credential writes no users', () {
     final json = buildShareSocksConfig(parseShareLink('socks5://1.2.3.4'));
     final decoded = jsonDecode(json!) as Map<String, dynamic>;
