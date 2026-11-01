@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:proxydom/core/theme.dart';
 import 'package:proxydom/core/widgets/proxydom_brand.dart';
 import 'package:proxydom/core/widgets/window_caption_bar.dart';
+import 'package:proxydom/core/widgets/windows_pane.dart';
 import 'package:proxydom/features/shell/presentation/main_shell.dart';
 import 'package:proxydom/l10n/app_localizations.dart';
 
@@ -82,7 +83,9 @@ void main() {
       expect(tester.getSize(find.byType(WindowsNavRail)).width,
           WindowsNavRail.compactWidth);
       expect(find.text('Настройки'), findsNothing);
-      expect(find.byType(ProxyDomKeyIcon), findsOneWidget);
+      // Folded, the PC version shows no mark at all: the lockup is its only one.
+      expect(find.byType(ProxyDomLockup), findsNothing);
+      expect(find.byType(ProxyDomKeyIcon), findsNothing);
 
       await tester.tap(find.byTooltip('Развернуть панель'));
       await tester.pumpAndSettle();
@@ -102,17 +105,62 @@ void main() {
     });
   });
 
-  testWidgets('the caption names the window next to the app icon',
-      (tester) async {
-    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-      const MethodChannel('proxydom/window_chrome'),
-      (call) async => null,
-    );
-    await tester.pumpWidget(_app(
-      const WindowCaptionBar(label: 'Прокси Дом', ink: AppBrand.inkDark),
-    ));
-    await tester.pump();
-    expect(find.text('Прокси Дом'), findsOneWidget);
-    expect(find.byType(ProxyDomKeyIcon), findsOneWidget);
+  group('the caption', () {
+    setUp(() => WindowsPane.currentWidth.value = null);
+
+    Future<void> pumpWindow(WidgetTester tester) async {
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        const MethodChannel('proxydom/window_chrome'),
+        (call) async => null,
+      );
+      await tester.pumpWidget(_app(Column(children: [
+        const WindowCaptionBar(label: 'Прокси Дом', ink: AppBrand.inkDark),
+        Expanded(
+          child: Row(children: [
+            WindowsNavRail(selected: 1, onSelect: (_) {}),
+            const Expanded(child: SizedBox()),
+          ]),
+        ),
+      ])));
+      await tester.pumpAndSettle();
+    }
+
+    final column = find.byKey(const ValueKey('caption-pane-column'));
+
+    testWidgets('carries no mark and no title of its own', (tester) async {
+      await pumpWindow(tester);
+      expect(find.text('Прокси Дом'), findsNothing);
+      expect(
+        find.descendant(
+            of: find.byType(WindowCaptionBar),
+            matching: find.byType(ProxyDomKeyIcon)),
+        findsNothing,
+      );
+      expect(find.bySemanticsLabel('Прокси Дом'), findsWidgets);
+    });
+
+    testWidgets('continues the pane to the top of the window, folded or not',
+        (tester) async {
+      await pumpWindow(tester);
+      expect(tester.getSize(column).width, WindowsNavRail.width);
+
+      await tester.tap(find.byTooltip('Свернуть панель'));
+      await tester.pumpAndSettle();
+      expect(tester.getSize(column).width, WindowsNavRail.compactWidth);
+      expect(tester.getSize(find.byType(WindowsNavRail)).width,
+          WindowsNavRail.compactWidth);
+    });
+
+    testWidgets('has no column where there is no pane', (tester) async {
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        const MethodChannel('proxydom/window_chrome'),
+        (call) async => null,
+      );
+      await tester.pumpWidget(_app(
+        const WindowCaptionBar(label: 'Прокси Дом', ink: AppBrand.inkDark),
+      ));
+      await tester.pump();
+      expect(column, findsNothing);
+    });
   });
 }

@@ -15,6 +15,7 @@ import '../../../core/widgets/interaction.dart';
 import '../../../core/widgets/mossy_rail.dart';
 import '../../../core/widgets/proxydom_brand.dart';
 import '../../../core/widgets/proxydom_ground.dart';
+import '../../../core/widgets/windows_pane.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../home/application/vpn_provider.dart';
 
@@ -276,13 +277,13 @@ class WindowsNavRail extends StatefulWidget {
 
   final bool initiallyExpanded;
 
-  static const double width = 248;
-  static const double compactWidth = 60;
+  static const double width = WindowsPane.width;
+  static const double compactWidth = WindowsPane.compactWidth;
 
   /// Below this the pane lays itself out folded, also while it animates.
   static const double wideFrom = 160;
 
-  static const Duration fold = Duration(milliseconds: 200);
+  static const Duration fold = WindowsPane.fold;
 
   @override
   State<WindowsNavRail> createState() => _WindowsNavRailState();
@@ -290,6 +291,31 @@ class WindowsNavRail extends StatefulWidget {
 
 class _WindowsNavRailState extends State<WindowsNavRail> {
   late bool _expanded = widget.initiallyExpanded;
+
+  double get _target =>
+      _expanded ? WindowsNavRail.width : WindowsNavRail.compactWidth;
+
+  @override
+  void initState() {
+    super.initState();
+    // The caption paints this pane's column over its own band; tell it how
+    // wide the column is, after this frame so the caption is not rebuilt
+    // while the shell is building.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) WindowsPane.currentWidth.value = _target;
+    });
+  }
+
+  @override
+  void dispose() {
+    WindowsPane.currentWidth.value = null;
+    super.dispose();
+  }
+
+  void _toggle() {
+    setState(() => _expanded = !_expanded);
+    WindowsPane.currentWidth.value = _target;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -318,16 +344,11 @@ class _WindowsNavRailState extends State<WindowsNavRail> {
     return RepaintBoundary(
       child: AnimatedContainer(
         duration: WindowsNavRail.fold,
-        curve: Curves.easeOutCubic,
-        width: _expanded ? WindowsNavRail.width : WindowsNavRail.compactWidth,
+        curve: WindowsPane.foldCurve,
+        width: _target,
         decoration: BoxDecoration(
-          color: dark ? AppBrand.surfaceRaisedDark : AppBrand.stoneLight,
-          border: Border(
-            right: BorderSide(
-              color: (dark ? AppBrand.mossLight : AppBrand.inkLight)
-                  .withValues(alpha: dark ? 0.16 : 0.10),
-            ),
-          ),
+          color: WindowsPane.panel(dark),
+          border: Border(right: WindowsPane.edge(dark)),
         ),
         child: ClipRect(
           child: LayoutBuilder(
@@ -345,7 +366,7 @@ class _WindowsNavRailState extends State<WindowsNavRail> {
                         icon: AppIcons.sidebar,
                         tooltip:
                             _expanded ? l.navPaneCollapse : l.navPaneExpand,
-                        onTap: () => setState(() => _expanded = !_expanded),
+                        onTap: _toggle,
                       ),
                     ),
                     const SizedBox(height: 10),
@@ -361,7 +382,9 @@ class _WindowsNavRailState extends State<WindowsNavRail> {
                                 height: 60,
                               ),
                             )
-                          : const Center(child: ProxyDomKeyIcon(size: 34)),
+                          // Folded, there is no room for the name, and the PC
+                          // version carries no other mark.
+                          : null,
                     ),
                     const SizedBox(height: 18),
                     for (final item in items)

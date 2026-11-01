@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../theme.dart';
-import 'proxydom_brand.dart';
+import 'windows_pane.dart';
 
 /// The Windows caption, drawn by the app instead of by the system frame.
 ///
@@ -25,9 +25,6 @@ class WindowCaptionBar extends StatefulWidget {
   final double height;
 
   static const MethodChannel _chrome = MethodChannel('proxydom/window_chrome');
-
-  /// Horizontal inset of the lockup from the window edge.
-  static const double _inset = 16;
 
   @override
   State<WindowCaptionBar> createState() => _WindowCaptionBarState();
@@ -109,33 +106,32 @@ class _WindowCaptionBarState extends State<WindowCaptionBar> {
       height: widget.height,
       child: Stack(
         children: [
-          // Transparent to the pointer everywhere except the buttons. Dragging
-          // is the runner's job, not this widget's.
+          // The navigation pane's column runs to the top of the window: over
+          // the pane's width the caption is the pane, so the pane does not end
+          // where the window frame begins. No mark here — the name lives at
+          // the top of the pane. The window is still named for screen readers.
           Positioned.fill(
-            child: Padding(
-              padding: const EdgeInsets.only(
-                left: WindowCaptionBar._inset,
-              ),
+            child: Semantics(
+              label: widget.label,
               child: Align(
                 alignment: Alignment.centerLeft,
-                // A Windows caption: the small app icon, then the title. The
-                // brand lockup lives at the top of the navigation pane, where
-                // it has the room to be read; the caption only names the window.
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const ProxyDomKeyIcon(size: 18),
-                    const SizedBox(width: 10),
-                    Text(
-                      widget.label,
-                      maxLines: 1,
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                            color: widget.ink.withValues(alpha: 0.86),
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                  ],
+                child: ValueListenableBuilder<double?>(
+                  valueListenable: WindowsPane.currentWidth,
+                  builder: (context, paneWidth, _) {
+                    if (paneWidth == null) return const SizedBox.shrink();
+                    final dark =
+                        Theme.of(context).brightness == Brightness.dark;
+                    return AnimatedContainer(
+                      key: const ValueKey('caption-pane-column'),
+                      duration: WindowsPane.fold,
+                      curve: WindowsPane.foldCurve,
+                      width: paneWidth,
+                      decoration: BoxDecoration(
+                        color: WindowsPane.panel(dark),
+                        border: Border(right: WindowsPane.edge(dark)),
+                      ),
+                    );
+                  },
                 ),
               ),
             ),
