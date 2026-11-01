@@ -27,6 +27,7 @@
   "navSettings": "Настройки",
   "navPaneCollapse": "Свернуть панель",
   "navPaneExpand": "Развернуть панель",
+  "windowTitle": "Прокси Дом · утилита",
   "homeStatServer": "Сервер",
   "homeStatPing": "Пинг",
   "homeStatPingPending": "измеряем",

@@ -90,6 +90,9 @@ class AppL10nEn extends AppL10n {
   String get navPaneExpand => 'Expand pane';
 
   @override
+  String get windowTitle => 'Proxy Dom · utility';
+
+  @override
   String get homeStatServer => 'Server';
 
   @override

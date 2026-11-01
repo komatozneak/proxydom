@@ -73,7 +73,7 @@ class _WindowsWindowFrame extends StatelessWidget {
       child: Column(
         children: [
           WindowCaptionBar(
-            label: AppL10n.of(context).appTitle,
+            label: AppL10n.of(context).windowTitle,
             ink: dark ? AppBrand.inkDark : AppBrand.inkLight,
           ),
           Expanded(child: child),

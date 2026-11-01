@@ -71,8 +71,8 @@ void main() {
         WindowsNavRail(selected: 1, onSelect: (_) {}),
         const Expanded(child: SizedBox()),
       ])));
-      // The name lives in the caption now, not in the pane.
-      expect(find.byType(ProxyDomLockup), findsNothing);
+      // The name stands at the foot of the open pane.
+      expect(find.byType(ProxyDomLockup), findsOneWidget);
       expect(find.text('Настройки'), findsOneWidget);
 
       await tester.tap(find.bySemanticsLabel('Свернуть панель'));
@@ -109,13 +109,15 @@ void main() {
   group('the caption', () {
     setUp(() => WindowsPane.currentWidth.value = null);
 
+    const title = 'Прокси Дом · утилита';
+
     Future<void> pumpWindow(WidgetTester tester) async {
       tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
         const MethodChannel('proxydom/window_chrome'),
         (call) async => null,
       );
       await tester.pumpWidget(_app(Column(children: [
-        const WindowCaptionBar(label: 'Прокси Дом', ink: AppBrand.inkDark),
+        const WindowCaptionBar(label: title, ink: AppBrand.inkDark),
         Expanded(
           child: Row(children: [
             WindowsNavRail(selected: 1, onSelect: (_) {}),
@@ -127,16 +129,30 @@ void main() {
     }
 
     final column = find.byKey(const ValueKey('caption-pane-column'));
+    final caption = find.byType(WindowCaptionBar);
 
-    testWidgets('carries the lockup over the pane, and no other mark',
+    testWidgets('is a thin band with the window title and no mark',
         (tester) async {
       await pumpWindow(tester);
+      expect(tester.getSize(caption).height, WindowsPane.captionHeight);
+      expect(find.descendant(of: caption, matching: find.text(title)),
+          findsOneWidget);
       expect(
-        find.descendant(of: column, matching: find.byType(ProxyDomLockup)),
-        findsOneWidget,
-      );
-      expect(find.text('Прокси Дом'), findsNothing);
-      expect(find.byType(ProxyDomKeyIcon), findsNothing);
+          find.descendant(of: caption, matching: find.byType(ProxyDomLockup)),
+          findsNothing);
+      expect(
+          find.descendant(
+              of: find.byType(WindowsNavRail),
+              matching: find.byType(ProxyDomLockup)),
+          findsOneWidget);
+    });
+
+    testWidgets('has minimize and close, and no maximize', (tester) async {
+      await pumpWindow(tester);
+      expect(find.bySemanticsLabel('Minimize'), findsOneWidget);
+      expect(find.bySemanticsLabel('Close'), findsOneWidget);
+      expect(find.bySemanticsLabel('Maximize'), findsNothing);
+      expect(find.bySemanticsLabel('Restore'), findsNothing);
     });
 
     testWidgets('drops the lockup when the pane folds', (tester) async {
@@ -148,6 +164,9 @@ void main() {
       }
       await tester.pumpAndSettle();
       expect(find.byType(ProxyDomLockup), findsNothing);
+      // The title moves past the folded pane's edge instead of crossing it.
+      final text = tester.getRect(find.text(title));
+      expect(text.left, greaterThan(WindowsNavRail.compactWidth));
     });
 
     testWidgets('the fold button has no hover hint', (tester) async {
@@ -181,7 +200,7 @@ void main() {
         (call) async => null,
       );
       await tester.pumpWidget(_app(
-        const WindowCaptionBar(label: 'Прокси Дом', ink: AppBrand.inkDark),
+        const WindowCaptionBar(label: title, ink: AppBrand.inkDark),
       ));
       await tester.pump();
       expect(column, findsNothing);

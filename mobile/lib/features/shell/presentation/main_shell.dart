@@ -322,7 +322,6 @@ class _WindowsNavRailState extends State<WindowsNavRail> {
     final l = AppL10n.of(context);
     final dark = theme.brightness == Brightness.dark;
     final ink = dark ? AppBrand.inkDark : AppBrand.inkLight;
-    final mute = dark ? AppBrand.inkMutedDark : AppBrand.inkMutedLight;
 
     final items = <({IconData icon, String label, int index})>[
       (
@@ -382,17 +381,21 @@ class _WindowsNavRailState extends State<WindowsNavRail> {
                         ),
                       ),
                     const Spacer(),
+                    // The name stands at the foot of the pane, where the
+                    // pane ends; folded, there is no room for it.
                     if (wide)
                       Padding(
-                        padding: const EdgeInsets.only(left: 12, right: 4),
-                        child: Text(
-                          Localizations.localeOf(context).languageCode == 'ru'
-                              ? 'Прокси Дом · утилита'
-                              : 'Proxy Dom · utility',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: mute.withValues(alpha: 0.65),
+                        padding: const EdgeInsets.only(left: 4, right: 4),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: ProxyDomLockup(
+                              label: l.appTitle,
+                              ink: ink,
+                              height: 46,
+                            ),
                           ),
                         ),
                       ),

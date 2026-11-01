@@ -24,9 +24,9 @@ class WindowsPane {
   /// import): then the caption is the ground's, with no column in it.
   static final ValueNotifier<double?> currentWidth = ValueNotifier(null);
 
-  /// Height of the window caption: tall enough to carry the lockup over the
-  /// pane, the way a Windows app puts its name in the title bar.
-  static const double captionHeight = 52;
+  /// Height of the window caption: the height of the Windows caption buttons,
+  /// so the band is no taller than the controls in it.
+  static const double captionHeight = 32;
 
   static Color panel(bool dark) =>
       dark ? AppBrand.surfaceRaisedDark : AppBrand.stoneLight;

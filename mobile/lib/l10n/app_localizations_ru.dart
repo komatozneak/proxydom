@@ -91,6 +91,9 @@ class AppL10nRu extends AppL10n {
   String get navPaneExpand => 'Развернуть панель';
 
   @override
+  String get windowTitle => 'Прокси Дом · утилита';
+
+  @override
   String get homeStatServer => 'Сервер';
 
   @override

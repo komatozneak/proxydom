@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../theme.dart';
-import 'proxydom_brand.dart';
 import 'windows_pane.dart';
 
 /// The Windows caption, drawn by the app instead of by the system frame.
@@ -35,14 +34,14 @@ class _WindowCaptionBarState extends State<WindowCaptionBar> {
   static const double _buttonWidth = 46;
   static const double _buttonHeight = 32;
 
-  int _buttonCount = 3;
-  bool _maximized = false;
+  /// Minimize and close. There is no maximize: the window is a utility with
+  /// a fixed layout, and full screen only spreads it thin.
+  static const int _buttonCount = 2;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _syncCaptionRegion());
-    _askMaximized();
   }
 
   @override
@@ -50,17 +49,6 @@ class _WindowCaptionBarState extends State<WindowCaptionBar> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.height != widget.height) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _syncCaptionRegion());
-    }
-  }
-
-  Future<void> _askMaximized() async {
-    try {
-      final value = await WindowCaptionBar._chrome.invokeMethod<bool>(
-        'isMaximized',
-      );
-      if (value != null && mounted) setState(() => _maximized = value);
-    } on PlatformException {
-      // Pre-channel runner, or a test host: the bar still draws.
     }
   }
 
@@ -89,7 +77,6 @@ class _WindowCaptionBarState extends State<WindowCaptionBar> {
   Future<void> _send(String method) async {
     try {
       await WindowCaptionBar._chrome.invokeMethod<void>(method);
-      if (method == 'toggleMaximize') _askMaximized();
     } on PlatformException {
       // Ignore: the window may already be gone.
     }
@@ -109,8 +96,7 @@ class _WindowCaptionBarState extends State<WindowCaptionBar> {
         children: [
           // The navigation pane's column runs to the top of the window: over
           // the pane's width the caption is the pane, so the pane does not end
-          // where the window frame begins. The lockup sits in that column, the
-          // app's only mark on the PC; folded, there is no room for it.
+          // where the window frame begins.
           Positioned.fill(
             child: Semantics(
               label: widget.label,
@@ -131,27 +117,42 @@ class _WindowCaptionBarState extends State<WindowCaptionBar> {
                         color: WindowsPane.panel(dark),
                         border: Border(right: WindowsPane.edge(dark)),
                       ),
-                      // Clipped and laid out at full size, so while the pane
-                      // unfolds the name is revealed rather than squeezed.
-                      child: paneWidth < WindowsPane.wideFrom
-                          ? null
-                          : ClipRect(
-                              child: OverflowBox(
-                                alignment: Alignment.centerLeft,
-                                maxWidth: double.infinity,
-                                child: Padding(
-                                  padding: const EdgeInsets.only(left: 16),
-                                  child: ProxyDomLockup(
-                                    label: widget.label,
-                                    ink: widget.ink,
-                                    height: widget.height - 14,
-                                  ),
-                                ),
-                              ),
-                            ),
                     );
                   },
                 ),
+              ),
+            ),
+          ),
+          // The window's title, the way a Windows caption carries one: over the
+          // pane while it is open, just past its edge when it is folded.
+          Positioned.fill(
+            child: ExcludeSemantics(
+              child: ValueListenableBuilder<double?>(
+                valueListenable: WindowsPane.currentWidth,
+                builder: (context, paneWidth, _) {
+                  final folded =
+                      paneWidth != null && paneWidth < WindowsPane.wideFrom;
+                  return AnimatedPadding(
+                    duration: WindowsPane.fold,
+                    curve: WindowsPane.foldCurve,
+                    padding: EdgeInsets.only(
+                      left: folded ? paneWidth + 14 : 16,
+                    ),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        widget.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: widget.ink.withValues(alpha: 0.6),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
           ),
@@ -168,18 +169,6 @@ class _WindowCaptionBarState extends State<WindowCaptionBar> {
                   onTap: () => _invoke('minimize'),
                   semanticLabel: 'Minimize',
                   painter: (c, s, h) => _drawMinimize(c, s, widget.ink),
-                ),
-                _CaptionButton(
-                  width: _buttonWidth,
-                  height: _buttonHeight,
-                  onTap: () => _invoke('toggleMaximize'),
-                  semanticLabel: _maximized ? 'Restore' : 'Maximize',
-                  painter: (c, s, h) => _drawMaximize(
-                    c,
-                    s,
-                    widget.ink,
-                    restore: _maximized,
-                  ),
                 ),
                 _CaptionButton(
                   width: _buttonWidth,
@@ -285,25 +274,6 @@ Paint _stroke(Color c) => Paint()
 void _drawMinimize(Canvas c, Size s, Color color) {
   final p = _stroke(color)..strokeWidth = 1;
   c.drawLine(Offset(0, s.height / 2), Offset(s.width, s.height / 2), p);
-}
-
-void _drawMaximize(Canvas c, Size s, Color color, {bool restore = false}) {
-  final p = _stroke(color);
-  if (!restore) {
-    c.drawRect(
-      Rect.fromLTWH(0.5, 0.5, s.width - 1, s.height - 1),
-      p,
-    );
-    return;
-  }
-  // Two offset squares: the back one peeks out top-right, the front one is the
-  // window that would come back.
-  c.drawRect(
-    Rect.fromLTWH(2.5, 0.5, s.width - 3, s.height - 3),
-    p,
-  );
-  c.drawRect(Rect.fromLTWH(0.5, 2.5, s.width - 3, s.height - 3), p);
-  c.drawLine(Offset(0.5, 2.5), Offset(s.width - 2.5, 2.5), p);
 }
 
 void _drawClose(Canvas c, Size s, Color color) {

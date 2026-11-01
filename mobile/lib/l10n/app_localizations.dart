@@ -259,6 +259,12 @@ abstract class AppL10n {
   /// **'Expand pane'**
   String get navPaneExpand;
 
+  /// No description provided for @windowTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Proxy Dom · utility'**
+  String get windowTitle;
+
   /// No description provided for @homeStatServer.
   ///
   /// In en, this message translates to:
