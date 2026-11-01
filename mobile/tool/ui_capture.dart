@@ -426,7 +426,7 @@ void _seedSavedProfile() {
               'upload=5000000000; download=2500000000; total=20000000000',
           'lastUpdated': '2026-10-04T12:22:09Z',
           'announce': 'Поддержка и обновления',
-          'supportUrl': 'https://t.me/example',
+          'supportUrl': 'https://proxydom.su',
           'manifest': {
             'version': 1,
             'displayName': 'Мой профиль',
@@ -439,11 +439,13 @@ void _seedSavedProfile() {
               'expiresAt': '2026-11-29T00:00:00Z',
             },
           },
+          // Play screenshots must not name third-party services or promise
+          // ad-free playback: Google reads that as blocking ads in another app.
           'lines': [
-            _savedLine('YouTube · без рекламы'),
-            _savedLine('Индия · дешёвые подписки'),
+            _savedLine('Нидерланды · основной'),
+            _savedLine('Индия · резерв'),
             _savedLine('Игровой · низкий пинг'),
-            _savedLine('США · нейросети'),
+            _savedLine('США · рабочий'),
           ],
         },
       ],
