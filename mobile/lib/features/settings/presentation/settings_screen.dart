@@ -545,9 +545,15 @@ class _SettingsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // AppSurface is a painted box, not a Material: without one here the rows'
+    // hover and splash ink lands on the page under the opaque plate and the
+    // pointer gets no visible answer on desktop.
     return AppSurface(
       clip: true,
-      child: Column(children: children),
+      child: Material(
+        type: MaterialType.transparency,
+        child: Column(children: children),
+      ),
     );
   }
 }
@@ -600,6 +606,8 @@ class _SettingsRow extends StatelessWidget {
     const maxLines = 4;
     return InkWell(
       onTap: onTap,
+      hoverColor: (dark ? AppBrand.lightSource : AppBrand.shadeSource)
+          .withValues(alpha: dark ? 0.05 : 0.04),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         child: Row(
