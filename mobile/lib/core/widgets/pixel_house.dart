@@ -124,7 +124,7 @@ class PixelHouseSpec {
   /// a bulging wall, a rounded base, an arched door and the largest eye set so
   /// the face reads at button size.
   static const PixelHouseSpec organic = PixelHouseSpec(
-    n: 50,
+    n: 54,
     bodyW: 28,
     bodyH: 12,
     roofH: 17,
@@ -230,6 +230,7 @@ class PixelHouse {
     required this.spec,
     required this.cells,
     required this.faceMask,
+    required this.occupied,
     required this.aura,
     required this.topRow,
     required this.bottom,
@@ -250,6 +251,11 @@ class PixelHouse {
   /// Which cells are the dark window. The sleep smoke and the eyes are only
   /// ever drawn inside it, so the `z` cannot drift onto the gold roof.
   final Uint8List faceMask;
+
+  /// Row-major silhouette: every wall, window and door cell. The tap burst
+  /// marches out from the centre along each ray until this says empty, so the
+  /// sparks leave from the mascot's own edge and not from a guessed radius.
+  final Uint8List occupied;
 
   /// `x, y, distance from the silhouette, Bayer threshold` quads. The distance
   /// is read in bands, so the pixels around the house come out stepped.
@@ -594,7 +600,9 @@ PixelHouse _finishHouse({
         final i = y * n + x;
         if (sil[i] == 1) continue;
         final d = distance[i];
-        if (d <= 11) {
+        // Only the three bands the painter draws are worth keeping: the old
+        // cutoff of 11 filled the array with cells no band ever read.
+        if (d <= 6.5) {
           auraOut.addAll([x.toDouble(), y.toDouble(), d, pixelBayer(x, y)]);
         }
       }
@@ -614,6 +622,7 @@ PixelHouse _finishHouse({
     spec: spec,
     cells: Int32List.fromList(cells),
     faceMask: face,
+    occupied: Uint8List.fromList(sil),
     aura: Float32List.fromList(auraOut),
     topRow: topRow,
     bottom: bottom,
@@ -674,9 +683,15 @@ class PixelHouseInk {
       };
 
   /// The house at work: three golds, the dark window and the cream door.
+  ///
+  /// The lit edge is a half step over the body, not a full one: a flat ridge
+  /// row painted in the full highlight read as a row the gold had not reached
+  /// yet. The outline is the shade gold, so the border is the house's own
+  /// shadow rather than a dark line drawn around it.
   static PixelHouseInk gold(PixelHouseSpec spec) {
     const body = AppBrand.mascotGold;
-    final lit = spec.shade ? AppBrand.mascotGoldLit : body;
+    final lit =
+        spec.shade ? Color.lerp(body, AppBrand.mascotGoldLit, 0.55)! : body;
     final shade = spec.shade ? AppBrand.mascotGoldDeep : body;
     return PixelHouseInk(
       body: body,
@@ -687,7 +702,7 @@ class PixelHouseInk {
           ? Color.lerp(AppBrand.mascotFace, AppBrand.shadeSource, 0.35)!
           : AppBrand.mascotFace,
       door: AppBrand.mascotCream,
-      outline: Color.lerp(AppBrand.mascotGoldDeep, AppBrand.mascotFace, 0.45)!,
+      outline: AppBrand.mascotGoldDeep,
       eye: AppBrand.mascotCream,
     );
   }
@@ -717,12 +732,16 @@ class PixelHouseInk {
     const body = AppBrand.mascotGold;
     return PixelHouseInk(
       body: wash(body, k),
-      lit: wash(spec.shade ? AppBrand.mascotGoldLit : body, k),
+      // No highlight on the resting house: a paler row along the roof read as
+      // the last line the wash had not reached.
+      lit: wash(body, k),
       shade: wash(spec.shade ? AppBrand.mascotGoldDeep : body, k - 0.05),
       face: wash(AppBrand.mascotFace, 0.3),
       faceDeep: wash(AppBrand.mascotFace, 0.2),
       door: wash(AppBrand.mascotCream, 0.45),
-      outline: wash(AppBrand.mascotGoldDeep, k - 0.1),
+      // Same wash as the shade: the outline is the house's edge, not a line
+      // darker than everything else.
+      outline: wash(spec.shade ? AppBrand.mascotGoldDeep : body, k),
       eye: wash(AppBrand.mascotCream, 0.35),
     );
   }

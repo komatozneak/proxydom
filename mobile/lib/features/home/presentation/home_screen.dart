@@ -874,14 +874,26 @@ class _FreeClientHome extends StatelessWidget {
                               ),
                             ),
                           );
+                          // A tall canvas only when there is no label under
+                          // the house to keep close: the fireflies get the
+                          // column's height while the tunnel is waking or up,
+                          // and the resting house keeps its label at hand.
+                          final tall = label == null;
+                          final height = tall
+                              ? math.max(
+                                  side,
+                                  math.min(constraints.maxHeight, side * 1.45),
+                                )
+                              : side;
                           return SizedBox(
                             width: side,
-                            height: side,
+                            height: height,
                             child: PixelHouseHero(
                               key: kHomeSignalNestKey,
                               state: treeState,
                               onTap: () => onNestTap(),
                               size: side,
+                              height: height,
                             ),
                           );
                         },

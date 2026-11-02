@@ -36,33 +36,65 @@ class PixelHouseRing {
   final List<Color> colors;
 }
 
-/// Two rings, against each other, so the lights look like a round dance and
-/// not like planets on one rail.
+/// One ring around the house.
 ///
-/// The radii are larger than the house's half-width and taller than its walls:
-/// the house is wide, and a circle tucked inside its silhouette read as dust
-/// at the edges instead of a circle. The outer ring reaches past the roof and
-/// under the door, so the dance is visible on both halves.
+/// It used to be two rings on different speeds, and where they crossed the
+/// lights stacked into clumps. One ring with evenly spaced lights can never
+/// bunch: every gap is the same, and the slow turn keeps them moving. The
+/// ellipse is taller than the grid, because the hero canvas is taller than the
+/// house: that extra height is where the dance gets its volume.
 const List<PixelHouseRing> kPixelHouseRings = [
   PixelHouseRing(
-    count: 10,
+    count: 9,
     rx: 0.44,
-    ry: 0.27,
+    ry: 0.52,
     direction: 1,
-    speed: 0.30,
-    speedConnecting: 0.62,
-    colors: [AppBrand.firefly, AppBrand.mascotGoldLit],
-  ),
-  PixelHouseRing(
-    count: 8,
-    rx: 0.49,
-    ry: 0.42,
-    direction: -1,
-    speed: 0.18,
-    speedConnecting: 0.42,
-    colors: [AppBrand.mascotGoldLit, AppBrand.mossLight],
+    speed: 0.16,
+    speedConnecting: 0.50,
+    colors: [
+      AppBrand.mossLight,
+      AppBrand.firefly,
+    ],
   ),
 ];
+
+/// Brightness of a light at [dx], [dy] cells from the centre of the house.
+///
+/// The canvas is a tall rectangle, so the falloff is an ellipse with the same
+/// shape: everything well inside is drawn at full strength, and a light
+/// dissolves into the background before the frame edge. A firefly that flew to
+/// the boundary and vanished there would draw the frame itself — the one thing
+/// pixel art must not show.
+double pixelLightFade({
+  required double dx,
+  required double dy,
+  required double halfW,
+  required double halfH,
+}) {
+  final q = math.sqrt(math.pow(dx / halfW, 2) + math.pow(dy / halfH, 2));
+  const inner = 0.90;
+  const outer = 0.995;
+  if (q <= inner) return 1;
+  if (q >= outer) return 0;
+  return (outer - q) / (outer - inner);
+}
+
+/// First row that is gold, counting the outline rows above the roof and under
+/// the base.
+///
+/// The outline is part of the house, so it has to fill with it: leaving it out
+/// kept the line over the ridge in the faded palette when everything else was
+/// gold, and painted the line under the base gold while the house was resting.
+int pixelFillStart({
+  required int topRow,
+  required int bottom,
+  required double gold,
+}) {
+  final fillTop = topRow - 1;
+  final fillBottom = bottom + 1;
+  final span = fillBottom - fillTop + 1;
+  return fillBottom - roundHalfUp(gold * span) + 1;
+}
 
 /// What the house is doing. One-to-one with [TreeState], kept apart so the
 /// motion model does not have to know about the tunnel.
@@ -102,9 +134,6 @@ class PixelHouseMotion {
   /// How wrong things are: dims the house and makes the lights fall.
   double err = 0;
 
-  /// One lonely firefly, for the resting house.
-  double lone = 0;
-
   /// The glow after the breath: what the painter draws.
   double lit = 0;
 
@@ -122,6 +151,11 @@ class PixelHouseMotion {
   final List<double> speed = [0, 0];
 
   final List<PixelHousePuff> puffs = [];
+
+  /// The sparks a tap throws out of the walls.
+  final List<PixelHouseSpark> sparks = [];
+  final math.Random _sparkRandom = math.Random(11);
+
   double _zClock = 0;
   bool _zBig = false;
 
@@ -139,7 +173,6 @@ class PixelHouseMotion {
     lights = _awake.contains(_mood) ? 1 : 0;
     glow = lights;
     err = _mood == PixelHouseMood.error ? 1 : 0;
-    lone = _mood == PixelHouseMood.off ? 1 : 0;
     door = _mood == PixelHouseMood.on ? 1 : 0;
     lit = glow;
   }
@@ -151,11 +184,29 @@ class PixelHouseMotion {
     blinkT = 0.14;
   }
 
-  /// A finger landed: the house is pushed in and the door flashes, whatever
-  /// the tunnel does next.
-  void tap() {
+  /// A finger landed: the house is pushed in, the door flashes, and a handful
+  /// of sparks leaves the walls. [burst] is off under reduce motion, where a
+  /// frozen ring of sparks on the house would be worse than none.
+  void tap({bool burst = true}) {
     press = 0.13;
     flash = 0.3;
+    if (!burst) return;
+    const count = 12;
+    for (var i = 0; i < count; i++) {
+      sparks.add(
+        PixelHouseSpark(
+          angle:
+              i * 2 * math.pi / count + (_sparkRandom.nextDouble() - 0.5) * 0.5,
+          speed: 0.75 + _sparkRandom.nextDouble() * 0.5,
+          size: _sparkRandom.nextDouble() < 0.55 ? 2 : 1,
+          color: [
+            AppBrand.firefly,
+            AppBrand.mascotGoldLit,
+            AppBrand.flame
+          ][i % 3],
+        ),
+      );
+    }
   }
 
   void update(double dt, {bool reduced = false}) {
@@ -187,7 +238,6 @@ class PixelHouseMotion {
       lights = lightsTarget;
       glow = lightsTarget;
       err = error ? 1.0 : 0.0;
-      lone = off ? 1.0 : 0.0;
       door = doorTarget;
     } else {
       gold = _approach(gold, goldTarget, (goldTarget > gold ? 0.9 : 1.4) * dt);
@@ -195,7 +245,6 @@ class PixelHouseMotion {
           lights, lightsTarget, (lightsTarget > lights ? 0.75 : 1.0) * dt);
       glow = _approach(glow, lightsTarget, 1.6 * dt);
       err = _approach(err, error ? 1.0 : 0.0, (error ? 1.1 : 3.0) * dt);
-      lone = _approach(lone, off ? 1.0 : 0.0, 0.5 * dt);
       door = _approach(door, doorTarget, 6 * dt);
     }
 
@@ -271,8 +320,13 @@ class PixelHouseMotion {
 
     if (reduced) {
       puffs.clear();
+      sparks.clear();
       return;
     }
+    for (final spark in sparks) {
+      spark.age += dt;
+    }
+    sparks.removeWhere((spark) => spark.age >= _sparkLife);
     // Asleep: a small `z`, then a big one, floating up inside the face.
     _zClock += dt;
     if (off && _zClock > 1.05) {
@@ -312,14 +366,32 @@ class PixelHousePuff {
   double age = 0;
 }
 
+/// One spark thrown out of the walls on a tap.
+class PixelHouseSpark {
+  PixelHouseSpark({
+    required this.angle,
+    required this.speed,
+    required this.size,
+    required this.color,
+  });
+
+  final double angle;
+  final double speed;
+  final int size;
+  final Color color;
+  double age = 0;
+}
+
+/// How long a spark lives. It is gone before it can reach the edge of the
+/// square, so the burst is never cut by the frame.
+const double _sparkLife = 1.25;
+
 double _approach(double value, double target, double step) {
   if (value < target) return math.min(target, value + step);
   return math.max(target, value - step);
 }
 
 double _q4(double alpha) => (alpha.clamp(0.0, 1.0) * 4).round() / 4;
-
-const List<String> _lightSizes = ['dot1', 'dot2', 'plus3', 'gem4', 'star5'];
 
 /// The approved look's firefly: a plus with a short fading trail.
 const String _lightShape = 'plus3';
@@ -349,14 +421,20 @@ class PixelHouseHero extends StatefulWidget {
     required this.state,
     this.onTap,
     this.size = 300,
+    this.height,
   });
 
   final TreeState state;
   final VoidCallback? onTap;
 
-  /// Side of the square the hero is drawn in. The house fills about three
-  /// quarters of it; the rest is the light circle.
+  /// Side of the square the house grid is drawn in. The house fills about
+  /// three quarters of it; the rest is the light circle.
   final double size;
+
+  /// Height of the canvas. It is taller than [size] when the column has the
+  /// room, and that extra height is where the fireflies get their volume: the
+  /// grid stays square and centred, the lights may leave it vertically.
+  final double? height;
 
   @override
   State<PixelHouseHero> createState() => _PixelHouseHeroState();
@@ -447,7 +525,7 @@ class _PixelHouseHeroState extends State<PixelHouseHero>
   }
 
   void _handleTap() {
-    _motion.tap();
+    _motion.tap(burst: !_reduced);
     _clock.tick();
     HapticFeedback.lightImpact();
     widget.onTap?.call();
@@ -468,7 +546,7 @@ class _PixelHouseHeroState extends State<PixelHouseHero>
         onTap: _handleTap,
         child: RepaintBoundary(
           child: CustomPaint(
-            size: Size.square(widget.size),
+            size: Size(widget.size, widget.height ?? widget.size),
             painter: _PixelHousePainter(
               motion: _motion,
               house: _house,
@@ -518,6 +596,13 @@ class _PixelHousePainter extends CustomPainter {
   final double haze;
   final double devicePixelRatio;
 
+  /// Set at the start of every paint: the canvas may be taller than the grid,
+  /// and the lights are allowed to use that height.
+  Size _canvas = Size.zero;
+  double _cell = 1;
+  double _left = 0;
+  double _top = 0;
+
   @override
   void paint(Canvas canvas, Size size) {
     final n = spec.n;
@@ -530,6 +615,10 @@ class _PixelHousePainter extends CustomPainter {
     final grid = cell * n;
     final left = ((size.width - grid) / 2 * dpr).roundToDouble() / dpr;
     final top = ((size.height - grid) / 2 * dpr).roundToDouble() / dpr;
+    _canvas = size;
+    _cell = cell;
+    _left = left;
+    _top = top;
 
     Rect at(int x, int y, [int w = 1, int h = 1]) =>
         Rect.fromLTWH(left + x * cell, top + y * cell, w * cell, h * cell);
@@ -543,22 +632,33 @@ class _PixelHousePainter extends CustomPainter {
 
     // 1. The haze. The only layer off the grid: it has to read as air on a
     // paper background, and a stepped one would read as a sticker.
+    //
+    // It is an ellipse with the canvas' own shape, so it reaches past the
+    // orbit in every direction and still dies at the frame instead of on it.
+    // Its strength is the motion's eased glow: it swells in when the tunnel
+    // wakes and sinks back when it drops.
     if (glow > 0.01) {
       final center = Offset(left + house.gx * cell, top + house.gy * cell);
-      final radius = n * cell * 0.52;
-      final rect = Rect.fromCircle(center: center, radius: radius);
+      final halfW = size.width / 2;
+      final halfH = size.height / 2;
+      final rect = Rect.fromCircle(center: Offset.zero, radius: halfW);
+      canvas.save();
+      canvas.translate(center.dx, center.dy);
+      canvas.scale(1, halfH / math.max(halfW, 1));
       canvas.drawRect(
         rect,
         Paint()
           ..shader = RadialGradient(
             colors: [
-              AppBrand.flame.withValues(alpha: 0.20 * glow * haze),
-              AppBrand.mascotGold.withValues(alpha: 0.10 * glow * haze),
+              AppBrand.flame.withValues(alpha: 0.24 * glow * haze),
+              AppBrand.mascotGold.withValues(alpha: 0.14 * glow * haze),
+              AppBrand.mascotGold.withValues(alpha: 0.07 * glow * haze),
               AppBrand.mascotGold.withValues(alpha: 0),
             ],
-            stops: const [0, 0.45, 1],
+            stops: const [0, 0.5, 0.8, 1],
           ).createShader(rect),
       );
+      canvas.restore();
     }
 
     // 2. The pixel glow: stepped bands hugging the silhouette, dithered so the
@@ -612,7 +712,7 @@ class _PixelHousePainter extends CustomPainter {
         final half = house.door.width / 2 + dy;
         for (var k = 0; k < half; k++) {
           for (final x in [house.door.left - k, house.door.right + k]) {
-            if (!_inside(x, y)) continue;
+            if (!_onCanvas(x, y)) continue;
             if (pixelBayer(x, y) < density * doorLit) put(spill, x, y);
           }
         }
@@ -626,12 +726,20 @@ class _PixelHousePainter extends CustomPainter {
     }
 
     final lights = _lights(time);
-    _drawLights(canvas, lights, time: time, front: false, at: at);
+    _drawLights(canvas, lights, front: false, at: at);
 
     // 4. The house: gold rises row by row from the door while it connects.
+    //
+    // The range includes the outline row above the roof and the one under the
+    // base: without them, "fully gold" still left the line over the ridge in
+    // the faded palette, and at rest the line under the base was gold - both
+    // read as a row the fill had missed.
     final pose = poses[motion.pose] ?? house;
-    final span = pose.bottom - pose.topRow + 1;
-    final litStart = pose.bottom - roundHalfUp(motion.gold * span) + 1;
+    final litStart = pixelFillStart(
+      topRow: pose.topRow,
+      bottom: pose.bottom,
+      gold: motion.gold,
+    );
     final lift = -motion.lift;
     final housePaths = <Color, Path>{};
     final cells = pose.cells;
@@ -759,35 +867,46 @@ class _PixelHousePainter extends CustomPainter {
     _drawLights(
       canvas,
       lights,
-      time: time,
       front: true,
       at: at,
     );
+    _paintSparks(canvas, at);
 
     canvas.restore();
   }
 
-  bool _inside(int x, int y) => x >= 0 && y >= 0 && x < spec.n && y < spec.n;
+  bool _onCanvas(int x, int y) => Rect.fromLTWH(
+        _left + x * _cell,
+        _top + y * _cell,
+        _cell,
+        _cell,
+      ).overlaps(Offset.zero & _canvas);
+
+  /// Alpha of a light at [dx], [dy] cells from the house centre, with the
+  /// canvas-shaped falloff.
+  double _edgeFade(double dx, double dy) {
+    if (_cell <= 0) return 1;
+    return pixelLightFade(
+      dx: dx,
+      dy: dy,
+      halfW: _canvas.width / 2 / _cell,
+      halfH: _canvas.height / 2 / _cell,
+    );
+  }
 
   void _drawLights(
     Canvas canvas,
     List<_Light> lights, {
-    required double time,
     required bool front,
     required Rect Function(int x, int y, [int w, int h]) at,
   }) {
-    final want = _lightSizes.indexOf(_lightShape);
+    // One shape for every light: at the distance the ring now sits, the small
+    // "depth" variant turned half of them into dust.
+    final shape = _lightShapes[_lightShape]!;
     for (final light in lights) {
       if (light.front != front) continue;
       final alpha = _q4(light.alpha);
       if (alpha <= 0) continue;
-      final depth = light.z > 0.3
-          ? 4
-          : light.z > -0.35
-              ? 2
-              : 1;
-      final shape = _lightShapes[
-          light.lone ? 'dot1' : _lightSizes[math.min(want, depth)]]!;
       final core = Color.lerp(
         light.color,
         AppBrand.mascotCream,
@@ -796,7 +915,7 @@ class _PixelHousePainter extends CustomPainter {
       final cells = <Color, Path>{};
 
       void add(Color color, double a, int x, int y) {
-        if (!_inside(x, y)) return;
+        if (!_onCanvas(x, y)) return;
         final quantized = _q4(a);
         if (quantized <= 0) return;
         (cells[color.withValues(alpha: quantized)] ??= Path())
@@ -823,39 +942,24 @@ class _PixelHousePainter extends CustomPainter {
         }
       }
 
-      if (light.lone) {
-        for (var j = 3; j >= 1; j--) {
-          final point = light.at!(time - j * 0.3);
-          add(
-            light.color,
-            [0.12, 0.25, 0.45][j - 1] * alpha / 0.5,
-            point.$1.round(),
-            point.$2.round(),
-          );
-        }
-        final point = light.at!(time);
-        shapeAt(point.$1.round(), point.$2.round());
-      } else {
-        List<int> position(double theta) {
-          final x = (house.rcx + light.rx * math.cos(theta)).round();
-          final y =
-              (house.rcy + light.ry * math.sin(theta) + light.fall).round();
-          return [x, y];
-        }
-
-        final dTheta = 1.5 / math.max(light.rx, 1);
-        for (var j = _trailLength; j >= 1; j--) {
-          final trail = position(light.theta - light.direction * j * dTheta);
-          add(
-            light.color,
-            _trailAlpha[j - 1] * alpha,
-            trail[0],
-            trail[1],
-          );
-        }
-        final point = position(light.theta);
-        shapeAt(point[0], point[1] - light.hop);
+      List<int> position(double theta) {
+        final x = (house.rcx + light.rx * math.cos(theta)).round();
+        final y = (house.rcy + light.ry * math.sin(theta) + light.fall).round();
+        return [x, y];
       }
+
+      final dTheta = 1.5 / math.max(light.rx, 1);
+      for (var j = _trailLength; j >= 1; j--) {
+        final trail = position(light.theta - light.direction * j * dTheta);
+        add(
+          light.color,
+          _trailAlpha[j - 1] * alpha,
+          trail[0],
+          trail[1],
+        );
+      }
+      final point = position(light.theta);
+      shapeAt(point[0], point[1] - light.hop);
 
       for (final entry in cells.entries) {
         canvas.drawPath(
@@ -868,60 +972,124 @@ class _PixelHousePainter extends CustomPainter {
     }
   }
 
-  /// The lights, placed on the same ellipse every frame.
+  /// The ring, placed on one ellipse, plus each light's own slow fade.
+  ///
+  /// Every light fades in and out on its own clock: the ring is never a solid
+  /// necklace, and at any moment only some fireflies are visible. The gaps stay
+  /// even because the positions are even — only the brightness drifts.
   List<_Light> _lights(double time) {
     final out = <_Light>[];
-    if (motion.lights > 0.01) {
-      for (var k = 0; k < kPixelHouseRings.length; k++) {
-        final ring = kPixelHouseRings[k];
-        final spiral = 1 - motion.lights;
-        final rx = ring.rx * spec.n * (1 + spiral * 0.9);
-        final ry = ring.ry * spec.n * (1 + spiral * 0.9);
-        for (var i = 0; i < ring.count; i++) {
-          final theta = motion.phase[k] +
-              i * 2 * math.pi / ring.count +
-              ring.direction * spiral * 2.4;
-          final hop = (motion.lights > 0.9 &&
-                  motion.err < 0.1 &&
-                  math.sin(time * 5.5 - theta * 2 * ring.direction) > 0.55)
-              ? 1
-              : 0;
-          var alpha = motion.lights * (1 - motion.err);
-          alpha *= math.sin(time * 3.1 + i * 1.7 + k) > -0.7 ? 1 : 0.6;
-          final z = math.sin(theta);
-          alpha *= 0.5 + 0.5 * (z + 1) / 2;
-          out.add(
-            _Light(
-              theta: theta,
-              rx: rx,
-              ry: ry,
-              hop: hop,
-              fall: motion.err * motion.err * spec.n * 0.35,
-              front: z > 0,
-              z: z,
-              alpha: alpha,
-              color: ring.colors[i % ring.colors.length],
-              direction: ring.direction,
-            ),
-          );
-        }
-      }
-    }
-    if (motion.lone > 0.01) {
+    if (motion.lights <= 0.01) return out;
+    final ring = kPixelHouseRings.first;
+    final spiral = 1 - motion.lights;
+    // The circle may open up while connecting, but only to the fade band. The
+    // band follows the canvas, which is taller than the grid: the lights get
+    // the whole height to fly into, not just the square.
+    final halfW = _canvas.width / 2 / _cell;
+    final halfH = _canvas.height / 2 / _cell;
+    // The ellipse may use the height the column gave it, but it still has to
+    // fit a window where that height is barely taller than the grid: it is
+    // clamped to the canvas, not to the design ratio.
+    final rxBase = math.min(ring.rx * spec.n, halfW * 0.86);
+    final ryBase = math.min(ring.ry * spec.n, halfH * 0.86);
+    final maxScale = 0.985 * math.min(halfW / rxBase, halfH / ryBase);
+    final scale = math.min(1 + spiral * 0.9, maxScale);
+    final rx = rxBase * scale;
+    final ry = ryBase * scale;
+    for (var i = 0; i < ring.count; i++) {
+      final theta = motion.phase.first +
+          i * 2 * math.pi / ring.count +
+          ring.direction * spiral * 2.4;
+      final presenceWave = math.sin(time * 0.33 + i * 1.9);
+      final presence = 0.70 + 0.30 * (0.5 + 0.5 * presenceWave);
+      if (presence <= 0) continue;
+      final hop = (motion.lights > 0.9 &&
+              motion.err < 0.1 &&
+              math.sin(time * 5.5 - theta * 2 * ring.direction) > 0.55)
+          ? 1
+          : 0;
+      final x = house.rcx + rx * math.cos(theta);
+      final y = house.rcy +
+          ry * math.sin(theta) +
+          motion.err * motion.err * spec.n * 0.35;
+      final fade = _edgeFade(x - house.rcx, y - house.rcy);
+      if (fade <= 0) continue;
+      var alpha = motion.lights * (1 - motion.err) * presence * fade;
+      final z = math.sin(theta);
+      alpha *= 0.7 + 0.3 * (z + 1) / 2;
+      if (alpha <= 0.01) continue;
       out.add(
         _Light(
-          lone: true,
-          at: (tt) => (
-            house.rcx + spec.n * 0.36 * math.sin(tt * 0.23),
-            house.rcy - spec.n * 0.05 + spec.n * 0.16 * math.sin(tt * 0.37 + 1),
-          ),
-          alpha: 0.5 * motion.lone,
-          color: AppBrand.firefly,
-          front: true,
+          theta: theta,
+          rx: rx,
+          ry: ry,
+          hop: hop,
+          fall: motion.err * motion.err * spec.n * 0.35,
+          front: z > 0,
+          z: z,
+          alpha: alpha,
+          color: ring.colors[i % ring.colors.length],
+          direction: ring.direction,
         ),
       );
     }
     return out;
+  }
+
+  /// The sparks a tap throws out of the walls.
+  ///
+  /// Each one starts where its ray leaves the mascot's silhouette — so the
+  /// burst really comes out of the house, roof and eaves included — and it
+  /// fades out before it can reach the frame, so the edge never cuts it.
+  void _paintSparks(
+    Canvas canvas,
+    Rect Function(int x, int y, [int w, int h]) at,
+  ) {
+    if (motion.sparks.isEmpty) return;
+    final paths = <Color, Path>{};
+    for (final spark in motion.sparks) {
+      final life = spark.age / _sparkLife;
+      if (life >= 1) continue;
+      final dirX = math.cos(spark.angle);
+      final dirY = math.sin(spark.angle);
+      var start = 1.0;
+      while (start < spec.n * 0.5) {
+        final x = (house.rcx + dirX * start).round();
+        final y = (house.rcy + dirY * start).round();
+        if (x < 0 || y < 0 || x >= spec.n || y >= spec.n) break;
+        if (house.occupied[y * spec.n + x] == 0) break;
+        start += 0.5;
+      }
+      // Never past the last cell the frame can draw: a spark that reaches the
+      // edge would be dropped mid-flight and read as a cut.
+      final room = spec.n * 0.47 - start;
+      final travel = math.min(
+        6.5 * spark.speed * Curves.easeOutCubic.transform(life),
+        room,
+      );
+      final x = (house.rcx + dirX * (start + travel)).round();
+      final y = (house.rcy + dirY * (start + travel)).round();
+      if (!_onCanvas(x, y)) continue;
+      // The spark burns out with age, and dissolves into the background as it
+      // nears the frame — the same falloff the ring uses.
+      final fade = (1 - life) *
+          _edgeFade(dirX * (start + travel), dirY * (start + travel));
+      final path = paths[spark.color.withValues(alpha: fade)] ??= Path();
+      path.addRect(at(x, y));
+      if (spark.size > 1) {
+        if (_onCanvas(x + 1, y)) path.addRect(at(x + 1, y));
+        if (_onCanvas(x, y + 1)) path.addRect(at(x, y + 1));
+        if (_onCanvas(x + 1, y + 1)) path.addRect(at(x + 1, y + 1));
+      }
+    }
+    for (final entry in paths.entries) {
+      canvas.drawPath(
+        entry.value,
+        Paint()
+          ..color = entry.key
+          ..isAntiAlias = false,
+      );
+    }
   }
 
   @override
@@ -945,8 +1113,6 @@ class _Light {
     this.fall = 0,
     this.z = 0,
     this.direction = 1,
-    this.lone = false,
-    this.at,
   });
 
   final double alpha;
@@ -959,6 +1125,4 @@ class _Light {
   final double fall;
   final double z;
   final int direction;
-  final bool lone;
-  final (double, double) Function(double time)? at;
 }

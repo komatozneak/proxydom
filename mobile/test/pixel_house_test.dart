@@ -80,6 +80,64 @@ void main() {
         expect(ring.rx * house.spec.n, greaterThan(halfWidth));
       }
     });
+
+    test('the ring is inside the bright zone of the taller canvas', () {
+      final ring = kPixelHouseRings.first;
+      final n = house.spec.n;
+      // The canvas is at least as wide as the grid and taller than it; the
+      // ring has to sit in the part that draws at full strength.
+      final halfW = n / 2;
+      final halfH = n / 2 * 1.3;
+      expect(
+        pixelLightFade(dx: ring.rx * n, dy: 0, halfW: halfW, halfH: halfH),
+        1,
+      );
+      expect(
+        pixelLightFade(dx: 0, dy: ring.ry * n, halfW: halfW, halfH: halfH),
+        1,
+      );
+    });
+
+    test('a light dissolves before the frame instead of being cut by it', () {
+      const halfW = 27.0;
+      const halfH = 35.0;
+      expect(pixelLightFade(dx: 0, dy: 0, halfW: halfW, halfH: halfH), 1);
+      expect(
+        pixelLightFade(dx: halfW * 0.85, dy: 0, halfW: halfW, halfH: halfH),
+        1,
+      );
+      expect(
+        pixelLightFade(dx: halfW * 0.999, dy: 0, halfW: halfW, halfH: halfH),
+        0,
+      );
+      expect(
+        pixelLightFade(dx: 0, dy: halfH * 0.999, halfW: halfW, halfH: halfH),
+        0,
+      );
+      // Never brighter as it gets closer to the edge: a soft falloff, not a
+      // step that would draw the frame.
+      var previous = 1.0;
+      for (var radius = 0.0; radius <= halfW; radius += 0.5) {
+        final fade = pixelLightFade(
+          dx: radius,
+          dy: 0,
+          halfW: halfW,
+          halfH: halfH,
+        );
+        expect(fade, lessThanOrEqualTo(previous + 1e-9));
+        previous = fade;
+      }
+    });
+
+    test('the gold fill includes the outline rows', () {
+      // The outline is part of the house: fully on, the line above the roof
+      // must be gold too, and fully off the line under the base must not be.
+      expect(pixelFillStart(topRow: 11, bottom: 40, gold: 1), 10);
+      expect(pixelFillStart(topRow: 11, bottom: 40, gold: 0), greaterThan(41));
+      // Halfway up, the boundary sits around the middle of the walls.
+      final half = pixelFillStart(topRow: 11, bottom: 40, gold: 0.5);
+      expect(half, inInclusiveRange(18, 34));
+    });
   });
 
   group('the eyes', () {
@@ -120,13 +178,29 @@ void main() {
       expect(motion.eyes(motion.t).mask, 'happy');
     });
 
-    test('resting: the circle is out, one firefly is left', () {
+    test('resting: nothing moves but the sleeping house', () {
       final motion = settled(PixelHouseMood.off);
       expect(motion.gold, 0);
       expect(motion.lights, 0);
       expect(motion.lit, 0);
-      expect(motion.lone, 1);
+      expect(motion.sparks, isEmpty);
       expect(motion.eyes(motion.t).mask, 'sleep');
+    });
+
+    test('a tap throws sparks out of the house, and they burn out', () {
+      final motion = PixelHouseMotion(PixelHouseMood.on);
+      motion.tap();
+      expect(motion.sparks, isNotEmpty);
+      for (var i = 0; i < 90; i++) {
+        motion.update(1 / 60);
+      }
+      expect(motion.sparks, isEmpty);
+    });
+
+    test('reduce motion taps without leaving a frozen ring of sparks', () {
+      final motion = PixelHouseMotion(PixelHouseMood.on);
+      motion.tap(burst: false);
+      expect(motion.sparks, isEmpty);
     });
 
     test('a drop from connected fades the circle instead of snapping it', () {

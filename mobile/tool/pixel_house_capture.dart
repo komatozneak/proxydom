@@ -40,6 +40,8 @@ Future<void> _shoot(
   double scale = 1,
   double box = 300,
   bool reduced = false,
+  bool tap = false,
+  int warmupFrames = 220,
 }) async {
   final boundaryKey = GlobalKey();
   final dpr = tester.view.devicePixelRatio;
@@ -52,7 +54,7 @@ Future<void> _shoot(
       supportedLocales: AppL10n.supportedLocales,
       home: MediaQuery(
         data: MediaQueryData(
-          size: Size(box * scale + 80, box * scale + 80),
+          size: Size(box * scale + 80, box * scale * 1.4 + 80),
           devicePixelRatio: dpr,
           disableAnimations: reduced,
         ),
@@ -66,6 +68,7 @@ Future<void> _shoot(
               child: PixelHouseHero(
                 state: state,
                 size: box * scale,
+                height: box * scale * 1.4,
               ),
             ),
           ),
@@ -73,8 +76,14 @@ Future<void> _shoot(
       ),
     ),
   );
-  for (var i = 0; i < 220; i++) {
+  for (var i = 0; i < warmupFrames; i++) {
     await tester.pump(const Duration(milliseconds: 16));
+  }
+  if (tap) {
+    // The burst is a third of a second old here, half-way to the frame.
+    await tester.tap(find.byType(PixelHouseHero));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 320));
   }
   final boundary =
       boundaryKey.currentContext!.findRenderObject()! as RenderRepaintBoundary;
@@ -128,6 +137,36 @@ void main() {
       TreeState.connected,
       Brightness.light,
       reduced: true,
+    );
+  });
+
+  testWidgets('on-tap', (tester) async {
+    tester.view
+      ..physicalSize = const Size(760, 760)
+      ..devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+    await _shoot(
+      tester,
+      'on-tap-light',
+      TreeState.connected,
+      Brightness.light,
+      tap: true,
+    );
+  });
+
+  // A third of a second into the wake-up, when the lights are still climbing
+  // out of the fade band at the edge.
+  testWidgets('connecting-early', (tester) async {
+    tester.view
+      ..physicalSize = const Size(760, 760)
+      ..devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+    await _shoot(
+      tester,
+      'connecting-early-light',
+      TreeState.connecting,
+      Brightness.light,
+      warmupFrames: 22,
     );
   });
 }
