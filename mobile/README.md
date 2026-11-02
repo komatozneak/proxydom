@@ -1,6 +1,7 @@
 # Proxy Dom — мобильный клиент
 
-> Локальный конфигуратор прокси: Hysteria2 на всех платформах, VLESS на Android.
+> Локальный конфигуратор прокси: Hysteria2, семейство `v2fly/v2ray-core` и
+> Reality на Android, iOS и Windows.
 > minSdk **26**. Пакет Play: `com.proxy.dom`.
 > Правила: [`mobile/AGENTS.md`](./AGENTS.md), корневой [`AGENTS.md`](../AGENTS.md).
 
