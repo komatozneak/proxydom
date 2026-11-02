@@ -364,7 +364,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('973 ГБ'), findsOneWidget);
+    expect(find.text('973ГБ'), findsOneWidget);
     expect(find.text('ОСТАЛОСЬ'), findsOneWidget);
     expect(find.text('использовано 27 ГБ / 1 ТБ'), findsOneWidget);
     expect(find.text('2,7%'), findsNothing);
@@ -401,7 +401,7 @@ void main() {
     );
     await tester.pump();
     expect(find.textContaining('устарело'), findsOneWidget);
-    expect(find.text('73 ГБ'), findsOneWidget);
+    expect(find.text('73ГБ'), findsOneWidget);
   });
 
   testWidgets('a capped profile shows its expiry date', (tester) async {

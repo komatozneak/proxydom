@@ -154,11 +154,13 @@ class ProfileInstrument extends StatelessWidget {
     final watermark = unlimited
         ? '∞'
         : capped
+            // The watermark is a glyph block, not prose: a gap between number
+            // and unit splits it into two shapes at 58pt.
             ? formatTrafficAmount(
                 remainingBytes!,
                 russian: russian,
                 decimal: manifest != null,
-              )
+              ).replaceAll(RegExp(r'\s'), '')
             : '—';
     final barColor = exhausted
         ? (dark ? AppBrand.inkDangerDark : AppBrand.inkDangerLight)

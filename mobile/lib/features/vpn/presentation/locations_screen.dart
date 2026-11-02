@@ -870,21 +870,23 @@ class _ServerCount extends StatelessWidget {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final gold = dark ? AppBrand.mascotGoldLit : AppBrand.mascotGoldDeep;
     final wide = count > 9;
+    // A stadium, not a circle: a two-digit count widens the ring instead of
+    // stretching a circle into an oval.
     return Container(
-      width: wide ? null : 28,
-      height: 28,
-      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-      padding: EdgeInsets.symmetric(horizontal: wide ? 8 : 0),
+      width: wide ? null : 32,
+      height: 32,
+      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+      padding: EdgeInsets.symmetric(horizontal: wide ? 9 : 0),
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        shape: BoxShape.circle,
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppBrand.mascotGold.withValues(alpha: 0.45)),
       ),
       child: Text(
         '$count',
         style: terminalText(
           context,
-          size: 14,
+          size: 18,
           color: gold,
           weight: 700,
           spacing: 0.4,
