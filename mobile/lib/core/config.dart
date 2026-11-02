@@ -1,32 +1,24 @@
-/// Конфигурация приложения.
+/// Application configuration.
 ///
 /// ## Dev vs prod backend
 ///
-/// По умолчанию [baseUrl] = [vpsBaseUrl] (prod smoke на Pixel).
-/// Для эмулятора: `flutter run --dart-define=APP_ENV=dev`
+/// [baseUrl] defaults to [vpsBaseUrl] for production.
+/// Emulator: `flutter run --dart-define=APP_ENV=dev`
 ///
-/// ## Платформенные URL (dev)
+/// ## Platform dev URLs
 ///
-/// - Android emulator: [androidBaseUrl] (`http://10.0.2.2:8000/v2` when useV2)
-/// - Физический Android: `adb reverse tcp:8000 tcp:8000` + `http://127.0.0.1:8000`
+/// - Android emulator: [androidBaseUrl] (`http://10.0.2.2:8000/api/v1`)
+/// - Physical Android: `adb reverse tcp:8000 tcp:8000` + `http://127.0.0.1:8000`
 /// - iOS simulator: [iosBaseUrl]
 /// - Desktop: [desktopBaseUrl]
 class AppConfig {
   AppConfig._();
 
-  /// Prefer Ogon-parity `/v2` control plane. Legacy `/api/v1` fallback
-  /// via [useV2Api]=false for one release if needed.
-  static const bool useV2Api = bool.fromEnvironment(
-    'USE_V2_API',
-    defaultValue: true,
-  );
-
-  /// Production API origin (scheme + host + port), no path.
+  /// Production API origin (scheme + host, no path).
   static const String vpsApiOrigin = 'https://api.proxydom.su';
 
-  /// Production backend — `/v2` or legacy `/api/v1`.
-  static const String vpsBaseUrl =
-      useV2Api ? '$vpsApiOrigin/v2' : '$vpsApiOrigin/api/v1';
+  /// Production API. The hub serves `/api/v1`; `/v2` is not routed.
+  static const String vpsBaseUrl = '$vpsApiOrigin/api/v1';
 
   /// Seed hosts for discovery failover (own domains only — not Огонь .xyz).
   static const List<String> discoverySeedHosts = [
@@ -62,13 +54,10 @@ class AppConfig {
   /// Alias kept for existing call sites (TUN exclude, Dio happy-eyeballs).
   static String get vpsIpv4 => vpsControlPlaneIpv4;
 
-  /// Базовый URL API — dev defaults.
-  static const String androidBaseUrl =
-      useV2Api ? 'http://10.0.2.2:8000/v2' : 'http://10.0.2.2:8000/api/v1';
-  static const String iosBaseUrl =
-      useV2Api ? 'http://127.0.0.1:8000/v2' : 'http://127.0.0.1:8000/api/v1';
-  static const String desktopBaseUrl =
-      useV2Api ? 'http://localhost:8000/v2' : 'http://localhost:8000/api/v1';
+  /// Dev API base URL — Android emulator.
+  static const String androidBaseUrl = 'http://10.0.2.2:8000/api/v1';
+  static const String iosBaseUrl = 'http://127.0.0.1:8000/api/v1';
+  static const String desktopBaseUrl = 'http://localhost:8000/api/v1';
 
   /// Compile-time env: `prod` (default на физ. устройстве) или `dev` (эмулятор).
   /// Эмулятор: `flutter run --dart-define=APP_ENV=dev`
@@ -105,10 +94,10 @@ class AppConfig {
     return u;
   }
 
-  /// Build Dio baseUrl for [origin] honouring [useV2Api].
+  /// Build the API base URL for [origin].
   static String baseUrlForOrigin(String origin) {
     final o = origin.trim().replaceAll(RegExp(r'/+$'), '');
-    return useV2Api ? '$o/v2' : '$o/api/v1';
+    return '$o/api/v1';
   }
 
   /// Таймаут dio по умолчанию.
