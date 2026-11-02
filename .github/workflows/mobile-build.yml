@@ -54,7 +54,7 @@ jobs:
 
       - name: Run tests
         working-directory: mobile
-        run: flutter test --reporter compact --dart-define=AUTH_ANONYMOUS=false
+        run: flutter test --reporter compact
 
   changes:
     name: Detect native changes

@@ -95,7 +95,7 @@ XCFramework для iOS и обычный `.exe` для Windows. Это сдел�
 cd mobile
 flutter pub get
 flutter analyze --no-fatal-infos
-flutter test --dart-define=AUTH_ANONYMOUS=false
+flutter test
 ```
 
 Go-движок собирается отдельно:

@@ -270,7 +270,8 @@ class SignalNestPainter extends CustomPainter {
   final TreeState state;
   final double emitProgress;
 
-  // Mustard Living House + moss nest — never teal/cyan (v1/v2 leak).
+  // Mustard Living House + moss nest — never teal/cyan (a leak from the old
+  // palette).
   static const Color houseLive = AppBrand.livingHouse;
   static const Color arcLive = AppBrand.secondary;
   static const Color houseIdle = AppBrand.livingHouse;

@@ -116,7 +116,7 @@ Reality и XHTTP по-прежнему не запускаются через `v
 ```powershell
 cd mobile
 flutter analyze --no-fatal-infos                     # без новых замечаний
-flutter test --dart-define=AUTH_ANONYMOUS=false      # dial_set, share_link_parser, engine_share_config
+flutter test                                         # dial_set, share_link_parser, engine_share_config
 
 cd ..\mobile\android\hysteria-bind
 go test ./...                                        # AAR проверяется отдельно, см. §5

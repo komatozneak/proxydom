@@ -9,7 +9,7 @@ what is specific to the Flutter app and the engine that ships inside it.
 ```bash
 flutter pub get
 flutter analyze --no-fatal-infos
-flutter test --dart-define=AUTH_ANONYMOUS=false
+flutter test
 flutter test test/<name>_test.dart
 
 bash android/hysteria-bind/build-aar.sh       # hysteria-client.aar (NDK, LIEF)

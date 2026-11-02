@@ -362,15 +362,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
       (
         title: l.settingsSupport,
         rows: [
-          if (AppConfig.authAnonymous)
-            _SettingsRow(
-              icon: AppIcons.siteCustom,
-              title: l.settingsSupport,
-              subtitle: AppConfig.supportEmail,
-              onTap: () {
-                SupportContact.open();
-              },
-            ),
+          _SettingsRow(
+            icon: AppIcons.siteCustom,
+            title: l.settingsSupport,
+            subtitle: AppConfig.supportEmail,
+            onTap: () {
+              SupportContact.open();
+            },
+          ),
         ],
       ),
       (

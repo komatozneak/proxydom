@@ -37,7 +37,7 @@ for Android, an XCFramework for iOS, and `proxydom-engine.exe` for Windows.
 cd mobile
 flutter pub get
 flutter analyze --no-fatal-infos
-flutter test --dart-define=AUTH_ANONYMOUS=false
+flutter test
 
 # Go engine
 cd mobile/android/hysteria-bind

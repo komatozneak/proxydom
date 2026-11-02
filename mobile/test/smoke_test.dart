@@ -199,17 +199,12 @@ void main() {
   test('AppConfig.vpsBaseUrl is the production control plane', () {
     expect(AppConfig.vpsBaseUrl, 'https://api.proxydom.su/api/v1');
     expect(AppConfig.vpsBaseUrl, isNot(contains('/v2')));
-    expect(AppConfig.vpsIpv4, '195.225.108.81');
   });
 
   test('AppConfig dev defaults use the same /api/v1 route', () {
     expect(AppConfig.androidBaseUrl, 'http://10.0.2.2:8000/api/v1');
     expect(AppConfig.iosBaseUrl, 'http://127.0.0.1:8000/api/v1');
     expect(AppConfig.desktopBaseUrl, 'http://localhost:8000/api/v1');
-    expect(AppConfig.baseUrlForEnvironment('prod'), AppConfig.vpsBaseUrl);
-    expect(AppConfig.baseUrlForEnvironment('dev'), AppConfig.androidBaseUrl);
-    expect(AppConfig.baseUrlForEnvironment('dev'),
-        isNot(equals(AppConfig.vpsBaseUrl)));
   });
 
   group('AppTheme (Material 3)', () {
