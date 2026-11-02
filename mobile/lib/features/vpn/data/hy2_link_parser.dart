@@ -77,9 +77,9 @@ ParsedHy2Link parseHy2Link(String raw) {
 ///
 /// Values are forwarded verbatim. `hy2bind` clamps the timers and narrows the
 /// controller (`hy2bind_quic_timers.go`, `hy2bind_congestion.go`), because an
-/// out-of-range timer or an unknown controller is a fatal ConfigError in
-/// core/v2. Bandwidth figures inside `fm` are named in [Hy2QuicDecl.declared]
-/// and are not copied onto the profile.
+/// out-of-range timer or an unknown controller is a fatal ConfigError in the
+/// v2ray-core config API. Bandwidth figures inside `fm` are named in
+/// [Hy2QuicDecl.declared] and are not copied onto the profile.
 ///
 /// Nested `quicParams` wins over a flat query key. `keepAlivePeriode22` is the
 /// provider's typo, and it is the key their fleet ships.

@@ -44,8 +44,8 @@ xhttpExtra`, `publicKey/shortId/spiderX` (Reality), `hy2Obfs*`, `portHopping*`,
 | Формат | Было | Стало |
 |---|---|---|
 | `hysteria2://`, `hy2://` | да | да |
-| `vless://`, `vmess://`, `trojan://`, `ss://` | разбирались и лежали «в парке» | разбираются и **запускаются** на Android/Windows |
-| `socks5://`, `socks://` | не опознавались (строка исчезала) | разбираются и **запускаются** на Android/Windows |
+| `vless://`, `vmess://`, `trojan://`, `ss://` | разбирались и лежали «в парке» | разбираются и **запускаются** на Android/Windows/iOS |
+| `socks5://`, `socks://` | не опознавались (строка исчезала) | разбираются и **запускаются** на Android/Windows/iOS |
 | `wireguard://`, `wg://`, `amneziawg://`, `awg://`, `vpn://` | не опознавались (строка исчезала) | опознаются и **считаются**: строка получает нейтральный бейдж и причину, документ не теряет ключи |
 | `http://user:pass@host` | — | сознательно **не** ключ: этот же вид у адреса подписки, до запроса их не различить (см. §3) |
 | Deep links из другого приложения | только `proxydom://add/…` | `hysteria2`, `hy2`, `vless`, `vmess`, `trojan`, `ss`, `socks5` — `intent-filter` в манифесте Android |
@@ -58,23 +58,27 @@ xhttpExtra`, `publicKey/shortId/spiderX` (Reality), `hy2Obfs*`, `portHopping*`,
 
 ### 2.2 Методы подключения
 
-Движок один на оба настольных и мобильных пути: `v2fly/v2ray-core` v5.54.2
-(MIT) внутри `hy2bind`. Hysteria2 — отдельный диалер того же `hy2bind`.
+Движок один на все три пути: `v2fly/v2ray-core` v5.54.2 (MIT) внутри
+`hy2bind`. Hysteria2 — отдельный диалер того же `hy2bind`. Reality — отдельный
+permissive-движок на uTLS.
 
 | Протокол | Android | Windows | iOS |
 |---|---|---|---|
-| Hysteria2 (+obfs, port hop) | да | да | да |
-| VLESS (tcp/ws/kcp × tls/none, uTLS) | да | да | нет |
-| VLESS поверх gRPC и HTTPUpgrade | да | да | нет |
-| VMess (tcp/ws/kcp × tls/none) | да | да | нет |
-| Trojan | да | да | нет |
-| Shadowsocks (AEAD) | да | да | нет |
-| SOCKS5 (с авторизацией и без) | да | да | нет |
-| Reality, XHTTP, QUIC | нет | нет | нет |
+| Hysteria2 (+obfs=salamander) | да | да | да |
+| Hysteria2 port hopping | нет | да | нет |
+| VLESS (tcp/ws/kcp × tls/none, uTLS) | да | да | да |
+| VLESS поверх gRPC и HTTPUpgrade | да | да | да |
+| VMess (tcp/ws/kcp × tls/none) | да | да | да |
+| Trojan | да | да | да |
+| Shadowsocks (AEAD) | да | да | да |
+| SOCKS5 (с авторизацией и без) | да | да | да |
+| Reality (VLESS, TCP + UDP) | да | да | да |
+| XHTTP, QUIC | нет | нет | нет |
 
-Reality и XHTTP по-прежнему не запускаются через `v2ray-core`: он их не
-описывает, и `buildShareSocksConfig` возвращает `null` — строка остаётся
-неактивной с нейтральным бейджем, а не падает на старте.
+Reality несёт отдельный permissive-движок `share_reality.go` (uTLS + VLESS, без
+`xray-core`): TCP и UDP. XHTTP и QUIC не запускаются: их не описывает ни
+`v2ray-core`, ни REALITY-движок, поэтому строка остаётся неактивной с
+нейтральным бейджем, а не падает на старте.
 
 ### 2.3 Где правки
 
@@ -100,10 +104,13 @@ Reality и XHTTP по-прежнему не запускаются через `v
 2. **`wireguard://`, `amneziawg://`, `vpn://` не запускаются.** В `hy2bind` нет
    userspace-WireGuard (это `wireguard-go` + netstack, отдельная работа и
    отдельный вес бинарника), `vpn://` — контейнер, а не диалер.
-3. **Reality и XHTTP не запускаются.** Их умеет `XTLS/Xray-core`; его
-   `LICENSE` — MPL-2.0, то есть лицензионно он допустим (клиент собирается из
-   MIT/BSD/ISC/Apache-2.0/MPL-2.0). Движок сейчас другой — `v2fly/v2ray-core`,
-   и переход на `xray-core` это архитектурная работа, а не правка парсера.
+3. **XHTTP не запускается.** Его умеет `XTLS/Xray-core`; его `LICENSE` —
+   MPL-2.0, то есть лицензионно он допустим (клиент собирается из
+   MIT/BSD/ISC/Apache-2.0/MPL-2.0). Но сборочный граф `xray-core` тянет
+   GPL-3.0 и LGPL, поэтому в клиент он не входит. Reality этого не требует:
+   её клиентская половина реализована отдельно в `hy2bind/share_reality.go`
+   на uTLS, без графа Xray. XHTTP-фрейминг придётся реализовать так же
+   отдельно.
 4. **SSTP, OpenConnect, OlcRTC, «noises»** живут в Go-ядрах других клиентов; у
    нас нет ни одного из этих транспортов, поэтому в паритет они не заявлены.
 5. **Локальный HTTP/SOCKS5-прокси без туннеля** у нас отсутствует: это режим
@@ -116,7 +123,7 @@ Reality и XHTTP по-прежнему не запускаются через `v
 ```powershell
 cd mobile
 flutter analyze --no-fatal-infos                     # без новых замечаний
-flutter test --dart-define=AUTH_ANONYMOUS=false      # dial_set, share_link_parser, engine_share_config
+flutter test                                         # dial_set, share_link_parser, engine_share_config
 
 cd ..\mobile\android\hysteria-bind
 go test ./...                                        # AAR проверяется отдельно, см. §5

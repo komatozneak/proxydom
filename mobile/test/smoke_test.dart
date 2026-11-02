@@ -186,30 +186,25 @@ void main() {
       final granted = await VpnController.instance.requestPermission();
       expect(granted, true);
     });
-
   });
 
-  test('AppConfig.baseUrl defaults to prod VPS', () {
-    expect(AppConfig.baseUrl, isNotEmpty);
-    expect(AppConfig.baseUrl, contains('/v2'));
+  test('AppConfig.baseUrl defaults to the production /api/v1 backend', () {
+    expect(AppConfig.vpsApiOrigin, 'https://api.proxydom.su');
+    expect(AppConfig.vpsBaseUrl, 'https://api.proxydom.su/api/v1');
     expect(AppConfig.baseUrl, AppConfig.vpsBaseUrl);
+    expect(AppConfig.baseUrl, startsWith('https://'));
+    expect(AppConfig.baseUrl, contains('/api/v1'));
   });
 
-  test('AppConfig.vpsBaseUrl points to RF control-plane prod backend', () {
-    expect(
-      AppConfig.vpsBaseUrl,
-      'https://api.proxydom.su/v2',
-    );
-    expect(AppConfig.vpsBaseUrl, startsWith('https://'));
-    expect(AppConfig.vpsBaseUrl, contains('/v2'));
-    expect(AppConfig.vpsIpv4, '195.225.108.81');
+  test('AppConfig.vpsBaseUrl is the production control plane', () {
+    expect(AppConfig.vpsBaseUrl, 'https://api.proxydom.su/api/v1');
+    expect(AppConfig.vpsBaseUrl, isNot(contains('/v2')));
   });
 
-  test('AppConfig dev switch via APP_ENV=dev dart-define', () {
-    expect(AppConfig.baseUrlForEnvironment('prod'), AppConfig.vpsBaseUrl);
-    expect(AppConfig.baseUrlForEnvironment('dev'), AppConfig.androidBaseUrl);
-    expect(AppConfig.baseUrlForEnvironment('dev'),
-        isNot(equals(AppConfig.vpsBaseUrl)));
+  test('AppConfig dev defaults use the same /api/v1 route', () {
+    expect(AppConfig.androidBaseUrl, 'http://10.0.2.2:8000/api/v1');
+    expect(AppConfig.iosBaseUrl, 'http://127.0.0.1:8000/api/v1');
+    expect(AppConfig.desktopBaseUrl, 'http://localhost:8000/api/v1');
   });
 
   group('AppTheme (Material 3)', () {
@@ -362,9 +357,4 @@ void main() {
       expect(fValue, -1);
     });
   });
-
 }
-
-
-
-

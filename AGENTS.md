@@ -18,7 +18,7 @@ ops-документов здесь нет: они остались в закр�
 ```bash
 cd mobile && flutter pub get
 flutter analyze --no-fatal-infos
-flutter test --dart-define=AUTH_ANONYMOUS=false
+flutter test
 flutter test test/dial_set_test.dart          # один файл
 
 cd android/hysteria-bind

@@ -38,20 +38,25 @@
 
 ## Протоколы
 
-| Платформа | Hysteria2 | VLESS |
-|---|---|---|
-| Android | да | да |
-| Windows | да | да |
-| iOS | да | нет |
+| Платформа | Hysteria2 | v2fly/v2ray-core: VLESS, VMess, Trojan, Shadowsocks, SOCKS5 | Reality (VLESS) |
+|---|---|---|---|
+| Android | да | да | да |
+| Windows | да | да | да |
+| iOS | да | да | да |
 
 Hysteria2 — основной транспорт: `hy2://` и `hysteria2://`, включая
-`obfs=salamander` и port hopping. VLESS на Android и Windows работает на том же
-движке, что и Hysteria2 — `v2fly/v2ray-core` v5.54.2 (MIT) внутри `hy2bind`.
-Reality и XHTTP этот движок не описывает, такие строки остаются неактивными.
+`obfs=salamander`, на всех ОС. Port hopping движок умеет, но сейчас его несёт
+только Windows-брокер: Android и iOS не передают `server_ports`, а диапазон
+прямо в порту (`host:20000-30000`) Dart-парсер отбрасывает на всех ОС.
 
-Trojan, Shadowsocks и VMess парсер читает, но не подключает: смешанный документ
-импортируется целиком, а строки, которые платформа не умеет запустить,
-показываются с нейтральным бейджем, а не с ошибкой.
+Семейство `v2fly/v2ray-core` v5.54.2 (MIT) — VLESS, VMess, Trojan,
+Shadowsocks и SOCKS5 — работает на Android, Windows и iOS. Reality — отдельный
+permissive-движок `share_reality.go` (uTLS + VLESS, без `xray-core`): TCP и
+UDP. XHTTP и XTLS Vision не поддержаны ни одним движком; такие строки остаются
+неактивными.
+
+Смешанный документ импортируется целиком. Строки, которые платформа не умеет
+запустить, остаются в нём с нейтральным бейджем, а не с ошибкой.
 
 ## Устройство
 
@@ -60,8 +65,10 @@ Flutter UI  (mobile/lib)
       │  MethodChannel proxydom/vpn
       ▼
 hy2bind     (mobile/android/hysteria-bind)   Go
-      ├── v2fly/v2ray-core v5.54.2  — Hysteria2 и VLESS, MIT
-      └── tun2socks                 — TUN → SOCKS
+      ├── Hysteria2 dialer — hy2://, obfs, port hopping
+      ├── v2fly/v2ray-core v5.54.2 — VLESS, VMess, Trojan, Shadowsocks, SOCKS5, MIT
+      ├── share_reality.go — Reality + VLESS over uTLS
+      └── tun2socks — TUN → SOCKS
       │
       ├── Android  VpnService, архив gomobile
       ├── iOS      Packet Tunnel Provider
@@ -95,7 +102,7 @@ XCFramework для iOS и обычный `.exe` для Windows. Это сдел�
 cd mobile
 flutter pub get
 flutter analyze --no-fatal-infos
-flutter test --dart-define=AUTH_ANONYMOUS=false
+flutter test
 ```
 
 Go-движок собирается отдельно:
@@ -169,9 +176,15 @@ It holds no account, sells no access, issues no keys, and never sends your proxy
 credentials anywhere. The key you paste stays on your device. This is a tool,
 not a service.
 
-- **Protocols:** Hysteria2 on all three platforms; VLESS on Android and Windows.
-  Both run on `v2fly/v2ray-core` v5.54.2 (MIT) inside the `hy2bind` Go module.
-  Reality and XHTTP are not implemented and such lines stay inactive.
+- **Protocols:** Hysteria2 (`hy2://`, `hysteria2://`, including
+  `obfs=salamander`) on all three platforms. Port hopping is implemented in the
+  engine and currently wired on Windows only. The `v2fly/v2ray-core` v5.54.2
+  (MIT) family — VLESS, VMess, Trojan, Shadowsocks and SOCKS5 — runs on
+  Android, Windows and iOS. Reality is carried by the separate permissive
+  `share_reality.go` engine (uTLS + VLESS, no `xray-core`), TCP and UDP. XHTTP
+  and XTLS Vision are not implemented; those lines stay inactive. A mixed
+  document is imported whole, and a line this platform cannot start stays in it
+  with a neutral badge.
 - **Build:** `cd mobile && flutter pub get && flutter test`. The Go engine lives
   in `mobile/android/hysteria-bind/` and is compiled by `build-aar.sh`; the
   archive is a build product and is not committed.

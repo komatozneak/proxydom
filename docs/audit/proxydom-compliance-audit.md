@@ -168,6 +168,9 @@
 | Release APK | `aapt dump badging/resources`, zip scan | `com.proxy.dom`, minSdk 26, `ic_qs_tunnel`, нет `teremok`, нет `DebugVpnActivity`, нет `brand/sites` и `flags/lgbt` |
 | Obfuscated APK | `flutter build apk --release --obfuscate --split-debug-info=build/symbols` | 175.4 MB; symbols в `build/symbols`, в APK их нет |
 
+> Позже флаг `AUTH_ANONYMOUS` удалён из клиента; таблица выше — датированный
+> снимок и не переписывается.
+
 ## 4. Остаточные риски и ручные шаги
 
 1. **Store declarations.** Приложение использует `VpnService` и Packet Tunnel
