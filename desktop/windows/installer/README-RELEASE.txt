@@ -4,6 +4,16 @@
 Приложение бесплатное, работает локально и не отправляет ваши ключи на сервер.
 
 
+WHAT CHANGED IN 1.0.1
+---------------------
+
+- The in-app update check reads `/api/v1/app/version`. It only offers a
+  download from `proxydom.su`, `dl.proxydom.su` or the Proxy Dom Google Play
+  page; any other link is ignored.
+- Reality (VLESS) is supported and the protocol notes now match the app.
+- Version 1.0.1, build 22.
+
+
 ЧТО ИЗМЕНЕНО В ВЕРСИИ 1.5.28
 ---------------------------
 
