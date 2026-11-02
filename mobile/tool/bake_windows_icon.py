@@ -1,12 +1,12 @@
-"""Bake the Прокси Дом mark into the Windows runner icon.
+"""Bake the Прокси Дом mascot into the Windows runner icon.
 
-Source: `assets/icon/app_icon_c1_win.png` — the key-and-house icon on its
-rounded tile, printed by `tool/bake_brand_icons.dart` from the painter the app
-draws it with. Output: a multi-size `windows/runner/resources/app_icon.ico`.
+Source: `assets/icon/app_icon_mascot_win.png` — the pixel house on its rounded
+tile, printed by `tool/bake_mascot_icon.dart` from the same grid the connect
+button draws. Output: a multi-size `windows/runner/resources/app_icon.ico`.
 
 Why not a single 256px entry: Explorer, the taskbar, the Start menu and the
 Alt+Tab switcher ask for 16/24/32/48. A lone 256 entry is downscaled by the
-shell and the DOM cutout turns to mush at those sizes.
+shell and the face turns to mush at those sizes.
 
 Why the transparent corners: the source PNG is opaque edge to edge — the
 rounded square sits on a black field. Shipped as-is, Windows paints that black
@@ -25,7 +25,7 @@ import numpy as np
 from PIL import Image
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
-SRC = os.path.join(ROOT, "assets", "icon", "app_icon_c1_win.png")
+SRC = os.path.join(ROOT, "assets", "icon", "app_icon_mascot_win.png")
 OUT = os.path.join(ROOT, "windows", "runner", "resources", "app_icon.ico")
 
 # Sizes Explorer actually asks for. 256 is the last one that may be PNG;

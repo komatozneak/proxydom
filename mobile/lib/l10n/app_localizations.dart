@@ -1192,7 +1192,7 @@ abstract class AppL10n {
   /// No description provided for @freeOnboardBody.
   ///
   /// In en, this message translates to:
-  /// **'An address or a key becomes a profile. Its nodes stay in one list: Moscow (Primary), St Petersburg (Backup), Novosibirsk (Low ping).'**
+  /// **'An address or a key becomes a profile. Its nodes stay in one list.'**
   String get freeOnboardBody;
 
   /// No description provided for @freeOnboardAddTitle.
@@ -1402,7 +1402,7 @@ abstract class AppL10n {
   /// No description provided for @freeFoundEmpty.
   ///
   /// In en, this message translates to:
-  /// **'Nodes from the link will appear here — for example Moscow (Primary) or St Petersburg (Backup).'**
+  /// **'Nodes from the link will appear here'**
   String get freeFoundEmpty;
 
   /// No description provided for @freeFieldEmpty.

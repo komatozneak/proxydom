@@ -618,7 +618,7 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get freeOnboardBody =>
-      'Адрес документа или ключ становятся профилем. Узлы из него собираются в один список: Москва (Основной узел), Санкт-Петербург (Запасной), Новосибирск (Низкий пинг).';
+      'Адрес документа или ключ становятся профилем. Узлы из него собираются в один список.';
 
   @override
   String get freeOnboardAddTitle => 'Выберите сервер';
@@ -734,8 +734,7 @@ class AppL10nRu extends AppL10n {
   String get freeStepFound => 'Найдено';
 
   @override
-  String get freeFoundEmpty =>
-      'Здесь появятся узлы из ссылки — например, Москва (Основной узел) или Санкт-Петербург (Запасной).';
+  String get freeFoundEmpty => 'Здесь появятся узлы из ссылки';
 
   @override
   String get freeFieldEmpty =>

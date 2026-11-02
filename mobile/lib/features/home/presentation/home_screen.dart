@@ -16,11 +16,9 @@ import '../../../core/utils/format_utils.dart';
 import '../../../core/toasts/proxy_dom_toast.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/app_surface.dart';
-import '../../../core/widgets/house_orbit.dart';
-import '../../../core/widgets/proxydom_ground.dart';
 import '../../../core/widgets/connect_button.dart';
-import '../../../core/widgets/house_pulsar.dart';
-import '../../../core/widgets/signal_nest_hero.dart';
+import '../../../core/widgets/pixel_house_hero.dart';
+import '../../../core/widgets/proxydom_ground.dart';
 import '../../../core/widgets/terminal_type.dart';
 
 import '../../../l10n/app_localizations.dart';
@@ -74,12 +72,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   double _yardGlow = _yardResting;
 
-  /// True while the house is burning: pressed, connecting or connected. The
-  /// button is dark at rest and lights on touch — the light is the state.
-  bool _charged = false;
-
   Timer? _yardTimer;
-  Timer? _chargeTimer;
 
   /// Publishes the lit level to the night behind the screen.
   void _setYard(double value) {
@@ -88,60 +81,38 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     setState(() => _yardGlow = value);
   }
 
-  void _setCharged(bool value) {
-    if (_charged == value) return;
-    setState(() => _charged = value);
-  }
-
   /// A tap on the house wakes the yard for a beat, whatever the tunnel does.
   ///
-  /// The lamp goes out on its own, and how long that takes is the difference
+  /// The yard goes out on its own, and how long that takes is the difference
   /// between a light and a delay. Too long and the house stays lit after you
   /// let go, which reads as the button having missed; too short and the yard
-  /// snaps off, which reads as the button having broken. The charge holds for
-  /// 820ms and the ground dies at 480 - ground always goes last, because a
-  /// floor takes longer to cool than a lamp.
+  /// snaps off, which reads as the button having broken. The ground dies at
+  /// 480ms — the house itself carries the press flash on its own grid, so the
+  /// yard only has to agree with the tunnel after the finger is gone.
   void _wakeYard() {
     _yardTimer?.cancel();
-    _chargeTimer?.cancel();
     _setYard(1.0);
-    _setCharged(true);
-    _chargeTimer = Timer(const Duration(milliseconds: 820), () {
-      if (!mounted) return;
-      _setCharged(_yardFor(ref.read(vpnProvider)) > _yardResting + 0.01);
-    });
     _yardTimer = Timer(const Duration(milliseconds: 480), () {
       if (mounted) _setYard(_yardFor(ref.read(vpnProvider)));
     });
   }
 
-  /// The tunnel decides how bright the house is.
+  /// The tunnel decides how bright the yard is.
   double _yardFor(Object status) {
     if (status is VpnConnected) return 1.0;
     if (status is VpnConnecting) return 0.75;
     return _yardResting;
   }
 
-  /// Makes the lamp agree with the tunnel.
+  /// Makes the yard agree with the tunnel.
   ///
-  /// A server pick drops the tunnel without touching the house. The press
-  /// flash is the only other owner of the lamp, and it has its own timer: if
-  /// that timer is quiet, a disconnected tunnel is a dark house. Skipping the
-  /// update while the yard was already fully lit left the rings burning on a
+  /// A server pick drops the tunnel without touching the house. Skipping the
+  /// update while the yard was already fully lit left the ground burning on a
   /// screen that already said it was disconnected.
   void _applyTunnelLight(VpnStatus status) {
-    final live = status is VpnConnected || status is VpnConnecting;
-    if (live) {
-      _chargeTimer?.cancel();
-      _yardTimer?.cancel();
-      _setCharged(true);
-      _setYard(_yardFor(status));
-      return;
-    }
-    if (_chargeTimer?.isActive == true) return;
     _yardTimer?.cancel();
-    _setCharged(false);
-    _setYard(_yardResting);
+    final live = status is VpnConnected || status is VpnConnecting;
+    _setYard(live ? _yardFor(status) : _yardResting);
   }
 
   @override
@@ -160,7 +131,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   @override
   void dispose() {
     _yardTimer?.cancel();
-    _chargeTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -442,7 +412,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             final content = _DashboardBody(
               status: vpnStatus,
               maxHeight: constraints.maxHeight,
-              charged: _charged,
               serverTitle: _serverTitle == '…' && _selectionIsAuto
                   ? l.regionAutoTitle
                   : _serverTitle,
@@ -505,7 +474,6 @@ class _DashboardBody extends ConsumerStatefulWidget {
   const _DashboardBody({
     required this.status,
     required this.maxHeight,
-    required this.charged,
     required this.serverTitle,
     required this.serverSubtitle,
     this.trafficMeta,
@@ -524,8 +492,6 @@ class _DashboardBody extends ConsumerStatefulWidget {
   final VpnStatus status;
   final double maxHeight;
 
-  /// The house is burning: pressed, connecting or connected.
-  final bool charged;
   final String serverTitle;
   final String serverSubtitle;
   final String? trafficMeta;
@@ -613,20 +579,19 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
     final showVpnSettingsCta =
         status is VpnError && status.code == kVpnConflictErrorCode;
 
-    // The house is the focal point. On a phone it fills the band between the
-    // panel and the keys; in a window it keeps to the same share of the frame.
-    // It used to be a fixed 300..440 of the window height: at the opening size
-    // (826x591) that left the house wider than the column it stands in and the
-    // artwork spilled over the readout above it. A window is a small window now,
-    // so the house is sized for it.
+    // The house is the focal point and the button: it has to be the first thing
+    // the eye lands on, not a token in the middle of the screen. The pixel art
+    // only reads while the cells are big enough to see, so the square is
+    // generous and the FittedBox under it scales the whole group down on a
+    // short window instead of overflowing it.
     final nestSize = windowsDesktop
-        ? math.min(300.0, math.max(200.0, size.height * 0.46))
-        // A phone has no room to be generous: the house takes a little over half
-        // the width and lets the night show around it. At 0.98 of the width it
-        // became the wallpaper and the yard behind it stopped existing.
+        ? math.min(350.0, math.max(240.0, size.height * 0.56))
+        // A phone has no room to be shy: the house takes most of the width and
+        // lets the night show around it. Past ~0.94 the light circle leaves the
+        // screen and the yard behind it stops existing.
         : math.min(
-            size.width * 0.78,
-            math.max(210.0, widget.maxHeight * 0.34),
+            size.width * 0.94,
+            math.max(240.0, widget.maxHeight * 0.44),
           );
     // Tell the night where the house is, so the bloom belongs to it and the
     // orbit clears the roof. Published during layout: the ground repaints from
@@ -640,7 +605,6 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
 
     return _FreeClientHome(
       nestSize: nestSize,
-      charged: widget.charged,
       treeState: treeState,
       status: status,
       serverTitle: widget.serverTitle,
@@ -660,7 +624,6 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
 class _FreeClientHome extends StatelessWidget {
   const _FreeClientHome({
     required this.nestSize,
-    required this.charged,
     required this.treeState,
     required this.status,
     required this.serverTitle,
@@ -677,8 +640,6 @@ class _FreeClientHome extends StatelessWidget {
 
   final double nestSize;
 
-  /// The house is burning: pressed, connecting or connected.
-  final bool charged;
   final TreeState treeState;
   final VpnStatus status;
   final String serverTitle;
@@ -781,7 +742,6 @@ class _FreeClientHome extends StatelessWidget {
     // Nothing is scattered across the screen — the eye has one place to land,
     // and that place is the power button.
     final isConnected = status is VpnConnected;
-    final isConnecting = status is VpnConnecting;
     final statusInk = switch (status) {
       VpnConnected() => theme.brightness == Brightness.dark
           ? AppBrand.inkMossDark
@@ -805,78 +765,26 @@ class _FreeClientHome extends StatelessWidget {
     // The house keeps one action label only in the idle/error state. Connected
     // and connecting states live in the chip; a second "Отключить"/"Защищено"
     // under the house was a duplicate and made the hero top-heavy.
-    final hero = Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // The button and the dance share one box, so the lights ring the roof
-        // without pushing the layout wider than the screen.
-        SizedBox(
-          width: nestSize,
-          height: nestSize,
-          child: Stack(
-            alignment: Alignment.center,
-            clipBehavior: Clip.none,
-            children: [
-              // The house is a control, but the ring was a second, static
-              // control around it. The orbit and the lit gradient are the
-              // animation; there is no hoop.
-              // The dance belongs to the house, not to the wallpaper: it is
-              // drawn around the button and only while the button burns.
-              Positioned.fill(
-                child: HouseOrbit(
-                  burning: charged ? 1.0 : (isConnecting ? 0.45 : 0.0),
-                ),
+    //
+    // The house is not scaled by the layout. A fractional scale puts the cell
+    // edges between device pixels and the pixel art goes soft, so the square is
+    // chosen from the room the column actually has and the painting fills it at
+    // a whole number of device pixels per cell.
+    final label = houseLabel == null
+        ? null
+        : Padding(
+            padding: const EdgeInsets.only(top: 6),
+            // The label is the affordance: the house was a picture, and a
+            // picture is not a button. It sits outside the tap box so TalkBack
+            // reads one button, not a decorative image plus a label.
+            child: Text(
+              houseLabel,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.w700,
               ),
-              // The familiar pulse: it answers the finger whether or not
-              // the tunnel has moved yet.
-              if (charged || isConnecting) HousePulsar(diameter: nestSize),
-              // The artwork is painted larger than the tap box: the mark
-              // ships with a wide transparent margin, and at box size the house
-              // read as a small token lost in the middle of the screen.
-              // Scaling the painting rather than the box keeps the layout
-              // honest — nothing overflows the column, the house just draws
-              // past its own frame.
-              // Unlit, not muddy: alpha-fading the mark turned the gold to mud. The house
-              // stays crisp at rest and the difference is carried by the light
-              // itself — no bloom, no orbit, no pulse until a finger lands on
-              // it.
-              AnimatedOpacity(
-                duration: const Duration(milliseconds: 420),
-                curve: Curves.easeOut,
-                opacity: charged ? 1.0 : 0.74,
-                child: Transform.scale(
-                  // The artwork is drawn inside a frame with its own margin, so
-                  // the scale that fills a window's empty column would eat a
-                  // phone whole. A window has no empty column to fill any more —
-                  // it opens at 826x591 — so both platforms use one scale and
-                  // the house spills ~15% past its box instead of 45%.
-                  scale: 1.16,
-                  child: SignalNestHero(
-                    key: kHomeSignalNestKey,
-                    state: treeState,
-                    onTap: () => onNestTap(),
-                    size: nestSize,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 6),
-        // The label is the affordance: the house was a picture, and a picture
-        // is not a button. It sits outside the tap box so TalkBack reads one
-        // button, not a decorative image plus a label. Connecting has no label:
-        // the chip is the one status on this screen.
-        if (houseLabel != null)
-          Text(
-            houseLabel,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.w700,
             ),
-          ),
-      ],
-    );
+          );
     final actions = <Widget>[
       if (showVpnSettingsCta) ...[
         const SizedBox(height: 14),
@@ -945,11 +853,55 @@ class _FreeClientHome extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Expanded(
-              // Scales the button down on a short window instead of
-              // overflowing it: a tunnel that cannot be pressed is worse than
-              // a slightly smaller house.
+              // The house takes what the readout above and the keys below
+              // leave, up to its intended size. It used to be a FittedBox:
+              // a short window scaled the mascot down along with the label and
+              // the cells landed on half pixels.
               child: Center(
-                child: FittedBox(fit: BoxFit.scaleDown, child: hero),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final side = math.max(
+                            120.0,
+                            math.min(
+                              nestSize,
+                              math.min(
+                                constraints.maxHeight,
+                                constraints.maxWidth,
+                              ),
+                            ),
+                          );
+                          // A tall canvas only when there is no label under
+                          // the house to keep close: the fireflies get the
+                          // column's height while the tunnel is waking or up,
+                          // and the resting house keeps its label at hand.
+                          final tall = label == null;
+                          final height = tall
+                              ? math.max(
+                                  side,
+                                  math.min(constraints.maxHeight, side * 1.45),
+                                )
+                              : side;
+                          return SizedBox(
+                            width: side,
+                            height: height,
+                            child: PixelHouseHero(
+                              key: kHomeSignalNestKey,
+                              state: treeState,
+                              onTap: () => onNestTap(),
+                              size: side,
+                              height: height,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    if (label != null) label,
+                  ],
+                ),
               ),
             ),
             // The strip exists only when it has a reading: the clock and the

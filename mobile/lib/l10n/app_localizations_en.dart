@@ -616,7 +616,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get freeOnboardBody =>
-      'An address or a key becomes a profile. Its nodes stay in one list: Moscow (Primary), St Petersburg (Backup), Novosibirsk (Low ping).';
+      'An address or a key becomes a profile. Its nodes stay in one list.';
 
   @override
   String get freeOnboardAddTitle => 'Pick a server';
@@ -730,8 +730,7 @@ class AppL10nEn extends AppL10n {
   String get freeStepFound => 'Found';
 
   @override
-  String get freeFoundEmpty =>
-      'Nodes from the link will appear here — for example Moscow (Primary) or St Petersburg (Backup).';
+  String get freeFoundEmpty => 'Nodes from the link will appear here';
 
   @override
   String get freeFieldEmpty =>
