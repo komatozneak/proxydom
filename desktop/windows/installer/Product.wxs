@@ -5,12 +5,13 @@
   <Package
       Name="Прокси Дом"
       Manufacturer="Proxy Dom"
-      Description="Corporate proxy &amp; network tunnel configuration client"
       Version="$(var.ProductVersion)"
       UpgradeCode="7C2A1B4E-6D3F-4A91-9E2B-1F6C8A0D4E27"
       Scope="perMachine"
       Language="1049"
       Codepage="1251">
+    <!-- WiX 5 takes the package description here, not as a Package attribute. -->
+    <SummaryInformation Description="Corporate proxy &amp; network tunnel configuration client" />
     <!-- RemoveExistingProducts runs after the new files exist. The cached 1.0.1.14
          package still runs ProxyDomBroker.exe with reconcile from Program Files.
          That path is empty until InstallFiles of this package. -->
