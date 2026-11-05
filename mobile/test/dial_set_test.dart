@@ -107,6 +107,30 @@ void main() {
     expect(canDialLink(link), isTrue);
   });
 
+  test('Vision, gRPC and XHTTP over Reality stop at iOS', () {
+    const vision =
+        'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
+        '?security=reality&pbk=PUBLIC&flow=xtls-rprx-vision#Vision';
+    const grpc =
+        'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
+        '?security=reality&pbk=PUBLIC&type=grpc&serviceName=svc#Grpc';
+    const xhttp =
+        'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
+        '?security=reality&pbk=PUBLIC&type=xhttp&path=%2Fx#Xhttp';
+    for (final raw in [vision, grpc, xhttp]) {
+      final link = parseShareLink(raw);
+      expect(canDialLinkOn(DialTarget.android, link), isTrue, reason: raw);
+      expect(canDialLinkOn(DialTarget.windows, link), isTrue, reason: raw);
+      expect(canDialLinkOn(DialTarget.ios, link), isFalse, reason: raw);
+      expect(canDialLinkOn(DialTarget.other, link), isFalse, reason: raw);
+    }
+    // The plain TCP stream is what iOS already carried, and it stays.
+    const plain =
+        'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
+        '?security=reality&pbk=PUBLIC#Plain';
+    expect(canDialLinkOn(DialTarget.ios, parseShareLink(plain)), isTrue);
+  });
+
   test('a Reality line over WebSocket stays inactive', () {
     const raw =
         'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'

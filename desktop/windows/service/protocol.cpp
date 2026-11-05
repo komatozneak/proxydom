@@ -813,6 +813,7 @@ bool parse_share_line(const std::string& raw, ShareLine& out, std::string& error
     // gRPC carries its path as a service name; an empty one is a real server
     // shape, so it travels as written rather than being defaulted here.
     out.service_name = query_value(query, "serviceName");
+    out.service_mode = query_value(query, "mode");
     if (out.security.empty()) out.security = "tls";
     if (out.security == "reality" && out.public_key.empty()) {
       error = "reality";
@@ -954,6 +955,9 @@ std::string engine_outbound(const ShareLine& line, const std::string& server_ip)
   }
   if (!line.service_name.empty()) {
     outbound << ",\"service_name\":\"" << json_escape(line.service_name) << "\"";
+  }
+  if (!line.service_mode.empty()) {
+    outbound << ",\"service_mode\":\"" << json_escape(line.service_mode) << "\"";
   }
   // Without these a vless:// over WebSocket cannot be described at all, and
   // the row that needs them is exactly the one subscriptions hand out.

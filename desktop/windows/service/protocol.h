@@ -61,6 +61,9 @@ struct ShareLine {
   // gRPC service name. Empty means the server's empty service, which is legal
   // and common; the link's own word travels when it carries one.
   std::string service_name;
+  // gRPC/XHTTP `mode` (`gun`, `auto`). A name the engine does not carry is
+  // refused there by name, not folded into the default here.
+  std::string service_mode;
   int port = 443;
   bool insecure = false;
 };

@@ -31,6 +31,12 @@ type realityEndpoint struct {
 	fingerprint string
 	alpn        []string
 	socksListen string
+	flow        string
+	network     string
+	serviceName string
+	mode        string
+	path        string
+	host        string
 }
 
 // realityDocument is what StartShare receives for a REALITY line.
@@ -50,6 +56,10 @@ type realityDocument struct {
 	Fingerprint          string   `json:"fingerprint"`
 	Flow                 string   `json:"flow"`
 	Network              string   `json:"network"`
+	ServiceName          string   `json:"service_name"`
+	ServiceMode          string   `json:"service_mode"`
+	Path                 string   `json:"path"`
+	Host                 string   `json:"host"`
 	ALPN                 []string `json:"alpn"`
 	SocksListen          string   `json:"socks_listen"`
 	DirectDomainSuffixes []string `json:"direct_domain_suffixes"`
@@ -98,17 +108,23 @@ func parseRealityDocument(configJSON string) (realityEndpoint, error) {
 	if err != nil {
 		return realityEndpoint{}, err
 	}
-	// TCP only. WebSocket, gRPC and XHTTP need their own framing on top of the
-	// REALITY stream; refusing them here keeps a line inactive instead of
-	// failing after the TLS handshake.
+	// The transport decides how the VLESS stream reaches the node: plain TCP,
+	// Xray's gRPC stream or its XHTTP request pair. The REALITY handshake is
+	// the same for all of them.
 	network := strings.ToLower(strings.TrimSpace(doc.Network))
-	if network != "" && network != "tcp" && network != "raw" {
+	switch network {
+	case "", "tcp", "raw":
+		network = "tcp"
+	case "grpc", "xhttp", "splithttp":
+		if network == "splithttp" {
+			network = "xhttp"
+		}
+	default:
 		return realityEndpoint{}, fmt.Errorf("reality: transport %q is not carried yet", network)
 	}
-	// XTLS Vision is another framing layer above VLESS, and a Vision user is
-	// refused by the server without it. Plain VLESS only.
-	if flow := strings.TrimSpace(doc.Flow); flow != "" && !strings.EqualFold(flow, "none") {
-		return realityEndpoint{}, errors.New("reality: xtls-rprx-vision is not carried yet")
+	flow := strings.TrimSpace(doc.Flow)
+	if strings.EqualFold(flow, "none") {
+		flow = ""
 	}
 	sni := strings.TrimSpace(doc.SNI)
 	if sni == "" {
@@ -128,6 +144,12 @@ func parseRealityDocument(configJSON string) (realityEndpoint, error) {
 		fingerprint: strings.TrimSpace(doc.Fingerprint),
 		alpn:        doc.ALPN,
 		socksListen: socksListen,
+		flow:        flow,
+		network:     network,
+		serviceName: strings.TrimSpace(doc.ServiceName),
+		mode:        strings.TrimSpace(doc.ServiceMode),
+		path:        strings.TrimSpace(doc.Path),
+		host:        strings.TrimSpace(doc.Host),
 	}, nil
 }
 
@@ -325,8 +347,20 @@ func handleRealityConnect(ctx context.Context, conn net.Conn, cfg realityEndpoin
 		return
 	}
 	errc := make(chan struct{}, 2)
-	go func() { _, _ = io.Copy(remote, conn); errc <- struct{}{} }()
-	go func() { _, _ = io.Copy(conn, remote); errc <- struct{}{} }()
+	go func() {
+		_, err := io.Copy(remote, conn)
+		if err != nil {
+			log.Printf("hy2bind reality upload %s: %v", target, err)
+		}
+		errc <- struct{}{}
+	}()
+	go func() {
+		_, err := io.Copy(conn, remote)
+		if err != nil {
+			log.Printf("hy2bind reality download %s: %v", target, err)
+		}
+		errc <- struct{}{}
+	}()
 	<-errc
 }
 
@@ -342,10 +376,45 @@ var realityOutboundDial = engineOutboundDial
 // request byte deadlocks a server that waits for the first payload. The
 // returned conn strips it on the first Read instead.
 func dialRealityStream(ctx context.Context, cfg realityEndpoint, target string, command byte) (net.Conn, error) {
-	request, err := vlessRequest(cfg.uuid, target, command)
+	// Vision is a TCP-only flow: Xray's inbound answers a UDP request that
+	// carries `xtls-rprx-vision` with "flow doesn't support UDP". UDP on a
+	// Vision account is a plain VLESS UDP stream, so the flow is dropped here
+	// rather than handed to the framing layer.
+	cfg.flow = vlessFlowFor(command, cfg.flow)
+	switch cfg.network {
+	case "", "tcp":
+		return dialRealityTCP(ctx, cfg, target, command)
+	case "grpc":
+		return dialRealityGRPC(ctx, cfg, target, command)
+	case "xhttp":
+		return dialRealityXHTTP(ctx, cfg, target, command)
+	default:
+		return nil, fmt.Errorf("reality: transport %q is not carried yet", cfg.network)
+	}
+}
+
+func dialRealityTCP(ctx context.Context, cfg realityEndpoint, target string, command byte) (net.Conn, error) {
+	request, err := vlessRequestWithFlow(cfg.uuid, target, command, cfg.flow)
 	if err != nil {
 		return nil, err
 	}
+	conn, err := openRealityTLS(ctx, cfg)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := conn.Write(request); err != nil {
+		_ = conn.Close()
+		return nil, err
+	}
+	if isVisionFlow(cfg.flow) {
+		return newRealityVisionConn(conn, cfg.uuid), nil
+	}
+	return &vlessConn{Conn: conn}, nil
+}
+
+// openRealityTLS reaches the node and completes the REALITY handshake. Every
+// transport starts here; only what is written into the TLS stream differs.
+func openRealityTLS(ctx context.Context, cfg realityEndpoint) (net.Conn, error) {
 	raw, err := realityOutboundDial(ctx, "tcp", net.JoinHostPort(cfg.server, strconv.Itoa(cfg.port)))
 	if err != nil {
 		return nil, err
@@ -355,11 +424,24 @@ func dialRealityStream(ctx context.Context, cfg realityEndpoint, target string, 
 		_ = raw.Close()
 		return nil, err
 	}
-	if _, err := conn.Write(request); err != nil {
-		_ = conn.Close()
-		return nil, err
+	return conn, nil
+}
+
+// isVisionFlow reports whether the line asked for XTLS Vision. The spelling is
+// Xray's; anything else is treated as plain VLESS, which is what a server with
+// an empty flow carries.
+func isVisionFlow(flow string) bool {
+	return strings.EqualFold(strings.TrimSpace(flow), "xtls-rprx-vision")
+}
+
+// vlessFlowFor keeps the Vision flow on TCP only. Xray's inbound rejects UDP
+// with a flow (`flow doesn't support UDP`) while the same flow is what makes a
+// TCP line work at all.
+func vlessFlowFor(command byte, flow string) string {
+	if command != vlessCommandTCP {
+		return ""
 	}
-	return &vlessConn{Conn: conn}, nil
+	return flow
 }
 
 // vlessConn hides the VLESS response header from the layer above. The header
@@ -387,6 +469,13 @@ const (
 )
 
 func vlessRequest(id [16]byte, address string, command byte) ([]byte, error) {
+	return vlessRequestWithFlow(id, address, command, "")
+}
+
+// vlessRequestWithFlow adds the VLESS `flow` addon. Xray's server refuses a
+// Vision inbound when the request carries no flow, and then the data layer
+// must speak the same Vision framing the server does.
+func vlessRequestWithFlow(id [16]byte, address string, command byte, flow string) ([]byte, error) {
 	host, portText, err := net.SplitHostPort(address)
 	if err != nil {
 		return nil, fmt.Errorf("vless target: %w", err)
@@ -399,14 +488,28 @@ func vlessRequest(id [16]byte, address string, command byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	request := make([]byte, 0, 1+len(id)+1+1+2+len(encoded))
+	addons := vlessAddons(flow)
+	request := make([]byte, 0, 1+len(id)+1+len(addons)+1+2+len(encoded))
 	request = append(request, 0)
 	request = append(request, id[:]...)
-	request = append(request, 0)
+	request = append(request, byte(len(addons)))
+	request = append(request, addons...)
 	request = append(request, command)
 	request = append(request, byte(port>>8), byte(port))
 	request = append(request, encoded...)
 	return request, nil
+}
+
+// vlessAddons encodes the protobuf `Addons` message Xray puts between the UUID
+// and the command. Field 1 is the flow name; an empty flow is a zero-length
+// message, which is what every plain VLESS line has always sent.
+func vlessAddons(flow string) []byte {
+	name := strings.TrimSpace(flow)
+	if name == "" || strings.EqualFold(name, "none") {
+		return nil
+	}
+	addons := []byte{0x0a, byte(len(name))}
+	return append(addons, name...)
 }
 
 func vlessAddress(host string) ([]byte, error) {

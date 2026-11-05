@@ -60,11 +60,45 @@ void main() {
     expect(buildShareSocksConfig(parseShareLink(raw)), isNull);
   });
 
-  test('reality with XTLS Vision stays inactive until Vision is carried', () {
+  test('reality with XTLS Vision is carried by the engine', () {
     const raw =
         'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
         '?security=reality&pbk=PUBLIC&flow=xtls-rprx-vision#Vision';
-    expect(buildShareSocksConfig(parseShareLink(raw)), isNull);
+    final json = buildShareSocksConfig(parseShareLink(raw));
+    expect(json, isNotNull);
+    final decoded = jsonDecode(json!) as Map<String, dynamic>;
+    expect(decoded['engine'], 'reality');
+    expect(decoded['flow'], 'xtls-rprx-vision');
+    expect(decoded['network'], 'tcp');
+  });
+
+  test('reality over gRPC names the service and the mode', () {
+    const raw =
+        'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
+        '?security=reality&pbk=PUBLIC&type=grpc&serviceName=svc&mode=gun#Grpc';
+    final json = buildShareSocksConfig(parseShareLink(raw));
+    expect(json, isNotNull);
+    final decoded = jsonDecode(json!) as Map<String, dynamic>;
+    expect(decoded['engine'], 'reality');
+    expect(decoded['network'], 'grpc');
+    expect(decoded['service_name'], 'svc');
+    expect(decoded['service_mode'], 'gun');
+  });
+
+  test('reality over XHTTP keeps the path and refuses another mode', () {
+    const raw =
+        'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
+        '?security=reality&pbk=PUBLIC&type=xhttp&path=%2Fxhttp&mode=auto#X';
+    final json = buildShareSocksConfig(parseShareLink(raw));
+    expect(json, isNotNull);
+    final decoded = jsonDecode(json!) as Map<String, dynamic>;
+    expect(decoded['network'], 'xhttp');
+    expect(decoded['path'], '/xhttp');
+
+    const streamUp =
+        'vless://11111111-1111-1111-1111-111111111111@203.0.113.10:443'
+        '?security=reality&pbk=PUBLIC&type=xhttp&path=%2Fxhttp&mode=stream-up#X';
+    expect(buildShareSocksConfig(parseShareLink(streamUp)), isNull);
   });
 
   test('vless xhttp link is refused by the parked engine', () {

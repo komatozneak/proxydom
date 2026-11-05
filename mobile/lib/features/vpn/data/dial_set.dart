@@ -15,7 +15,9 @@
 /// Trojan, Shadowsocks and SOCKS5 — on the platforms where that core runs.
 /// REALITY is a security layer over VLESS and has its own permissive engine,
 /// so [canDialLinkOn] admits a VLESS line whose REALITY handshake the engine
-/// can describe. XHTTP is still refused: neither engine carries its framing.
+/// can describe: plain TCP on every OS, XTLS Vision, gRPC and XHTTP on Android
+/// and Windows only. The v2ray-core path still refuses XHTTP, so a non-REALITY
+/// XHTTP line stays inactive.
 /// [kParkedSchemes] names the rest by protocol.
 library;
 
@@ -104,8 +106,12 @@ bool windowsDialScheme(String scheme) =>
 /// rather than fail at start: [buildShareSocksConfig] is the authority for
 /// what either share core can describe.
 bool canDialLinkOn(DialTarget target, ParsedShareLink link) {
-  return canDialSchemeOn(target, link.scheme) &&
-      (link.isHysteria2 || buildShareSocksConfig(link) != null);
+  if (!canDialSchemeOn(target, link.scheme)) return false;
+  if (link.isHysteria2) return true;
+  // Vision, gRPC and XHTTP above REALITY ship on Android and Windows. iOS
+  // keeps the plain TCP REALITY stream this build already carried.
+  if (target == DialTarget.ios && isExtendedRealityLink(link)) return false;
+  return buildShareSocksConfig(link) != null;
 }
 
 /// Whether [link] can start on the platform this build is running on.
