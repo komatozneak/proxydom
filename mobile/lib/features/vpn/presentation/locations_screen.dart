@@ -399,6 +399,8 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       supportUrl: catalog.supportUrl,
     );
     final planeUrl = (manifest?.supportUrl ?? notice.planeUrl?.trim()) ?? '';
+    final planeIsTelegram = subscriptionPlaneIsTelegram(planeUrl);
+    final siteUrl = _profileSiteUrl(catalog.webPageUrl, planeUrl);
     final noticeBody = manifest?.description ?? notice.text?.trim() ?? '';
     final legacyTraffic = parseSubscriptionTraffic(catalog.trafficMeta);
     final sourceHost = Uri.tryParse(catalog.url ?? '')?.host ?? '';
@@ -454,11 +456,12 @@ class _LocationsScreenState extends ConsumerState<LocationsScreen> {
       ],
       selectedNodeTitle: selectedLabel,
       telegramLabel: manifest?.supportLabel ??
-          (subscriptionPlaneIsTelegram(planeUrl)
-              ? l.freeTelegram
-              : l.settingsSupport),
+          (planeIsTelegram ? l.freeTelegram : l.settingsSupport),
+      telegramIcon: planeIsTelegram ? AppIcons.paperPlane : AppIcons.link,
       onTelegram:
           planeUrl.isEmpty ? null : () => openSubscriptionPlane(planeUrl),
+      siteLabel: planeIsTelegram ? l.settingsSupport : l.profileSite,
+      onSite: siteUrl == null ? null : () => openSubscriptionPlane(siteUrl),
       onRefresh: catalog.url == null || catalog.url!.isEmpty
           ? null
           : () => _refreshCatalog(catalog),
@@ -894,4 +897,15 @@ class _ServerCount extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The provider page from `profile-web-page-url`, when it is a distinct https
+/// address. The support link keeps its own button.
+String? _profileSiteUrl(String? raw, String supportUrl) {
+  final url = raw?.trim() ?? '';
+  if (url.isEmpty) return null;
+  final uri = Uri.tryParse(url);
+  if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) return null;
+  if (url == supportUrl.trim()) return null;
+  return url;
 }

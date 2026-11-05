@@ -4,7 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/app_locale.dart';
 import '../data/locale_prefs.dart';
 
-/// App-wide locale preference (persisted). Default: [AppLocale.current] (ru).
+/// App-wide locale preference (persisted). Without a stored choice it is
+/// [AppLocale.current], which main() resolves from the device at boot.
 final localeProvider =
     AsyncNotifierProvider<LocaleNotifier, Locale>(LocaleNotifier.new);
 

@@ -55,7 +55,10 @@ class ProfileInstrument extends StatelessWidget {
     required this.onNodeTap,
     this.selectedNodeTitle,
     this.telegramLabel,
+    this.telegramIcon,
     this.onTelegram,
+    this.onSite,
+    this.siteLabel,
     this.onRefresh,
     this.refreshing = false,
     this.onShare,
@@ -97,7 +100,10 @@ class ProfileInstrument extends StatelessWidget {
   final String? selectedNodeTitle;
 
   final String? telegramLabel;
+  final IconData? telegramIcon;
   final VoidCallback? onTelegram;
+  final VoidCallback? onSite;
+  final String? siteLabel;
   final VoidCallback? onRefresh;
   final bool refreshing;
   final VoidCallback? onShare;
@@ -457,16 +463,31 @@ class ProfileInstrument extends StatelessWidget {
                       ),
                     ),
                   ],
-                  if (onTelegram != null) ...[
+                  if (onTelegram != null || onSite != null) ...[
                     const SizedBox(height: 7),
                     Align(
                       alignment: Alignment.centerLeft,
-                      child: ToolAction(
-                        icon: AppIcons.paperPlane,
-                        label: telegramLabel ?? l.freeTelegram,
-                        onTap: onTelegram,
-                        tone: AppActionTone.link,
-                        dense: true,
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        children: [
+                          if (onTelegram != null)
+                            ToolAction(
+                              icon: telegramIcon ?? AppIcons.paperPlane,
+                              label: telegramLabel ?? l.freeTelegram,
+                              onTap: onTelegram,
+                              tone: AppActionTone.link,
+                              dense: true,
+                            ),
+                          if (onSite != null)
+                            ToolAction(
+                              icon: AppIcons.link,
+                              label: siteLabel ?? l.profileSite,
+                              onTap: onSite,
+                              tone: AppActionTone.link,
+                              dense: true,
+                            ),
+                        ],
                       ),
                     ),
                   ],

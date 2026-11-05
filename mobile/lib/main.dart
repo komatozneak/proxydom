@@ -14,6 +14,7 @@ import 'core/diagnostics/tunnel_log_prefs.dart';
 import 'core/internet_permission.dart';
 import 'core/router.dart';
 import 'features/settings/data/browser_bridge.dart';
+import 'features/settings/data/locale_prefs.dart';
 import 'features/vpn/data/windows_tunnel.dart';
 
 void main() async {
@@ -60,6 +61,16 @@ void main() async {
   }
 
   await AppRouter.warmWelcomeFlag();
+  // Before the first frame: on a phone that is not Russian, a Russian first
+  // screen is the first thing a person sees.
+  try {
+    AppLocale.set(
+      await LocalePrefs.startup(
+        device: WidgetsBinding.instance.platformDispatcher.locales,
+        seenWelcome: AppRouter.welcomeSeenCache == true,
+      ),
+    );
+  } catch (_) {}
   registerThirdPartyNotices();
 
   AppLogBuffer.instance.debug(
