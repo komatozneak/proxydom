@@ -244,8 +244,8 @@ func TestVLESSRealityUsesTheRealityEngine(t *testing.T) {
 	}
 }
 
-// The REALITY engine currently speaks TCP. A ws/gRPC line must be refused by
-// name instead of failing after the TLS handshake.
+// WebSocket has no framing layer in the REALITY engine. A ws line must be
+// refused by name instead of failing after the TLS handshake.
 func TestVLESSRealityRefusesANonTCPTransport(t *testing.T) {
 	cfg, err := parseEngineConfig([]byte(`{"outbound":{"type":"vless","server":"203.0.113.11","server_port":443,"uuid":"11111111-2222-3333-4444-555555555555","security":"reality","public_key":"pub","network":"ws"}}`))
 	if err != nil {
@@ -256,14 +256,54 @@ func TestVLESSRealityRefusesANonTCPTransport(t *testing.T) {
 	}
 }
 
-// XTLS Vision is a second framing layer the permissive engine does not carry.
-func TestVLESSRealityRefusesVision(t *testing.T) {
+// XTLS Vision is a framing layer the permissive engine carries itself.
+func TestVLESSRealityCarriesVision(t *testing.T) {
 	cfg, err := parseEngineConfig([]byte(`{"outbound":{"type":"vless","server":"203.0.113.11","server_port":443,"uuid":"11111111-2222-3333-4444-555555555555","security":"reality","public_key":"pub","flow":"xtls-rprx-vision"}}`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := cfg.shareRefusal(); got != "security_unsupported" {
-		t.Fatalf("refusal = %q, want security_unsupported", got)
+	if got := cfg.shareRefusal(); got != "" {
+		t.Fatalf("refusal = %q, want none", got)
+	}
+	doc, err := cfg.realityStartJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(doc), `"flow":"xtls-rprx-vision"`) {
+		t.Fatalf("document lost the flow: %s", doc)
+	}
+}
+
+// gRPC and XHTTP are carried above the REALITY stream and must reach the
+// engine with their own names, not be folded into TCP.
+func TestVLESSRealityCarriesGRPCAndXHTTP(t *testing.T) {
+	grpcCfg, err := parseEngineConfig([]byte(`{"outbound":{"type":"vless","server":"203.0.113.11","server_port":443,"uuid":"11111111-2222-3333-4444-555555555555","security":"reality","public_key":"pub","network":"grpc","service_name":"svc","service_mode":"gun"}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := grpcCfg.shareRefusal(); got != "" {
+		t.Fatalf("grpc refusal = %q", got)
+	}
+	doc, err := grpcCfg.realityStartJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(doc), `"network":"grpc"`) || !strings.Contains(string(doc), `"service_name":"svc"`) {
+		t.Fatalf("grpc document = %s", doc)
+	}
+	xhttpCfg, err := parseEngineConfig([]byte(`{"outbound":{"type":"vless","server":"203.0.113.11","server_port":443,"uuid":"11111111-2222-3333-4444-555555555555","security":"reality","public_key":"pub","network":"xhttp","path":"/x","service_mode":"auto"}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := xhttpCfg.shareRefusal(); got != "" {
+		t.Fatalf("xhttp refusal = %q", got)
+	}
+	doc, err = xhttpCfg.realityStartJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(doc), `"network":"xhttp"`) || !strings.Contains(string(doc), `"path":"/x"`) {
+		t.Fatalf("xhttp document = %s", doc)
 	}
 }
 

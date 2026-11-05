@@ -79,6 +79,8 @@ type outboundConfig struct {
 	// which is what many providers serve; the link's own word travels when it
 	// has one.
 	ServiceName string `json:"service_name"`
+	// ServiceMode is the `mode` of a gRPC or XHTTP line (`gun`, `auto`).
+	ServiceMode string `json:"service_mode"`
 }
 
 // networkName is the transport the core will be asked for. Empty means the
@@ -183,16 +185,21 @@ func (c engineConfig) shareRefusal() string {
 	if c.socksOutbound() {
 		return ""
 	}
-	// The REALITY engine carries its own stream framing and currently speaks
-	// TCP only. A WebSocket or gRPC REALITY line would otherwise pass the
-	// generic table and fail after the TLS handshake. SOCKS5 has no TLS layer
-	// at all, so the word `reality` on such a line is not this branch's.
-	if c.shareScheme() == "vless" && c.Outbound.securityName() == "reality" && c.Outbound.networkName() != "tcp" {
-		return "transport_unsupported"
-	}
-	if c.shareScheme() == "vless" && c.Outbound.securityName() == "reality" &&
-		c.Outbound.Flow != "" && !strings.EqualFold(c.Outbound.Flow, "none") {
-		return "security_unsupported"
+	// The REALITY engine carries its own stream framing: plain TCP, XTLS
+	// Vision on top of it, and gRPC/XHTTP above the TLS stream. The generic
+	// table below is the v2ray core's, which has neither Reality nor XHTTP, so
+	// this branch answers for the engine that will actually dial.
+	if c.shareScheme() == "vless" && c.Outbound.securityName() == "reality" {
+		switch c.Outbound.networkName() {
+		case "tcp", "grpc", "xhttp":
+		default:
+			return "transport_unsupported"
+		}
+		flow := c.Outbound.Flow
+		if flow != "" && !strings.EqualFold(flow, "none") && !strings.EqualFold(flow, "xtls-rprx-vision") {
+			return "security_unsupported"
+		}
+		return ""
 	}
 	if !hy2bind.TransportDialable(c.Outbound.networkName()) {
 		return "transport_unsupported"
@@ -347,7 +354,8 @@ func (c engineConfig) realityStartJSON() ([]byte, error) {
 	if c.Outbound.UUID == "" || c.Outbound.PublicKey == "" {
 		return nil, fmt.Errorf("share start failed")
 	}
-	if c.Outbound.networkName() != "tcp" {
+	network := c.Outbound.networkName()
+	if network != "tcp" && network != "grpc" && network != "xhttp" {
 		return nil, fmt.Errorf("share start failed")
 	}
 	doc := map[string]any{
@@ -360,7 +368,11 @@ func (c engineConfig) realityStartJSON() ([]byte, error) {
 		"sni":          c.Outbound.SNI,
 		"fingerprint":  c.Outbound.Fingerprint,
 		"flow":         c.Outbound.Flow,
-		"network":      "tcp",
+		"network":      network,
+		"service_name": c.Outbound.ServiceName,
+		"service_mode": c.Outbound.ServiceMode,
+		"path":         c.Outbound.Path,
+		"host":         c.Outbound.Host,
 		"alpn":         c.Outbound.alpnList(),
 		"socks_listen": c.SocksListen,
 	}

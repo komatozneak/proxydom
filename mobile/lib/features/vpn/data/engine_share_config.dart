@@ -77,6 +77,20 @@ bool isRealityLink(ParsedShareLink link) {
       (q['pbk'] ?? '').trim().isNotEmpty;
 }
 
+/// Whether [link] is a REALITY line that uses one of the transports only
+/// Android and Windows carry: XTLS Vision, gRPC or XHTTP.
+///
+/// The plain TCP stream stays available on iOS; these three do not.
+bool isExtendedRealityLink(ParsedShareLink link) {
+  if (!isRealityLink(link)) return false;
+  final q = Uri.tryParse(link.raw)?.queryParameters;
+  if (q == null) return false;
+  final flow = (q['flow'] ?? '').trim().toLowerCase();
+  if (flow == 'xtls-rprx-vision') return true;
+  final network = (q['type'] ?? q['net'] ?? 'tcp').trim().toLowerCase();
+  return network == 'grpc' || network == 'xhttp' || network == 'splithttp';
+}
+
 /// JSON for the permissive REALITY + VLESS engine.
 ///
 /// The engine keeps the link's UUID, public key, short id and SNI in memory and
@@ -91,10 +105,27 @@ String? buildRealityConfig(ParsedShareLink link) {
   final publicKey = (q['pbk'] ?? '').trim();
   if (publicKey.isEmpty) return null;
   final network = (q['type'] ?? q['net'] ?? 'tcp').trim().toLowerCase();
-  // TCP only (`raw` is Xray's newer name for it). WebSocket and gRPC put
-  // another framing layer above this stream; until that layer exists the line
-  // stays inactive instead of failing after the TLS handshake.
-  if (network.isNotEmpty && network != 'tcp' && network != 'raw') return null;
+  // TCP is the bare stream; gRPC and XHTTP put their own framing above it and
+  // the engine carries both. `raw` is Xray's newer name for TCP, `splithttp`
+  // the older name for XHTTP. Everything else (ws, kcp, quic) has no layer
+  // here yet.
+  final transport = switch (network) {
+    '' || 'raw' => 'tcp',
+    'splithttp' => 'xhttp',
+    _ => network,
+  };
+  if (transport != 'tcp' && transport != 'grpc' && transport != 'xhttp') {
+    return null;
+  }
+  final mode = (q['mode'] ?? '').trim().toLowerCase();
+  // The XHTTP engine implements the packet-up uplink and stream-down downlink;
+  // the other modes are another request shape, not another name for this one.
+  if (transport == 'xhttp' &&
+      mode.isNotEmpty &&
+      mode != 'auto' &&
+      mode != 'packet-up') {
+    return null;
+  }
   final uuid = Uri.decodeComponent(uri.userInfo);
   if (uuid.isEmpty) return null;
   // A server's short ids are whole bytes, at most eight of them. Anything else
@@ -103,9 +134,13 @@ String? buildRealityConfig(ParsedShareLink link) {
   if (sid.length.isOdd || sid.length > 16 || !_hex.hasMatch(sid)) return null;
   final sni = (q['sni'] ?? q['peer'] ?? host).trim();
   final flow = (q['flow'] ?? '').trim();
-  // XTLS Vision adds a second framing layer above VLESS, and a Vision user is
-  // refused without it. The engine carries plain VLESS only.
-  if (flow.isNotEmpty && flow != 'none') return null;
+  // XTLS Vision is a framing layer above VLESS: the server refuses a Vision
+  // user that opens the stream without it, and the engine carries the framing
+  // itself. Any other flow is a dialect neither side speaks.
+  final vision = flow.toLowerCase();
+  if (vision.isNotEmpty && vision != 'none' && vision != 'xtls-rprx-vision') {
+    return null;
+  }
   // `allowInsecure` is not forwarded: the certificate check is what proves the
   // peer holds the node's key, so the engine always performs it.
   return jsonEncode({
@@ -117,7 +152,12 @@ String? buildRealityConfig(ParsedShareLink link) {
     'short_id': sid,
     'sni': sni,
     'fingerprint': (q['fp'] ?? '').trim(),
-    'network': 'tcp',
+    'flow': vision == 'xtls-rprx-vision' ? 'xtls-rprx-vision' : '',
+    'network': transport,
+    'service_name': (q['serviceName'] ?? '').trim(),
+    'service_mode': mode,
+    'path': (q['path'] ?? '').trim(),
+    'host': (q['host'] ?? '').trim(),
     // `Uri` decodes `%2F` in the query, so the list arrives as the wire
     // spelling the engine can use directly.
     'alpn': _alpnList(q['alpn']),

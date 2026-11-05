@@ -63,18 +63,46 @@ func TestParseRealityDocument(t *testing.T) {
 }
 
 func TestParseRealityDocumentRefusesUncarriedTransport(t *testing.T) {
-	_, err := parseRealityDocument(realityTestDocument(t, map[string]any{"network": "xhttp"}))
+	_, err := parseRealityDocument(realityTestDocument(t, map[string]any{"network": "ws"}))
 	if err == nil {
-		t.Fatal("xhttp must not parse as a carried REALITY transport yet")
+		t.Fatal("ws must not parse as a carried REALITY transport")
 	}
 }
 
-func TestParseRealityDocumentRefusesVision(t *testing.T) {
-	_, err := parseRealityDocument(realityTestDocument(t, map[string]any{
+func TestParseRealityDocumentCarriesVision(t *testing.T) {
+	cfg, err := parseRealityDocument(realityTestDocument(t, map[string]any{
 		"flow": "xtls-rprx-vision",
 	}))
-	if err == nil {
-		t.Fatal("xtls-rprx-vision must stay inactive until Vision is carried")
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if cfg.flow != "xtls-rprx-vision" {
+		t.Fatalf("flow = %q", cfg.flow)
+	}
+}
+
+func TestParseRealityDocumentCarriesGRPCAndXHTTP(t *testing.T) {
+	grpcCfg, err := parseRealityDocument(realityTestDocument(t, map[string]any{
+		"network":      "grpc",
+		"service_name": "svc",
+		"service_mode": "gun",
+	}))
+	if err != nil {
+		t.Fatalf("grpc parse: %v", err)
+	}
+	if grpcCfg.network != "grpc" || grpcCfg.serviceName != "svc" || grpcCfg.mode != "gun" {
+		t.Fatalf("grpc = %q %q %q", grpcCfg.network, grpcCfg.serviceName, grpcCfg.mode)
+	}
+	xhttpCfg, err := parseRealityDocument(realityTestDocument(t, map[string]any{
+		"network": "xhttp",
+		"path":    "/xhttp",
+		"host":    "edge.example",
+	}))
+	if err != nil {
+		t.Fatalf("xhttp parse: %v", err)
+	}
+	if xhttpCfg.network != "xhttp" || xhttpCfg.path != "/xhttp" || xhttpCfg.host != "edge.example" {
+		t.Fatalf("xhttp = %q %q %q", xhttpCfg.network, xhttpCfg.path, xhttpCfg.host)
 	}
 }
 
