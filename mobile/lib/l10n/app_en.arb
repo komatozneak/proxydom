@@ -364,6 +364,7 @@
   "locationsActive": "Active",
   "locationsShareKey": "Key",
   "freeTelegram": "Telegram",
+  "profileSite": "Site",
   "freeDelete": "Remove",
   "freeDeleteServerTitle": "Remove this server?",
   "freeDeleteServerBody": "The link is deleted from this device.",

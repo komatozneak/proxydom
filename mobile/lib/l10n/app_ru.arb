@@ -266,6 +266,7 @@
   "locationsActive": "Активен",
   "locationsShareKey": "Ключ",
   "freeTelegram": "Telegram",
+  "profileSite": "Сайт",
   "freeDelete": "Удалить",
   "freeDeleteServerTitle": "Удалить этот сервер?",
   "freeDeleteServerBody": "Ссылка сотрётся с этого устройства.",

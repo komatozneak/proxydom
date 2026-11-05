@@ -1339,6 +1339,12 @@ abstract class AppL10n {
   /// **'Telegram'**
   String get freeTelegram;
 
+  /// No description provided for @profileSite.
+  ///
+  /// In en, this message translates to:
+  /// **'Site'**
+  String get profileSite;
+
   /// No description provided for @freeDelete.
   ///
   /// In en, this message translates to:

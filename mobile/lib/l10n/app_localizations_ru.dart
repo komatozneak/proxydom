@@ -701,6 +701,9 @@ class AppL10nRu extends AppL10n {
   String get freeTelegram => 'Telegram';
 
   @override
+  String get profileSite => 'Сайт';
+
+  @override
   String get freeDelete => 'Удалить';
 
   @override
