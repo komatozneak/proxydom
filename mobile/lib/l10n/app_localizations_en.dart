@@ -697,6 +697,9 @@ class AppL10nEn extends AppL10n {
   String get freeTelegram => 'Telegram';
 
   @override
+  String get profileSite => 'Site';
+
+  @override
   String get freeDelete => 'Remove';
 
   @override
